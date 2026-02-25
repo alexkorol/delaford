@@ -162,7 +162,7 @@ export default {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid color.adjust(#1e1e1e, $lightness: 10%);
   border-radius: 6px;
-  font-family: 'GameFont', serif;
+  font-family: 'GameFont', sans-serif;
 
   &__skeleton {
     position: absolute;

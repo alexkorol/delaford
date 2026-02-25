@@ -73,6 +73,7 @@
         placeholder="Say something..."
         @focus="handleFocus"
         @blur="handleBlur"
+        @keydown.escape.stop="blurAndRefocusGame"
       >
       <button
         class="chatbox__submit"
@@ -252,6 +253,7 @@ export default {
     sendMessage() {
       const payload = this.said && this.said.trim();
       if (!payload) {
+        this.blurAndRefocusGame();
         return;
       }
       // Enforce the maxlength from the input element
@@ -262,9 +264,18 @@ export default {
       }
       Socket.emit('player:say', { said: sanitised, id: player.socket_id });
       this.clearInput();
+      this.blurAndRefocusGame();
     },
     clearInput() {
       this.said = '';
+    },
+    blurAndRefocusGame() {
+      if (this.$refs.input) {
+        this.$refs.input.blur();
+      }
+      if (typeof window.focusOnGame === 'function') {
+        window.focusOnGame();
+      }
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -331,9 +342,9 @@ export default {
   width: var(--chat-width);
   max-width: 100%;
 
-  @include glass-panel(rgba(16, 20, 32, 0.78));
+  @include stone-panel(rgba(42, 36, 28, 0.96));
 
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   overflow: hidden;
   transition: transform 180ms ease-out, opacity 180ms ease-out;
 
@@ -355,9 +366,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--space-xs) var(--space-sm);
+  background: linear-gradient(180deg, rgba(60, 50, 35, 0.4) 0%, rgba(30, 25, 18, 0.4) 100%);
+  border-bottom: 1px solid var(--color-frame-dark);
 }
 
 .chatbox__meta {
@@ -386,13 +397,14 @@ export default {
 }
 
 .chatbox__badge {
-  min-width: 22px;
-  padding: 2px 6px;
-  border-radius: 999px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
-  color: #020307;
-  font-size: 0.75em;
+  color: #12100e;
+  font-size: 0.7em;
   text-align: center;
+  font-weight: 700;
 }
 
 .chatbox__pin {
@@ -471,34 +483,44 @@ export default {
 .chatbox__input {
   flex: 1;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--color-frame-dark);
+  background: rgba(0, 0, 0, 0.5);
   color: var(--color-text-primary);
-  padding: 8px;
+  padding: 6px 8px;
+  font-family: 'ChatFont', 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
 
   &:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline: none;
+    border-color: var(--color-accent);
   }
 }
 
 .chatbox__submit {
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-accent);
-  color: #020307;
-  padding: 8px 12px;
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  background: linear-gradient(180deg, #5a4e3a 0%, #3a3020 100%);
+  color: var(--color-text-primary);
+  padding: 6px 12px;
+  font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
   cursor: pointer;
-  font-weight: 600;
 
   &:hover {
-    filter: brightness(1.1);
+    background: linear-gradient(180deg, #6a5e4a 0%, #4a4030 100%);
+  }
+
+  &:active {
+    border-top-color: var(--color-frame-dark);
+    border-left-color: var(--color-frame-dark);
+    border-bottom-color: var(--color-bevel-light);
+    border-right-color: var(--color-bevel-light);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-accent-strong);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }

@@ -57,33 +57,39 @@ export default {
   display: flex;
   flex-direction: column;
   width: 100%;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, rgba(18, 21, 32, 0.92), rgba(12, 14, 22, 0.88));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.45);
-  color: #f8f8f8;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #28221a 0%, #1a1610 100%);
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  box-shadow:
+    inset 1px 1px 0 rgba(200, 180, 140, 0.12),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.6);
+  color: var(--color-text-primary);
   overflow: hidden;
 }
 
 .pane-card--compressed {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
 }
 
 .pane-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   gap: var(--space-md);
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(70, 60, 42, 0.6) 0%, rgba(40, 34, 24, 0.6) 100%);
+  border-bottom: 1px solid var(--color-frame-dark);
 }
 
 .pane-card__title {
   font-family: 'GameFont', sans-serif;
-  font-size: clamp(14px, 1.4vw, 18px);
-  letter-spacing: 0.08em;
+  font-size: clamp(12px, 1.2vw, 15px);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--color-accent);
   margin: 0;
 }
 
@@ -95,31 +101,31 @@ export default {
 
 .pane-card__dismiss {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.35);
-  color: inherit;
+  border: 1px solid var(--color-frame-dark);
+  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  color: var(--color-text-secondary);
   border-radius: var(--radius-sm);
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 160ms ease-out, background 160ms ease-out;
+  font-size: 14px;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.45);
-    background: rgba(0, 0, 0, 0.55);
+    color: var(--color-danger);
+    background: linear-gradient(180deg, #4a3020 0%, #2a1610 100%);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.85);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }
 
 .pane-card__body {
-  padding: var(--space-lg);
+  padding: var(--space-md);
   overflow: auto;
   max-height: min(72vh, 640px);
 }

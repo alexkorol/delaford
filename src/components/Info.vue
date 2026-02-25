@@ -88,7 +88,7 @@ $health_fill: #558b2f;
 
 div.info {
   margin-bottom: auto;
-  font-family: "GameFont", serif;
+  font-family: "GameFont", sans-serif;
   text-align: left;
   padding: 0 0 0 5px;
   color: $info_text_color;

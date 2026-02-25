@@ -72,45 +72,37 @@ export default {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 0;
   align-items: center;
-  padding: 0 clamp(var(--space-md), 2vw, var(--space-xl));
   pointer-events: none;
 }
 
 .hud-shell__row {
   width: 100%;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: clamp(var(--space-md), 2vw, var(--space-xl));
-  padding: calc(var(--space-sm) * 1.25) var(--space-lg) calc(var(--space-sm) * 1.25 + 18px);
-  border-radius: var(--radius-lg);
-  background: rgba(18, 24, 48, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.55);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: linear-gradient(180deg, #342e24 0%, #221e18 100%);
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  border-radius: var(--radius-md);
+  box-shadow:
+    inset 1px 1px 0 rgba(200, 180, 140, 0.1),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.6);
   pointer-events: auto;
 }
 
 .hud-shell__orb {
   flex: 0 0 auto;
-  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.55));
 }
 
 .hud-shell__quickbar {
   flex: 1 1 auto;
-  transform: translateY(18px);
-  margin: 0 var(--space-md);
-}
-
-@media (width <= 1279px) {
-  .hud-shell__row {
-    gap: clamp(var(--space-sm), 2vw, var(--space-lg));
-  }
-
-  .hud-shell__quickbar {
-    transform: translateY(12px);
-  }
+  margin: 0 var(--space-xs);
 }
 
 @media (width <= 767px) {
@@ -124,8 +116,7 @@ export default {
   }
 
   .hud-shell__quickbar {
-    transform: none;
-    margin: var(--space-sm) 0 0;
+    margin: var(--space-xs) 0 0;
   }
 }
 </style>

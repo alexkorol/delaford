@@ -225,12 +225,12 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 .pane-host {
-  --pane-host-side-width: clamp(220px, 22vw, 320px);
+  --pane-host-side-width: clamp(200px, 18vw, 280px);
 
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr) minmax(0, var(--pane-host-side-width));
-  gap: clamp(var(--space-md), 2vw, var(--space-xl));
+  gap: var(--space-xs);
   width: 100%;
   height: 100%;
   align-items: stretch;
@@ -261,7 +261,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-width: var(--pane-host-side-width);
-  max-width: clamp(240px, 28vw, 360px);
+  max-width: clamp(200px, 22vw, 300px);
   pointer-events: auto;
 
   &--left {
@@ -279,15 +279,14 @@ export default {
   flex-direction: column;
   align-items: center;
   min-height: 0;
-  gap: var(--space-xl);
+  gap: var(--space-sm);
   width: 100%;
 }
 
 .pane-host__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 18, 0.65);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 8, 6, 0.78);
   display: grid;
   align-items: center;
   justify-items: center;

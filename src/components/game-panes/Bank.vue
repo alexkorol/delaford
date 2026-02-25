@@ -46,7 +46,7 @@ $default_color: #383838;
 
 .bankView {
   background-color: $color;
-  font-family: "GameFont", serif;
+  font-family: "GameFont", sans-serif;
   border: 5px solid color.adjust($color, $lightness: -10%);
 
   .header {

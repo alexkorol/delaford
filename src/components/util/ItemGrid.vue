@@ -298,7 +298,7 @@ div.grid_container {
   max-height: 320px;
   overflow-y: auto;
   box-sizing: border-box;
-  font-family: "GameFont", serif;
+  font-family: "GameFont", sans-serif;
   grid-gap: 5px;
   overflow-x: hidden;
 

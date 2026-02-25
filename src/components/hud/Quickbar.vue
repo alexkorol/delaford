@@ -54,36 +54,28 @@ export default {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-lg);
-  background: rgba(12, 16, 28, 0.82);
-  border: 1px solid var(--color-border-subtle);
-  box-shadow: var(--shadow-soft);
-  min-width: clamp(320px, 40vw, 640px);
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: transparent;
 }
 
 .quickbar__slot {
-  display: grid;
-  grid-template-columns: auto;
-  grid-template-rows: auto auto;
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-items: stretch;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(36, 42, 64, 0.95), rgba(18, 22, 34, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 140ms ease-out, box-shadow 140ms ease-out, border-color 140ms ease-out;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45);
-  }
+  background: linear-gradient(180deg, #3a3226 0%, #28221a 100%);
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(200, 180, 140, 0.25);
+  border-left-color: rgba(200, 180, 140, 0.25);
+  min-width: 56px;
 }
 
 .quickbar__slot--active {
-  border-color: rgba(255, 214, 102, 0.8);
-  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.45), 0 12px 24px rgba(0, 0, 0, 0.55);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 6px rgba(197, 160, 89, 0.4);
 }
 
 .quickbar__activate {
@@ -93,11 +85,15 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: var(--space-sm);
+  gap: 2px;
+  padding: 4px 6px;
   color: var(--color-text-primary);
   font-family: 'GameFont', sans-serif;
   cursor: pointer;
+
+  &:hover {
+    background: rgba(197, 160, 89, 0.1);
+  }
 
   &:focus-visible {
     outline: 2px solid var(--color-accent);
@@ -109,34 +105,42 @@ export default {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: clamp(28px, 3vw, 36px);
-  height: clamp(28px, 3vw, 36px);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.35);
-  font-size: clamp(12px, 2vw, 18px);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(139, 115, 85, 0.2);
+  font-size: 14px;
 }
 
 .quickbar__label {
-  font-size: var(--font-size-sm);
+  font-size: clamp(8px, 0.7vw, 10px);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
 }
 
 .quickbar__remap {
   appearance: none;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(12, 16, 28, 0.72);
-  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-frame-dark);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--color-accent);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  padding: 6px var(--space-sm);
-  font-size: var(--font-size-sm);
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 4px;
+  font-size: clamp(9px, 0.7vw, 11px);
+  font-family: 'GameFont', sans-serif;
   cursor: pointer;
 
   &:hover {
+    background: rgba(197, 160, 89, 0.15);
     color: var(--color-accent-strong);
   }
 
@@ -148,24 +152,25 @@ export default {
 
 .quickbar__hotkey {
   font-family: 'GameFont', sans-serif;
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.08em;
+  font-size: clamp(9px, 0.7vw, 11px);
 }
 
 .quickbar__remap-text {
-  font-size: 0.75em;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  display: none;
 }
 
 @media (width <= 768px) {
   .quickbar {
-    min-width: min(90vw, 520px);
-    padding: var(--space-xs) var(--space-sm);
+    gap: 2px;
+  }
+
+  .quickbar__slot {
+    min-width: 44px;
   }
 
   .quickbar__label {
-    font-size: 0.7rem;
+    font-size: 8px;
+    max-width: 44px;
   }
 }
 </style>

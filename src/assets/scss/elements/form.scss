@@ -4,23 +4,33 @@
   appearance: none;
   border-radius: var(--radius-sm);
   padding: var(--space-xs) var(--space-md);
-  border: 1px solid var(--color-border-strong);
-  background: linear-gradient(180deg, rgba(80, 110, 168, 0.85), rgba(40, 62, 112, 0.95));
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  background: linear-gradient(180deg, #5a4e3a 0%, #3a3020 100%);
   color: var(--color-text-primary);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
-  font-family: 'UIFont', serif;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: transform 140ms ease-out, box-shadow 140ms ease-out, border-color 140ms ease-out;
+  transition: background 100ms ease-out;
 
   &:hover {
-    transform: translateY(-1px);
-    border-color: rgba(255, 255, 255, 0.45);
-    box-shadow: var(--shadow-soft);
+    background: linear-gradient(180deg, #6a5e4a 0%, #4a4030 100%);
+    border-top-color: var(--color-frame-light);
+    border-left-color: var(--color-frame-light);
+  }
+
+  &:active {
+    border-top-color: var(--color-frame-dark);
+    border-left-color: var(--color-frame-dark);
+    border-bottom-color: var(--color-bevel-light);
+    border-right-color: var(--color-bevel-light);
+    background: linear-gradient(180deg, #2a2218 0%, #1a1610 100%);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-accent-strong);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }

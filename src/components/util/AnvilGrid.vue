@@ -309,7 +309,7 @@ div.grid_container {
   justify-content: space-between;
   overflow-y: auto;
   box-sizing: border-box;
-  font-family: "GameFont", serif;
+  font-family: "GameFont", sans-serif;
   overflow-x: hidden;
 
   &::-webkit-scrollbar-track {

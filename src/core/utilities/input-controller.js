@@ -171,11 +171,23 @@ class InputController {
     return null;
   }
 
+  getRepeatDelay() {
+    const base = MOVEMENT_REPEAT.repeatDelayMs;
+    // Diagonal movement covers sqrt(2) distance; slow down repeat proportionally
+    const isDiagonal = this.activeDirection && this.activeDirection.includes('-');
+    return isDiagonal ? Math.round(base * Math.SQRT2) : base;
+  }
+
   restartRepeat() {
     this.clearRepeat();
     if (!this.activeDirection) {
       return;
     }
+
+    const isDiagonal = this.activeDirection.includes('-');
+    const initialDelay = isDiagonal
+      ? Math.round(MOVEMENT_REPEAT.initialDelayMs * Math.SQRT2)
+      : MOVEMENT_REPEAT.initialDelayMs;
 
     this.repeatTimeout = setTimeout(() => {
       if (!this.activeDirection) {
@@ -192,8 +204,8 @@ class InputController {
         if (typeof this.onMove === 'function') {
           this.onMove(this.activeDirection, { repeated: true });
         }
-      }, MOVEMENT_REPEAT.repeatDelayMs);
-    }, MOVEMENT_REPEAT.initialDelayMs);
+      }, this.getRepeatDelay());
+    }, initialDelay);
   }
 
   ensureRepeat() {

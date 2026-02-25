@@ -1277,7 +1277,7 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 #app {
-  font-family: 'Roboto Slab', Helvetica, Arial, sans-serif;
+  font-family: 'GameFont', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--color-text-primary);
@@ -1285,7 +1285,7 @@ export default {
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  background: radial-gradient(circle at top, rgba(25, 32, 48, 0.92), rgba(8, 10, 18, 0.98));
+  background: var(--color-bg-primary);
   overflow: hidden;
 
   .wrapper {

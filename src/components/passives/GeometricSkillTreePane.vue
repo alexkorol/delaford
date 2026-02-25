@@ -646,7 +646,7 @@ export default {
   height: 100%;
   overflow: hidden;
   background-color: var(--bg-color);
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'GameFont', sans-serif;
   color: #e0e0e0;
   user-select: none;
 

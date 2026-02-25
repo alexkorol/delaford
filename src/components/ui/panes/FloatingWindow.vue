@@ -15,37 +15,36 @@
       <div class="floating-window__title">{{ title }}</div>
       <div class="floating-window__actions">
         <slot name="actions" />
-        <div class="floating-window__dock">
-          <button
-            v-for="dockOption in dockOptions"
-            :key="dockOption"
-            type="button"
-            class="floating-window__dock-btn"
-            :class="{ 'floating-window__dock-btn--active': dock === dockOption }"
-            :aria-label="`Dock ${dockOption}`"
-            @click.stop="applyDock(dockOption)"
-          >
-            {{ dockLabel(dockOption) }}
-          </button>
-        </div>
         <button
           v-if="allowGhostToggle"
           type="button"
-          class="floating-window__ghost"
-          :class="{ 'floating-window__ghost--active': isGhost }"
+          class="floating-window__action-btn"
+          :class="{ 'floating-window__action-btn--active': isGhost }"
+          :title="isGhost ? 'Make opaque' : 'Make transparent'"
           aria-label="Toggle transparency"
           @click.stop="toggleGhost"
         >
-          👁
+          <span aria-hidden="true">{{ isGhost ? '&#9673;' : '&#9675;' }}</span>
+        </button>
+        <button
+          type="button"
+          class="floating-window__action-btn"
+          :class="{ 'floating-window__action-btn--active': dock !== 'floating' }"
+          :title="dock !== 'floating' ? 'Undock (float)' : 'Dock to side'"
+          aria-label="Toggle dock"
+          @click.stop="toggleDock"
+        >
+          <span aria-hidden="true">{{ dock !== 'floating' ? '&#8862;' : '&#9638;' }}</span>
         </button>
         <button
           v-if="closable"
           type="button"
-          class="floating-window__close"
+          class="floating-window__action-btn floating-window__action-btn--close"
+          title="Close"
           aria-label="Close"
           @click.stop="requestClose"
         >
-          ×
+          <span aria-hidden="true">&times;</span>
         </button>
       </div>
     </header>
@@ -190,13 +189,14 @@ export default {
       if (!dragging.value) {
         return;
       }
+      const didMove = dragMoved.value;
       dragging.value = false;
       dragStartedFromDock.value = false;
       dragMoved.value = false;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDragging);
 
-      if (props.snapDocking && props.dock === 'floating' && dragMoved.value) {
+      if (props.snapDocking && props.dock === 'floating' && didMove) {
         snapToEdge();
       }
     };
@@ -372,13 +372,17 @@ export default {
 
 .floating-window {
   position: absolute;
-  background: linear-gradient(135deg, rgba(12, 14, 22, 0.95), rgba(16, 19, 30, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.55);
-  color: #f5f5f5;
+  background: linear-gradient(180deg, #3a3228 0%, #28221a 100%);
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  border-radius: var(--radius-md);
+  box-shadow:
+    inset 1px 1px 0 rgba(200, 180, 140, 0.12),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.6);
+  color: var(--color-text-primary);
   pointer-events: auto;
-  backdrop-filter: blur(6px);
   overflow: hidden;
   user-select: none;
 }
@@ -387,101 +391,80 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm);
+  background: linear-gradient(180deg, rgba(70, 60, 42, 0.6) 0%, rgba(40, 34, 24, 0.6) 100%);
+  border-bottom: 1px solid var(--color-frame-dark);
   cursor: grab;
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .floating-window__title {
   font-family: 'GameFont', sans-serif;
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
+  font-size: clamp(11px, 1vw, 13px);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--color-accent);
   user-select: none;
 }
 
 .floating-window__actions {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: 3px;
 }
 
-.floating-window__dock {
+.floating-window__action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-frame-dark);
+  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-}
-
-.floating-window__dock-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: inherit;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
-
-  &--active {
-    background: rgba(255, 215, 79, 0.18);
-    border-color: rgba(255, 215, 79, 0.5);
-  }
-
-  &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.8);
-    outline-offset: 2px;
-  }
-}
-
-.floating-window__close {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.35);
-  color: inherit;
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
+  justify-content: center;
+  padding: 0;
+  font-family: 'GameFont', sans-serif;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.4);
-    background: rgba(0, 0, 0, 0.55);
+    background: linear-gradient(180deg, #5a5040 0%, #3a3428 100%);
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+  }
+
+  &--active {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  &--close:hover {
+    color: var(--color-danger);
+    background: linear-gradient(180deg, #4a2020 0%, #2a1010 100%);
+    border-color: var(--color-danger);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }
 
 .floating-window__body {
-  padding: var(--space-md);
-  min-height: 120px;
+  padding: var(--space-sm);
+  min-height: 80px;
   max-height: 80vh;
   overflow: auto;
 }
 
-.floating-window__ghost {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.35);
-  color: inherit;
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, opacity 120ms ease;
-
-  &--active {
-    opacity: 0.65;
-    border-color: rgba(255, 215, 79, 0.45);
-  }
-
-  &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.8);
-    outline-offset: 2px;
-  }
+.floating-window--ghost {
+  opacity: 0.5;
 }
 
 .floating-window--dock-left,

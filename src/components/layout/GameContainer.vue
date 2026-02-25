@@ -20,7 +20,7 @@
           class="game-container__world-shell"
           :style="worldShellStyle"
         >
-          <div class="game-container__stage-shell">
+          <div class="game-container__stage-shell" @click.self="refocusGame">
             <GameCanvas ref="canvasRef" :game="game" />
             <div
               ref="floatingLayerRef"
@@ -347,6 +347,12 @@ export default {
       emit('right-click', event);
     };
 
+    const refocusGame = () => {
+      if (typeof window.focusOnGame === 'function') {
+        window.focusOnGame();
+      }
+    };
+
     const handleQuickSlot = (slot, index) => {
       emit('quick-slot', slot, index);
     };
@@ -421,14 +427,22 @@ export default {
     };
 
     const updateFloatingBounds = () => {
-      const rect = floatingLayerRef.value
-        ? floatingLayerRef.value.getBoundingClientRect()
-        : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      const el = floatingLayerRef.value;
+      if (!el) {
+        floatingBounds.value = {
+          left: 0,
+          top: 0,
+          width: window.innerWidth || 0,
+          height: window.innerHeight || 0,
+        };
+        return;
+      }
+      const rect = el.getBoundingClientRect();
       floatingBounds.value = {
-        left: 0,
-        top: 0,
-        width: window.innerWidth || rect.width,
-        height: window.innerHeight || rect.height,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
       };
     };
 
@@ -573,7 +587,7 @@ export default {
     watch(viewMode, persistPanels);
     watch(uiHidden, persistPanels);
 
-    expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill });
+    expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill, refocusGame });
 
     return {
       paneHostRef,
@@ -598,6 +612,7 @@ export default {
       hardResetUI,
       viewMode,
       uiHidden,
+      refocusGame,
       gameContainerClasses: computed(() => ({
         'game-container--inventory-mode': viewMode.value === 'inventory',
         'game-container--ui-hidden': uiHidden.value,
@@ -625,11 +640,11 @@ export default {
   justify-content: center;
   align-items: stretch;
   position: relative;
-  padding: clamp(0.15rem, 0.5vw, 1rem);
+  padding: 4px;
   width: 100%;
   min-height: 0;
   box-sizing: border-box;
-  background: radial-gradient(circle at top, rgba(30, 36, 58, 0.92), rgba(10, 12, 22, 0.96));
+  background: var(--color-bg-primary);
   overflow: auto;
 }
 
@@ -646,23 +661,27 @@ export default {
   width: 100%;
   min-height: 0;
   position: relative;
-  gap: clamp(var(--space-lg), 3vw, var(--space-2xl));
+  gap: var(--space-sm);
 }
 
 .game-container__world-shell {
-  --world-shell-padding: clamp(var(--space-sm), 1.5vw, var(--space-lg));
-
   position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
-  padding: var(--world-shell-padding);
-  gap: clamp(var(--space-md), 1.5vw, var(--space-lg));
+  padding: 4px;
+  gap: var(--space-xs);
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  border-radius: var(--radius-lg);
-  background: rgba(8, 10, 20, 0.65);
-  box-shadow: 0 32px 60px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-md);
+  background: #141210;
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  box-shadow:
+    inset 1px 1px 0 rgba(200, 180, 140, 0.1),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.7);
 }
 
 .game-container__world-shell::after {
@@ -670,7 +689,7 @@ export default {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(139, 115, 85, 0.15);
   pointer-events: none;
 }
 
@@ -683,10 +702,10 @@ export default {
   align-items: stretch;
   justify-content: center;
   min-height: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: visible;
-  background: rgba(4, 6, 12, 0.85);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45);
+  background: #000;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
 .game-container__stage-shell :deep(.game) {
@@ -708,11 +727,8 @@ export default {
 
 .game-container__floating-layer {
   position: absolute;
-  inset: var(--space-sm);
+  inset: 0;
   pointer-events: none;
-  display: grid;
-  grid-auto-flow: row;
-  gap: var(--space-sm);
   z-index: 8;
 }
 
@@ -722,16 +738,18 @@ export default {
 
 .game-container__floating-controls {
   position: fixed;
-  right: var(--space-md);
-  bottom: var(--space-md);
+  right: var(--space-sm);
+  bottom: var(--space-sm);
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 10px 12px;
-  border-radius: var(--radius-lg);
-  background: rgba(10, 12, 20, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #3a3228 0%, #28221a 100%);
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   z-index: 150;
   flex-wrap: wrap;
 }
@@ -739,35 +757,41 @@ export default {
 .floating-controls__btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(12, 16, 28, 0.78);
-  color: #f5f5f5;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-frame-dark);
+  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  color: var(--color-text-primary);
+  font-family: 'GameFont', sans-serif;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .floating-controls__btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, #4a3e2a 0%, #2a2218 100%);
+  border-color: var(--color-frame);
 }
 
 .floating-controls__btn--active {
-  background: rgba(255, 215, 79, 0.15);
-  border-color: rgba(255, 215, 79, 0.5);
-  color: #ffe082;
+  background: linear-gradient(180deg, #4a3a20 0%, #2a2010 100%);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.floating-controls__btn--ghost {
+  color: var(--color-text-secondary);
+  font-size: clamp(10px, 0.9vw, 12px);
 }
 
 .floating-controls__badge {
-  min-width: 20px;
-  padding: 2px 6px;
-  border-radius: 999px;
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
-  color: #020307;
+  color: #12100e;
   font-weight: 700;
-  font-size: 0.75em;
+  font-size: 0.7em;
 }
 
 .game-container--inventory-mode .game-container__floating-controls {
@@ -787,38 +811,35 @@ export default {
   position: fixed;
   right: var(--space-md);
   bottom: var(--space-md);
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(12, 16, 28, 0.85);
-  color: #f5f5f5;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-frame-dark);
+  border-top-color: var(--color-bevel-light);
+  border-left-color: var(--color-bevel-light);
+  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  color: var(--color-text-primary);
+  font-family: 'GameFont', sans-serif;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   z-index: 200;
 }
 
 .game-container__party-panel {
-  min-width: 280px;
+  min-width: 240px;
 }
 
 @media (width <= 639px) {
   .game-container__center {
-    gap: var(--space-lg);
-  }
-
-  .game-container__world-shell {
-    --world-shell-padding: var(--space-md);
-
-    max-width: 100%;
+    gap: var(--space-sm);
   }
 
   .game-container__floating-layer {
-    inset: var(--space-xs);
+    inset: 2px;
   }
 
   .floating-controls__btn {
-    padding: 8px 10px;
-    font-size: 0.9rem;
+    padding: 4px 8px;
+    font-size: clamp(10px, 0.9vw, 12px);
   }
 }
 </style>

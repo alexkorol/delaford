@@ -1,15 +1,23 @@
 :root {
-  --color-bg-primary: #0f111a;
-  --color-bg-surface: rgba(20, 24, 36, 0.92);
-  --color-bg-surface-muted: rgba(12, 15, 25, 0.9);
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: rgba(255, 255, 255, 0.76);
-  --color-accent: #4cb3ff;
-  --color-accent-strong: #8ad6ff;
-  --color-danger: #ff6b6b;
-  --color-success: #7dd97c;
+  /* Retro stone / marble palette */
+  --color-bg-primary: #1e1a14;
+  --color-bg-surface: rgba(50, 44, 34, 0.96);
+  --color-bg-surface-muted: rgba(40, 35, 26, 0.94);
+  --color-border-subtle: rgba(160, 135, 95, 0.35);
+  --color-border-strong: rgba(190, 160, 110, 0.55);
+  --color-text-primary: #f0e6d2;
+  --color-text-secondary: rgba(220, 205, 180, 0.9);
+  --color-accent: #d4ad5a;
+  --color-accent-strong: #e8c76e;
+  --color-danger: #cc3a3a;
+  --color-success: #6a9e48;
+
+  /* Beveled border colors for skeuomorphic panels */
+  --color-bevel-light: rgba(210, 190, 150, 0.5);
+  --color-bevel-dark: rgba(0, 0, 0, 0.5);
+  --color-frame: #9e8462;
+  --color-frame-light: #d4ad5a;
+  --color-frame-dark: #4a3820;
 
   --font-size-base: clamp(14px, 1.1vw, 16px);
   --font-size-sm: clamp(12px, 1vw, 14px);
@@ -22,16 +30,16 @@
   --space-xl: clamp(20px, 1.4vw, 28px);
   --space-2xl: clamp(28px, 2vw, 40px);
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 
-  --shadow-soft: 0 12px 24px rgba(0, 0, 0, 0.35);
-  --shadow-strong: 0 28px 48px rgba(0, 0, 0, 0.65);
+  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.5);
+  --shadow-strong: 0 16px 40px rgba(0, 0, 0, 0.7);
 }
 
 body {
-  font-family: 'GameFont', 'Segoe UI', sans-serif;
+  font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-base);
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
