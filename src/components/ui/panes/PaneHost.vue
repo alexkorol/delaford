@@ -192,13 +192,13 @@ export default {
       if (!this.leftPaneComponent) {
         return false;
       }
-      return this.layoutMode !== 'mobile';
+      return true;
     },
     showRightPane() {
       if (!this.rightPaneComponent) {
         return false;
       }
-      return this.layoutMode !== 'mobile';
+      return true;
     },
     showOverlay() {
       if (!this.overlayComponent) {
@@ -225,52 +225,50 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 .pane-host {
-  --pane-host-side-width: clamp(200px, 18vw, 280px);
+  --pane-host-panel-top: 8px;
+  --pane-host-panel-bottom: 104px;
+  --pane-host-panel-gutter: 8px;
+  --pane-host-side-width: var(--arpg-pane-width, clamp(420px, 28vw, 560px));
 
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr) minmax(0, var(--pane-host-side-width));
-  gap: var(--space-xs);
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100%;
   align-items: stretch;
-  transition: grid-template-columns 160ms ease-out, gap 160ms ease-out;
-
-  &--tablet {
-    grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr);
-  }
-
-  &--mobile {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  &--no-left {
-    grid-template-columns: minmax(0, 1fr) minmax(0, var(--pane-host-side-width));
-  }
-
-  &--no-right {
-    grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr);
-  }
-
-  &--no-left.pane-host--no-right {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .pane-host__side {
+  position: fixed;
+  top: var(--pane-host-panel-top);
+  bottom: var(--pane-host-panel-bottom);
+  z-index: 70;
   display: flex;
   flex-direction: column;
-  min-width: var(--pane-host-side-width);
-  max-width: clamp(200px, 22vw, 300px);
+  width: var(--pane-host-side-width);
+  min-width: min(360px, calc(100vw - 16px));
+  max-width: var(--pane-host-side-width);
   pointer-events: auto;
 
   &--left {
     align-items: stretch;
+    left: var(--pane-host-panel-gutter);
   }
 
   &--right {
     align-items: stretch;
+    right: var(--pane-host-panel-gutter);
   }
+}
+
+.pane-host__side :deep(.pane-card) {
+  height: 100%;
+}
+
+.pane-host__side :deep(.pane-card__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
 }
 
 .pane-host__center {
@@ -285,28 +283,31 @@ export default {
 
 .pane-host__overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(10, 8, 6, 0.78);
+  inset: var(--pane-host-panel-top) var(--pane-host-panel-gutter) var(--pane-host-panel-bottom);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(88, 18, 26, 0.18), transparent 32%),
+    radial-gradient(circle at 80% 10%, rgba(18, 45, 78, 0.14), transparent 30%),
+    rgba(6, 7, 8, 0.88);
   display: grid;
   align-items: center;
   justify-items: center;
-  padding: var(--space-2xl) var(--space-lg);
-  z-index: 40;
+  padding: 0;
+  z-index: 50;
 }
 
 .pane-host__overlay-card {
-  max-width: min(720px, 94vw);
+  max-width: min(820px, 94vw);
   width: 100%;
 }
 
 .pane-host__overlay--fullscreen {
-  padding: clamp(var(--space-lg), 3vw, var(--space-2xl));
+  padding: 0;
 }
 
 .pane-host__overlay-card--fullscreen {
   max-width: none;
-  width: min(96vw, 100%);
-  height: min(92vh, 100%);
+  width: 100%;
+  height: 100%;
 }
 
 .pane-host__overlay-card--fullscreen :deep(.pane-card) {
@@ -331,16 +332,22 @@ export default {
   min-height: 0;
 }
 
-.pane-host--tablet .pane-host__side {
-  min-width: clamp(260px, 48vw, 420px);
+.pane-host--tablet {
+  --pane-host-side-width: min(44vw, 520px);
 }
 
-.pane-host--mobile .pane-host__overlay {
-  padding: var(--space-lg) var(--space-md);
+.pane-host--mobile {
+  --pane-host-panel-top: 6px;
+  --pane-host-panel-bottom: 92px;
+  --pane-host-panel-gutter: 6px;
+  --pane-host-side-width: calc(100vw - 12px);
 }
 
 .pane-host--mobile .pane-host__side {
-  min-width: 100%;
+  left: var(--pane-host-panel-gutter);
+  right: var(--pane-host-panel-gutter);
+  width: auto;
+  max-width: none;
 }
 
 .pane-slide-enter-active,

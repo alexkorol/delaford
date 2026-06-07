@@ -18,9 +18,129 @@ import Smithing from '#server/core/skills/smithing.js';
 import Query from '#server/core/data/query.js';
 import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
+import {
+  INVENTORY_COLUMNS,
+  canPlaceInventoryItem,
+  positionFromSlot,
+  slotFromPosition,
+} from '#shared/inventory-footprints.js';
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
+
+const refreshInventory = (player) => {
+  if (!player || !player.socket_id) {
+    return;
+  }
+
+  Socket.emit('core:refresh:inventory', {
+    player: { socket_id: player.socket_id },
+    data: player.inventory.slots,
+  });
+};
+
+const sendInventoryError = (player, text) => {
+  if (!player || !player.socket_id) {
+    return;
+  }
+
+  Socket.emit('game:send:message', {
+    player: { socket_id: player.socket_id },
+    text,
+  });
+  refreshInventory(player);
+};
+
+const getPlayerFromPayload = (incoming) => {
+  const payload = incoming.data || {};
+  const socketId = payload.player?.socket_id || incoming.player?.socket_id;
+  const playerId = payload.id || incoming.id;
+
+  return world.players.find((player) => (
+    (playerId && player.uuid === playerId)
+    || (socketId && player.socket_id === socketId)
+  ));
+};
+
+const getInventoryItemIndex = (slots = [], reference = {}) => {
+  if (reference.uuid) {
+    const uuidIndex = slots.findIndex(item => item && item.uuid === reference.uuid);
+    if (uuidIndex !== -1) {
+      return uuidIndex;
+    }
+  }
+
+  if (Number.isInteger(reference.slot)) {
+    const slotIndex = slots.findIndex(item => (
+      item
+      && item.slot === reference.slot
+      && (!reference.id || item.id === reference.id)
+    ));
+    if (slotIndex !== -1) {
+      return slotIndex;
+    }
+  }
+
+  if (reference.id) {
+    return slots.findIndex(item => item && item.id === reference.id);
+  }
+
+  return -1;
+};
+
+const normaliseInventoryPosition = (payload = {}) => {
+  const position = payload.position || payload.target?.position;
+  if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+    return {
+      x: Math.floor(position.x),
+      y: Math.floor(position.y),
+    };
+  }
+
+  const slot = payload.slot ?? payload.target?.slot;
+  if (Number.isInteger(slot)) {
+    return positionFromSlot(slot, INVENTORY_COLUMNS);
+  }
+
+  return null;
+};
+
+const isStackable = (item = {}) => (
+  item.stackable === true
+  || (Number.isFinite(item.maxStack) && item.maxStack > 1)
+  || (Number.isFinite(item.qty) && item.qty > 1)
+);
+
+const canStackItems = (source, target) => (
+  Boolean(source)
+  && Boolean(target)
+  && source.id === target.id
+  && isStackable(source)
+  && isStackable(target)
+);
+
+const dropInventoryItem = (player, itemIndex) => {
+  if (!player || itemIndex < 0 || !player.inventory.slots[itemIndex]) {
+    return null;
+  }
+
+  const [itemInventory] = player.inventory.slots.splice(itemIndex, 1);
+  Player.broadcastMovement(player);
+
+  const dropped = ItemFactory.toWorldInstance(itemInventory, {
+    x: player.x,
+    y: player.y,
+  }, {
+    timestamp: Date.now(),
+  });
+
+  world.items.push(dropped);
+  Socket.broadcast('world:itemDropped', world.items);
+  Socket.broadcast('item:change', world.items);
+  refreshInventory(player);
+
+  return dropped;
+};
 
 export default {
   'player:walk-here': (data) => {
@@ -176,36 +296,106 @@ export default {
     });
   },
   'player:inventory-drop': (data) => {
-    const itemInventory = data.player.inventory.slots.find(
-      s => s.slot === data.data.miscData.slot,
-    );
-
-    const playerIndex = world.players.findIndex(p => p.uuid === data.id);
-    if (playerIndex === -1) {
+    const player = world.players.find(p => p.uuid === data.id) || getPlayerFromPayload(data);
+    if (!player) {
       return;
     }
-    const player = world.players[playerIndex];
-    world.players[playerIndex].inventory.slots = world.players[
-      playerIndex
-    ].inventory.slots.filter(v => v.slot !== data.data.miscData.slot);
-    Player.broadcastMovement(player);
 
-    const dropped = ItemFactory.toWorldInstance(itemInventory, {
-      x: player.x,
-      y: player.y,
-    }, {
-      timestamp: Date.now(),
-    });
+    const miscData = data.data?.miscData || data.data?.item?.miscData || {};
+    const itemReference = {
+      uuid: data.item?.uuid || data.data?.item?.uuid,
+      id: data.item?.id || data.data?.item?.id,
+      slot: miscData.slot,
+    };
+    const itemIndex = getInventoryItemIndex(player.inventory.slots, itemReference);
+    const dropped = dropInventoryItem(player, itemIndex);
 
-    world.items.push(dropped);
+    if (!dropped) {
+      sendInventoryError(player, 'That item is no longer in your inventory.');
+      return;
+    }
 
     console.log(
-      `Dropping: ${data.item.id} (${itemInventory.qty || 0}) at ${
-        world.players[playerIndex].x
-      }, ${world.players[playerIndex].y}`,
+      `Dropping: ${dropped.id} (${dropped.qty || 0}) at ${player.x}, ${player.y}`,
     );
+  },
 
-    Socket.broadcast('world:itemDropped', world.items);
+  'player:inventory:commit': (incoming) => {
+    const payload = incoming.data || {};
+    const player = getPlayerFromPayload(incoming);
+
+    if (!player || !player.inventory || !Array.isArray(player.inventory.slots)) {
+      return;
+    }
+
+    const sourceReference = payload.item || {};
+    const itemIndex = getInventoryItemIndex(player.inventory.slots, sourceReference);
+    const inventoryItem = player.inventory.slots[itemIndex];
+
+    if (!inventoryItem) {
+      sendInventoryError(player, 'That item is no longer in your inventory.');
+      return;
+    }
+
+    if (payload.action === 'world-drop') {
+      dropInventoryItem(player, itemIndex);
+      return;
+    }
+
+    if (payload.action === 'stack') {
+      const targetReference = {
+        uuid: payload.target?.stackTargetUuid,
+        id: payload.target?.stackTargetId || inventoryItem.id,
+        slot: payload.target?.stackTargetSlot,
+      };
+      const targetIndex = getInventoryItemIndex(player.inventory.slots, targetReference);
+      const targetItem = player.inventory.slots[targetIndex];
+
+      if (targetIndex === itemIndex || !canStackItems(inventoryItem, targetItem)) {
+        sendInventoryError(player, 'Those items cannot be stacked.');
+        return;
+      }
+
+      const maxStack = targetItem.maxStack || inventoryItem.maxStack || Infinity;
+      const combinedQty = (targetItem.qty || 1) + (inventoryItem.qty || 1);
+      targetItem.qty = Math.min(combinedQty, maxStack);
+
+      const remainder = Math.max(0, combinedQty - maxStack);
+      if (remainder > 0) {
+        inventoryItem.qty = remainder;
+      } else {
+        player.inventory.slots.splice(itemIndex, 1);
+      }
+
+      refreshInventory(player);
+      return;
+    }
+
+    if (payload.action === 'move') {
+      const targetPosition = normaliseInventoryPosition(payload.target || payload);
+      const requestedOrientation = payload.target?.orientation || payload.orientation || inventoryItem.orientation || 'default';
+      const orientation = requestedOrientation === 'rotated' ? 'rotated' : 'default';
+      const placement = canPlaceInventoryItem(
+        player.inventory.slots,
+        inventoryItem,
+        targetPosition,
+        {
+          ignoreUuid: inventoryItem.uuid,
+          ignoreSlot: inventoryItem.slot,
+          orientation,
+        },
+      );
+
+      if (!placement.valid) {
+        sendInventoryError(player, 'There is no room to place that item there.');
+        return;
+      }
+
+      inventoryItem.position = targetPosition;
+      inventoryItem.slot = slotFromPosition(targetPosition, INVENTORY_COLUMNS);
+      inventoryItem.orientation = orientation;
+      refreshInventory(player);
+    }
   },
 
   /**

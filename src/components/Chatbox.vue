@@ -333,7 +333,6 @@ export default {
 <style lang="scss" scoped>
 @use '@/assets/scss/abstracts/tokens' as *;
 @use '@/assets/scss/abstracts/breakpoints' as *;
-@use '@/assets/scss/abstracts/mixins' as *;
 
 .chatbox {
   position: relative;
@@ -341,10 +340,10 @@ export default {
   flex-direction: column;
   width: var(--chat-width);
   max-width: 100%;
-
-  @include stone-panel(rgba(42, 36, 28, 0.96));
-
+  background: rgba(7, 8, 10, 0.72);
+  border: 1px solid rgba(180, 145, 86, 0.22);
   border-radius: var(--radius-md);
+  color: #f0e6d2;
   overflow: hidden;
   transition: transform 180ms ease-out, opacity 180ms ease-out;
 
@@ -367,8 +366,9 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-xs) var(--space-sm);
-  background: linear-gradient(180deg, rgba(60, 50, 35, 0.4) 0%, rgba(30, 25, 18, 0.4) 100%);
-  border-bottom: 1px solid var(--color-frame-dark);
+  background:
+    linear-gradient(90deg, rgba(82, 18, 24, 0.24), rgba(10, 12, 15, 0.78));
+  border-bottom: 1px solid rgba(180, 145, 86, 0.2);
 }
 
 .chatbox__meta {
@@ -379,9 +379,10 @@ export default {
 
 .chatbox__title {
   margin: 0;
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0;
   text-transform: uppercase;
+  color: #f2d391;
 }
 
 .chatbox__countdown {
@@ -409,9 +410,9 @@ export default {
 
 .chatbox__pin {
   appearance: none;
-  border: 1px solid var(--color-border-subtle);
-  background: rgba(0, 0, 0, 0.35);
-  color: var(--color-text-primary);
+  border: 1px solid rgba(180, 145, 86, 0.32);
+  background: rgba(0, 0, 0, 0.42);
+  color: #f0e6d2;
   border-radius: var(--radius-sm);
   padding: 4px 10px;
   font-size: var(--font-size-sm);
@@ -433,6 +434,7 @@ export default {
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.18);
   overflow-y: auto;
   max-height: 320px;
   scroll-behavior: smooth;
@@ -451,8 +453,9 @@ export default {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: var(--space-xs);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-size: 12px;
+  color: #f0e6d2;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.72);
 }
 
 .chatbox__username {
@@ -470,7 +473,7 @@ export default {
 
 .chatbox__time {
   font-size: 0.7em;
-  opacity: 0.6;
+  color: rgba(231, 218, 190, 0.62);
 }
 
 .chatbox__form {
@@ -483,9 +486,9 @@ export default {
 .chatbox__input {
   flex: 1;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-frame-dark);
-  background: rgba(0, 0, 0, 0.5);
-  color: var(--color-text-primary);
+  border: 1px solid rgba(180, 145, 86, 0.32);
+  background: rgba(2, 3, 5, 0.78);
+  color: #f0e6d2;
   padding: 6px 8px;
   font-family: 'ChatFont', 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
@@ -498,18 +501,16 @@ export default {
 
 .chatbox__submit {
   border-radius: var(--radius-sm);
-  border: 2px solid var(--color-frame-dark);
-  border-top-color: var(--color-bevel-light);
-  border-left-color: var(--color-bevel-light);
-  background: linear-gradient(180deg, #5a4e3a 0%, #3a3020 100%);
-  color: var(--color-text-primary);
+  border: 1px solid rgba(180, 145, 86, 0.46);
+  background: linear-gradient(180deg, #3b3d42 0%, #18191d 100%);
+  color: #f0e6d2;
   padding: 6px 12px;
   font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
   cursor: pointer;
 
   &:hover {
-    background: linear-gradient(180deg, #6a5e4a 0%, #4a4030 100%);
+    background: linear-gradient(180deg, #444850 0%, #202228 100%);
   }
 
   &:active {

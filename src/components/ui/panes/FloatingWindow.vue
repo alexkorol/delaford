@@ -153,10 +153,10 @@ export default {
       }
 
       if (props.dock !== 'floating') {
-        const inset = 'var(--space-md)';
+        const inset = '12px';
         const dockStyles = {
-          left: { left: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
-          right: { right: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
+          left: { left: inset, top: inset, width: normaliseSize(props.width), height: normaliseSize(props.height) },
+          right: { right: inset, top: inset, width: normaliseSize(props.width), height: normaliseSize(props.height) },
           bottom: { left: inset, right: inset, bottom: inset, width: 'auto' },
           top: { left: inset, right: inset, top: inset, width: 'auto' },
         };
@@ -372,15 +372,17 @@ export default {
 
 .floating-window {
   position: absolute;
-  background: linear-gradient(180deg, #3a3228 0%, #28221a 100%);
-  border: 2px solid var(--color-frame-dark);
-  border-top-color: var(--color-bevel-light);
-  border-left-color: var(--color-bevel-light);
+  background:
+    linear-gradient(180deg, rgba(255, 244, 205, 0.05), rgba(255, 244, 205, 0) 30%),
+    linear-gradient(180deg, #191b1d 0%, #101113 100%);
+  border: 2px solid #16100a;
+  border-top-color: #806b45;
+  border-left-color: #6f5a3a;
   border-radius: var(--radius-md);
   box-shadow:
-    inset 1px 1px 0 rgba(200, 180, 140, 0.12),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.35),
-    0 6px 18px rgba(0, 0, 0, 0.6);
+    inset 0 0 0 1px rgba(215, 180, 103, 0.16),
+    inset 0 -20px 28px rgba(0, 0, 0, 0.55),
+    0 10px 26px rgba(0, 0, 0, 0.72);
   color: var(--color-text-primary);
   pointer-events: auto;
   overflow: hidden;
@@ -392,9 +394,12 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
+  min-height: 34px;
   padding: 6px var(--space-sm);
-  background: linear-gradient(180deg, rgba(70, 60, 42, 0.6) 0%, rgba(40, 34, 24, 0.6) 100%);
-  border-bottom: 1px solid var(--color-frame-dark);
+  background:
+    linear-gradient(90deg, rgba(110, 20, 28, 0.42), rgba(20, 22, 26, 0.35) 42%, rgba(26, 44, 70, 0.28)),
+    linear-gradient(180deg, #2d2b28 0%, #191816 100%);
+  border-bottom: 1px solid rgba(215, 180, 103, 0.28);
   cursor: grab;
   touch-action: none;
 
@@ -405,10 +410,11 @@ export default {
 
 .floating-window__title {
   font-family: 'GameFont', sans-serif;
-  font-size: clamp(11px, 1vw, 13px);
-  letter-spacing: 0.1em;
+  font-size: 12px;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--color-accent);
+  color: #f2d391;
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(217, 169, 74, 0.28);
   user-select: none;
 }
 
@@ -422,8 +428,8 @@ export default {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-frame-dark);
-  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  border: 1px solid #24170e;
+  background: linear-gradient(180deg, #3b3d42 0%, #18191d 100%);
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
@@ -434,7 +440,7 @@ export default {
   font-family: 'GameFont', sans-serif;
 
   &:hover {
-    background: linear-gradient(180deg, #5a5040 0%, #3a3428 100%);
+    background: linear-gradient(180deg, #444850 0%, #202228 100%);
     border-color: var(--color-border-strong);
     color: var(--color-text-primary);
   }
@@ -461,6 +467,9 @@ export default {
   min-height: 80px;
   max-height: 80vh;
   overflow: auto;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(95, 25, 30, 0.12), transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(26, 55, 92, 0.11), transparent 24%);
 }
 
 .floating-window--ghost {

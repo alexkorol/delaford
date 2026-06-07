@@ -1,6 +1,7 @@
 import { coordsFromIndex, indexFromCoords, normaliseSize } from './grid-math.js';
 import { ORIENTATION_DEFAULT } from './constants.js';
 import { isStackableItem } from './stacking.js';
+import { resolveItemSize } from '@shared/inventory-footprints.js';
 
 const deriveUuid = (item) => {
   if (item.uuid) {
@@ -41,7 +42,7 @@ const deriveSlot = (item, grid) => {
 
 export const normaliseInventoryItem = (item, grid, orientationMap = new Map()) => {
   const uuid = deriveUuid(item);
-  const baseSize = normaliseSize(item.size || item.baseSize);
+  const baseSize = normaliseSize(item.size || item.baseSize || resolveItemSize(item));
   const orientation = orientationMap.get(uuid) || item.orientation || ORIENTATION_DEFAULT;
   const position = derivePosition(item, grid);
   const slot = deriveSlot(item, grid);

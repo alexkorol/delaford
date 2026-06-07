@@ -16,6 +16,7 @@
       :default-right-pane="defaultRightPane"
       :active-overlay-descriptor="activeOverlayDescriptor"
       :world-shell-style="worldShellStyle"
+      :world-viewport="worldViewport"
       :player-vitals="playerVitals"
       :quick-slots="quickSlots"
       :quickbar-active-index="quickbarActiveIndex"
@@ -90,12 +91,29 @@ const paneRegistry = {
 };
 
 const defaultPaneAssignments = {
-  left: 'stats',
+  left: null,
   right: null,
 };
 
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
 const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
+const DESKTOP_PANE_GUTTER = 8;
+const MOBILE_PANE_GUTTER = 6;
+
+const floorOdd = (value, minimum = 1) => {
+  const numeric = Number.isFinite(value) ? value : minimum;
+  let floored = Math.floor(numeric);
+
+  if (floored < minimum) {
+    floored = minimum;
+  }
+
+  if (floored % 2 === 0 && floored > minimum) {
+    floored -= 1;
+  }
+
+  return floored;
+};
 
 const getInitialMapDimensions = (mapConfig = {}) => {
   const tileWidth = mapConfig?.tileset?.tile?.width || 0;
@@ -132,6 +150,8 @@ export default {
       screen: 'login',
       layout: {
         activePane: null,
+        leftPane: defaultPaneAssignments.left,
+        rightPane: defaultPaneAssignments.right,
         chat: {
           isPinned: false,
           isOpen: false,
@@ -141,6 +161,7 @@ export default {
       },
       quickSlots: createDefaultQuickSlots(),
       viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1440,
+      viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 900,
       viewportResizeRaf: null,
       bodyOverflowBackup: '',
       quickbarActiveIndex: null,
@@ -247,10 +268,10 @@ export default {
       return paneRegistry;
     },
     defaultLeftPane() {
-      return defaultPaneAssignments.left;
+      return this.layout.leftPane;
     },
     defaultRightPane() {
-      return defaultPaneAssignments.right;
+      return this.layout.rightPane;
     },
     activeOverlayDescriptor() {
       const id = this.layout.activePane;
@@ -265,13 +286,7 @@ export default {
     },
     isOverlayBlocking() {
       const { id } = this.activeOverlayDescriptor;
-      if (!id) {
-        return false;
-      }
-      if (this.isDesktop && [this.defaultLeftPane, this.defaultRightPane].includes(id)) {
-        return false;
-      }
-      return true;
+      return Boolean(id);
     },
     chatShellClasses() {
       return {
@@ -280,7 +295,7 @@ export default {
         'chat-shell--pinned': this.layout.chat.isPinned,
       };
     },
-    worldShellStyle() {
+    worldViewport() {
       const mapInstance = this.game && this.game.map ? this.game.map : null;
       const runtimeConfig = mapInstance && mapInstance.config
         ? mapInstance.config.map
@@ -295,21 +310,77 @@ export default {
       const scale = typeof resolvedDimensions.scale === 'number'
         ? resolvedDimensions.scale
         : (mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1);
-      const baseDisplayWidth = resolvedDimensions.displayWidth || (width * scale);
-      const viewportWidth = this.viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : baseDisplayWidth);
-      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : baseDisplayWidth;
-      const availableWidth = viewportWidth - 8;
-      const targetWidth = Math.max(baseDisplayWidth, availableWidth);
-      const targetHeight = Math.max(targetWidth * (height / width), viewportHeight - 40);
-    return {
-      '--map-aspect-ratio': `${width} / ${height}`,
-      '--world-internal-width': `${width}px`,
-      '--world-internal-height': `${height}px`,
-      '--world-display-width': `${targetWidth}px`,
+      const tileConfig = runtimeConfig?.tileset?.tile || {};
+      const tileWidth = tileConfig.width || 32;
+      const tileHeight = tileConfig.height || 32;
+      const displayTileWidth = tileWidth * scale;
+      const displayTileHeight = tileHeight * scale;
+      const viewportWidth = this.viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : width * scale);
+      const viewportHeight = this.viewportHeight || (typeof window !== 'undefined' ? window.innerHeight : height * scale);
+      const gutter = this.layoutMode === 'mobile' ? MOBILE_PANE_GUTTER : DESKTOP_PANE_GUTTER;
+      const paneWidth = this.resolvePaneWidth(viewportWidth);
+      const centerLeft = this.defaultLeftPane && this.layoutMode !== 'mobile'
+        ? paneWidth + (gutter * 2)
+        : gutter;
+      const centerRight = this.defaultRightPane && this.layoutMode !== 'mobile'
+        ? paneWidth + (gutter * 2)
+        : gutter;
+      const centerTop = this.layoutMode === 'mobile' ? MOBILE_PANE_GUTTER : DESKTOP_PANE_GUTTER;
+      const centerBottom = centerTop;
+      const centerWidth = Math.max(displayTileWidth * 5, viewportWidth - centerLeft - centerRight - 8);
+      const centerHeight = Math.max(displayTileHeight * 5, viewportHeight - centerTop - centerBottom);
+      const hudReserve = this.layoutMode === 'mobile' ? 164 : 96;
+      const shellReserve = this.layoutMode === 'mobile' ? 12 : 6;
+      const maxStageWidth = Math.max(displayTileWidth * 5, centerWidth - shellReserve);
+      const maxStageHeight = Math.max(displayTileHeight * 5, centerHeight - hudReserve - shellReserve);
+
+      const maxColumns = floorOdd(maxStageWidth / displayTileWidth, 5);
+      const maxRows = floorOdd(maxStageHeight / displayTileHeight, 5);
+      const aspectColumns = floorOdd((maxRows * 2) + 1, 5);
+      let columns = Math.min(maxColumns, aspectColumns);
+      let rows = maxRows;
+
+      if (columns < rows) {
+        rows = columns;
+      }
+
+      const nativeWidth = tileWidth * columns;
+      const nativeHeight = tileHeight * rows;
+      const displayWidth = nativeWidth * scale;
+      const displayHeight = nativeHeight * scale;
+
+      return {
+        x: columns,
+        y: rows,
+        center: {
+          x: Math.floor(columns / 2),
+          y: Math.floor(rows / 2),
+        },
+        width: nativeWidth,
+        height: nativeHeight,
+        displayWidth,
+        displayHeight,
+        scale,
+      };
+    },
+    worldViewportKey() {
+      const viewport = this.worldViewport;
+      return `${viewport.x}x${viewport.y}:${viewport.scale}`;
+    },
+    worldShellStyle() {
+      const viewport = this.worldViewport;
+      const chromeReserve = this.layoutMode === 'mobile' ? 176 : 106;
+      const targetHeight = viewport.displayHeight + chromeReserve;
+
+      return {
+        '--map-aspect-ratio': `${viewport.width} / ${viewport.height}`,
+        '--world-internal-width': `${viewport.width}px`,
+        '--world-internal-height': `${viewport.height}px`,
+        '--world-display-width': `${viewport.displayWidth}px`,
         '--world-display-height': `${targetHeight}px`,
-        '--map-display-width': `${targetWidth}px`,
-        '--map-display-height': `${targetHeight}px`,
-        '--world-display-scale': `${scale}`,
+        '--map-display-width': `${viewport.displayWidth}px`,
+        '--map-display-height': `${viewport.displayHeight}px`,
+        '--world-display-scale': `${viewport.scale}`,
       };
     },
   },
@@ -334,7 +405,6 @@ export default {
         return;
       }
       if (newMode === 'desktop') {
-        this.layout.chat.isOpen = true;
         if (!this.layout.chat.isPinned) {
           this.cancelChatAutohide();
         }
@@ -342,6 +412,9 @@ export default {
         this.layout.chat.isOpen = false;
         this.cancelChatAutohide();
       }
+    },
+    worldViewportKey() {
+      this.applyWorldViewportToMap();
     },
   },
   /**
@@ -396,17 +469,14 @@ export default {
   mounted() {
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.onViewportResize, { passive: true });
-      window.addEventListener('keydown', this.handleGlobalKeydown);
+      window.addEventListener('keydown', this.handleGlobalKeydown, { capture: true });
     }
 
-    if (this.isDesktop) {
-      this.layout.chat.isOpen = true;
-    }
   },
   beforeUnmount() {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.onViewportResize);
-      window.removeEventListener('keydown', this.handleGlobalKeydown);
+      window.removeEventListener('keydown', this.handleGlobalKeydown, { capture: true });
       if (this.viewportResizeRaf) {
         window.cancelAnimationFrame(this.viewportResizeRaf);
         this.viewportResizeRaf = null;
@@ -471,6 +541,8 @@ export default {
       this.screen = 'login';
       this.game = { exit: true };
       this.layout.activePane = null;
+      this.layout.leftPane = defaultPaneAssignments.left;
+      this.layout.rightPane = defaultPaneAssignments.right;
       this.resetChatState();
       this.handleMapDimensions();
       this.party = null;
@@ -490,6 +562,8 @@ export default {
     cancelLogin() {
       this.screen = 'main';
       this.layout.activePane = null;
+      this.layout.leftPane = defaultPaneAssignments.left;
+      this.layout.rightPane = defaultPaneAssignments.right;
       this.resetChatState();
       this.handleMapDimensions();
     },
@@ -514,7 +588,36 @@ export default {
       this.viewportResizeRaf = window.requestAnimationFrame(() => {
         this.viewportResizeRaf = null;
         this.viewportWidth = window.innerWidth;
+        this.viewportHeight = window.innerHeight;
       });
+    },
+
+    resolvePaneWidth(viewportWidth = this.viewportWidth) {
+      if (this.layoutMode === 'mobile') {
+        return Math.max(0, viewportWidth - (MOBILE_PANE_GUTTER * 2));
+      }
+
+      if (this.layoutMode === 'tablet') {
+        return Math.min(viewportWidth * 0.44, 520);
+      }
+
+      return Math.min(Math.max(viewportWidth * 0.28, 420), 560);
+    },
+
+    applyWorldViewportToMap() {
+      const mapInstance = this.game && this.game.map ? this.game.map : null;
+      if (!mapInstance || typeof mapInstance.setViewportDimensions !== 'function') {
+        return false;
+      }
+
+      const dimensions = mapInstance.setViewportDimensions(this.worldViewport);
+      if (dimensions) {
+        this.syncMapDimensionsFromPayload(dimensions);
+      } else {
+        this.syncMapDimensionsFromGame();
+      }
+
+      return true;
     },
 
     handleQuickSlot(slot, index) {
@@ -579,12 +682,51 @@ export default {
       this.openPane(pane);
     },
 
+    getPanePreferredSide(pane) {
+      if (this.layout.activePane === 'flowerOfLife') {
+        if (pane === 'inventory') {
+          return 'left';
+        }
+        if (pane === 'stats') {
+          return 'right';
+        }
+      }
+
+      const entry = paneRegistry[pane];
+      if (!entry || !entry.slot) {
+        return null;
+      }
+      return entry.slot === 'right' ? 'right' : 'left';
+    },
+
+    toggleSidePane(pane) {
+      const side = this.getPanePreferredSide(pane);
+      if (!side) {
+        return false;
+      }
+
+      if (this.layout.leftPane === pane) {
+        this.layout.leftPane = null;
+        return true;
+      }
+
+      if (this.layout.rightPane === pane) {
+        this.layout.rightPane = null;
+        return true;
+      }
+
+      const key = side === 'right' ? 'rightPane' : 'leftPane';
+      this.layout[key] = pane;
+      return true;
+    },
+
     openPane(pane) {
       bus.$emit('contextmenu:close');
-      if (this.isDesktop && ['stats', 'inventory'].includes(pane)) {
-        this.layout.activePane = null;
+
+      if (this.toggleSidePane(pane)) {
         return;
       }
+
       if (this.layout.activePane === pane) {
         this.closePane();
         return;
@@ -596,7 +738,22 @@ export default {
       });
     },
 
-    closePane() {
+    closePane(pane = null) {
+      if (pane && this.layout.leftPane === pane) {
+        this.layout.leftPane = null;
+        return;
+      }
+
+      if (pane && this.layout.rightPane === pane) {
+        this.layout.rightPane = null;
+        return;
+      }
+
+      if (pane && this.layout.activePane === pane) {
+        this.layout.activePane = null;
+        return;
+      }
+
       this.layout.activePane = null;
     },
 
@@ -816,11 +973,37 @@ export default {
           return;
         }
 
+        if (this.layout.rightPane) {
+          event.stopPropagation();
+          this.layout.rightPane = null;
+          return;
+        }
+
+        if (this.layout.leftPane) {
+          event.stopPropagation();
+          this.layout.leftPane = null;
+          return;
+        }
+
         if (this.chatExpanded && !this.layout.chat.isPinned) {
           event.stopPropagation();
           this.closeChat();
         }
         return;
+      }
+
+      if (!this.shouldIgnoreHotkeys(event)) {
+        const key = String(event.key || '').toLowerCase();
+        const paneHotkeys = {
+          c: 'stats',
+          i: 'inventory',
+          p: 'flowerOfLife',
+        };
+        if (paneHotkeys[key]) {
+          this.openPane(paneHotkeys[key]);
+          event.preventDefault();
+          return;
+        }
       }
 
       if (/^[1-8]$/.test(event.key)) {
@@ -1106,6 +1289,7 @@ export default {
       }
 
       await this.game.loadScene(scene, playerState);
+      this.applyWorldViewportToMap();
 
       if (partySnapshot) {
         this.party = partySnapshot;
@@ -1175,7 +1359,9 @@ export default {
 
       await this.game.buildMap();
       this.game.monsters = this.game.map.monsters;
-      this.syncMapDimensionsFromGame();
+      if (!this.applyWorldViewportToMap()) {
+        this.syncMapDimensionsFromGame();
+      }
 
       // Start game engine
       const engine = new Engine(this.game);
@@ -1190,9 +1376,6 @@ export default {
       bus.$emit('login:done');
       this.screen = 'game';
       this.resetChatState();
-      if (this.isDesktop) {
-        this.layout.chat.isOpen = true;
-      }
     },
     /**
      * A click-handler event that does nothing, really.
@@ -1256,7 +1439,7 @@ export default {
 
       const mapConfig = mapInstance.config.map;
       const tile = mapConfig?.tileset?.tile || { width: 32, height: 32 };
-      const viewport = mapConfig?.viewport || { x: 16, y: 10 };
+      const viewport = mapConfig?.viewport || { x: 24, y: 15 };
       const width = (tile.width || 0) * (viewport.x || 0);
       const height = (tile.height || 0) * (viewport.y || 0);
       const scale = typeof mapInstance.scale === 'number' && mapInstance.scale > 0 ? mapInstance.scale : 1;

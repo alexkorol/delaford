@@ -2,7 +2,7 @@
   <div class="container-stack">
     <header>
       <h3>Containers</h3>
-      <p v-if="!containers.length">Drag a bag or cube here to open its storage.</p>
+      <p v-if="!containers.length">Empty</p>
     </header>
 
     <ul v-if="containers.length" class="container-stack__list">
@@ -61,12 +61,15 @@ export default {
 
 <style lang="scss" scoped>
 .container-stack {
-  margin-top: 16px;
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.25);
+  min-height: 54px;
+  padding: 9px 12px;
+  background:
+    linear-gradient(180deg, rgba(34, 36, 40, 0.86), rgba(10, 11, 13, 0.88)),
+    rgba(0, 0, 0, 0.25);
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(180, 145, 86, 0.28);
   color: rgba(255, 255, 255, 0.86);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.62);
 }
 
 .container-stack header {
@@ -75,15 +78,16 @@ export default {
 
 .container-stack h3 {
   margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.03em;
+  font-size: 12px;
+  letter-spacing: 0;
   text-transform: uppercase;
+  color: #f2d391;
 }
 
 .container-stack p {
   margin: 4px 0 0 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(231, 218, 190, 0.58);
 }
 
 .container-stack__list {
@@ -101,7 +105,7 @@ export default {
   padding: 8px 10px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.35);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border: 1px dashed rgba(180, 145, 86, 0.24);
 }
 
 .container-stack__meta {
@@ -118,7 +122,7 @@ export default {
 .container-stack__status {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   color: rgba(255, 255, 255, 0.45);
 }
 </style>

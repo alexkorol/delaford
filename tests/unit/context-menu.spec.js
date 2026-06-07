@@ -26,6 +26,7 @@ vi.mock('#server/core/data/query.js', () => ({
 }));
 
 import ContextMenu, { actionCatalog } from '#server/core/context-menu.js';
+import Config from '#server/config.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_ACTIONS = [
@@ -92,7 +93,7 @@ afterEach(() => {
 });
 
 describe('ContextMenu strategies', () => {
-  const tile = { x: 7, y: 5 };
+  const tile = { x: Config.map.player.x, y: Config.map.player.y };
 
   it('includes the walk-here option when clicking on the game map', async () => {
     const miscData = { clickedOn: { 0: 'gameMap' } };

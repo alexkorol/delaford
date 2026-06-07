@@ -16,8 +16,9 @@
       <div
         v-for="item in items"
         :key="item.uuid"
-        :class="['inventory-item', { 'inventory-item--dragging': isItemDragging(item.uuid) }]"
+        :class="itemClasses(item)"
         :style="itemStyle(item)"
+        :title="itemTooltip(item)"
         @pointerdown.prevent="beginPointerDrag($event, item)"
       >
         <div
@@ -211,6 +212,30 @@ export default {
 
     const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
 
+    const itemRarity = (item) => {
+      if (item?.rarity) {
+        return String(item.rarity).toLowerCase();
+      }
+
+      if (item?.affixes && (item.affixes.brand || item.affixes.bond)) {
+        return 'magic';
+      }
+
+      return 'normal';
+    };
+
+    const itemClasses = (item) => ([
+      'inventory-item',
+      `inventory-item--rarity-${itemRarity(item)}`,
+      { 'inventory-item--dragging': isItemDragging(item.uuid) },
+    ]);
+
+    const itemTooltip = (item) => {
+      const { width, height } = getItemDimensions(item, item.orientation);
+      const name = item.displayName || item.name || item.id || 'Item';
+      return `${name} (${width} x ${height})`;
+    };
+
     const ghostPlacement = computed(() => {
       if (!dragState.value.ghostPosition) {
         return null;
@@ -263,6 +288,8 @@ export default {
       beginPointerDrag,
       itemStyle,
       itemSpriteStyle,
+      itemClasses,
+      itemTooltip,
       isItemDragging,
       ghostPlacement,
       ghostClasses,
@@ -278,19 +305,30 @@ export default {
   display: grid;
   gap: var(--cell-gap);
   padding: var(--cell-gap);
-  background: rgba(0, 0, 0, 0.4);
+  width: max-content;
+  background:
+    linear-gradient(180deg, rgba(23, 25, 29, 0.92), rgba(9, 10, 12, 0.96)),
+    rgba(0, 0, 0, 0.76);
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.65);
+  border: 2px solid #17100b;
+  border-top-color: rgba(167, 132, 74, 0.55);
+  border-left-color: rgba(126, 104, 69, 0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(204, 171, 101, 0.12),
+    inset 0 0 24px rgba(0, 0, 0, 0.82),
+    0 10px 24px rgba(0, 0, 0, 0.42);
   user-select: none;
 }
 
 .inventory-grid__cell {
   width: var(--cell-size);
   height: var(--cell-size);
-  background: rgba(0, 0, 0, 0.1);
-  border: 1px dashed rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
+    rgba(4, 5, 7, 0.72);
+  border: 1px solid rgba(117, 101, 78, 0.22);
   box-sizing: border-box;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.72);
 }
 
 .inventory-item {
@@ -301,11 +339,46 @@ export default {
   width: 100%;
   height: 100%;
   cursor: grab;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(156, 137, 100, 0.52);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.07), transparent 42%),
+    linear-gradient(180deg, rgba(37, 40, 44, 0.94), rgba(13, 14, 16, 0.94));
   border-radius: 4px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.48),
+    0 3px 8px rgba(0, 0, 0, 0.45);
   transition: transform 0.12s ease;
+}
+
+.inventory-item::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 235, 180, 0.08);
+  pointer-events: none;
+}
+
+.inventory-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(236, 202, 122, 0.86);
+}
+
+.inventory-item--rarity-magic {
+  border-color: rgba(105, 155, 233, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(122, 175, 255, 0.12),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.48),
+    0 0 12px rgba(62, 115, 202, 0.2);
+}
+
+.inventory-item--rarity-rare {
+  border-color: rgba(238, 202, 94, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 224, 121, 0.16),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.48),
+    0 0 14px rgba(220, 163, 54, 0.24);
 }
 
 .inventory-item--dragging {
@@ -315,11 +388,14 @@ export default {
 
 .inventory-item__sprite {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 50%;
+  left: 50%;
+  width: var(--cell-size);
+  height: var(--cell-size);
+  transform: translate(-50%, -50%);
   background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.85));
+  image-rendering: pixelated;
 }
 
 .inventory-item__quantity {
@@ -335,13 +411,15 @@ export default {
 
 .inventory-grid__ghost {
   pointer-events: none;
-  border: 2px dashed rgba(255, 255, 255, 0.35);
-  background: rgba(0, 255, 153, 0.08);
+  border: 2px solid rgba(106, 210, 150, 0.72);
+  background: rgba(72, 180, 120, 0.16);
+  box-shadow: inset 0 0 14px rgba(72, 180, 120, 0.22);
 }
 
 .inventory-grid__ghost--invalid {
-  border-color: rgba(255, 82, 82, 0.65);
-  background: rgba(255, 82, 82, 0.12);
+  border-color: rgba(220, 70, 75, 0.82);
+  background: rgba(180, 40, 48, 0.18);
+  box-shadow: inset 0 0 14px rgba(180, 40, 48, 0.26);
 }
 
 .inventory-item-enter-active,

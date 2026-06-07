@@ -27,5 +27,13 @@ describe('UI utilities', () => {
     it('returns false for unknown locations', () => {
       expect(UI.getOpenSlot([], 'unknown')).toBe(false);
     });
+
+    it('uses item footprint placement when an inventory item is provided', () => {
+      const inventory = [
+        { id: 'iron-halberd', slot: 0, type: 'weapon', twoHanded: true },
+      ];
+
+      expect(UI.getOpenSlot(inventory, 'inventory', { id: 'coins', stackable: true })).toBe(2);
+    });
   });
 });

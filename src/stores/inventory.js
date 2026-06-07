@@ -7,6 +7,7 @@ import { rotateOrientation, canRotateItem } from '@/core/inventory/footprint.js'
 import { buildOccupancyMap, canPlaceItem, clampFootprintWithinGrid, getItemAtCell } from '@/core/inventory/collision.js';
 import { canStackWith, applyStacking } from '@/core/inventory/stacking.js';
 import { indexFromCoords } from '@/core/inventory/grid-math.js';
+import { packInventoryItems } from '@shared/inventory-footprints.js';
 
 const cloneItems = (items) => items.map((item) => ({ ...item, position: { ...item.position } }));
 
@@ -30,7 +31,8 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
   const setInventoryItems = (rawItems = []) => {
     const snapshot = new Map(orientationMap);
     orientationMap.clear();
-    state.items = cloneItems(rawItems.map((item) => {
+    const packedItems = packInventoryItems(rawItems, grid);
+    state.items = cloneItems(packedItems.map((item) => {
       const mapped = normaliseInventoryItem(item, grid, snapshot);
       orientationMap.set(mapped.uuid, mapped.orientation);
       return mapped;

@@ -1,4 +1,5 @@
 import config from '../config.js';
+import { findOpenInventorySlot } from './inventory-footprints.js';
 
 const { map } = config;
 
@@ -135,7 +136,7 @@ class UI {
    * @param {array} inventory Your current inventory
    * @returns {integer}
    */
-  static getOpenSlot(inventory = [], location = 'inventory') {
+  static getOpenSlot(inventory = [], location = 'inventory', item = null) {
     const slots = Array.isArray(inventory) ? inventory : [];
     const slotsAvailable = {
       inventory: 84,
@@ -145,6 +146,10 @@ class UI {
     const maxSlots = slotsAvailable[location];
     if (typeof maxSlots !== 'number') {
       return false;
+    }
+
+    if (location === 'inventory' && item) {
+      return findOpenInventorySlot(slots, item);
     }
 
     const occupied = new Set(

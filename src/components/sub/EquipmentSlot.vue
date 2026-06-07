@@ -176,23 +176,31 @@ export default {
   background-size: contain;
   border-radius: 4px;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(180, 145, 86, 0.32);
+  background-color: rgba(5, 6, 8, 0.72);
+  box-shadow:
+    inset 0 0 7px rgba(0, 0, 0, 0.78),
+    inset 0 1px 0 rgba(255, 242, 202, 0.05);
 
   &.wearSlot {
-    background: rgba(0, 0, 0, 0.4);
+    background-color: rgba(7, 8, 10, 0.8);
+    border-color: rgba(231, 199, 124, 0.62);
   }
 
   .wearSlot {
     width: 40px;
     height: 40px;
     background-repeat: no-repeat;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.8));
   }
 }
 
 .slot--drop-target {
-  border-color: rgba(0, 200, 255, 0.65);
-  box-shadow: 0 0 10px rgba(0, 200, 255, 0.35);
+  border-color: rgba(105, 170, 235, 0.82);
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.78),
+    0 0 12px rgba(75, 135, 210, 0.4);
 }
 
 .slot.head {

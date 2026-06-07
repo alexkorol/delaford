@@ -250,6 +250,11 @@ class Delaford {
       const item = {
         name: i.name,
         id: i.id,
+        type: i.type,
+        slot: i.slot,
+        size: i.size,
+        stackable: i.stackable,
+        twoHanded: i.twoHanded,
         graphics: i.graphics,
       };
 

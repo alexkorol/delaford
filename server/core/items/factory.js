@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import Query from '#server/core/data/query.js';
 import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine.js';
+import { resolveItemSize } from '#shared/inventory-footprints.js';
 
 const composeAffixedName = (baseName, brand, bond) => {
   const prefix = brand ? `${brand.name} ` : '';
@@ -95,6 +96,7 @@ const createFromBase = (baseItem, options = {}) => {
   }
 
   instance.displayName = instance.name;
+  instance.size = resolveItemSize(instance);
 
   if (typeof quantity !== 'undefined') {
     instance.qty = quantity;
@@ -141,6 +143,7 @@ const adoptExisting = (existingItem, options = {}) => {
 
   clone.name = clone.name || clone.displayName || clone.baseName || existingItem.name;
   clone.displayName = clone.displayName || clone.name;
+  clone.size = resolveItemSize(baseItem || clone);
 
   if (!clone.affixes && eligibleForAffixes(bindingReference)) {
     clone.affixes = { brand: null, bond: null };

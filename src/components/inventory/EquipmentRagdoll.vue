@@ -148,37 +148,41 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
 .equipment-ragdoll {
-  --eq-slot-size: clamp(40px, 6vw, 48px);
+  --eq-slot-size: 40px;
 
   position: relative;
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto;
   justify-items: center;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid color.adjust(#1e1e1e, $lightness: 10%);
+  padding: 10px 12px 12px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(82, 18, 24, 0.2), transparent 48%),
+    linear-gradient(180deg, rgba(26, 29, 33, 0.94), rgba(8, 9, 11, 0.92));
+  border: 1px solid rgba(180, 145, 86, 0.34);
   border-radius: 6px;
   font-family: 'GameFont', sans-serif;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 190, 0.04),
+    inset 0 0 24px rgba(0, 0, 0, 0.72);
 
   &__skeleton {
     position: absolute;
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    width: 160px;
+    width: 146px;
     height: 200px;
-    stroke: rgba(255, 255, 255, 0.15);
+    stroke: rgba(194, 165, 105, 0.22);
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.75));
   }
 
   &__slots {
     position: relative;
     display: grid;
     grid-auto-rows: minmax(40px, auto);
-    gap: 8px;
+    gap: 7px;
     padding-top: 6px;
     z-index: 1;
   }
@@ -188,16 +192,18 @@ export default {
   display: grid;
   grid-auto-flow: column;
   justify-content: center;
-  gap: 10px;
+  gap: 7px;
 }
 
 .slot {
   width: var(--eq-slot-size);
   height: var(--eq-slot-size);
-  background-color: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(180, 145, 86, 0.28);
   border-radius: 4px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.82),
+    0 1px 0 rgba(255, 235, 190, 0.05);
 }
 
 .slot.arrows {

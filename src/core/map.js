@@ -29,6 +29,7 @@ class Map {
     this.config = config;
     this.defaultViewport = { ...INITIAL_VIEWPORT };
     this.defaultCenter = { ...INITIAL_CENTER };
+    this.viewportOverride = null;
     this.minViewport = { x: 5, y: 4 };
 
     this.droppedItems = [];
@@ -134,6 +135,24 @@ class Map {
       x: Math.round(position.x - (tileCrop.x * tileSize) - this.camera.offsetX),
       y: Math.round(position.y - (tileCrop.y * tileSize) - this.camera.offsetY),
     };
+  }
+
+  isWithinViewport(entity, metrics = null, padding = 1) {
+    if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) {
+      return false;
+    }
+
+    const viewportMetrics = metrics || this.getViewportMetrics();
+    const { viewport, tileCrop } = viewportMetrics;
+    const minX = tileCrop.x - padding;
+    const maxX = tileCrop.x + viewport.x + padding;
+    const minY = tileCrop.y - padding;
+    const maxY = tileCrop.y + viewport.y + padding;
+
+    return entity.x >= minX
+      && entity.x <= maxX
+      && entity.y >= minY
+      && entity.y <= maxY;
   }
 
   update(deltaSeconds) {
@@ -500,6 +519,43 @@ class Map {
     this.handleResize();
   }
 
+  getActiveViewport() {
+    return this.viewportOverride || this.defaultViewport;
+  }
+
+  getCanvasDimensions(viewport = this.getActiveViewport()) {
+    const { tileset } = this.config.map;
+    const tileWidth = tileset.tile.width;
+    const tileHeight = tileset.tile.height;
+    const scale = this.scale || 1;
+    const nativeWidth = tileWidth * viewport.x;
+    const nativeHeight = tileHeight * viewport.y;
+
+    return {
+      width: nativeWidth,
+      height: nativeHeight,
+      displayWidth: nativeWidth * scale,
+      displayHeight: nativeHeight * scale,
+      scale,
+    };
+  }
+
+  setViewportDimensions(viewport = {}) {
+    const nextX = Number.isFinite(viewport.x) && viewport.x > 0
+      ? Math.floor(viewport.x)
+      : this.defaultViewport.x;
+    const nextY = Number.isFinite(viewport.y) && viewport.y > 0
+      ? Math.floor(viewport.y)
+      : this.defaultViewport.y;
+
+    this.viewportOverride = {
+      x: nextX,
+      y: nextY,
+    };
+
+    return this.configureCanvas();
+  }
+
   /**
    * Configure the canvas paramters correctly
    */
@@ -514,8 +570,9 @@ class Map {
     const tileWidth = tileset.tile.width;
     const tileHeight = tileset.tile.height;
 
-    const viewportX = this.defaultViewport.x;
-    const viewportY = this.defaultViewport.y;
+    const activeViewport = this.getActiveViewport();
+    const viewportX = activeViewport.x;
+    const viewportY = activeViewport.y;
 
     viewportConfig.x = viewportX;
     viewportConfig.y = viewportY;
@@ -534,10 +591,10 @@ class Map {
 
     this.canvas.width = displayWidth;
     this.canvas.height = displayHeight;
-    this.canvas.style.width = `${displayWidth}px`;
-    this.canvas.style.height = `${displayHeight}px`;
-    this.canvas.style.maxWidth = `${displayWidth}px`;
-    this.canvas.style.maxHeight = `${displayHeight}px`;
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = '100%';
+    this.canvas.style.maxWidth = '100%';
+    this.canvas.style.maxHeight = '100%';
 
     if (container) {
       container.style.setProperty('--map-native-width', `${nativeWidth}px`);
@@ -549,6 +606,10 @@ class Map {
 
     this.context.imageSmoothingEnabled = false;
     this.bufferContext.imageSmoothingEnabled = false;
+
+    const dimensions = this.getCanvasDimensions({ x: viewportX, y: viewportY });
+    bus.$emit('game:map:dimensions', dimensions);
+    return dimensions;
   }
 
   handleResize() {
@@ -582,6 +643,7 @@ class Map {
         container.style.removeProperty('--map-aspect-ratio');
       }
     }
+    this.viewportOverride = null;
     this.config.map.viewport.x = this.defaultViewport.x;
     this.config.map.viewport.y = this.defaultViewport.y;
     this.config.map.player.x = this.defaultCenter.x;
@@ -681,17 +743,9 @@ class Map {
       return;
     }
 
-    // Filter out NPCs in viewport
-    const nearbyItems = this.droppedItems.filter((item) => {
-      const foundItems = (this.player.x <= (8 + item.x))
-        && (this.player.x >= (item.x - 8))
-        && (this.player.y <= (6 + item.y))
-        && (this.player.y >= (item.y - 6));
-      return foundItems;
-    });
-
     const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
+    const nearbyItems = this.droppedItems.filter((item) => this.isWithinViewport(item, metrics));
 
     // Get relative X,Y coordinates to paint on viewport
     nearbyItems.forEach((item) => {
@@ -782,18 +836,9 @@ class Map {
       return;
     }
 
-    // Filter out nearby players
-    const nearbyPlayers = this.players.filter((player) => {
-      const foundPlayers = (this.player.x <= (8 + player.x))
-        && (this.player.x >= (player.x - 8))
-        && (this.player.y <= (6 + player.y))
-        && (this.player.y >= (player.y - 6));
-
-      return foundPlayers;
-    });
-
     const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
+    const nearbyPlayers = this.players.filter((player) => this.isWithinViewport(player, metrics));
 
     nearbyPlayers.forEach((player) => {
       const centerPosition = player.movement
@@ -835,17 +880,13 @@ class Map {
       return;
     }
 
-    const nearbyMonsters = this.monsters.filter((monster) => {
-      const withinX = this.player.x <= (8 + monster.x) && this.player.x >= (monster.x - 8);
-      const withinY = this.player.y <= (6 + monster.y) && this.player.y >= (monster.y - 6);
-      return withinX && withinY;
-    });
+    const metrics = this.getViewportMetrics();
+    const nearbyMonsters = this.monsters.filter((monster) => this.isWithinViewport(monster, metrics));
 
     if (!nearbyMonsters.length) {
       return;
     }
 
-    const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
     const spriteSheet = this.images.monstersImage || this.images.npcsImage;
 
@@ -890,18 +931,9 @@ class Map {
       return;
     }
 
-    // Filter out NPCs in viewport
-    const nearbyNPCs = this.npcs.filter((npc) => {
-      const foundNPCs = (this.player.x <= (8 + npc.x))
-        && (this.player.x >= (npc.x - 8))
-        && (this.player.y <= (6 + npc.y))
-        && (this.player.y >= (npc.y - 6));
-
-      return foundNPCs;
-    });
-
     const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
+    const nearbyNPCs = this.npcs.filter((npc) => this.isWithinViewport(npc, metrics));
 
     nearbyNPCs.forEach((npc) => {
       const centerPosition = npc.movement

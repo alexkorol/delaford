@@ -15,7 +15,7 @@
           @click="$emit('dismiss')"
         >
           <span class="sr-only">Close</span>
-          ×
+          &times;
         </button>
       </div>
     </header>
@@ -54,20 +54,44 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 .pane-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   border-radius: var(--radius-md);
-  background: linear-gradient(180deg, #28221a 0%, #1a1610 100%);
-  border: 2px solid var(--color-frame-dark);
-  border-top-color: var(--color-bevel-light);
-  border-left-color: var(--color-bevel-light);
+  background:
+    linear-gradient(180deg, rgba(255, 244, 205, 0.05), rgba(255, 244, 205, 0) 30%),
+    linear-gradient(180deg, #191b1d 0%, #101113 100%);
+  border: 2px solid #16100a;
+  border-top-color: #806b45;
+  border-left-color: #6f5a3a;
   box-shadow:
-    inset 1px 1px 0 rgba(200, 180, 140, 0.12),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.35),
-    0 6px 18px rgba(0, 0, 0, 0.6);
+    inset 0 0 0 1px rgba(215, 180, 103, 0.16),
+    inset 0 18px 26px rgba(255, 255, 255, 0.03),
+    inset 0 -20px 28px rgba(0, 0, 0, 0.55),
+    0 10px 26px rgba(0, 0, 0, 0.72);
   color: var(--color-text-primary);
   overflow: hidden;
+}
+
+.pane-card::before,
+.pane-card::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(215, 180, 103, 0.55), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pane-card::before {
+  top: 5px;
+}
+
+.pane-card::after {
+  bottom: 5px;
 }
 
 .pane-card--compressed {
@@ -78,18 +102,23 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
+  min-height: 34px;
+  padding: 7px var(--space-md);
   gap: var(--space-md);
-  background: linear-gradient(180deg, rgba(70, 60, 42, 0.6) 0%, rgba(40, 34, 24, 0.6) 100%);
-  border-bottom: 1px solid var(--color-frame-dark);
+  background:
+    linear-gradient(90deg, rgba(110, 20, 28, 0.42), rgba(20, 22, 26, 0.35) 42%, rgba(26, 44, 70, 0.28)),
+    linear-gradient(180deg, #2d2b28 0%, #191816 100%);
+  border-bottom: 1px solid rgba(215, 180, 103, 0.28);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.75);
 }
 
 .pane-card__title {
   font-family: 'GameFont', sans-serif;
-  font-size: clamp(12px, 1.2vw, 15px);
-  letter-spacing: 0.1em;
+  font-size: 13px;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--color-accent);
+  color: #f2d391;
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(217, 169, 74, 0.28);
   margin: 0;
 }
 
@@ -101,8 +130,8 @@ export default {
 
 .pane-card__dismiss {
   appearance: none;
-  border: 1px solid var(--color-frame-dark);
-  background: linear-gradient(180deg, #4a4030 0%, #2a2418 100%);
+  border: 1px solid #24170e;
+  background: linear-gradient(180deg, #3b3d42 0%, #18191d 100%);
   color: var(--color-text-secondary);
   border-radius: var(--radius-sm);
   width: 24px;
@@ -115,7 +144,7 @@ export default {
 
   &:hover {
     color: var(--color-danger);
-    background: linear-gradient(180deg, #4a3020 0%, #2a1610 100%);
+    background: linear-gradient(180deg, #452126 0%, #1d1012 100%);
   }
 
   &:focus-visible {
@@ -125,9 +154,14 @@ export default {
 }
 
 .pane-card__body {
+  position: relative;
   padding: var(--space-md);
   overflow: auto;
   max-height: min(72vh, 640px);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(95, 25, 30, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(26, 55, 92, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(9, 10, 11, 0.18), rgba(0, 0, 0, 0.08));
 }
 
 .sr-only {

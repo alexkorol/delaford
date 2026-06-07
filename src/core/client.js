@@ -258,13 +258,13 @@ class Client {
 
     const mapConfig = this.map.config?.map || null;
     const tileConfig = mapConfig?.tileset?.tile || { width: 32, height: 32 };
-    const viewportConfig = mapConfig?.viewport || { x: 16, y: 10 };
+    const viewportConfig = mapConfig?.viewport || { x: 24, y: 15 };
 
     const calculatedWidth = (tileConfig.width || 0) * (viewportConfig.x || 0);
     const calculatedHeight = (tileConfig.height || 0) * (viewportConfig.y || 0);
 
-    const fallbackWidth = 32 * 16;
-    const fallbackHeight = 32 * 10;
+    const fallbackWidth = 32 * 24;
+    const fallbackHeight = 32 * 15;
 
     const width = calculatedWidth || fallbackWidth;
     const height = calculatedHeight || fallbackHeight;

@@ -52,6 +52,10 @@ export default {
       type: Object,
       required: true,
     },
+    worldViewport: {
+      type: Object,
+      default: () => ({ x: 24, y: 15, scale: 1 }),
+    },
   },
   data() {
     return {
@@ -67,7 +71,7 @@ export default {
   },
   computed: {
     ...mapStores(useUiStore),
-    canvasDimensions() {
+    canvasNativeDimensions() {
       const tile = this.resolveTileDimensions();
       const viewport = this.resolveViewportDimensions();
       const width = (tile.width || 0) * (viewport.x || 0);
@@ -78,13 +82,26 @@ export default {
         height: Number.isFinite(height) && height > 0 ? height : 352,
       };
     },
+    canvasDimensions() {
+      const { width, height } = this.canvasNativeDimensions;
+      const scale = this.resolveDisplayScale();
+
+      return {
+        width: width * scale,
+        height: height * scale,
+      };
+    },
     canvasStyle() {
-      const { width, height } = this.canvasDimensions;
+      const { width, height } = this.canvasNativeDimensions;
+      const scale = this.resolveDisplayScale();
+      const displayWidth = width * scale;
+      const displayHeight = height * scale;
+
       return {
         '--map-native-width': `${width}px`,
         '--map-native-height': `${height}px`,
-        '--map-display-width': `${width}px`,
-        '--map-display-height': `${height}px`,
+        '--map-display-width': `${displayWidth}px`,
+        '--map-display-height': `${displayHeight}px`,
       };
     },
     getPaneDimensions() {
@@ -147,14 +164,26 @@ export default {
     },
     resolveViewportDimensions() {
       const fallback = (config && config.map && config.map.viewport) || {};
+      const requested = this.worldViewport || {};
       const runtime = this.game
         && this.game.map
         && this.game.map.config
         && this.game.map.config.map
         && this.game.map.config.map.viewport;
-      const x = (runtime && runtime.x) || fallback.x || 16;
-      const y = (runtime && runtime.y) || fallback.y || 10;
+      const x = (runtime && runtime.x) || requested.x || fallback.x || 24;
+      const y = (runtime && runtime.y) || requested.y || fallback.y || 15;
       return { x, y };
+    },
+    resolveDisplayScale() {
+      if (this.game && this.game.map && typeof this.game.map.scale === 'number') {
+        return this.game.map.scale;
+      }
+
+      if (this.worldViewport && typeof this.worldViewport.scale === 'number') {
+        return this.worldViewport.scale;
+      }
+
+      return 1;
     },
     initialiseInputController() {
       if (this.inputController) {
@@ -472,10 +501,10 @@ export default {
 div.game {
   position: relative;
   display: block;
-  width: min(100%, var(--map-display-width, var(--world-display-width, var(--map-native-width, auto))));
-  min-width: min(100%, var(--map-display-width, var(--world-display-width, var(--map-native-width, auto))));
-  height: min(100%, var(--map-display-height, var(--world-display-height, var(--map-native-height, auto))));
-  min-height: min(100%, var(--map-display-height, var(--world-display-height, var(--map-native-height, auto))));
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
   max-width: none;
   max-height: none;
   background: transparent;

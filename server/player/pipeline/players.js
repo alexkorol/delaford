@@ -75,7 +75,7 @@ export default {
         return;
       }
 
-      const slot = UI.getOpenSlot(player.inventory.slots);
+      const slot = UI.getOpenSlot(player.inventory.slots, 'inventory', equipped);
       const targetSlot = (data.replacing && UI.isNumeric(slot) && slot >= data.item.slot)
         ? data.item.slot
         : slot;

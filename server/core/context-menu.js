@@ -168,12 +168,18 @@ class ContextMenu {
   }
 
   createStrategyContext(action) {
+    const viewportPadding = 1;
+    const viewportMinX = this.player.x - this.viewportCenter.x - viewportPadding;
+    const viewportMinY = this.player.y - this.viewportCenter.y - viewportPadding;
+    const viewportMaxX = viewportMinX + this.viewportSize.x + (viewportPadding * 2);
+    const viewportMaxY = viewportMinY + this.viewportSize.y + (viewportPadding * 2);
+
     const groundItems = this.droppedItems
       .filter(
-        item => item.x < this.player.x + 7 && item.x > this.player.x - 10,
+        item => item.x >= viewportMinX && item.x <= viewportMaxX,
       )
       .filter(
-        item => item.y < this.player.y + 7 && item.y > this.player.y - 10,
+        item => item.y >= viewportMinY && item.y <= viewportMaxY,
       )
       .filter(
         item => item.x === this.coordinates.map.x && item.y === this.coordinates.map.y,

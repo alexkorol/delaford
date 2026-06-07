@@ -7,6 +7,7 @@ import { createFootprint, rotateOrientation, getItemDimensions } from '@/core/in
 import { canPlaceItem } from '@/core/inventory/collision.js';
 import { applyStacking, canStackWith, isStackableItem } from '@/core/inventory/stacking.js';
 import { DEFAULT_GRID, ORIENTATION_DEFAULT, ORIENTATION_ROTATED } from '@/core/inventory/constants.js';
+import { canPlaceInventoryItem, packInventoryItems, resolveItemSize } from '@shared/inventory-footprints.js';
 
 const mockItem = (overrides = {}) => ({
   id: 'mock-item',
@@ -41,6 +42,23 @@ describe('inventory normalisation', () => {
     expect(normalised.position).toEqual({ x: 5 % DEFAULT_GRID.columns, y: Math.floor(5 / DEFAULT_GRID.columns) });
     expect(normalised.baseSize).toEqual({ width: 2, height: 1 });
   });
+
+  it('infers footprint sizes for equipment without explicit size metadata', () => {
+    expect(resolveItemSize({ id: 'bronze-dagger', slot: 'right_hand', type: 'weapon' })).toEqual({ width: 1, height: 2 });
+    expect(resolveItemSize({ id: 'iron-halberd', slot: 'right_hand', type: 'weapon', twoHanded: true })).toEqual({ width: 2, height: 4 });
+    expect(resolveItemSize({ id: 'bronze-armor', slot: 'armor', type: 'armor' })).toEqual({ width: 2, height: 3 });
+  });
+
+  it('packs legacy slot-only items around larger footprints', () => {
+    const packed = packInventoryItems([
+      { id: 'iron-halberd', slot: 0, type: 'weapon', twoHanded: true },
+      { id: 'coins', slot: 1, stackable: true, qty: 10 },
+    ], DEFAULT_GRID);
+
+    expect(packed[0].position).toEqual({ x: 0, y: 0 });
+    expect(packed[1].slot).toBe(2);
+    expect(packed[1].position).toEqual({ x: 2, y: 0 });
+  });
 });
 
 describe('collision detection', () => {
@@ -60,6 +78,26 @@ describe('collision detection', () => {
     const active = mockItem({ uuid: 'moving', size: { width: 1, height: 3 } });
     const rotated = rotateOrientation(ORIENTATION_DEFAULT);
     const result = canPlaceItem([active], { x: 0, y: 0 }, active, DEFAULT_GRID, rotated);
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates shared server placement against multi-cell blockers', () => {
+    const moving = mockItem({ uuid: 'moving', slot: 0, position: { x: 0, y: 0 }, size: { width: 1, height: 3 } });
+    const blocking = mockItem({ uuid: 'blocking', slot: 13, position: { x: 1, y: 1 }, size: { width: 2, height: 2 } });
+    const result = canPlaceInventoryItem([moving, blocking], moving, { x: 1, y: 0 }, {
+      ignoreUuid: 'moving',
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.blockers).toContain('blocking');
+  });
+
+  it('allows shared server placement over the moving item old footprint', () => {
+    const moving = mockItem({ uuid: 'moving', slot: 0, position: { x: 0, y: 0 }, size: { width: 1, height: 3 } });
+    const result = canPlaceInventoryItem([moving], moving, { x: 0, y: 1 }, {
+      ignoreUuid: 'moving',
+    });
+
     expect(result.valid).toBe(true);
   });
 });
