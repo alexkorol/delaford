@@ -15,32 +15,32 @@ export const DIAGONAL_BINDINGS = [
 export const SKILL_BINDINGS = [
   {
     id: 'primary-attack',
-    keys: [' '],
+    keys: [' ', '1'],
     type: 'press',
   },
   {
     id: 'dash',
-    keys: ['shift'],
+    keys: ['shift', '2'],
     type: 'press',
   },
   {
     id: 'ability-1',
-    keys: ['q'],
+    keys: ['q', '3'],
     type: 'press',
   },
   {
     id: 'ability-2',
-    keys: ['e'],
+    keys: ['e', '4'],
     type: 'press',
   },
   {
     id: 'ability-3',
-    keys: ['r'],
+    keys: ['r', '5'],
     type: 'press',
   },
   {
     id: 'ability-4',
-    keys: ['f'],
+    keys: ['f', '6'],
     type: 'press',
   },
 ];

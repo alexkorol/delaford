@@ -103,6 +103,11 @@ export default {
      */
     async selectAction(event, item) {
       // Data to perform action
+      if (!item || !item.action) {
+        this.closeMenu();
+        return;
+      }
+
       const tilePayload = this.getTilePayload();
       const data = {
         item,
@@ -147,8 +152,16 @@ export default {
      * @param {integer} y The y-axis of where the mouse was clicked
      */
     setMenu(x, y) {
-      this.style.left = `${x - 9}px`;
-      this.style.top = `${y - 7}px`;
+      const menu = this.$el && this.$el.querySelector ? this.$el.querySelector('#actions') : null;
+      const menuWidth = menu && menu.offsetWidth ? menu.offsetWidth : 195;
+      const menuHeight = menu && menu.offsetHeight ? menu.offsetHeight : 120;
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : x + menuWidth;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : y + menuHeight;
+      const left = Math.min(Math.max(0, x - 9), Math.max(0, viewportWidth - menuWidth - 8));
+      const top = Math.min(Math.max(0, y - 7), Math.max(0, viewportHeight - menuHeight - 8));
+
+      this.style.left = `${left}px`;
+      this.style.top = `${top}px`;
     },
 
     /**
@@ -223,6 +236,11 @@ export default {
       this.items = data.data.data
         .sort((a, b) => b.timestamp - a.timestamp) // Sort by when item appeared
         .sort((a, b) => a.action.weight - b.action.weight); // then by action weight
+
+      if (this.items.length === 0) {
+        this.closeMenu();
+        return;
+      }
 
       // Ready to show
       this.view = true;
