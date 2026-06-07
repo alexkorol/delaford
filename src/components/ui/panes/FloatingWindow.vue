@@ -190,13 +190,15 @@ export default {
       if (!dragging.value) {
         return;
       }
+
+      const shouldSnap = props.snapDocking && props.dock === 'floating' && dragMoved.value;
       dragging.value = false;
       dragStartedFromDock.value = false;
       dragMoved.value = false;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopDragging);
 
-      if (props.snapDocking && props.dock === 'floating' && dragMoved.value) {
+      if (shouldSnap) {
         snapToEdge();
       }
     };
@@ -254,9 +256,22 @@ export default {
       window.addEventListener('pointerup', stopDragging);
     };
 
+    const clampFloatingPosition = (position = {}) => {
+      const bounds = props.bounds || {};
+      const rect = windowRef.value ? windowRef.value.getBoundingClientRect() : null;
+      const width = rect ? rect.width : 0;
+      const height = rect ? rect.height : 0;
+      const maxX = Math.max(0, (bounds.width || 0) - width);
+      const maxY = Math.max(0, (bounds.height || 0) - height);
+      return {
+        x: clamp(position.x || 0, 0, maxX || 0),
+        y: clamp(position.y || 0, 0, maxY || 0),
+      };
+    };
+
     const applyDock = (dock) => {
       if (dock === 'floating' && props.dock !== 'floating') {
-        emit('update:position', lastFloatingPosition.value);
+        emit('update:position', clampFloatingPosition(lastFloatingPosition.value));
       }
       if (dock !== 'floating') {
         preferredDock.value = dock;
@@ -309,7 +324,7 @@ export default {
         return;
       }
       emit('update:dock', 'floating');
-      emit('update:position', lastFloatingPosition.value);
+      emit('update:position', clampFloatingPosition(lastFloatingPosition.value));
     };
 
     const handleDoubleClick = () => {
