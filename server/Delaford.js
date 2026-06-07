@@ -53,6 +53,67 @@ class Delaford {
     Monster.load(this);
   }
 
+  static getSocketPlayer(ws) {
+    if (!ws || !ws.id) {
+      return null;
+    }
+
+    return world.players.find(player => player.socket_id === ws.id) || null;
+  }
+
+  static isForeignIdentifier(player, value) {
+    return Boolean(value && value !== player.uuid && value !== player.socket_id);
+  }
+
+  static hasForeignPlayerReference(player, payload = {}) {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    if (Delaford.isForeignIdentifier(player, payload.id)
+      || Delaford.isForeignIdentifier(player, payload.uuid)
+      || Delaford.isForeignIdentifier(player, payload.socket_id)) {
+      return true;
+    }
+
+    if (payload.player && typeof payload.player === 'object') {
+      return Delaford.isForeignIdentifier(player, payload.player.id)
+        || Delaford.isForeignIdentifier(player, payload.player.uuid)
+        || Delaford.isForeignIdentifier(player, payload.player.socket_id);
+    }
+
+    return false;
+  }
+
+  static authorizeSocketMessage(data, ws, publicEvents) {
+    if (publicEvents.has(data.event)) {
+      return true;
+    }
+
+    const player = Delaford.getSocketPlayer(ws);
+    if (!player) {
+      console.warn(`[socket] Authenticated socket ${ws.id.substring(0, 5)}... has no bound player for "${data.event}".`);
+      return false;
+    }
+
+    const payload = data.data || {};
+    if (Delaford.hasForeignPlayerReference(player, payload)
+      || Delaford.hasForeignPlayerReference(player, payload.data || {})) {
+      console.warn(`[socket] Rejected foreign player reference from ${ws.id.substring(0, 5)}... event="${data.event}".`);
+      return false;
+    }
+
+    if (payload && typeof payload === 'object') {
+      payload.player = {
+        ...(payload.player || {}),
+        uuid: player.uuid,
+        socket_id: player.socket_id,
+      };
+    }
+
+    return true;
+  }
+
   /**
    * Create the new server with the port
    */
@@ -290,6 +351,10 @@ class Delaford {
       // Require authentication for non-public events
       if (!PUBLIC_EVENTS.has(data.event) && !ws.authenticated) {
         console.warn(`[socket] Unauthenticated event "${data.event}" from ${ws.id.substring(0, 5)}...`);
+        return;
+      }
+
+      if (!this.constructor.authorizeSocketMessage(data, ws, PUBLIC_EVENTS)) {
         return;
       }
 
