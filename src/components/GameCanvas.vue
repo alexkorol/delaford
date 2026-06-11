@@ -329,6 +329,15 @@ export default {
      */
     leftClick(event) {
       bus.$emit('screen:close');
+
+      if (!this.currentAction || !this.currentAction.action) {
+        bus.$emit('contextmenu:close');
+        if (typeof window.focusOnGame === 'function') {
+          window.focusOnGame();
+        }
+        return;
+      }
+
       bus.$emit('canvas:select-action', {
         event,
         item: this.currentAction,

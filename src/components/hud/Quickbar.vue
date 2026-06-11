@@ -8,13 +8,18 @@
       <button
         class="quickbar__activate"
         type="button"
-        :title="slot.label"
+        :title="slotTitle(slot, index)"
+        :disabled="!slot.skillId"
         @click="$emit('slot-activate', slot, index)"
       >
         <span class="quickbar__icon" aria-hidden="true">
           <span v-if="slot.icon">{{ slot.icon }}</span>
         </span>
         <span class="quickbar__label">{{ slot.label || `Slot ${index + 1}` }}</span>
+        <span
+          v-if="slot.skill && slot.skill.cooldown"
+          class="quickbar__cooldown"
+        >{{ slot.skill.cooldown }}s</span>
       </button>
       <button
         class="quickbar__remap"
@@ -43,6 +48,14 @@ export default {
     },
   },
   emits: ['slot-activate', 'request-remap'],
+  methods: {
+    slotTitle(slot, index) {
+      const label = slot.label || `Slot ${index + 1}`;
+      const hotkey = slot.hotkey ? ` [${slot.hotkey}]` : '';
+      const description = slot.skill && slot.skill.description ? ` — ${slot.skill.description}` : '';
+      return `${label}${hotkey}${description}`;
+    },
+  },
 };
 </script>
 
@@ -99,6 +112,11 @@ export default {
     outline: 2px solid var(--color-accent);
     outline-offset: -2px;
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
 }
 
 .quickbar__icon {
@@ -122,6 +140,12 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 60px;
+}
+
+.quickbar__cooldown {
+  font-size: 0.7rem;
+  color: var(--color-accent-strong);
+  letter-spacing: 0.08em;
 }
 
 .quickbar__remap {

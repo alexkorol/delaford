@@ -83,6 +83,7 @@ vi.mock('#server/player/handler.js', () => ({
     'player:login': vi.fn(),
     'player:move': vi.fn(),
     'player:say': vi.fn(),
+    'player:context-menu:action': vi.fn(),
   },
 }));
 
@@ -173,6 +174,7 @@ describe('Delaford.connection – message handler validation', () => {
     // Create a mock WebSocket and run it through the real connection method
     ws = createMockWs();
     game.connection(ws);
+    world.players = [{ uuid: 'abc', socket_id: ws.id }];
     // After connection, ws.authenticated is still false (requires login)
     // Set authenticated for general handler tests
     ws.authenticated = true;
@@ -216,10 +218,27 @@ describe('Delaford.connection – message handler validation', () => {
     const payload = { event: 'player:say', data: { said: 'hello' } };
     await ws._triggerMessage(JSON.stringify(payload));
     expect(Handler['player:say']).toHaveBeenCalledWith(
-      payload,
+      {
+        event: 'player:say',
+        data: {
+          said: 'hello',
+          player: { uuid: 'abc', socket_id: ws.id },
+        },
+      },
       ws,
       game,
     );
+  });
+
+  it('rejects authenticated messages that reference another player', async () => {
+    const msg = JSON.stringify({
+      event: 'player:context-menu:action',
+      data: { player: { socket_id: 'other-socket' } },
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:context-menu:action']).not.toHaveBeenCalled();
   });
 
   it('rejects null message body', async () => {
@@ -261,6 +280,7 @@ describe('Delaford.connection – authentication gate', () => {
   });
 
   it('allows non-login events after authentication', async () => {
+    world.players = [{ uuid: 'abc', socket_id: ws.id }];
     ws.authenticated = true;
     const msg = JSON.stringify({ event: 'player:move', data: {} });
     await ws._triggerMessage(msg);
@@ -280,6 +300,7 @@ describe('Delaford.connection – rate limiting', () => {
     game = new Delaford(mockServer);
     ws = createMockWs();
     game.connection(ws);
+    world.players = [{ uuid: 'abc', socket_id: ws.id }];
     ws.authenticated = true;
   });
 

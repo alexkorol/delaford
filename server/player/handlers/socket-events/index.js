@@ -9,14 +9,30 @@ import config from '#server/config.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import world from '#server/core/world.js';
 
+const getPlayerBySocket = (ws) => {
+  if (!ws || !ws.id) {
+    return null;
+  }
+
+  return world.players.find(player => player.socket_id === ws.id) || null;
+};
+
+const isSpoofedPlayerPayload = (player, payload = {}) => (
+  Boolean(payload.id && payload.id !== player.uuid)
+  || Boolean(payload.uuid && payload.uuid !== player.uuid)
+  || Boolean(payload.socket_id && payload.socket_id !== player.socket_id)
+);
+
 export default {
   /**
    * A player logins into the game
    */
   'player:login': async (data, ws) => {
+    const payload = data.data || {};
+
     try {
-      if (!data.data.useGuestAccount) {
-        const { player, token } = await Authentication.login(data);
+      if (!payload.useGuestAccount) {
+        const { player, token } = await Authentication.login({ ...data, data: payload });
         Authentication.addPlayer(new Player(player, token, ws.id));
       } else {
         Authentication.addPlayer(new Player(playerGuest, 'none', ws.id));
@@ -24,7 +40,8 @@ export default {
       ws.authenticated = true;
     } catch (error) {
       console.log(error);
-      console.log(`${data.data.username} logged in with a bad password.`);
+      const username = typeof payload.username === 'string' ? payload.username : 'unknown user';
+      console.log(`${username} logged in with a bad password.`);
 
       Socket.emit('player:login-error', {
         data: error && error.message ? error.message : 'Login failed.',
@@ -43,15 +60,15 @@ export default {
   /**
    * A player sends a chat message to everyone
    */
-  'player:say': ({ data }) => {
-    const { id, said } = data;
+  'player:say': ({ data }, ws) => {
+    const { said } = data || {};
     const { viewport } = config.map;
 
     if (typeof said !== 'string' || !said.trim()) {
       return;
     }
 
-    const speaker = world.players.find(p => p.socket_id === id);
+    const speaker = getPlayerBySocket(ws);
     if (!speaker) {
       return;
     }
@@ -87,28 +104,24 @@ export default {
   /**
    * A player moves to a new tile via keyboard
    */
-  'player:move': (data) => {
+  'player:move': (data, ws) => {
     const payload = data.data || {};
-    const playerIndex = world.players.findIndex(player => player.uuid === payload.id);
-    if (playerIndex === -1) {
+    const player = getPlayerBySocket(ws);
+    if (!player || isSpoofedPlayerPayload(player, payload)) {
       return;
     }
-
-    const player = world.players[playerIndex];
     const startedAt = Date.now();
     player.move(payload.direction, { startedAt, direction: payload.direction });
 
     Player.broadcastMovement(player);
   },
 
-  'player:skill:trigger': (data) => {
+  'player:skill:trigger': (data, ws) => {
     const payload = data.data || {};
-    const playerIndex = world.players.findIndex(player => player.uuid === payload.id);
-    if (playerIndex === -1) {
+    const player = getPlayerBySocket(ws);
+    if (!player || isSpoofedPlayerPayload(player, payload)) {
       return;
     }
-
-    const player = world.players[playerIndex];
     const triggered = player.recordSkillInput(payload.skillId, {
       direction: payload.direction,
       modifiers: payload.modifiers,
@@ -132,17 +145,13 @@ export default {
   /**
    * Queue up a player action to be executed when they reach their destination
    */
-  'player:queueAction': (data) => {
-    if (!data.player || !data.player.socket_id) {
+  'player:queueAction': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!player) {
       return;
     }
 
-    const playerIndex = world.players.findIndex(p => p.socket_id === data.player.socket_id);
-    if (playerIndex === -1) {
-      return;
-    }
-
-    const player = world.players[playerIndex];
+    data.player = { ...(data.player || {}), socket_id: player.socket_id };
     if (player.queue.length >= 20) {
       return;
     }
@@ -150,17 +159,13 @@ export default {
     player.action = data.actionToQueue;
   },
 
-  'player:pane:close': (data) => {
+  'player:pane:close': (data, ws) => {
     const payload = data.data || {};
-    if (!payload.id) {
+    const player = getPlayerBySocket(ws);
+    if (!player || isSpoofedPlayerPayload(player, payload)) {
       return;
     }
 
-    const playerIndex = world.players.findIndex(p => p.uuid === payload.id);
-    if (playerIndex === -1) {
-      return;
-    }
-
-    world.players[playerIndex].currentPane = false;
+    player.currentPane = false;
   },
 };
