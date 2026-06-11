@@ -9,7 +9,6 @@ import { wearableItems } from '#server/core/data/items/index.js';
 import config from '#server/config.js';
 import Action from '#server/player/action.js';
 import ContextMenu from '#server/core/context-menu.js';
-import Handler from '#server/player/handler.js';
 import Item from '#server/core/item.js';
 import Map from '#server/core/map.js';
 import Player from '#server/core/player.js';
@@ -142,10 +141,10 @@ const dropInventoryItem = (player, itemIndex) => {
   return dropped;
 };
 
-export default {
+const actionEvents = {
   'player:walk-here': (data) => {
     if (data.tileWalkable) {
-      Handler['player:mouseTo']({
+      actionEvents['player:mouseTo']({
         data: {
           id: data.player.uuid,
           coordinates: { x: data.clickedTile.x, y: data.clickedTile.y },
@@ -970,3 +969,5 @@ export default {
     }
   },
 };
+
+export default actionEvents;

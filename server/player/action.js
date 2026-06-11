@@ -2,7 +2,7 @@ import UI from '#shared/ui.js';
 import World from '#server/core/world.js';
 import config from '#server/config.js';
 import merge from 'lodash/merge.js';
-import Handler from './handler.js';
+import socketEvents from './handlers/socket-events/index.js';
 import playerEvent from './handlers/actions/index.js';
 
 class Action {
@@ -174,7 +174,7 @@ class Action {
     if (queuedAction && queuedAction.queueable) {
       // Queue it up and tell the server.
       // IF already in queue... do not add it
-      Handler['player:queueAction'](merge(queuedAction, {
+      socketEvents['player:queueAction'](merge(queuedAction, {
         player: {
           socket_id: this.player.socket_id,
         },
@@ -186,7 +186,7 @@ class Action {
           viewport: viewportState,
           center: centerState,
         },
-      }));
+      }), { id: this.player.socket_id });
     }
 
     // Object need to complete an action
