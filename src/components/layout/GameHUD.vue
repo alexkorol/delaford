@@ -14,6 +14,18 @@
         :current="playerVitals.hp.current"
         :max="playerVitals.hp.max"
       />
+      <div
+        class="hud-shell__level"
+        :title="`Level ${playerProgress.level} — ${Math.floor(playerProgress.fraction * 100)}% to next level`"
+      >
+        <span class="hud-shell__level-value">Lv {{ playerProgress.level }}</span>
+        <span class="hud-shell__level-bar">
+          <span
+            class="hud-shell__level-fill"
+            :style="{ width: `${Math.min(100, Math.max(0, playerProgress.fraction * 100))}%` }"
+          />
+        </span>
+      </div>
       <Quickbar
         class="hud-shell__quickbar"
         :slots="quickSlots"
@@ -46,6 +58,10 @@ export default {
     playerVitals: {
       type: Object,
       required: true,
+    },
+    playerProgress: {
+      type: Object,
+      default: () => ({ level: 1, fraction: 0 }),
     },
     quickSlots: {
       type: Array,
@@ -126,6 +142,39 @@ export default {
 
 .hud-shell__orb {
   flex: 0 0 auto;
+}
+
+.hud-shell__level {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 52px;
+}
+
+.hud-shell__level-value {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f5d68a;
+  text-shadow: 1px 1px 0 black;
+}
+
+.hud-shell__level-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.hud-shell__level-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #c9a227 0%, #ffd54f 100%);
+  transition: width 250ms ease-out;
 }
 
 .hud-shell__quickbar {

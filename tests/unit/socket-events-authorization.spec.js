@@ -55,6 +55,7 @@ const createPlayer = (overrides = {}) => ({
   currentPane: 'inventory',
   combat: { sequence: 0 },
   animation: { state: 'idle' },
+  stats: { resources: { health: { current: 10, max: 10 }, mana: { current: 10, max: 10 } } },
   move: vi.fn(),
   recordSkillInput: vi.fn(() => true),
   ...overrides,

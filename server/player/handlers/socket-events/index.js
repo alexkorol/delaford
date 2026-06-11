@@ -3,6 +3,7 @@
  * for example: (login, logout, queue. etc.)
  */
 import Authentication from '#server/player/authentication.js';
+import Combat from '#server/core/combat/index.js';
 import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import config from '#server/config.js';
@@ -107,7 +108,7 @@ export default {
   'player:move': (data, ws) => {
     const payload = data.data || {};
     const player = getPlayerBySocket(ws);
-    if (!player || isSpoofedPlayerPayload(player, payload)) {
+    if (!player || isSpoofedPlayerPayload(player, payload) || !Combat.isPlayerAlive(player)) {
       return;
     }
     const startedAt = Date.now();
@@ -122,15 +123,9 @@ export default {
     if (!player || isSpoofedPlayerPayload(player, payload)) {
       return;
     }
-    const triggered = player.recordSkillInput(payload.skillId, {
-      direction: payload.direction,
-      modifiers: payload.modifiers,
-      animationState: payload.animationState,
-      duration: payload.duration,
-      holdState: payload.holdState,
-    });
 
-    if (!triggered) {
+    const outcome = Combat.tryUseSkill(player, payload);
+    if (!outcome || !outcome.triggered) {
       return;
     }
 
@@ -139,7 +134,7 @@ export default {
       playerId: player.uuid,
       combat: player.combat,
       animation: player.animation,
-    });
+    }, world.getScenePlayers(player.sceneId));
   },
 
   /**

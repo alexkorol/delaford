@@ -1,6 +1,7 @@
 import { general, wearableItems, smithing } from '#server/core/data/items/index.js';
 
 import Authentication from '#server/player/authentication.js';
+import Combat from '#server/core/combat/index.js';
 import Handler from '#server/player/handler.js';
 import Item from '#server/core/item.js';
 import Map from '#server/core/map.js';
@@ -185,6 +186,7 @@ class Delaford {
       Item.resourcesCheck();
     });
     this.addPeriodicTask('party:instances', 1500, () => partyService.evaluateInstances());
+    this.addPeriodicTask('player:respawn', 1000, () => Combat.processPlayerRespawns());
     this.addPeriodicTask('player:auto-save', this.playerAutoSaveInterval, () => playerPersistenceService.flushAllPlayers());
   }
 

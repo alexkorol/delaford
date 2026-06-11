@@ -36,6 +36,9 @@ class Map {
     this.players = [];
     this.player = null;
 
+    // Transient combat feedback (floating damage numbers, hit flashes)
+    this.combatFeedback = [];
+
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
       finder: new PF.DijkstraFinder({
@@ -429,6 +432,43 @@ class Map {
       }
 
       return updated;
+    });
+  }
+
+  /**
+   * Record a combat hit for visual feedback and update the local
+   * target health immediately (ahead of the next state broadcast).
+   *
+   * @param {object} payload The combat:hit event payload
+   */
+  registerCombatHit(payload = {}) {
+    if (!payload || !payload.targetId) {
+      return;
+    }
+
+    const at = now();
+
+    if (payload.targetType === 'monster') {
+      const index = (this.monsters || []).findIndex((monster) => monster.uuid === payload.targetId);
+      if (index !== -1) {
+        const monster = this.monsters[index];
+        if (payload.health && monster.stats && monster.stats.resources) {
+          monster.stats.resources.health = {
+            ...monster.stats.resources.health,
+            ...payload.health,
+          };
+        }
+        monster.lastHitAt = at;
+        this.monsters.splice(index, 1, monster);
+      }
+    }
+
+    this.combatFeedback.push({
+      targetId: payload.targetId,
+      targetType: payload.targetType || 'monster',
+      amount: Number.isFinite(payload.amount) ? payload.amount : 0,
+      died: Boolean(payload.died),
+      startedAt: at,
     });
   }
 
@@ -903,7 +943,18 @@ class Map {
     const { tileSize } = metrics;
     const spriteSheet = this.images.monstersImage || this.images.npcsImage;
 
+    const timestamp = now();
+
     nearbyMonsters.forEach((monster) => {
+      const health = monster.stats && monster.stats.resources
+        ? monster.stats.resources.health
+        : null;
+
+      // The dead are not drawn; the server respawns them later
+      if (health && health.current <= 0) {
+        return;
+      }
+
       const centerPosition = monster.movement
         ? monster.movement.getPosition()
         : centerOfTile(monster.x, monster.y, tileSize);
@@ -932,6 +983,88 @@ class Map {
         tileSize,
         tileSize,
       );
+
+      // Brief red flash when recently hit
+      if (monster.lastHitAt && timestamp - monster.lastHitAt < 200) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 64, 64, 0.4)';
+        ctx.fillRect(screenPosition.x, screenPosition.y, tileSize, tileSize);
+        ctx.restore();
+      }
+
+      // Health bar once the monster has taken damage
+      if (health && Number.isFinite(health.max) && health.max > 0 && health.current < health.max) {
+        const barWidth = tileSize - 8;
+        const barHeight = 3;
+        const barX = screenPosition.x + 4;
+        const barY = screenPosition.y - (barHeight + 2);
+        const fraction = Math.max(0, Math.min(1, health.current / health.max));
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+        ctx.fillStyle = fraction > 0.4 ? '#5fd35f' : '#e04f4f';
+        ctx.fillRect(barX, barY, Math.round(barWidth * fraction), barHeight);
+        ctx.restore();
+      }
+    });
+  }
+
+  /**
+   * Draw floating damage numbers for recent combat hits
+   */
+  drawCombatFeedback() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !Array.isArray(this.combatFeedback) || !this.combatFeedback.length || !this.player) {
+      return;
+    }
+
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+    const duration = 900;
+
+    this.combatFeedback = this.combatFeedback.filter(
+      (entry) => timestamp - entry.startedAt < duration,
+    );
+
+    this.combatFeedback.forEach((entry) => {
+      let actor = null;
+      if (entry.targetType === 'player') {
+        actor = this.player.uuid === entry.targetId
+          ? this.player
+          : (this.players || []).find((player) => player.uuid === entry.targetId);
+      } else {
+        actor = (this.monsters || []).find((monster) => monster.uuid === entry.targetId);
+      }
+
+      if (!actor) {
+        return;
+      }
+
+      const centerPosition = actor.movement
+        ? actor.movement.getPosition()
+        : centerOfTile(actor.x, actor.y, tileSize);
+      const screenPosition = this.worldToScreen(centerPosition, metrics);
+
+      const progress = Math.max(0, Math.min(1, (timestamp - entry.startedAt) / duration));
+      const rise = (tileSize * 0.6) + (progress * 18);
+      const alpha = 1 - progress;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = '600 12px "GameFont", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillStyle = entry.targetType === 'player' ? '#ff5252' : '#ffd54f';
+
+      const label = entry.amount > 0 ? `-${entry.amount}` : '0';
+      const textX = screenPosition.x;
+      const textY = screenPosition.y - rise;
+      ctx.strokeText(label, textX, textY);
+      ctx.fillText(label, textX, textY);
+      ctx.restore();
     });
   }
 

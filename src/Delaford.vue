@@ -18,6 +18,7 @@
       :world-shell-style="worldShellStyle"
       :world-viewport="worldViewport"
       :player-vitals="playerVitals"
+      :player-progress="playerProgress"
       :quick-slots="quickSlots"
       :quickbar-active-index="quickbarActiveIndex"
       :party="party"
@@ -66,6 +67,7 @@ import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
 import GeometricSkillTreePane from './components/passives/GeometricSkillTreePane.vue';
 
+import UI from '@shared/ui.js';
 import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/index.js';
 
 // Core assets
@@ -251,6 +253,34 @@ export default {
         hp: normaliseMeter(hpSource, hpMax),
         mp: normaliseMeter(mpSource, mpMax),
       };
+    },
+    playerProgress() {
+      const fallback = { level: 1, fraction: 0 };
+      const player = this.game && this.game.player;
+      if (!player) {
+        return fallback;
+      }
+
+      const skills = player.skills || {};
+      const combatXp = ['attack', 'defence'].reduce((total, skillId) => {
+        const skill = skills[skillId];
+        return total + (skill && Number.isFinite(skill.exp) ? skill.exp : 0);
+      }, 0);
+
+      const derived = UI.getLevel(combatXp);
+      const statsLevel = player.stats && Number.isFinite(player.stats.level)
+        ? player.stats.level
+        : (player.level || 1);
+      const level = Math.max(derived, statsLevel, 1);
+
+      const currentFloor = UI.getExperience(level);
+      const nextRequirement = UI.getExperience(level + 1);
+      const span = nextRequirement - currentFloor;
+      const fraction = span > 0
+        ? Math.max(0, Math.min(1, (combatXp - currentFloor) / span))
+        : 0;
+
+      return { level, fraction };
     },
     chatExpanded() {
       return this.layout.chat.isOpen || this.layout.chat.isPinned;
@@ -1181,6 +1211,14 @@ export default {
 
       this.game.map.setMonsters(data, meta);
       this.game.monsters = this.game.map.monsters;
+    },
+
+    combatHit(payload = {}) {
+      if (!this.game || !this.game.map || typeof this.game.map.registerCombatHit !== 'function') {
+        return;
+      }
+
+      this.game.map.registerCombatHit(payload);
     },
 
     pruneExpiredInvites() {

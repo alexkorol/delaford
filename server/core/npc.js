@@ -97,8 +97,8 @@ class NPC {
       })),
     };
 
-    // Tell the clients of the new NPCs
-    Socket.broadcast('npc:movement', world.npcs, null, { meta });
+    // NPCs only exist in the town scene; keep instance players out of it
+    Socket.broadcast('npc:movement', world.npcs, world.getScenePlayers(world.defaultTownId), { meta });
   }
 }
 

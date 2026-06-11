@@ -8,4 +8,11 @@ export default {
     const meta = message && message.meta ? message.meta : {};
     context.monsterState(payload, meta);
   },
+  'combat:hit': (message, context) => {
+    if (!context || typeof context.combatHit !== 'function') {
+      return;
+    }
+
+    context.combatHit(message && message.data ? message.data : {});
+  },
 };

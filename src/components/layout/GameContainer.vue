@@ -48,6 +48,7 @@
           <GameHUD
             class="game-container__hud"
             :player-vitals="playerVitals"
+            :player-progress="playerProgress"
             :quick-slots="quickSlots"
             :quickbar-active-index="quickbarActiveIndex"
             @quick-slot="handleQuickSlot"
@@ -117,6 +118,10 @@ export default {
     playerVitals: {
       type: Object,
       required: true,
+    },
+    playerProgress: {
+      type: Object,
+      default: () => ({ level: 1, fraction: 0 }),
     },
     quickSlots: {
       type: Array,

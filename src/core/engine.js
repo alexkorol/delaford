@@ -111,6 +111,11 @@ class Engine {
     // Draw the player
     this.game.map.drawPlayer();
 
+    // Draw floating combat feedback above actors
+    if (typeof this.game.map.drawCombatFeedback === 'function') {
+      this.game.map.drawCombatFeedback();
+    }
+
     // Draw the mouse selection
     this.game.map.drawMouse();
 

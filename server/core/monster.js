@@ -12,6 +12,7 @@ import createMonsterAIController from '#server/core/entities/monster/ai-controll
 import createMonsterStatsManager, {
   clone,
 } from '#server/core/entities/monster/stats-manager.js';
+import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
 
 
 class Monster {
@@ -157,10 +158,31 @@ class Monster {
       return false;
     }
 
-    const { target, result } = outcome;
+    const { target, result, damage } = outcome;
     syncShortcuts(target.stats, target);
     Player.broadcastAnimation(target);
     Player.broadcastStats(target);
+
+    const died = result.type === 'death' || result.type === 'permadeath';
+    const amount = result.amount !== undefined ? result.amount : damage;
+
+    awardSkillExperience(target, 'defence', amount);
+
+    Socket.broadcast('combat:hit', {
+      attackerId: this.uuid,
+      targetId: target.uuid,
+      targetType: 'player',
+      amount,
+      health: {
+        current: target.stats.resources.health.current,
+        max: target.stats.resources.health.max,
+      },
+      died,
+    }, world.getScenePlayers(this.sceneId));
+
+    if (died) {
+      sendMessage(target, `You have been slain by ${this.name}.`);
+    }
 
     return true;
   }

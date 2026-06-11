@@ -527,6 +527,15 @@ class Map {
     const playerIndex = world.players.findIndex(p => p.uuid === uuidPath);
     if (playerIndex === -1) return;
 
+    const pathingPlayer = world.players[playerIndex];
+    if (pathingPlayer.stats
+      && pathingPlayer.stats.resources
+      && pathingPlayer.stats.resources.health
+      && pathingPlayer.stats.resources.health.current <= 0) {
+      // The dead don't walk
+      return;
+    }
+
     if (world.players[playerIndex].moving) {
       world.players[playerIndex].path.current.interrupted = true;
     }

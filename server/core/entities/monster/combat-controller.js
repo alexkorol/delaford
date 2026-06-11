@@ -170,7 +170,7 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     }
   }
 
-  return result ? { target, result } : false;
+  return result ? { target, result, damage: payload.damage } : false;
 };
 
 const createMonsterCombatController = (monster) => ({
