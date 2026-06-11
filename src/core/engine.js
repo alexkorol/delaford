@@ -15,6 +15,9 @@ class Engine {
       lastTimestamp: 0,
     };
 
+    this._rafId = null;
+    this._running = false;
+
     // Bind context to same method as
     // we will be calling it out-of-context
     this.loop = this.loop.bind(this);
@@ -39,9 +42,11 @@ class Engine {
    * @param {decimal} timestamp The timestamp of when last called
    */
   loop(timestamp) {
+    if (!this._running) return;
+
     const minFrameMs = 1000 / this.maxFps;
     if (this.frame.lastTimestamp && timestamp < this.frame.lastTimestamp + minFrameMs) {
-      requestAnimationFrame(this.loop);
+      this._rafId = requestAnimationFrame(this.loop);
       return;
     }
 
@@ -56,14 +61,26 @@ class Engine {
     this.paintCanvas(deltaSeconds);
 
     // and back to the top...
-    requestAnimationFrame(this.loop);
+    this._rafId = requestAnimationFrame(this.loop);
   }
 
   /**
    * Kicks off the main game loop
    */
   start() {
-    this.loop();
+    this._running = true;
+    this._rafId = requestAnimationFrame(this.loop);
+  }
+
+  /**
+   * Stops the game loop and cancels pending animation frame
+   */
+  stop() {
+    this._running = false;
+    if (this._rafId !== null) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
   }
 
   /**

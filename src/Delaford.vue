@@ -474,6 +474,11 @@ export default {
 
   },
   beforeUnmount() {
+    if (this.engine) {
+      this.engine.stop();
+      this.engine = null;
+    }
+
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.onViewportResize);
       window.removeEventListener('keydown', this.handleGlobalKeydown, { capture: true });
@@ -1364,8 +1369,8 @@ export default {
       }
 
       // Start game engine
-      const engine = new Engine(this.game);
-      engine.start();
+      this.engine = new Engine(this.game);
+      this.engine.start();
 
       // Focus on game.
       setTimeout(() => {

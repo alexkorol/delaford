@@ -1,3 +1,4 @@
+import { v4 as uuid } from 'uuid';
 import { addHours, addMinutes, addSeconds } from 'date-fns';
 
 import Socket from '#server/socket.js';
@@ -148,12 +149,12 @@ class Item {
       seconds: Item.parseTime(respawnsIn, 's'),
     };
 
-    let timeToAdd = 0;
-    if (typeof (add.hours) === 'number') timeToAdd = addHours(pickedUpAt, add.hours);
-    if (typeof (add.minutes) === 'number') timeToAdd = addMinutes(pickedUpAt, add.minutes);
-    if (typeof (add.seconds) === 'number') timeToAdd = addSeconds(pickedUpAt, add.seconds);
+    let result = pickedUpAt;
+    if (typeof add.hours === 'number') result = addHours(result, add.hours);
+    if (typeof add.minutes === 'number') result = addMinutes(result, add.minutes);
+    if (typeof add.seconds === 'number') result = addSeconds(result, add.seconds);
 
-    return timeToAdd;
+    return result;
   }
 }
 

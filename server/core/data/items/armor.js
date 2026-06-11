@@ -229,7 +229,7 @@ export default [
     examine: 'A bronze helmet with proper protection.',
     price: 30,
     type: 'armor',
-    slot: 'left_hand',
+    slot: 'head',
     stats: {
       attack: {
         stab: 0, slash: 0, crush: 0, range: 0,
@@ -403,10 +403,10 @@ export default [
   {
     id: 'iron-helm',
     name: 'Iron Helm',
-    examine: 'A bronze helmet with proper protection.',
+    examine: 'An iron helmet with proper protection.',
     price: 130,
     type: 'armor',
-    slot: 'left_hand',
+    slot: 'head',
     stats: {
       attack: {
         stab: 0, slash: 0, crush: 0, range: 0,
@@ -430,11 +430,13 @@ export default [
     price: 14,
     type: 'armor',
     slot: 'head',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 2,
-    },
-    defense: {
-      stab: 2, slash: 3, crush: 4, range: 3,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 2,
+      },
+      defense: {
+        stab: 2, slash: 3, crush: 4, range: 3,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -450,11 +452,13 @@ export default [
     price: 14,
     type: 'armor',
     slot: 'feet',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 1,
-    },
-    defense: {
-      stab: 0, slash: 2, crush: 1, range: 2,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 1,
+      },
+      defense: {
+        stab: 0, slash: 2, crush: 1, range: 2,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -470,11 +474,13 @@ export default [
     price: 5,
     type: 'armor',
     slot: 'gloves',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 1,
-    },
-    defense: {
-      stab: 0, slash: 1, crush: 3, range: 1,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 1,
+      },
+      defense: {
+        stab: 0, slash: 1, crush: 3, range: 1,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -490,11 +496,13 @@ export default [
     price: 17,
     type: 'armor',
     slot: 'armor',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 2,
-    },
-    defense: {
-      stab: 8, slash: 9, crush: 10, range: 10,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 2,
+      },
+      defense: {
+        stab: 8, slash: 9, crush: 10, range: 10,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -510,11 +518,13 @@ export default [
     price: 35,
     type: 'armor',
     slot: 'head',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 2,
-    },
-    defense: {
-      stab: 12, slash: 13, crush: 14, range: 13,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 2,
+      },
+      defense: {
+        stab: 12, slash: 13, crush: 14, range: 13,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -530,11 +540,13 @@ export default [
     price: 34,
     type: 'armor',
     slot: 'feet',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 1,
-    },
-    defense: {
-      stab: 10, slash: 12, crush: 11, range: 12,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 1,
+      },
+      defense: {
+        stab: 10, slash: 12, crush: 11, range: 12,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -550,11 +562,13 @@ export default [
     price: 25,
     type: 'armor',
     slot: 'gloves',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 1,
-    },
-    defense: {
-      stab: 10, slash: 11, crush: 13, range: 11,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 1,
+      },
+      defense: {
+        stab: 10, slash: 11, crush: 13, range: 11,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -570,11 +584,13 @@ export default [
     price: 37,
     type: 'armor',
     slot: 'armor',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 2,
-    },
-    defense: {
-      stab: 18, slash: 19, crush: 20, range: 23,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 2,
+      },
+      defense: {
+        stab: 18, slash: 19, crush: 20, range: 23,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -591,11 +607,13 @@ export default [
     price: 125,
     type: 'armor',
     slot: 'head',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 2,
-    },
-    defense: {
-      stab: 32, slash: 40, crush: 44, range: 43,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 2,
+      },
+      defense: {
+        stab: 32, slash: 40, crush: 44, range: 43,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -611,11 +629,13 @@ export default [
     price: 134,
     type: 'armor',
     slot: 'feet',
-    attack: {
-      stab: 0, slash: 0, crush: 0, range: 1,
-    },
-    defense: {
-      stab: 30, slash: 32, crush: 31, range: 32,
+    stats: {
+      attack: {
+        stab: 0, slash: 0, crush: 0, range: 1,
+      },
+      defense: {
+        stab: 30, slash: 32, crush: 31, range: 32,
+      },
     },
     graphics: {
       tileset: 'armor',
@@ -697,7 +717,7 @@ export default [
     examine: 'Good shield to use once you have ground footing',
     price: 13,
     type: 'armor',
-    slot: 'armor',
+    slot: 'left_hand',
     stats: {
       attack: {
         stab: 0, slash: 0, crush: 0, range: 2,
@@ -744,7 +764,7 @@ export default [
     examine: 'The hat worn by Heiyah when he roamed the lands.',
     price: 45000,
     type: 'armor',
-    slot: 'armor',
+    slot: 'head',
     stats: {
       attack: {
         stab: 0, slash: 0, crush: 0, range: 0,

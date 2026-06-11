@@ -24,6 +24,9 @@ class Shop {
 
     // Object index references
     this.shopIndex = world.shops.findIndex(i => i.npcId === shopId);
+    if (this.shopIndex === -1) {
+      throw new Error('Shop not found in world.');
+    }
     this.shop = world.shops[this.shopIndex].inventory; // Shop's inventory
     this.coinIndex = this.inventory.slots.findIndex(e => e.id === 'coins');
     this.shopItemIndex = this.shop.findIndex(q => q.id === this.itemId);

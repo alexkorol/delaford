@@ -321,6 +321,7 @@ class ContextMenu {
       q => q.npcId === this.player.objectId,
     );
 
+    if (shopIndex === -1) return [];
     return world.shops[shopIndex].inventory;
   }
 

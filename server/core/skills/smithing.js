@@ -67,12 +67,13 @@ export default class Smithing extends Skill {
     const hasEnoughBars = inventoryHasThisManyBars >= this.resourceId.bars;
 
     if (hasEnoughBars) {
-      const getIndexOfBar = this.inventory.findIndex(
-        inv => inv.id === `${barToTakeAway}-bar`,
-      );
-
       for (let index = 0; index < this.resourceId.bars; index += 1) {
-        this.inventory.splice(getIndexOfBar, 1);
+        const barIndex = this.inventory.findIndex(
+          inv => inv.id === `${barToTakeAway}-bar`,
+        );
+        if (barIndex !== -1) {
+          this.inventory.splice(barIndex, 1);
+        }
       }
 
       world.players[this.playerIndex].inventory.slots = this.inventory;

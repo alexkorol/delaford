@@ -525,6 +525,7 @@ class Map {
    */
   static async findPath(uuidPath, x, y, location) {
     const playerIndex = world.players.findIndex(p => p.uuid === uuidPath);
+    if (playerIndex === -1) return;
 
     if (world.players[playerIndex].moving) {
       world.players[playerIndex].path.current.interrupted = true;
