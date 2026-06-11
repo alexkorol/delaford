@@ -170,4 +170,49 @@ describe('ContextMenu strategies', () => {
     expect(actionCatalog['player:walk-here']).toContain('Move');
     expect(actionCatalog['player:screen:bank:action']).toContain('Transfer');
   });
+
+  it('sorts actions by weight then timestamp', async () => {
+    world.items = [
+      { id: 10, x: player.x, y: player.y, uuid: 'first-uuid', timestamp: 100 },
+      { id: 11, x: player.x, y: player.y, uuid: 'second-uuid', timestamp: 200 },
+    ];
+
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    expect(Array.isArray(actions)).toBe(true);
+
+    for (let i = 1; i < actions.length; i += 1) {
+      const prev = actions[i - 1].action.weight;
+      const curr = actions[i].action.weight;
+      expect(prev).toBeLessThanOrEqual(curr);
+    }
+  });
+
+  it('returns empty list when no matching context', async () => {
+    const miscData = { clickedOn: {} };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    expect(Array.isArray(actions)).toBe(true);
+    expect(actions).toHaveLength(0);
+  });
+
+  it('does not produce take actions for items far from the player', async () => {
+    world.items = [{
+      id: 2,
+      x: player.x + 100,
+      y: player.y + 100,
+      uuid: 'far-away-uuid',
+      timestamp: 123,
+    }];
+
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    const takeActions = actions.filter(entry => entry.action.actionId === 'player:take');
+    expect(takeActions).toHaveLength(0);
+  });
 });

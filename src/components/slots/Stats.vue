@@ -233,11 +233,11 @@ export default {
 section.skill-tree {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--space-xs);
   align-items: flex-start;
 
   header {
-    font-size: 0.85em;
+    font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #f5d68a;
@@ -245,43 +245,38 @@ section.skill-tree {
 
   .summary {
     margin: 0;
-    font-size: 0.8em;
+    font-size: var(--font-size-sm);
     display: flex;
-    gap: 0.35rem;
+    gap: var(--space-xs);
     align-items: baseline;
 
     strong {
       color: #ffd54f;
-      font-size: 1.05em;
-    }
-
-    span {
-      font-size: 0.9em;
     }
   }
 
   .available {
     margin: 0;
-    font-size: 0.75em;
+    font-size: var(--font-size-sm);
     color: rgba(255, 255, 255, 0.75);
   }
 
   .flower-button {
-    margin-top: 0.35rem;
-    padding: 0.35rem 0.6rem;
-    border-radius: 4px;
+    margin-top: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.25);
     background: rgba(255, 255, 255, 0.08);
     color: #f1f1f1;
-    font-size: 0.75em;
+    font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.16);
-      color: #111;
+      background: rgba(255, 215, 79, 0.15);
+      border-color: rgba(255, 215, 79, 0.5);
     }
   }
 }
@@ -292,22 +287,22 @@ div.stats_slot {
   color: #f1f1f1;
   text-align: left;
   text-shadow: 1px 1px 0 black;
-  font-size: .8em;
+  font-size: var(--font-size-sm);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-md);
 
   section {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
 
     header {
-      font-size: 0.85em;
+      font-size: var(--font-size-sm);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 0.4rem;
+      margin-bottom: var(--space-xs);
       color: #f5d68a;
     }
 
@@ -317,12 +312,12 @@ div.stats_slot {
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: var(--space-xs);
 
       li {
         display: grid;
         grid-template-columns: 1fr auto;
-        gap: 0.4rem;
+        gap: var(--space-xs);
         align-items: baseline;
 
         .label {
@@ -336,9 +331,9 @@ div.stats_slot {
         .breakdown {
           grid-column: 1 / -1;
           display: flex;
-          gap: 0.4rem;
+          gap: var(--space-xs);
           opacity: 0.75;
-          font-size: 0.75em;
+          font-size: 0.85em;
 
           span {
             display: inline-block;

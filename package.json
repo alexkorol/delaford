@@ -21,6 +21,7 @@
     "lint:css": "stylelint \"src/**/*.{scss,vue}\" --custom-syntax postcss-html --allow-empty-input",
     "start": "cross-env NODE_ENV=production node server/index.js",
     "start:dev": "npm run dev",
+    "test": "vitest run",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "start-server-and-test preview http://127.0.0.1:4173 \"playwright test\"",
