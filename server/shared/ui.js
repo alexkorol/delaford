@@ -1,7 +1,15 @@
 import config from '../config.js';
 import { findOpenInventorySlot } from './inventory-footprints.js';
+import DUNGEON_TILESET from './dungeon-tiles.js';
 
 const { map } = config;
+
+// Zero-based global tile id ranges (gid - 1):
+// terrain.png 0..251 | objects.png 252..539 | dungeon.png 540..
+const OBJECTS_ZERO = 252;
+const DUNGEON_ZERO = DUNGEON_TILESET.firstGid - 1;
+const DUNGEON_BLOCKED_BG = new Set(DUNGEON_TILESET.blockedBg);
+const DUNGEON_WALKABLE_FG = new Set(DUNGEON_TILESET.walkableFg);
 
 class UI {
   /**
@@ -71,8 +79,8 @@ class UI {
     const tile = (((mouseY + (playerY - center.y)) * map.size.x) + mouseX) + (playerX - center.x);
 
     if (board !== undefined) {
-      const specialEquation = layer === 'foreground' ? 253 : 1;
-      return board[tile] - specialEquation;
+      // Zero-based global tile id (gid - 1), regardless of layer.
+      return board[tile] - 1;
     }
 
     return -1;
@@ -81,28 +89,37 @@ class UI {
   /**
    * Checks to see if the tile can be walked through or not
    *
-   * @param {integer} tile The ID of the tile
+   * @param {integer} tile Zero-based global tile id (gid - 1)
    * @param {string} layer Check the foreground or background
    * @returns {boolean}
    */
   static tileWalkable(tile, layer = 'background') {
-    const certainLayer = layer === 'background' ? map.tileset : map.objects;
-
-    if (layer === 'foreground') {
-      const fgBlocked = certainLayer.blocked.includes(tile);
-      const fgWalkable = map.objects.walkable.includes(tile);
-      if (tile < -1) {
-        return true;
-      }
-
-      if (!fgBlocked && fgWalkable) {
-        return true;
-      }
-
-      return false;
+    if (typeof tile !== 'number' || Number.isNaN(tile) || tile < 0) {
+      // gid 0 = no tile on this layer
+      return true;
     }
 
-    return certainLayer.blocked.includes(tile) === false;
+    // Dungeon tileset (DCSS) range
+    if (tile >= DUNGEON_ZERO) {
+      const local = tile - DUNGEON_ZERO;
+      if (layer === 'foreground') {
+        return DUNGEON_WALKABLE_FG.has(local);
+      }
+      return !DUNGEON_BLOCKED_BG.has(local);
+    }
+
+    if (layer === 'foreground') {
+      const local = tile - OBJECTS_ZERO;
+      if (local < 0) {
+        // terrain-range id on the foreground layer: nothing solid here
+        return true;
+      }
+      const fgBlocked = map.objects.blocked.includes(local);
+      const fgWalkable = map.objects.walkable.includes(local);
+      return !fgBlocked && fgWalkable;
+    }
+
+    return map.tileset.blocked.includes(tile) === false;
   }
 
   /**

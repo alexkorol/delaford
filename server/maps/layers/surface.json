@@ -40,6 +40,10 @@
         {
          "firstgid":253,
          "source":"objects.tsx"
+        }, 
+        {
+         "firstgid":541,
+         "source":"dungeon.tsx"
         }],
  "tilewidth":32,
  "type":"map",

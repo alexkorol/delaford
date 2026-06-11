@@ -164,7 +164,7 @@ const canStep = (monster, direction) => {
   }
 
   const tileIndexBg = UI.getFutureTileID(background, monster.x, monster.y, direction);
-  const tileIndexFg = UI.getFutureTileID(foreground, monster.x, monster.y, direction) - 252;
+  const tileIndexFg = UI.getFutureTileID(foreground, monster.x, monster.y, direction);
 
   const canWalkThrough = UI.tileWalkable(tileIndexBg)
     && UI.tileWalkable(tileIndexFg, 'foreground');

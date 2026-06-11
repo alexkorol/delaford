@@ -4,12 +4,96 @@ import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import config from '#server/config.js';
 import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
+import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
 
 const DEFAULT_INSTANCE_ROOM_COUNT = 6;
 const DEFAULT_CORRIDOR_WIDTH = 3;
+
+// Visual themes for generated instances, built on the DCSS (RLTiles) dungeon
+// tileset. Each entry lists gid pools; generation picks per-tile variants.
+const INSTANCE_THEMES = {
+  stone: {
+    floors: () => dungeonGroupGids('floor', 'stone'),
+    floorAccents: () => dungeonGroupGids('floor', 'grey'),
+    walls: () => dungeonGroupGids('wall', 'stone'),
+    decor: () => [
+      ...dungeonGroupGids('decor', 'statue_angel'),
+      ...dungeonGroupGids('decor', 'statue_archer'),
+      ...dungeonGroupGids('decor', 'fountain_blue'),
+      ...dungeonGroupGids('decor', 'altar_generic'),
+    ],
+    trees: () => [],
+    water: false,
+  },
+  crypt: {
+    floors: () => dungeonGroupGids('floor', 'crypt'),
+    floorAccents: () => dungeonGroupGids('floor', 'tomb'),
+    walls: () => dungeonGroupGids('wall', 'crypt'),
+    decor: () => [
+      ...dungeonGroupGids('decor', 'sarcophagus'),
+      ...dungeonGroupGids('decor', 'altar_generic'),
+      ...dungeonGroupGids('decor', 'fountain_blood'),
+    ],
+    trees: () => [
+      ...dungeonGroupGids('tree', 'tree_dead'),
+      ...dungeonGroupGids('tree', 'tree_petrified'),
+    ],
+    water: false,
+  },
+  sand: {
+    floors: () => dungeonGroupGids('floor', 'sand'),
+    floorAccents: () => dungeonGroupGids('floor', 'dirt'),
+    walls: () => dungeonGroupGids('wall', 'sand'),
+    decor: () => [
+      ...dungeonGroupGids('decor', 'statue_dragon'),
+      ...dungeonGroupGids('decor', 'fountain_dry'),
+      ...dungeonGroupGids('decor', 'altar_generic'),
+    ],
+    trees: () => dungeonGroupGids('tree', 'tree_dead'),
+    water: false,
+  },
+  volcanic: {
+    floors: () => dungeonGroupGids('floor', 'volcanic'),
+    floorAccents: () => dungeonGroupGids('floor', 'blood'),
+    walls: () => dungeonGroupGids('wall', 'volcanic'),
+    decor: () => [
+      ...dungeonGroupGids('decor', 'statue_dragon'),
+      ...dungeonGroupGids('decor', 'fountain_blood'),
+    ],
+    trees: () => dungeonGroupGids('tree', 'tree_petrified'),
+    water: false,
+  },
+  marsh: {
+    floors: () => dungeonGroupGids('floor', 'marsh'),
+    floorAccents: () => dungeonGroupGids('floor', 'mud'),
+    walls: () => [
+      ...dungeonGroupGids('wall', 'vines'),
+      ...dungeonGroupGids('wall', 'brick'),
+    ],
+    decor: () => [
+      ...dungeonGroupGids('decor_walk', 'flowers'),
+      ...dungeonGroupGids('decor', 'fountain_sparkling'),
+    ],
+    trees: () => dungeonGroupGids('tree', 'tree'),
+    water: true,
+  },
+};
+
+const TEMPLATE_THEMES = {
+  dungeon: 'stone',
+  stone: 'stone',
+  crypt: 'crypt',
+  tomb: 'crypt',
+  sand: 'sand',
+  desert: 'sand',
+  volcanic: 'volcanic',
+  hell: 'volcanic',
+  marsh: 'marsh',
+  swamp: 'marsh',
+};
 
 class Map {
   constructor(level) {
@@ -50,17 +134,27 @@ class Map {
     return Date.now();
   }
 
-  static carveRoom(background, foreground, width, height, x, y, tileId) {
+  static pickTile(tileId, rng) {
+    if (typeof tileId === 'function') {
+      return tileId();
+    }
+    if (Array.isArray(tileId)) {
+      return tileId[Math.floor((rng ? rng() : Math.random()) * tileId.length)] || tileId[0];
+    }
+    return tileId;
+  }
+
+  static carveRoom(background, foreground, width, height, x, y, tileId, rng) {
     for (let row = y; row < y + height; row += 1) {
       for (let col = x; col < x + width; col += 1) {
         const index = (row * surfaceMap.width) + col;
-        background[index] = tileId;
+        background[index] = Map.pickTile(tileId, rng);
         foreground[index] = 0;
       }
     }
   }
 
-  static carveCorridor(background, foreground, from, to, corridorWidth, tileId) {
+  static carveCorridor(background, foreground, from, to, corridorWidth, tileId, rng) {
     const minX = Math.min(from.x, to.x);
     const maxX = Math.max(from.x, to.x);
     const minY = Math.min(from.y, to.y);
@@ -75,7 +169,7 @@ class Map {
           }
 
           const index = (row * surfaceMap.width) + col;
-          background[index] = tileId;
+          background[index] = Map.pickTile(tileId, rng);
           foreground[index] = 0;
         }
       }
@@ -90,7 +184,7 @@ class Map {
           }
 
           const index = (row * surfaceMap.width) + col;
-          background[index] = tileId;
+          background[index] = Map.pickTile(tileId, rng);
           foreground[index] = 0;
         }
       }
@@ -100,21 +194,151 @@ class Map {
     carveColumn(to.x);
   }
 
+  /**
+   * Dress a carved instance: varied wall faces around open space, entry and
+   * exit stairs, open doors where corridors meet rooms, and themed decor.
+   */
+  static decorateInstance({
+    background,
+    foreground,
+    width,
+    height,
+    rng,
+    wallFill,
+    wallPool,
+    decorPool,
+    treePool,
+    theme,
+    roomRects,
+    carvedRooms,
+  }) {
+    const idx = (x, y) => (y * width) + x;
+    const isFloor = (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) {
+        return false;
+      }
+      const tile = background[idx(x, y)];
+      return tile !== wallFill && !wallPool.includes(tile);
+    };
+
+    // Wall pass: any solid cell touching open space gets a varied wall face.
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (background[idx(x, y)] !== wallFill) {
+          continue;
+        }
+        let touchesFloor = false;
+        for (let dy = -1; dy <= 1 && !touchesFloor; dy += 1) {
+          for (let dx = -1; dx <= 1 && !touchesFloor; dx += 1) {
+            if ((dx || dy) && isFloor(x + dx, y + dy)) {
+              touchesFloor = true;
+            }
+          }
+        }
+        if (touchesFloor && wallPool.length > 1) {
+          background[idx(x, y)] = wallPool[Math.floor(rng() * wallPool.length)];
+        }
+      }
+    }
+
+    // Door pass: room-perimeter floor cells that connect to outside floor.
+    const doorGid = dungeonGid('door_open') || dungeonGid('door_broken');
+    if (doorGid) {
+      roomRects.forEach((room) => {
+        let placed = 0;
+        for (let x = room.x; x < room.x + room.width && placed < 2; x += 1) {
+          [[x, room.y - 1, x, room.y], [x, room.y + room.height, x, room.y + room.height - 1]]
+            .forEach(([ox, oy, ix, iy]) => {
+              if (placed < 2 && isFloor(ox, oy) && isFloor(ix, iy)
+                && !foreground[idx(ix, iy)] && rng() < 0.6) {
+                foreground[idx(ix, iy)] = doorGid;
+                placed += 1;
+              }
+            });
+        }
+      });
+    }
+
+    // Stairs: entry in the first room, descent in the last.
+    const entry = carvedRooms[0];
+    const exit = carvedRooms[carvedRooms.length - 1];
+    const stairsUp = dungeonGid('stairs_up');
+    const stairsDown = dungeonGid('stairs_down');
+    if (entry && stairsUp) {
+      foreground[idx(entry.x, entry.y)] = stairsUp;
+    }
+    if (exit && exit !== entry && stairsDown) {
+      foreground[idx(exit.x, exit.y)] = stairsDown;
+    }
+
+    // Decor pass: a little themed furniture per room, off the spawn room.
+    roomRects.forEach((room, roomIndex) => {
+      const pools = [decorPool, treePool].filter((pool) => pool.length);
+      if (!pools.length) {
+        return;
+      }
+      const pieces = 1 + Math.floor(rng() * 2);
+      for (let i = 0; i < pieces; i += 1) {
+        const pool = pools[Math.floor(rng() * pools.length)];
+        const x = room.x + 1 + Math.floor(rng() * Math.max(1, room.width - 2));
+        const y = room.y + 1 + Math.floor(rng() * Math.max(1, room.height - 2));
+        const onSpawn = roomIndex === 0
+          && Math.abs(x - entry.x) <= 2 && Math.abs(y - entry.y) <= 2;
+        if (isFloor(x, y) && !foreground[idx(x, y)] && !onSpawn) {
+          foreground[idx(x, y)] = pool[Math.floor(rng() * pool.length)];
+        }
+      }
+
+      // Marsh-style themes get small water pools in roomy chambers.
+      if (theme.water && room.width >= 9 && room.height >= 9 && rng() < 0.7) {
+        const waterGid = dungeonGroupGids('liquid', 'water_shallow')[0];
+        if (waterGid) {
+          const px = room.x + 2 + Math.floor(rng() * (room.width - 5));
+          const py = room.y + 2 + Math.floor(rng() * (room.height - 5));
+          for (let dy = 0; dy < 2; dy += 1) {
+            for (let dx = 0; dx < 2; dx += 1) {
+              if (!foreground[idx(px + dx, py + dy)]) {
+                background[idx(px + dx, py + dy)] = waterGid;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   static async generateInstance(options = {}) {
     const template = options.template || 'dungeon';
+    const themeName = options.theme
+      || TEMPLATE_THEMES[String(template).toLowerCase()]
+      || 'stone';
+    const theme = INSTANCE_THEMES[themeName] || INSTANCE_THEMES.stone;
     const seed = Map.normaliseSeed(options.seed);
-    const layers = await Map.fetchMap('surface');
-    const background = [...layers[0].data];
-    const foreground = [...layers[1].data];
 
     const width = surfaceMap.width || config.map.size.x;
     const height = surfaceMap.height || config.map.size.y;
-    const centerIndex = (Math.floor(height / 2) * width) + Math.floor(width / 2);
-    const baseTile = background[centerIndex] || 1;
     const rng = Map.createSeededGenerator(seed);
+
+    // Resolve theme gid pools once
+    const floorPool = theme.floors();
+    const accentPool = theme.floorAccents();
+    const wallPool = theme.walls();
+    const decorPool = theme.decor();
+    const treePool = theme.trees();
+    const wallFill = wallPool[0] || 0;
+
+    // Solid rock everywhere; rooms and corridors are carved out of it.
+    const background = new Array(width * height).fill(wallFill);
+    const foreground = new Array(width * height).fill(0);
+
+    const floorPicker = () => {
+      const pool = accentPool.length && rng() < 0.12 ? accentPool : floorPool;
+      return pool[Math.floor(rng() * pool.length)] || floorPool[0];
+    };
 
     const rooms = Math.max(1, options.rooms || DEFAULT_INSTANCE_ROOM_COUNT);
     const carvedRooms = [];
+    const roomRects = [];
 
     for (let index = 0; index < rooms; index += 1) {
       const roomWidth = Math.max(6, Math.floor(rng() * 12) + 6);
@@ -130,22 +354,40 @@ class Map {
         Math.max(marginY, Math.floor(rng() * (height - roomHeight - marginY))),
       );
 
-      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, baseTile);
+      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng);
 
       const center = {
         x: Math.floor(originX + (roomWidth / 2)),
         y: Math.floor(originY + (roomHeight / 2)),
       };
       carvedRooms.push(center);
+      roomRects.push({
+        x: originX, y: originY, width: roomWidth, height: roomHeight,
+      });
     }
 
     if (carvedRooms.length > 1) {
       const corridorWidth = Math.max(2, options.corridorWidth || DEFAULT_CORRIDOR_WIDTH);
       const anchor = carvedRooms[0];
       carvedRooms.slice(1).forEach((roomCenter) => {
-        Map.carveCorridor(background, foreground, anchor, roomCenter, corridorWidth, baseTile);
+        Map.carveCorridor(background, foreground, anchor, roomCenter, corridorWidth, floorPicker, rng);
       });
     }
+
+    Map.decorateInstance({
+      background,
+      foreground,
+      width,
+      height,
+      rng,
+      wallFill,
+      wallPool,
+      decorPool,
+      treePool,
+      theme,
+      roomRects,
+      carvedRooms,
+    });
 
     const monsterSpawns = carvedRooms.slice(1);
     const roleCycle = ['melee', 'ranged', 'support'];
@@ -209,6 +451,7 @@ class Map {
       metadata: {
         seed,
         template,
+        theme: themeName,
         spawnPoints: carvedRooms,
         rewards: {
           coinsPerPlayer: 120 + (instanceMonsters.length * 20),
@@ -466,7 +709,7 @@ class Map {
             const activeMap = scene && scene.map ? scene.map : world.map;
             const tiles = {
               background: activeMap.background[onTile] - 1,
-              foreground: (activeMap.foreground[onTile] - 1) - 252,
+              foreground: activeMap.foreground[onTile] - 1,
             };
 
             // Push the block/non-blocked tile to the

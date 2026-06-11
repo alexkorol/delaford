@@ -198,6 +198,8 @@ class ContextMenu {
         return npc;
       });
 
+    // getTileOverMouse now returns zero-based global ids (gid - 1);
+    // foreground data definitions are keyed by objects.png local ids.
     const foregroundTile = UI.getTileOverMouse(
       this.foreground,
       this.coordinates.player.x,
@@ -206,7 +208,7 @@ class ContextMenu {
       this.coordinates.viewport.y,
       'foreground',
       { center: this.viewportCenter },
-    );
+    ) - 252;
 
     const foregroundData = Query.getForegroundData(foregroundTile);
 

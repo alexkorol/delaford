@@ -468,7 +468,8 @@ class Map {
     const armorImage = fallback(5);
     const jewelryImage = fallback(6);
     const generalImage = fallback(7);
-    const monstersImage = normalized[8] || npcsImage;
+    const dungeonImage = fallback(8);
+    const monstersImage = normalized[9] || npcsImage;
 
     // Image and data
     this.images = {
@@ -481,6 +482,7 @@ class Map {
       armorImage,
       jewelryImage,
       generalImage,
+      dungeonImage,
     };
 
     // Tell client images are loaded
@@ -671,9 +673,56 @@ class Map {
     const { tileset, size, objects } = this.config.map;
     const { offsetX, offsetY } = this.camera;
 
-    const divider = {
-      background: tileset.width / tileSize,
-      foreground: objects.width / tileSize,
+    // Tile sheets by zero-based global id (gid - 1):
+    // terrain 0..251 | objects 252..539 | dungeon 540..
+    const dungeonImage = this.images.dungeonImage;
+    const sheets = [
+      {
+        from: 540,
+        image: dungeonImage,
+        columns: dungeonImage && dungeonImage.width ? dungeonImage.width / tileSize : 16,
+      },
+      {
+        from: 252,
+        image: this.images.objectImage,
+        columns: objects.width / tileSize,
+      },
+      {
+        from: 0,
+        image: this.images.terrainImage,
+        columns: tileset.width / tileSize,
+      },
+    ];
+
+    const resolveSheet = (zeroId) => {
+      for (let i = 0; i < sheets.length; i += 1) {
+        if (zeroId >= sheets[i].from) {
+          return sheets[i];
+        }
+      }
+      return sheets[sheets.length - 1];
+    };
+
+    const drawTile = (zeroId, drawX, drawY) => {
+      if (zeroId < 0) {
+        return;
+      }
+      const sheet = resolveSheet(zeroId);
+      if (!sheet.image || !sheet.columns) {
+        return;
+      }
+      const local = zeroId - sheet.from;
+      ctx.drawImage(
+        sheet.image,
+        Math.floor(local % sheet.columns) * tileSize,
+        Math.floor(local / sheet.columns) * tileSize,
+        tileSize,
+        tileSize,
+        drawX,
+        drawY,
+        tileSize,
+        tileSize,
+      );
     };
 
     for (let column = -1; column <= viewport.y + 1; column += 1) {
@@ -687,47 +736,11 @@ class Map {
           const foregroundIndex = this.foreground[tileToFind];
 
           if (backgroundIndex !== undefined) {
-            const backgroundTile = backgroundIndex - 1;
-            const foregroundTile = (foregroundIndex - 1) - 252;
-
-            const sourceBackground = {
-              x: Math.floor(backgroundTile % divider.background) * tileSize,
-              y: Math.floor(backgroundTile / divider.background) * tileSize,
-            };
-
-            const sourceForeground = {
-              x: Math.floor(foregroundTile % divider.foreground) * tileSize,
-              y: Math.floor(foregroundTile / divider.foreground) * tileSize,
-            };
-
             const drawX = Math.round((row * tileSize) - offsetX);
             const drawY = Math.round((column * tileSize) - offsetY);
 
-            ctx.drawImage(
-              this.images.terrainImage,
-              sourceBackground.x,
-              sourceBackground.y,
-              tileSize,
-              tileSize,
-              drawX,
-              drawY,
-              tileSize,
-              tileSize,
-            );
-
-            if (foregroundTile > -1) {
-              ctx.drawImage(
-                this.images.objectImage,
-                sourceForeground.x,
-                sourceForeground.y,
-                tileSize,
-                tileSize,
-                drawX,
-                drawY,
-                tileSize,
-                tileSize,
-              );
-            }
+            drawTile(backgroundIndex - 1, drawX, drawY);
+            drawTile(foregroundIndex - 1, drawX, drawY);
           }
         }
       }
@@ -995,7 +1008,7 @@ class Map {
         this.player.y,
         x,
         y,
-      ) - 252,
+      ),
     };
 
     let isWalkable = UI.tileWalkable(tile.background);

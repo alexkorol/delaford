@@ -112,7 +112,7 @@ const canMove = (npc, direction, worldRef) => {
   }
 
   const background = UI.getFutureTileID(map.background, npc.x, npc.y, direction);
-  const foreground = UI.getFutureTileID(map.foreground, npc.x, npc.y, direction) - 252;
+  const foreground = UI.getFutureTileID(map.foreground, npc.x, npc.y, direction);
   const walkable = UI.tileWalkable(background)
     && UI.tileWalkable(foreground, 'foreground');
 

@@ -1,5 +1,6 @@
 import terrainTileset from '../assets/tiles/terrain.png';
 import objectsTileset from '../assets/tiles/objects.png';
+import dungeonTileset from '../assets/tiles/dungeon.png';
 
 import npcImage from '../assets/graphics/actors/npcs.png';
 import playerImage from '../assets/graphics/actors/players/human.png';
@@ -244,6 +245,7 @@ class Client {
       armorImage,
       jewelryImage,
       generalImage,
+      dungeonTileset,
     ];
 
     const images = Object.values(assets).map((asset) => this.constructor.uploadImage(asset));
