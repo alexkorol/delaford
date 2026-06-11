@@ -1,80 +1,20 @@
 <template>
   <div class="equipment-ragdoll">
-    <svg class="equipment-ragdoll__skeleton" viewBox="0 0 160 200" preserveAspectRatio="xMidYMid meet">
-      <line x1="80" x2="80" y1="25" y2="185" />
-      <line x1="28" x2="28" y1="130" y2="185" />
-      <line x1="132" x2="132" y1="130" y2="185" />
-      <line x1="132" x2="28" y1="145" y2="145" />
-      <line x1="132" x2="28" y1="93" y2="93" />
-    </svg>
-
     <div class="equipment-ragdoll__slots">
-      <div class="row">
-        <equipment-slot
-          slot-id="head"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-      </div>
-
-      <div class="row">
-        <equipment-slot
-          slot-id="back"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <equipment-slot
-          slot-id="necklace"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <div class="slot arrows" />
-      </div>
-
-      <div class="row">
-        <equipment-slot
-          slot-id="right_hand"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <equipment-slot
-          slot-id="armor"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <equipment-slot
-          slot-id="left_hand"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-      </div>
-
-      <div class="row">
-        <equipment-slot
-          slot-id="gloves"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <equipment-slot
-          slot-id="feet"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-        <equipment-slot
-          slot-id="ring"
-          :wear="wear"
-          :images="resolvedImages"
-          @open-context-menu="showContextMenu"
-        />
-      </div>
+      <equipment-slot
+        v-for="descriptor in slotLayout"
+        :key="descriptor.id"
+        :slot-id="descriptor.id"
+        :wear="wear"
+        :images="resolvedImages"
+        :style="slotStyle(descriptor)"
+        class="equipment-ragdoll__slot"
+        @open-context-menu="showContextMenu"
+      />
+      <div
+        class="slot arrows equipment-ragdoll__slot"
+        :style="slotStyle(arrowsDescriptor)"
+      />
     </div>
   </div>
 </template>
@@ -84,6 +24,24 @@ import UI from '@shared/ui.js';
 import bus from '../../core/utilities/bus.js';
 import ClientUI from '../../core/utilities/client-ui.js';
 import EquipmentSlot from '../sub/EquipmentSlot.vue';
+
+// Diablo/PoE-style footprints on an 8x6 cell grid.
+// column/row are 1-based CSS grid lines; width/height are cell spans.
+const SLOT_LAYOUT = [
+  { id: 'right_hand', column: 1, row: 1, width: 2, height: 4 }, // weapon, up to 2x4 two-hander
+  { id: 'back', column: 3, row: 1, width: 1, height: 2 }, // cape
+  { id: 'head', column: 4, row: 1, width: 2, height: 2 },
+  { id: 'necklace', column: 6, row: 2, width: 1, height: 1 },
+  { id: 'left_hand', column: 7, row: 1, width: 2, height: 4 }, // offhand/shield
+  { id: 'armor', column: 4, row: 3, width: 2, height: 3 }, // body armour 2x3
+  { id: 'ring', column: 3, row: 4, width: 1, height: 1 },
+  { id: 'gloves', column: 1, row: 5, width: 2, height: 2 },
+  { id: 'feet', column: 7, row: 5, width: 2, height: 2 },
+];
+
+const ARROWS_DESCRIPTOR = {
+  id: 'arrows', column: 6, row: 4, width: 1, height: 2,
+};
 
 export default {
   name: 'EquipmentRagdoll',
@@ -110,6 +68,12 @@ export default {
       }
       return (this.game && this.game.map && this.game.map.images) ? this.game.map.images : {};
     },
+    slotLayout() {
+      return SLOT_LAYOUT;
+    },
+    arrowsDescriptor() {
+      return ARROWS_DESCRIPTOR;
+    },
   },
   created() {
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
@@ -118,6 +82,12 @@ export default {
     bus.$off('game:context-menu:first-only', ClientUI.displayFirstAction);
   },
   methods: {
+    slotStyle(descriptor) {
+      return {
+        gridColumn: `${descriptor.column} / span ${descriptor.width}`,
+        gridRow: `${descriptor.row} / span ${descriptor.height}`,
+      };
+    },
     showContextMenu(event, slot, firstOnly = false) {
       const coordinates = UI.getViewportCoordinates(event);
 
@@ -149,14 +119,13 @@ export default {
 
 <style lang="scss" scoped>
 .equipment-ragdoll {
-  --eq-slot-size: 40px;
+  --eq-cell: clamp(40px, 3.4vw, 60px);
+  --eq-gap: 6px;
 
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto;
-  justify-items: center;
-  padding: 10px 12px 12px;
+  display: flex;
+  justify-content: center;
+  padding: clamp(12px, 1.4vw, 22px);
   background:
     radial-gradient(circle at 50% 42%, rgba(82, 18, 24, 0.2), transparent 48%),
     linear-gradient(180deg, rgba(26, 29, 33, 0.94), rgba(8, 9, 11, 0.92));
@@ -167,47 +136,28 @@ export default {
     inset 0 0 0 1px rgba(255, 240, 190, 0.04),
     inset 0 0 24px rgba(0, 0, 0, 0.72);
 
-  &__skeleton {
-    position: absolute;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 146px;
-    height: 200px;
-    stroke: rgba(194, 165, 105, 0.22);
-    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.75));
-  }
-
   &__slots {
     position: relative;
     display: grid;
-    grid-auto-rows: minmax(40px, auto);
-    gap: 7px;
-    padding-top: 6px;
+    grid-template-columns: repeat(8, var(--eq-cell));
+    grid-template-rows: repeat(6, var(--eq-cell));
+    gap: var(--eq-gap);
     z-index: 1;
+  }
+
+  &__slot {
+    width: 100%;
+    height: 100%;
   }
 }
 
-.row {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: center;
-  gap: 7px;
-}
-
-.slot {
-  width: var(--eq-slot-size);
-  height: var(--eq-slot-size);
-  background-color: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(180, 145, 86, 0.28);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 8px rgba(0, 0, 0, 0.82),
-    0 1px 0 rgba(255, 235, 190, 0.05);
-}
-
 .slot.arrows {
-  background: rgba(0, 0, 0, 0.25);
-  border-style: dashed;
+  background-color: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(180, 145, 86, 0.28);
+  border-radius: 4px;
+  background-image: url(../../assets/graphics/ui/client/slots/wear/arrows.png);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 32px;
 }
 </style>

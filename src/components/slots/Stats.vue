@@ -233,8 +233,9 @@ export default {
 section.skill-tree {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   align-items: flex-start;
+  line-height: 1.7;
 
   header {
     font-size: var(--font-size-sm);
@@ -288,6 +289,10 @@ div.stats_slot {
   text-align: left;
   text-shadow: 1px 1px 0 black;
   font-size: var(--font-size-sm);
+
+  /* GameFont renders tall glyphs in small line boxes; without an explicit
+     line-height consecutive lines overlap. */
+  line-height: 1.7;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -296,13 +301,13 @@ div.stats_slot {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-sm);
-    padding: var(--space-sm);
+    padding: var(--space-md);
 
     header {
       font-size: var(--font-size-sm);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: var(--space-xs);
+      margin-bottom: var(--space-sm);
       color: #f5d68a;
     }
 
@@ -312,12 +317,12 @@ div.stats_slot {
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
 
       li {
         display: grid;
         grid-template-columns: 1fr auto;
-        gap: var(--space-xs);
+        gap: var(--space-xs) var(--space-md);
         align-items: baseline;
 
         .label {
@@ -331,7 +336,7 @@ div.stats_slot {
         .breakdown {
           grid-column: 1 / -1;
           display: flex;
-          gap: var(--space-xs);
+          gap: var(--space-md);
           opacity: 0.75;
           font-size: 0.85em;
 

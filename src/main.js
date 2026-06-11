@@ -22,8 +22,12 @@ app.use(VueTippy, {
 });
 
 if (typeof window !== 'undefined' && 'WebSocket' in window) {
+  // Production default: same host/port the page was served from, so a
+  // self-hosted build works over LAN or Tailscale with no configuration.
+  // Override with VITE_WS_URL at build time when fronted by a proxy.
+  const sameOrigin = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
   const wsurl = {
-    prod: 'wss://play.delaford.com',
+    prod: import.meta.env.VITE_WS_URL || sameOrigin,
     dev: `ws://${window.location.hostname}:6500`,
   };
 

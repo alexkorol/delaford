@@ -24,7 +24,9 @@ const hasClientBundle = () => (
   && fs.existsSync(path.join(distDir, 'index.html'))
 );
 
-if (env === 'production') {
+// HTTPS enforcement is opt-in: self-hosted LAN/Tailscale deployments serve
+// plain HTTP and would redirect-loop. Set FORCE_HTTPS=true behind a TLS proxy.
+if (env === 'production' && process.env.FORCE_HTTPS === 'true') {
   app.use(enforce.HTTPS({ trustProtoHeader: true }));
   app.use(secure);
 }

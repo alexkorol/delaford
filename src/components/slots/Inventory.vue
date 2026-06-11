@@ -195,6 +195,8 @@ export default {
   flex-direction: column;
   gap: 10px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   box-sizing: border-box;
   color: var(--color-text-primary);
 
@@ -232,37 +234,42 @@ export default {
   }
 
   &__body {
-    display: grid;
-    grid-template-columns: minmax(148px, 170px) max-content;
-    gap: 8px;
-    align-items: start;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
     width: 100%;
     min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   &__ragdoll {
+    width: 100%;
     min-width: 0;
   }
 
   &__grid {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 10px;
     min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   &__utility-row {
     display: grid;
     grid-template-columns: 1fr 1.25fr;
     gap: 10px;
+    width: 100%;
   }
 }
 
 @media (width <= 700px) {
-  .inventory-pane__body {
-    grid-template-columns: 1fr;
-  }
-
   .inventory-pane__utility-row {
     grid-template-columns: 1fr;
   }

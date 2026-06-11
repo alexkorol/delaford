@@ -30,3 +30,6 @@ scratchpad.txt
 
 # Generated runtime data
 server/data/
+
+# pm2 runtime logs
+/logs

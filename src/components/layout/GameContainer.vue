@@ -27,6 +27,34 @@
               :world-viewport="worldViewport"
             />
             <div
+              v-if="!uiHidden"
+              class="game-container__party-overlay"
+            >
+              <button
+                type="button"
+                class="game-container__party-toggle"
+                @click="partyOpen = !partyOpen"
+              >
+                Party{{ partyInvites.length ? ` (${partyInvites.length})` : '' }}
+              </button>
+              <PartyPanel
+                v-if="partyOpen || partyInvites.length"
+                :player-id="game && game.player ? game.player.uuid : null"
+                :party="party"
+                :invites="partyInvites"
+                :loading="partyLoading"
+                :status-message="partyStatusMessage"
+                @create="$emit('party-create')"
+                @leave="$emit('party-leave')"
+                @toggle-ready="$emit('party-toggle-ready')"
+                @start-instance="$emit('party-start-instance')"
+                @return-to-town="$emit('party-return-to-town')"
+                @invite="$emit('party-invite', $event)"
+                @accept-invite="$emit('party-accept-invite', $event)"
+                @decline-invite="$emit('party-decline-invite', $event)"
+              />
+            </div>
+            <div
               v-if="!uiHidden && chatExpanded"
               class="game-container__chat-overlay"
             >
@@ -71,6 +99,7 @@ import PaneHost from '../ui/panes/PaneHost.vue';
 import GameCanvas from '../GameCanvas.vue';
 import Chatbox from '../Chatbox.vue';
 import ContextMenu from '../sub/ContextMenu.vue';
+import PartyPanel from '../ui/world/PartyPanel.vue';
 import GameHUD from './GameHUD.vue';
 
 export default {
@@ -80,6 +109,7 @@ export default {
     GameCanvas,
     Chatbox,
     ContextMenu,
+    PartyPanel,
     GameHUD,
   },
   props: {
@@ -233,6 +263,7 @@ export default {
     };
 
     const uiHidden = ref(false);
+    const partyOpen = ref(false);
 
     expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill, refocusGame });
 
@@ -245,6 +276,7 @@ export default {
       handleQuickbarRemap,
       triggerSkill,
       uiHidden,
+      partyOpen,
       refocusGame,
       gameContainerClasses: computed(() => ({
         'game-container--ui-hidden': uiHidden.value,
@@ -261,7 +293,8 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 .game-container {
-  --arpg-pane-width: clamp(420px, 28vw, 560px);
+  /* PoE-style: panes cover up to half the screen and overlay the world */
+  --arpg-pane-width: clamp(560px, 48vw, 1100px);
   --arpg-pane-gutter: 8px;
   --arpg-stage-top: 8px;
   --arpg-stage-bottom: 8px;
@@ -281,13 +314,8 @@ export default {
   overflow: hidden;
 }
 
-.game-container--left-pane-open {
-  --arpg-center-left: calc(var(--arpg-pane-width) + (var(--arpg-pane-gutter) * 2));
-}
-
-.game-container--right-pane-open {
-  --arpg-center-right: calc(var(--arpg-pane-width) + (var(--arpg-pane-gutter) * 2));
-}
+/* Panes overlay the world instead of squeezing it (PoE-style) —
+   the world shell stays centered regardless of open panes. */
 
 .game-container__stage {
   display: flex;
@@ -373,6 +401,39 @@ export default {
 }
 
 .game-container__hud {
+  width: 100%;
+}
+
+.game-container__party-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+  width: min(300px, 40%);
+  pointer-events: auto;
+}
+
+.game-container__party-toggle {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(180, 145, 86, 0.4);
+  background: rgba(12, 16, 28, 0.85);
+  color: #f5d68a;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.game-container__party-toggle:hover {
+  background: rgba(40, 36, 28, 0.95);
+}
+
+.game-container__party-overlay :deep(.party-panel) {
   width: 100%;
 }
 

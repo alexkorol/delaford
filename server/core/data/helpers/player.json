@@ -1,6 +1,6 @@
 {
-  "x": 13,
-  "y": 108,
+  "x": 38,
+  "y": 115,
   "x_ORIG": 65,
   "y_ORIG": 128,
   "username": "dev",
@@ -8,10 +8,6 @@
   "level": 1,
   "online": true,
   "sign_in": 1622502685,
-  "hp": {
-    "current": 10,
-    "max": 10
-  },
   "skills": {
     "attack": {
       "level": 1,

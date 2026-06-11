@@ -19,3 +19,27 @@ a {
 button, input {
   font: inherit;
 }
+
+/* Dark scrollbars everywhere — no white browser-default bars over the UI */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 145, 86, 0.45) rgba(10, 11, 14, 0.9);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 11, 14, 0.9);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(180, 145, 86, 0.45);
+  border-radius: 4px;
+
+  &:hover {
+    background: rgba(215, 180, 103, 0.6);
+  }
+}

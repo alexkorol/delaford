@@ -168,12 +168,14 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--eq-slot-size, 48px);
-  height: var(--eq-slot-size, 48px);
+  width: var(--eq-slot-size, 100%);
+  height: var(--eq-slot-size, 100%);
+  min-width: 36px;
+  min-height: 36px;
   box-sizing: border-box;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: contain;
+  background-size: 32px;
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid rgba(180, 145, 86, 0.32);
@@ -188,8 +190,10 @@ export default {
   }
 
   .wearSlot {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
+    transform: scale(var(--eq-sprite-scale, 1.25));
+    transform-origin: center;
     background-repeat: no-repeat;
     image-rendering: pixelated;
     filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.8));
