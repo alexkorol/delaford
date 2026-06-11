@@ -2,6 +2,7 @@ import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
 
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
+import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
 import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
@@ -309,11 +310,21 @@ class Map {
 
   static async generateInstance(options = {}) {
     const template = options.template || 'dungeon';
-    const themeName = options.theme
+    const depth = Math.max(1, Math.floor(options.depth || 1));
+    const baseThemeName = options.theme
       || TEMPLATE_THEMES[String(template).toLowerCase()]
       || 'stone';
+
+    // Deeper floors rotate through the theme list, starting from the
+    // template's theme on floor 1.
+    const themeNames = Object.keys(INSTANCE_THEMES);
+    const baseThemeIndex = Math.max(0, themeNames.indexOf(baseThemeName));
+    const themeName = themeNames[(baseThemeIndex + (depth - 1)) % themeNames.length];
     const theme = INSTANCE_THEMES[themeName] || INSTANCE_THEMES.stone;
-    const seed = Map.normaliseSeed(options.seed);
+
+    // Each floor gets its own deterministic seed derived from the base
+    const baseSeed = Map.normaliseSeed(options.seed);
+    const seed = Map.normaliseSeed(baseSeed + ((depth - 1) * 7919));
 
     const width = surfaceMap.width || config.map.size.x;
     const height = surfaceMap.height || config.map.size.y;
@@ -389,6 +400,9 @@ class Map {
       carvedRooms,
     });
 
+    const depthLevelBonus = (depth - 1) * 2;
+    const depthRewardMultiplier = 1 + ((depth - 1) * 0.35);
+
     const monsterSpawns = carvedRooms.slice(1);
     const roleCycle = ['melee', 'ranged', 'support'];
     const instanceMonsters = monsterSpawns.map((center, index) => {
@@ -424,7 +438,7 @@ class Map {
           : role === 'ranged'
             ? 'Ashen Marksman'
             : 'Dread Vanguard',
-        level: Math.max(4, Math.floor(5 + (index * 0.75))),
+        level: Math.max(4, Math.floor(5 + (index * 0.75))) + depthLevelBonus,
         archetype,
         rarity,
         spawn: {
@@ -434,14 +448,34 @@ class Map {
         },
         behaviour,
         rewards: {
-          experience: 30 + (index * 18),
-          coins: 60 + (index * 20),
+          experience: Math.round((30 + (index * 18)) * depthRewardMultiplier),
+          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier),
         },
         respawn: {
           delayMs: 600000,
         },
       };
     });
+
+    // Players spawn on the walkable tiles around the entry stairs,
+    // never on the stairs themselves (stepping on them transitions).
+    const entry = carvedRooms[0];
+    const exit = carvedRooms.length > 1 ? carvedRooms[carvedRooms.length - 1] : null;
+    const idx = (x, y) => (y * width) + x;
+    const spawnPoints = [
+      { x: entry.x + 1, y: entry.y },
+      { x: entry.x - 1, y: entry.y },
+      { x: entry.x, y: entry.y + 1 },
+      { x: entry.x, y: entry.y - 1 },
+    ].filter((tile) => {
+      const bgWalkable = UI.tileWalkable(background[idx(tile.x, tile.y)] - 1);
+      const fgGid = foreground[idx(tile.x, tile.y)];
+      return bgWalkable && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+    });
+
+    if (!spawnPoints.length) {
+      spawnPoints.push({ ...entry });
+    }
 
     return {
       map: {
@@ -450,14 +484,19 @@ class Map {
       },
       metadata: {
         seed,
+        baseSeed,
+        depth,
         template,
         theme: themeName,
-        spawnPoints: carvedRooms,
+        spawnPoints,
+        roomCentres: carvedRooms,
+        stairsUp: { x: entry.x, y: entry.y },
+        stairsDown: exit ? { x: exit.x, y: exit.y } : null,
         rewards: {
-          coinsPerPlayer: 120 + (instanceMonsters.length * 20),
+          coinsPerPlayer: Math.round((120 + (instanceMonsters.length * 20)) * depthRewardMultiplier),
           experience: {
             skill: 'attack',
-            amount: 40 + (instanceMonsters.length * 10),
+            amount: Math.round((40 + (instanceMonsters.length * 10)) * depthRewardMultiplier),
           },
         },
       },

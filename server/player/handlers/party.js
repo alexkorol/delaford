@@ -64,6 +64,9 @@ class PartyService {
       metadata: {
         template: 'dungeon',
         seed: null,
+        baseSeed: null,
+        depth: 0,
+        transitioning: false,
         instanceRewards: null,
         completedAt: null,
       },
@@ -286,8 +289,92 @@ class PartyService {
     party.sceneId = null;
     party.state = 'lobby';
     party.metadata.seed = null;
+    party.metadata.baseSeed = null;
+    party.metadata.depth = 0;
+    party.metadata.transitioning = false;
     party.metadata.instanceRewards = null;
     party.metadata.completedAt = null;
+  }
+
+  sendMessageToParty(party, text) {
+    this.forEachMember(party, (player) => {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text,
+      });
+    });
+  }
+
+  teleportMembersToSpawns(party, scene) {
+    const metadata = scene.metadata || {};
+    const spawnPoints = Array.isArray(metadata.spawnPoints) && metadata.spawnPoints.length
+      ? metadata.spawnPoints
+      : null;
+
+    let spawnIndex = 0;
+    this.forEachMember(party, (player) => {
+      const spawn = spawnPoints
+        ? spawnPoints[spawnIndex % spawnPoints.length]
+        : { x: player.x, y: player.y };
+      spawnIndex += 1;
+
+      if (spawn && typeof spawn.x === 'number' && typeof spawn.y === 'number') {
+        player.x = spawn.x;
+        player.y = spawn.y;
+      }
+      world.assignPlayerToScene(player, scene.id);
+      if (player.path) {
+        player.path.grid = null;
+      }
+    });
+  }
+
+  /**
+   * Generate and enter a dungeon floor for the party. Floor layouts are
+   * deterministic per (baseSeed, depth), so revisiting a floor
+   * regenerates the same layout.
+   */
+  async enterFloor(party, depth) {
+    const generation = await GameMap.generateInstance({
+      seed: party.metadata.baseSeed,
+      template: party.metadata.template,
+      depth,
+    });
+
+    world.destroyInstance(party.id);
+    const scene = world.createInstance(party.id, {
+      map: generation.map,
+      npcs: generation.npcs,
+      monsters: generation.monsters,
+      items: generation.items,
+      respawns: generation.respawns,
+      metadata: generation.metadata,
+    });
+
+    const monsterInstances = Array.isArray(generation.monsters)
+      ? generation.monsters.map((definition, index) => new Monster({
+        ...definition,
+        sceneId: scene.id,
+        instanceId: `${scene.id}:${definition.id || index}`,
+      }))
+      : [];
+    scene.monsters = monsterInstances;
+
+    party.sceneId = scene.id;
+    party.state = 'instance';
+    party.metadata.seed = generation.metadata.seed;
+    party.metadata.depth = depth;
+    party.metadata.instanceRewards = generation.metadata && generation.metadata.rewards
+      ? { ...generation.metadata.rewards }
+      : null;
+    party.metadata.completedAt = null;
+
+    this.teleportMembersToSpawns(party, scene);
+
+    this.sendPartyUpdate(party);
+    this.sendSceneTransition(party, scene);
+    this.sendLoadingState(party, 'idle');
+    return scene;
   }
 
   async startInstance(party, initiator) {
@@ -303,68 +390,91 @@ class PartyService {
     this.sendLoadingState(party, 'enter-instance');
 
     try {
-      const generation = await GameMap.generateInstance({
-        seed: Date.now(),
-        template: party.metadata.template,
-      });
-
-      const scene = world.createInstance(party.id, {
-        map: generation.map,
-        npcs: generation.npcs,
-        monsters: generation.monsters,
-        items: generation.items,
-        respawns: generation.respawns,
-        metadata: generation.metadata,
-      });
-
-      const monsterInstances = Array.isArray(generation.monsters)
-        ? generation.monsters.map((definition, index) => new Monster({
-          ...definition,
-          sceneId: scene.id,
-          instanceId: `${scene.id}:${definition.id || index}`,
-        }))
-        : [];
-      scene.monsters = monsterInstances;
-
-      party.sceneId = scene.id;
-      party.state = 'instance';
-      party.metadata.seed = generation.metadata.seed;
-      party.metadata.instanceRewards = generation.metadata && generation.metadata.rewards
-        ? { ...generation.metadata.rewards }
-        : null;
-      party.metadata.completedAt = null;
-
-      const spawnPoints = Array.isArray(generation.metadata.spawnPoints)
-        && generation.metadata.spawnPoints.length
-        ? generation.metadata.spawnPoints
-        : null;
-
-      let spawnIndex = 0;
-      this.forEachMember(party, (player) => {
-        const spawn = spawnPoints && spawnPoints.length
-          ? spawnPoints[spawnIndex % spawnPoints.length]
-          : { x: player.x, y: player.y };
-        spawnIndex += 1;
-
-        if (spawn && typeof spawn.x === 'number' && typeof spawn.y === 'number') {
-          player.x = spawn.x;
-          player.y = spawn.y;
-        }
-        world.assignPlayerToScene(player, scene.id);
-        if (player.path) {
-          player.path.grid = null;
-        }
-      });
-
+      party.metadata.baseSeed = Date.now();
+      await this.enterFloor(party, 1);
       this.clearReadyState(party);
-      this.sendPartyUpdate(party);
-      this.sendSceneTransition(party, scene);
-      this.sendLoadingState(party, 'idle');
     } catch (error) {
       console.error('Failed to start party instance', error);
       this.sendError(initiator, 'Failed to prepare the instance. Please try again.');
       this.sendLoadingState(party, 'idle');
     }
+  }
+
+  /**
+   * Move the party one floor up or down. Descending from the deepest
+   * floor generates a new one; ascending from floor 1 returns to town.
+   */
+  async transitionFloor(party, targetDepth) {
+    if (!party || party.state !== 'instance' || party.metadata.transitioning) {
+      return;
+    }
+
+    if (targetDepth < 1) {
+      this.returnToTown(party);
+      return;
+    }
+
+    party.metadata.transitioning = true;
+    this.sendLoadingState(party, 'enter-instance');
+
+    try {
+      const descending = targetDepth > (party.metadata.depth || 1);
+      await this.enterFloor(party, targetDepth);
+      this.sendMessageToParty(
+        party,
+        descending
+          ? `The party descends to floor ${targetDepth}...`
+          : `The party climbs back to floor ${targetDepth}.`,
+      );
+    } catch (error) {
+      console.error('Failed to transition party floor', error);
+      this.sendLoadingState(party, 'idle');
+    } finally {
+      party.metadata.transitioning = false;
+    }
+  }
+
+  /**
+   * Trigger floor transitions for any party member standing on stairs.
+   * Called periodically from the game loop.
+   */
+  checkStairTransitions() {
+    this.parties.forEach((party) => {
+      if (!party || party.state !== 'instance' || party.metadata.transitioning) {
+        return;
+      }
+
+      const scene = world.getScene(party.sceneId);
+      if (!scene || !scene.metadata || scene.type !== 'instance') {
+        return;
+      }
+
+      const { stairsDown, stairsUp } = scene.metadata;
+      const depth = party.metadata.depth || scene.metadata.depth || 1;
+      let triggered = false;
+
+      this.forEachMember(party, (player) => {
+        if (triggered || !player) {
+          return;
+        }
+
+        if (stairsDown && player.x === stairsDown.x && player.y === stairsDown.y) {
+          triggered = true;
+          this.transitionFloor(party, depth + 1);
+          return;
+        }
+
+        if (stairsUp && player.x === stairsUp.x && player.y === stairsUp.y) {
+          triggered = true;
+          if (depth <= 1) {
+            this.sendMessageToParty(party, 'The party returns to the surface.');
+            this.returnToTown(party);
+          } else {
+            this.transitionFloor(party, depth - 1);
+          }
+        }
+      });
+    });
   }
 
   returnToTown(party) {
@@ -376,6 +486,9 @@ class PartyService {
     party.state = 'lobby';
     party.sceneId = null;
     party.metadata.seed = null;
+    party.metadata.baseSeed = null;
+    party.metadata.depth = 0;
+    party.metadata.transitioning = false;
     party.metadata.instanceRewards = null;
     party.metadata.completedAt = null;
     this.clearReadyState(party);
@@ -481,9 +594,8 @@ class PartyService {
 
     const scene = options.scene || world.getInstance(party.id) || world.getScene(party.sceneId);
     party.metadata.completedAt = Date.now();
-    party.state = 'instance-complete';
 
-    this.sendPartyUpdate(party, { meta: { state: 'instance-complete' } });
+    this.sendPartyUpdate(party, { meta: { state: 'floor-complete' } });
     this.sendLoadingState(party, 'distribute-rewards');
 
     const rewardsConfig = options.rewards
@@ -493,10 +605,11 @@ class PartyService {
 
     const rewards = await this.distributeInstanceRewards(party, rewardsConfig);
 
-    const completionMessage = options.message || 'Instance cleared! Rewards distributed.';
+    const depth = party.metadata.depth || 1;
+    const completionMessage = options.message
+      || `Floor ${depth} cleared! Rewards distributed — find the stairs to descend, or take the entry stairs to leave.`;
     this.sendInstanceComplete(party, rewards, completionMessage);
-    this.sendLoadingState(party, 'return-instance');
-    this.returnToTown(party);
+    this.sendLoadingState(party, 'idle');
     return true;
   }
 

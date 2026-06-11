@@ -68,9 +68,19 @@ describe('generateInstance themes', () => {
     const outOfRange = map.background.filter(gid => gid < DUNGEON_FIRST_GID);
     expect(outOfRange).toHaveLength(0);
 
-    // entry stairs sit on the first spawn point
-    const entry = metadata.spawnPoints[0];
+    // entry stairs sit on the first room centre; spawn points surround them
+    const entry = metadata.stairsUp;
     expect(map.foreground[(entry.y * width) + entry.x]).toBe(dungeonGid('stairs_up'));
+    expect(metadata.spawnPoints.length).toBeGreaterThan(0);
+    metadata.spawnPoints.forEach((spawn) => {
+      expect(spawn.x === entry.x && spawn.y === entry.y).toBe(false);
+      expect(Math.abs(spawn.x - entry.x) + Math.abs(spawn.y - entry.y)).toBe(1);
+    });
+
+    // descent stairs are recorded and placed in the last room
+    const exit = metadata.stairsDown;
+    expect(exit).toBeTruthy();
+    expect(map.foreground[(exit.y * width) + exit.x]).toBe(dungeonGid('stairs_down'));
 
     // BFS from the entry: every room centre must be reachable
     const start = (entry.y * width) + entry.x;
@@ -92,7 +102,7 @@ describe('generateInstance themes', () => {
       });
     }
 
-    metadata.spawnPoints.forEach((room) => {
+    metadata.roomCentres.forEach((room) => {
       expect(seen.has((room.y * width) + room.x)).toBe(true);
     });
   });
