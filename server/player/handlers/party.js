@@ -3,7 +3,7 @@ import world from '#server/core/world.js';
 import GameMap from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
-import UI from '#shared/ui.js';
+import { awardSkillExperience } from '#server/core/combat/experience.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -551,13 +551,16 @@ class PartyService {
         const skillId = experienceConfig.skill;
         const amount = experienceConfig.amount;
         if (player.skills && player.skills[skillId]) {
-          player.skills[skillId].exp += amount;
-          player.skills[skillId].level = UI.getLevel(player.skills[skillId].exp);
-          Socket.emit('resource:skills:update', {
-            player: { socket_id: player.socket_id },
-            data: player.skills,
-          });
-          entry.experience = { skill: skillId, amount };
+          const experience = awardSkillExperience(player, skillId, amount);
+          if (experience) {
+            entry.experience = {
+              skill: skillId,
+              amount: experience.amount,
+              level: experience.level,
+              levelledUp: experience.levelledUp,
+              characterLevelledUp: experience.characterLevelledUp,
+            };
+          }
         }
       }
 

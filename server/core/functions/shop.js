@@ -7,6 +7,26 @@ import world from '#server/core/world.js';
 
 const { player } = config;
 
+const normaliseQuantity = (quantity) => {
+  const numeric = Number(quantity);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(numeric));
+};
+
+const getStackQuantity = (item) => {
+  if (!item) {
+    return 0;
+  }
+
+  const numeric = Number(item?.qty);
+  if (!Number.isFinite(numeric)) {
+    return 1;
+  }
+  return Math.max(0, Math.floor(numeric));
+};
+
 class Shop {
   constructor(shopId, playerUuid, itemId, type, quantity) {
     // Our player's reference and index
@@ -34,11 +54,16 @@ class Shop {
 
     // Is our item stackable?
     this.itemFull = Query.getItemData(this.itemId);
-    this.stackable = this.itemFull.stackable;
+    if (!this.itemFull) {
+      throw new Error('Item not found.');
+    }
+    this.stackable = this.itemFull.stackable === true;
+    this.price = Number.isFinite(this.itemFull.price) ? this.itemFull.price : 0;
     this.ableToBuyAll = false;
+    this.requestedQuantity = normaliseQuantity(quantity);
 
     // Is this item prohibited from being sold?
-    this.prohibited = this.itemFull.prohibited;
+    this.prohibited = this.itemFull.prohibited === true;
 
     // Get the quantity of how much we are able to buy
     this.quantity = this.getTrueStockableQuantity(quantity);
@@ -79,12 +104,20 @@ class Shop {
    * @return {integer}
    */
   getSellableQuantity(quantity) {
-    // How many items (to sell) do we have in our inventory?
-    const howManyItems = this.inventory.slots.map(q => q.id).filter(e => e === this.itemId).length;
+    const requestedQuantity = normaliseQuantity(quantity);
+    if (requestedQuantity <= 0) {
+      return 0;
+    }
 
-    // If our items exceed the quantity we want to
-    // sell (50), set the correct amount to sell.
-    return howManyItems > quantity ? quantity : howManyItems;
+    if (this.stackable) {
+      const stack = this.getInventoryStack();
+      return Math.min(requestedQuantity, getStackQuantity(stack));
+    }
+
+    // How many items (to sell) do we have in our inventory?
+    const howManyItems = this.inventory.slots.filter(e => e && e.id === this.itemId).length;
+
+    return Math.min(requestedQuantity, howManyItems);
   }
 
   /**
@@ -94,16 +127,22 @@ class Shop {
    * @return {boolean}
    */
   getTrueStockableQuantity(quantity) {
+    const requestedQuantity = normaliseQuantity(quantity);
+    if (requestedQuantity <= 0) {
+      return 0;
+    }
+
     if (this.shopItemIndex === -1) return 0;
     // Is our in-stock quantity higher than what we want to buy?
-    const moreThanWeHave = this.shop[this.shopItemIndex].qty >= quantity;
+    const stockQuantity = getStackQuantity(this.shop[this.shopItemIndex]);
+    const moreThanWeHave = stockQuantity >= requestedQuantity;
 
     // If not, we will be able to buy all (ig: in-stock = 10, buy 5)
     this.ableToBuyAll = moreThanWeHave === true;
 
     // If we want to buy more than we have, use the user-clicked
     // quantity otherwise lets buy the items in-stock quantity.
-    return moreThanWeHave ? quantity : this.shop[this.shopItemIndex].qty;
+    return moreThanWeHave ? requestedQuantity : stockQuantity;
   }
 
   /**
@@ -113,19 +152,51 @@ class Shop {
    * @return {integer}
    */
   getTrueBuyingQuantity() {
-    // If we don't have enought slots available,
-    // then we must substract from quantity to get true amount.
-    const slotsLeftQuantity = this.slotsAvailable - this.quantity;
-    if (slotsLeftQuantity < 0) {
-      this.quantity = this.slotsAvailable;
-      this.insufficient.space = true;
-      return this.slotsAvailable;
+    if (this.quantity <= 0) {
+      return 0;
     }
 
-    // If our quantity wanted is less than slots available, return the quantity
-    // otherwise, lets take the remaining slots left and just give them that.
-    // (eg: player has 8 slots left, wants to buy 20, we return 12)
-    return this.quantity <= this.slotsAvailable ? this.quantity : slotsLeftQuantity;
+    if (this.stackable && this.getInventoryStack()) {
+      return this.quantity;
+    }
+
+    const simulatedInventory = [...this.inventory.slots];
+    let quantityThatFits = 0;
+    const attempts = this.stackable ? 1 : this.quantity;
+
+    for (let index = 0; index < attempts; index += 1) {
+      const openSlot = UI.getOpenSlot(simulatedInventory, 'inventory', this.itemFull);
+      if (openSlot === false && openSlot !== 0) {
+        break;
+      }
+
+      quantityThatFits += this.stackable ? this.quantity : 1;
+      simulatedInventory.push({
+        ...this.itemFull,
+        id: this.itemId,
+        qty: this.stackable ? this.quantity : 1,
+        slot: openSlot,
+      });
+
+      if (this.stackable) {
+        break;
+      }
+    }
+
+    if (quantityThatFits < this.quantity) {
+      this.insufficient.space = true;
+    }
+
+    return quantityThatFits;
+  }
+
+  /**
+   * Return the player's inventory stack for this shop item, when one exists.
+   *
+   * @return {object|undefined}
+   */
+  getInventoryStack() {
+    return this.inventory.slots.find(item => item && item.id === this.itemId);
   }
 
   /**
@@ -170,16 +241,22 @@ class Shop {
     if (this.prohibited) {
       willWeSell = false;
       msg = 'You cannot sell this item.';
+    } else if (this.quantityToSell <= 0) {
+      willWeSell = false;
+      msg = 'You do not have that item.';
+    } else if (!this.spaceInInventory()) {
+      willWeSell = false;
+      msg = 'Not enough space in inventory.';
     } else if (this.isSpeciality()) {
       willWeSell = this.shop.map(q => q.id).includes(this.itemId);
       if (!willWeSell) {
         msg = 'You cannot sell this item to the store.';
-      } else if (!this.spaceInInventory()) {
-        willWeSell = false;
-        msg = 'Not enough space in inventory.';
       } else {
         willWeSell = true;
       }
+    } else if (!this.shopCanReceiveSale()) {
+      willWeSell = false;
+      msg = 'The store has no room for that item.';
     } else {
       willWeSell = true;
     }
@@ -199,35 +276,32 @@ class Shop {
    * Sell an item to the shop
    */
   sell() {
-    const { price } = Query.getItemData(this.itemId);
-
     if (this.canWeSell()) {
-      const rounds = this.stackable ? 1 : this.quantityToSell;
-
-      if (this.itemInStock() || this.buyingStoreProduct()) {
-        this.shop[this.shopItemIndex].qty += this.quantityToSell;
+      const quantitySold = this.removeSoldItemsFromInventory();
+      if (quantitySold <= 0) {
+        return {
+          inventory: this.inventory.slots,
+          shopItems: this.shop,
+        };
       }
 
-      if (!this.itemInStock() && this.isGeneralStore()) {
-        this.shop.push({
-          id: this.itemId,
-          qty: this.quantityToSell,
-          slot: UI.getOpenSlot(this.shop),
-        });
-      }
+      this.addSoldItemsToShop(quantitySold);
+      this.coinIndex = this.inventory.slots.findIndex(e => e.id === 'coins');
 
-      // Remove item from inventory
-      for (let index = 0; index < rounds; index += 1) {
-        this.inventory.slots.splice(this.inventory.slots.findIndex(z => z.id === this.itemId), 1);
-        this.coinIndex = this.inventory.slots.findIndex(e => e.id === 'coins'); // Update the index where coins are in inventory
+      const saleValue = this.price * quantitySold;
+      if (saleValue <= 0) {
+        return {
+          inventory: this.inventory.slots,
+          shopItems: this.shop,
+        };
       }
 
       // Add coins to our coins in inventory
       if (this.hasCoinsInInventory()) {
-        this.inventory.slots[this.coinIndex].qty += price * rounds;
+        this.inventory.slots[this.coinIndex].qty += saleValue;
       } else {
         // If not, lets give them their coins to the inventory
-        this.inventory.add('coins', price * rounds);
+        this.inventory.add('coins', saleValue);
       }
     }
 
@@ -243,56 +317,76 @@ class Shop {
    * @return {boolean}
    */
   buyingStoreProduct() {
-    return world.shops[this.shopIndex].originalStock.includes(this.itemId);
+    return (world.shops[this.shopIndex].originalStock || []).includes(this.itemId);
   }
 
   /**
    * Buy an item from the shop
    */
   buy() {
-    // Get price of item
-    const { price } = Query.getItemData(this.itemId);
+    // Save quantity before a purchase
+    const qtyBeforePurchase = this.shopItemIndex === -1
+      ? 0
+      : getStackQuantity(this.shop[this.shopItemIndex]);
     // How many items can we buy based on inventory space
-    const isBuying = this.getTrueBuyingQuantity();
-    // How much gold are we spending?
-    const toSpend = price * isBuying;
+    let isBuying = this.getTrueBuyingQuantity();
     // How much gold do we have?
     let playerGold = 0;
 
     if (this.inventory.slots[this.coinIndex]) {
       playerGold = this.inventory.slots[this.coinIndex].qty;
     }
-    // How much money left after purchase?
-    const moneyLeft = playerGold - toSpend;
-    // How many items to buy based on all calculations
-    let rounds = this.stackable ? 1 : this.quantity;
+    if (this.price > 0 && playerGold < this.price) {
+      this.insufficient.funds = true;
+      this.checkPurchase(qtyBeforePurchase);
+      return {
+        inventory: this.inventory.slots,
+        shopItems: this.shop,
+      };
+    }
 
-    // Do we have enough money?
-    this.insufficient.funds = moneyLeft <= -1;
-    // then we are not buying anything
-    if (this.insufficient.funds) rounds = 0;
+    if (this.price > 0 && playerGold < this.price * isBuying) {
+      this.insufficient.funds = true;
+      isBuying = Math.floor(playerGold / this.price);
+    }
 
-    // Add item to inventory
-    this.inventory.add(this.itemId, rounds);
+    if (isBuying <= 0) {
+      this.checkPurchase(qtyBeforePurchase);
+      return {
+        inventory: this.inventory.slots,
+        shopItems: this.shop,
+      };
+    }
 
-    // Save quantity before a purchase
-    const qtyBeforePurchase = this.shop[this.shopItemIndex].qty;
+    const quantityBought = this.addPurchasedItemsToInventory(isBuying);
+    if (quantityBought <= 0) {
+      this.insufficient.space = true;
+      this.checkPurchase(qtyBeforePurchase);
+      return {
+        inventory: this.inventory.slots,
+        shopItems: this.shop,
+      };
+    }
 
     // If we completed one round of purchasing
-    if (rounds > 0) {
+    if (quantityBought > 0) {
+      const toSpend = this.price * quantityBought;
+      const moneyLeft = playerGold - toSpend;
       // Update our new money total
-      if (moneyLeft > 0) {
-        this.inventory.slots[this.coinIndex].qty = moneyLeft;
-      } else {
+      if (this.price > 0 && this.inventory.slots[this.coinIndex]) {
+        if (moneyLeft > 0) {
+          this.inventory.slots[this.coinIndex].qty = moneyLeft;
+        } else {
       // A quantity of zero still renders the item sprite.
       // In the case that we have no money left, we should remove
       // the whole coin sprite from the inventory
-        this.inventory.slots.splice(this.coinIndex, 1);
+          this.inventory.slots.splice(this.coinIndex, 1);
+        }
       }
 
       // Substract the quantity of the items we have bought
       const shopQty = this.shop[this.shopItemIndex].qty;
-      const qtyAfterPurchase = shopQty - isBuying;
+      const qtyAfterPurchase = shopQty - quantityBought;
 
       if (qtyAfterPurchase > 0 || this.buyingStoreProduct()) {
         this.shop[this.shopItemIndex].qty = Math.max(0, qtyAfterPurchase);
@@ -338,10 +432,11 @@ class Shop {
    * Get the value for an item to player
    */
   value() {
-    const { price, name } = Query.getItemData(this.itemId);
     Socket.emit('game:send:message', {
       player: { socket_id: world.players[this.playerIndex].socket_id },
-      text: this.prohibited ? 'How can you value that which has infinite value?' : `${name}: ${price} coins.`,
+      text: this.prohibited
+        ? 'How can you value that which has infinite value?'
+        : `${this.itemFull.name}: ${this.price} coins.`,
     });
   }
 
@@ -361,7 +456,45 @@ class Shop {
    * @return {boolean}
    */
   spaceInInventory() {
-    return this.hasCoinsInInventory() || this.slotsAvailable > 0;
+    return this.hasCoinsInInventory()
+      || this.slotsAvailable > 0
+      || this.saleFreesInventorySlot();
+  }
+
+  /**
+   * Does this sale free a slot before coins need to be inserted?
+   *
+   * @return {boolean}
+   */
+  saleFreesInventorySlot() {
+    if (this.quantityToSell <= 0) {
+      return false;
+    }
+
+    if (!this.stackable) {
+      return true;
+    }
+
+    const stack = this.getInventoryStack();
+    return Boolean(stack) && this.quantityToSell >= getStackQuantity(stack);
+  }
+
+  /**
+   * Can the shop inventory accept this sold item?
+   *
+   * @return {boolean}
+   */
+  shopCanReceiveSale() {
+    if (this.shop.findIndex(q => q && q.id === this.itemId) !== -1) {
+      return true;
+    }
+
+    if (!this.isGeneralStore()) {
+      return false;
+    }
+
+    const openSlot = UI.getOpenSlot(this.shop, 'trade');
+    return openSlot !== false || openSlot === 0;
   }
 
   /**
@@ -371,6 +504,113 @@ class Shop {
    */
   hasCoinsInInventory() {
     return this.coinIndex > -1;
+  }
+
+  /**
+   * Add purchased items to the player's inventory and return the true quantity added.
+   *
+   * @param {integer} quantity The intended quantity to buy
+   * @return {integer}
+   */
+  addPurchasedItemsToInventory(quantity) {
+    if (quantity <= 0) {
+      return 0;
+    }
+
+    if (this.stackable) {
+      const existingStack = this.getInventoryStack();
+      if (existingStack) {
+        existingStack.qty = getStackQuantity(existingStack) + quantity;
+        return quantity;
+      }
+
+      const beforeStack = this.getInventoryStack();
+      this.inventory.add(this.itemId, quantity);
+      const afterStack = this.getInventoryStack();
+      if (!beforeStack && afterStack) {
+        return getStackQuantity(afterStack);
+      }
+      return 0;
+    }
+
+    const beforeCount = this.inventory.slots.filter(item => item && item.id === this.itemId).length;
+    this.inventory.add(this.itemId, quantity);
+    const afterCount = this.inventory.slots.filter(item => item && item.id === this.itemId).length;
+    return Math.max(0, afterCount - beforeCount);
+  }
+
+  /**
+   * Remove sold items from inventory and return the true quantity removed.
+   *
+   * @return {integer}
+   */
+  removeSoldItemsFromInventory() {
+    if (this.quantityToSell <= 0) {
+      return 0;
+    }
+
+    if (this.stackable) {
+      const stackIndex = this.inventory.slots.findIndex(item => item && item.id === this.itemId);
+      if (stackIndex === -1) {
+        return 0;
+      }
+
+      const stack = this.inventory.slots[stackIndex];
+      const quantitySold = Math.min(this.quantityToSell, getStackQuantity(stack));
+      if (quantitySold >= getStackQuantity(stack)) {
+        this.inventory.slots.splice(stackIndex, 1);
+      } else {
+        stack.qty = getStackQuantity(stack) - quantitySold;
+      }
+      return quantitySold;
+    }
+
+    let quantitySold = 0;
+    for (let index = 0; index < this.quantityToSell; index += 1) {
+      const itemIndex = this.inventory.slots.findIndex(z => z && z.id === this.itemId);
+      if (itemIndex === -1) {
+        break;
+      }
+
+      this.inventory.slots.splice(itemIndex, 1);
+      quantitySold += 1;
+    }
+
+    return quantitySold;
+  }
+
+  /**
+   * Place sold items back into the shop inventory.
+   *
+   * @param {integer} quantity The quantity sold by the player
+   */
+  addSoldItemsToShop(quantity) {
+    if (quantity <= 0) {
+      return;
+    }
+
+    const existingIndex = this.shop.findIndex(q => q && q.id === this.itemId);
+    if (existingIndex !== -1) {
+      this.shop[existingIndex].qty = getStackQuantity(this.shop[existingIndex]) + quantity;
+      this.shopItemIndex = existingIndex;
+      return;
+    }
+
+    if (!this.isGeneralStore()) {
+      return;
+    }
+
+    const openSlot = UI.getOpenSlot(this.shop, 'trade');
+    if (openSlot === false && openSlot !== 0) {
+      return;
+    }
+
+    this.shop.push({
+      id: this.itemId,
+      qty: quantity,
+      slot: openSlot,
+    });
+    this.shopItemIndex = this.shop.length - 1;
   }
 
   /**

@@ -389,6 +389,47 @@ class WorldManager {
     return this.towns.get(id);
   }
 
+  ensureScene(id, options = {}) {
+    if (!id) {
+      return this.getDefaultTown();
+    }
+
+    const sceneType = options.type || 'zone';
+    if (sceneType === 'town') {
+      return this.ensureTown(id, options);
+    }
+
+    if (!this.scenes.has(id)) {
+      const scene = new WorldScene({
+        id,
+        type: sceneType,
+        name: options.name || id,
+        persistent: options.persistent !== undefined ? options.persistent : true,
+        map: options.map,
+        npcs: options.npcs,
+        items: options.items,
+        respawns: options.respawns,
+        monsters: options.monsters,
+        metadata: options.metadata,
+      });
+
+      this.registerScene(scene);
+      return scene;
+    }
+
+    const scene = this.scenes.get(id);
+    scene.type = sceneType;
+    scene.name = options.name || scene.name || id;
+    scene.persistent = options.persistent !== undefined ? options.persistent : scene.persistent;
+    if (options.map) scene.map = options.map;
+    if (options.npcs) scene.npcs = options.npcs;
+    if (options.items) scene.items = options.items;
+    if (options.respawns) scene.respawns = options.respawns;
+    if (options.monsters) scene.monsters = options.monsters;
+    if (options.metadata) scene.metadata = options.metadata;
+    return scene;
+  }
+
   createInstance(partyId, options = {}) {
     if (!partyId) {
       throw new Error('Cannot create instance without party ID.');

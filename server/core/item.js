@@ -64,11 +64,7 @@ class Item {
           foreground[resource.onTile] = resource.setToTile;
         }
 
-        const players = scene.id === world.defaultTownId
-          ? null
-          : world.getScenePlayers(scene.id);
-
-        Socket.broadcast('world:foreground:update', foreground, players);
+        Socket.broadcast('world:foreground:update', foreground, world.getScenePlayers(scene.id));
         world.removeResourceRespawn(resource, scene.id);
       }
     });
@@ -78,27 +74,38 @@ class Item {
    * Checks the map for any picked up respawning items
    */
   static check() {
-    const itemsWaitingToRespawn = world.respawns.items.filter(i => i.pickedUp);
+    world.forEachScene((scene) => {
+      if (!scene || !scene.respawns || !Array.isArray(scene.respawns.items)) {
+        return;
+      }
 
-    if (itemsWaitingToRespawn.length) {
+      const itemsWaitingToRespawn = scene.respawns.items.filter(i => i.pickedUp);
+
+      if (!itemsWaitingToRespawn.length) {
+        return;
+      }
+
       itemsWaitingToRespawn.forEach((item) => {
-        if (Item.itemAlreadyPlaced(item) === undefined) {
-          const baseItem = ItemFactory.createById(item.id);
-          const respawned = ItemFactory.toWorldInstance(
-            baseItem || { id: item.id },
-            { x: item.x, y: item.y },
-            { respawn: true },
-          );
-
-          respawned.respawnIn = item.respawnIn;
-          world.addItem(respawned);
-
-          Socket.broadcast('world:itemDropped', world.items);
-
-          console.log(`${item.id} is respawning...`);
+        if (Item.itemAlreadyPlaced(item, scene.id) !== undefined) {
+          return;
         }
+
+        const baseItem = ItemFactory.createById(item.id);
+        const respawned = ItemFactory.toWorldInstance(
+          baseItem || { id: item.id },
+          { x: item.x, y: item.y },
+          { respawn: true },
+        );
+
+        respawned.respawnIn = item.respawnIn;
+        world.addItem(respawned, scene.id);
+
+        const sceneItems = Array.isArray(scene.items) ? scene.items : [];
+        Socket.broadcast('world:itemDropped', sceneItems, world.getScenePlayers(scene.id));
+
+        console.log(`${item.id} is respawning...`);
       });
-    }
+    });
   }
 
   /**
@@ -108,11 +115,13 @@ class Item {
    *
    * @returns {boolean}
    */
-  static itemAlreadyPlaced(item) {
+  static itemAlreadyPlaced(item, sceneId = world.defaultTownId) {
     const time = new Date();
+    const scene = world.getScene(sceneId);
+    const items = scene && Array.isArray(scene.items) ? scene.items : world.items;
 
     return time > item.willRespawnIn
-      && world.items.find(i => i.respawn && i.x === item.x && i.y === item.y);
+      && items.find(i => i.respawn && i.x === item.x && i.y === item.y);
   }
 
   /**

@@ -3,9 +3,12 @@
     v-tippy
     :title="tooltip"
     :class="rootClasses"
+    :data-equipment-slot="slotId"
     @click.left="handleSelect"
     @contextmenu.prevent="emitContext($event, false)"
     @mouseover="emitContext($event, true)"
+    @pointerdown.left="handlePointerDown"
+    @pointerup.left.stop.prevent="handlePointerUp"
     @pointerenter="handlePointerEnter"
     @pointerleave="handlePointerLeave"
   >
@@ -19,12 +22,18 @@
 
 <script>
 import { mapStores } from 'pinia';
+import { unref } from 'vue';
 
+import { canEquipInventoryItemToSlot } from '@/stores/inventory.js';
 import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 
+const storeValue = value => unref(value);
+const isStoreDragging = store => Boolean(store && storeValue(store.isDragging));
+
 export default {
   name: 'EquipmentSlot',
+  emits: ['open-context-menu', 'commit'],
   props: {
     slotId: {
       type: String,
@@ -39,6 +48,11 @@ export default {
       default: () => ({}),
     },
   },
+  beforeUnmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointerup', this.handlePointerUp);
+    }
+  },
   inject: {
     inventoryDragStore: {
       from: 'inventoryDragStore',
@@ -52,22 +66,51 @@ export default {
         item: this.uiStore.action.object,
       });
     },
-    handlePointerEnter() {
-      if (!this.inventoryDragStore || !this.inventoryDragStore.isDragging.value) {
+    handlePointerDown(event) {
+      if (!this.item || !this.inventoryDragStore) {
         return;
       }
 
+      event.preventDefault();
+      this.inventoryDragStore.beginDrag(this.item.uuid, 'equipment', {
+        sourceSlotId: this.slotId,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pointerup', this.handlePointerUp);
+        window.addEventListener('pointerup', this.handlePointerUp);
+      }
+    },
+    handlePointerUp() {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pointerup', this.handlePointerUp);
+      }
+
+      if (!isStoreDragging(this.inventoryDragStore)) {
+        return;
+      }
+
+      const result = this.inventoryDragStore.commitDrop();
+      this.$emit('commit', result);
+    },
+    handlePointerEnter() {
+      if (!isStoreDragging(this.inventoryDragStore)) {
+        return;
+      }
+
+      const item = storeValue(this.inventoryDragStore.activeItem);
       this.inventoryDragStore.setHoverTarget({
         type: 'equipment',
         slotId: this.slotId,
+        valid: canEquipInventoryItemToSlot(item, this.slotId),
       });
     },
     handlePointerLeave() {
-      if (!this.inventoryDragStore || !this.inventoryDragStore.isDragging.value) {
+      if (!isStoreDragging(this.inventoryDragStore)) {
         return;
       }
 
-      if (this.inventoryDragStore.dragState.value?.hoverTarget?.slotId === this.slotId) {
+      if (storeValue(this.inventoryDragStore.dragState)?.hoverTarget?.slotId === this.slotId) {
         this.inventoryDragStore.clearHoverTarget();
       }
     },
@@ -116,6 +159,7 @@ export default {
         this.slotId,
         { wearSlot: this.isFilled },
         { 'slot--drop-target': this.isDropTarget },
+        { 'slot--invalid-drop-target': this.isInvalidDropTarget },
       ];
     },
     backgroundClass() {
@@ -155,8 +199,19 @@ export default {
         return false;
       }
 
-      const target = this.inventoryDragStore.dragState.value?.hoverTarget;
+      const target = storeValue(this.inventoryDragStore.dragState)?.hoverTarget;
       return target && target.type === 'equipment' && target.slotId === this.slotId;
+    },
+    isInvalidDropTarget() {
+      if (!this.inventoryDragStore) {
+        return false;
+      }
+
+      const target = storeValue(this.inventoryDragStore.dragState)?.hoverTarget;
+      return target
+        && target.type === 'equipment'
+        && target.slotId === this.slotId
+        && target.valid === false;
     },
   },
 };
@@ -205,6 +260,13 @@ export default {
   box-shadow:
     inset 0 0 8px rgba(0, 0, 0, 0.78),
     0 0 12px rgba(75, 135, 210, 0.4);
+}
+
+.slot--invalid-drop-target {
+  border-color: rgba(210, 75, 75, 0.86);
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.78),
+    0 0 12px rgba(185, 55, 55, 0.4);
 }
 
 .slot.head {

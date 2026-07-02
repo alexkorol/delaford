@@ -32,6 +32,32 @@ export const computeStepDuration = (direction, options = {}) => {
   return Math.round((150 * multiplier) / speed);
 };
 
+const getActiveSlowMultiplier = (monster, now = Date.now()) => {
+  const effects = monster && monster.state && monster.state.effects;
+  if (!effects || typeof effects !== 'object') {
+    return 1;
+  }
+
+  return Object.entries(effects).reduce((slowest, [id, effect]) => {
+    if (!effect || !Number.isFinite(effect.expiresAt) || effect.expiresAt <= now) {
+      delete effects[id];
+      return slowest;
+    }
+
+    if (!Number.isFinite(effect.slowMultiplier)) {
+      return slowest;
+    }
+
+    return Math.min(slowest, Math.max(0.1, Math.min(1, effect.slowMultiplier)));
+  }, 1);
+};
+
+const getStepInterval = (monster, now = Date.now()) => {
+  const baseInterval = monster.behaviour.stepIntervalMs;
+  const slowMultiplier = getActiveSlowMultiplier(monster, now);
+  return Math.round(baseInterval / slowMultiplier);
+};
+
 export const euclideanDistance = (a, b) => {
   const dx = (a.x || 0) - (b.x || 0);
   const dy = (a.y || 0) - (b.y || 0);
@@ -136,6 +162,34 @@ const setAnimationState = (monster, state, options = {}) => {
   return monster.animation;
 };
 
+const hasBlockingHealth = (actor) => {
+  const current = actor && actor.stats && actor.stats.resources
+    && actor.stats.resources.health
+    && actor.stats.resources.health.current;
+
+  return !Number.isFinite(current) || current > 0;
+};
+
+const actorAt = (actor, x, y) => actor && actor.x === x && actor.y === y;
+
+const playerBlocksTile = (player, x, y) => actorAt(player, x, y)
+  && hasBlockingHealth(player);
+
+const monsterBlocksTile = (monster, other, x, y) => actorAt(other, x, y)
+  && other !== monster
+  && (!other.uuid || !monster.uuid || other.uuid !== monster.uuid)
+  && other.isAlive !== false
+  && hasBlockingHealth(other);
+
+const tileOccupiedByActor = (monster, x, y) => {
+  const scene = monster.activeScene;
+  const players = scene && Array.isArray(scene.players) ? scene.players : [];
+  const monsters = scene && Array.isArray(scene.monsters) ? scene.monsters : [];
+
+  return players.some(player => playerBlocksTile(player, x, y))
+    || monsters.some(other => monsterBlocksTile(monster, other, x, y));
+};
+
 const pickPatrolTarget = (monster) => {
   if (!monster.behaviour || !monster.behaviour.patrolRadius) {
     return { x: monster.spawn.x, y: monster.spawn.y };
@@ -185,6 +239,10 @@ const canStep = (monster, direction) => {
     return false;
   }
 
+  if (tileOccupiedByActor(monster, targetX, targetY)) {
+    return false;
+  }
+
   const distanceFromSpawn = euclideanDistance({ x: targetX, y: targetY }, monster.spawn);
   if (monster.behaviour && monster.behaviour.leash && distanceFromSpawn > monster.behaviour.leash) {
     return false;
@@ -207,7 +265,9 @@ const step = (monster, direction, now = Date.now()) => {
   }
 
   const vector = directionVectors[direction];
-  const stepDuration = computeStepDuration(direction, { speedMultiplier: monster.behaviour.stepSpeedMultiplier || 1 });
+  const speedMultiplier = (monster.behaviour.stepSpeedMultiplier || 1)
+    * getActiveSlowMultiplier(monster, now);
+  const stepDuration = computeStepDuration(direction, { speedMultiplier });
 
   monster.x += vector.x;
   monster.y += vector.y;
@@ -245,7 +305,7 @@ const patrol = (monster, now = Date.now()) => {
     return false;
   }
 
-  if (now - (monster.state.lastStepAt || 0) < monster.behaviour.stepIntervalMs) {
+  if (now - (monster.state.lastStepAt || 0) < getStepInterval(monster, now)) {
     return false;
   }
 
@@ -267,7 +327,7 @@ const pursue = (monster, target, now = Date.now()) => {
     return false;
   }
 
-  if (now - (monster.state.lastStepAt || 0) < monster.behaviour.stepIntervalMs) {
+  if (now - (monster.state.lastStepAt || 0) < getStepInterval(monster, now)) {
     return false;
   }
 
@@ -291,7 +351,7 @@ const returnToSpawn = (monster, now = Date.now()) => {
     return false;
   }
 
-  if (now - (monster.state.lastStepAt || 0) < monster.behaviour.stepIntervalMs) {
+  if (now - (monster.state.lastStepAt || 0) < getStepInterval(monster, now)) {
     return false;
   }
 

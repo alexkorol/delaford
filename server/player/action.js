@@ -166,7 +166,9 @@ class Action {
     // If the player clicked on himself make the action be immediate
     if (clickedTile.x === center.x && clickedTile.y === center.y) {
       incomingAction.queueable = false;
-      queuedAction.queueable = false;
+      if (queuedAction) {
+        queuedAction.queueable = false;
+      }
     }
 
     // If an action needs to be performed

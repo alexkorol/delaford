@@ -139,6 +139,27 @@ const tryAttack = (monster, target, now = Date.now()) => {
   return true;
 };
 
+const consumeExpiredPlayerBuffs = (target, now) => {
+  const buffs = target && target.combat && target.combat.buffs;
+  if (!buffs || typeof buffs !== 'object') {
+    return [];
+  }
+
+  return Object.entries(buffs).reduce((active, [id, buff]) => {
+    if (!buff || !Number.isFinite(buff.expiresAt) || buff.expiresAt <= now) {
+      delete buffs[id];
+      return active;
+    }
+    active.push(buff);
+    return active;
+  }, []);
+};
+
+const getArmourMitigation = (target, now) => (
+  consumeExpiredPlayerBuffs(target, now)
+    .reduce((total, buff) => total + Math.max(0, Math.floor(buff.armourBonus || 0)), 0)
+);
+
 const resolvePendingAttack = (monster, now = Date.now()) => {
   const payload = monster.state.pendingAttack;
   if (!payload) {
@@ -159,7 +180,9 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   }
 
   const nowTs = now;
-  const result = target.applyDamage(payload.damage, { allowCheatDeath: true, now: nowTs });
+  const mitigation = getArmourMitigation(target, nowTs);
+  const damage = Math.max(0, Math.floor(payload.damage - mitigation));
+  const result = target.applyDamage(damage, { allowCheatDeath: true, now: nowTs });
 
   if (result) {
     target.setAnimationState('hurt', { direction: target.facing, startedAt: nowTs });
@@ -170,7 +193,13 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     }
   }
 
-  return result ? { target, result, damage: payload.damage } : false;
+  return result ? {
+    target,
+    result,
+    damage,
+    rawDamage: payload.damage,
+    mitigation,
+  } : false;
 };
 
 const createMonsterCombatController = (monster) => ({

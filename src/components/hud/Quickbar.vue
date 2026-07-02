@@ -1,33 +1,39 @@
 <template>
   <nav class="quickbar" aria-label="Quick actions">
     <div
-      v-for="(slot, index) in slots"
-      :key="slot.id || index"
-      :class="['quickbar__slot', { 'quickbar__slot--active': index === activeIndex }]"
+      v-for="entry in visibleSlotEntries"
+      :key="entry.slot.id || entry.index"
+      :class="[
+        'quickbar__slot',
+        {
+          'quickbar__slot--active': entry.index === activeIndex,
+          'quickbar__slot--empty': !entry.slot.skillId,
+        },
+      ]"
     >
       <button
         class="quickbar__activate"
         type="button"
-        :title="slotTitle(slot, index)"
-        :disabled="!slot.skillId"
-        @click="$emit('slot-activate', slot, index)"
+        :title="slotTitle(entry.slot, entry.index)"
+        :disabled="!entry.slot.skillId"
+        @click="$emit('slot-activate', entry.slot, entry.index)"
       >
         <span class="quickbar__icon" aria-hidden="true">
-          <span v-if="slot.icon">{{ slot.icon }}</span>
+          <span v-if="entry.slot.icon">{{ entry.slot.icon }}</span>
         </span>
-        <span class="quickbar__label">{{ slot.label || `Slot ${index + 1}` }}</span>
+        <span class="quickbar__label">{{ entry.slot.label || `Slot ${entry.index + 1}` }}</span>
         <span
-          v-if="slot.skill && slot.skill.cooldown"
+          v-if="entry.slot.skill && entry.slot.skill.cooldown"
           class="quickbar__cooldown"
-        >{{ slot.skill.cooldown }}s</span>
+        >{{ entry.slot.skill.cooldown }}s</span>
       </button>
       <button
         class="quickbar__remap"
         type="button"
-        :aria-label="`Remap ${slot.label || `slot ${index + 1}`}`"
-        @click="$emit('request-remap', slot, index)"
+        :aria-label="`Remap ${entry.slot.label || `slot ${entry.index + 1}`}`"
+        @click="$emit('request-remap', entry.slot, entry.index)"
       >
-        <span class="quickbar__hotkey">{{ slot.hotkey }}</span>
+        <span class="quickbar__hotkey">{{ entry.slot.hotkey }}</span>
         <span class="quickbar__remap-text">Remap</span>
       </button>
     </div>
@@ -48,6 +54,13 @@ export default {
     },
   },
   emits: ['slot-activate', 'request-remap'],
+  computed: {
+    visibleSlotEntries() {
+      const entries = this.slots.map((slot, index) => ({ slot, index }));
+      const assigned = entries.filter(entry => entry.slot && entry.slot.skillId);
+      return assigned.length ? assigned : entries.slice(0, 1);
+    },
+  },
   methods: {
     slotTitle(slot, index) {
       const label = slot.label || `Slot ${index + 1}`;
@@ -65,25 +78,37 @@ export default {
 
 .quickbar {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   gap: 3px;
+  width: max-content;
+  max-width: 100%;
   padding: 3px;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background:
+    linear-gradient(180deg, rgba(58, 50, 38, 0.58), rgba(12, 10, 8, 0.62)),
+    rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(180, 145, 86, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 170, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.46);
 }
 
 .quickbar__slot {
+  position: relative;
+  flex: 0 0 40px;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  max-width: 40px;
+  height: 40px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: linear-gradient(180deg, #3a3226 0%, #28221a 100%);
   border: 1px solid var(--color-frame-dark);
   border-top-color: rgba(200, 180, 140, 0.25);
   border-left-color: rgba(200, 180, 140, 0.25);
-  min-width: 56px;
 }
 
 .quickbar__slot--active {
@@ -91,15 +116,23 @@ export default {
   box-shadow: 0 0 6px rgba(197, 160, 89, 0.4);
 }
 
+.quickbar__slot--empty {
+  flex-basis: 30px;
+  max-width: 30px;
+  opacity: 0.5;
+}
+
 .quickbar__activate {
   appearance: none;
   background: transparent;
   border: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 5px;
   color: var(--color-text-primary);
   font-family: 'GameFont', sans-serif;
   cursor: pointer;
@@ -123,43 +156,54 @@ export default {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(139, 115, 85, 0.2);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .quickbar__label {
-  font-size: clamp(8px, 0.7vw, 10px);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .quickbar__cooldown {
-  font-size: 0.7rem;
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 18px;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: rgba(5, 5, 6, 0.72);
+  font-size: 0.62rem;
   color: var(--color-accent-strong);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .quickbar__remap {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  z-index: 2;
   appearance: none;
-  border: 0;
-  border-top: 1px solid var(--color-frame-dark);
-  background: rgba(0, 0, 0, 0.3);
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(180, 145, 86, 0.28);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.58);
   color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 2px 4px;
-  font-size: clamp(9px, 0.7vw, 11px);
+  padding: 0;
+  font-size: 10px;
   font-family: 'GameFont', sans-serif;
   cursor: pointer;
 
@@ -176,11 +220,51 @@ export default {
 
 .quickbar__hotkey {
   font-family: 'GameFont', sans-serif;
-  font-size: clamp(9px, 0.7vw, 11px);
+  font-size: 10px;
+  line-height: 1;
 }
 
 .quickbar__remap-text {
   display: none;
+}
+
+@media (width <= 1100px) {
+  .quickbar {
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .quickbar__slot {
+    flex-basis: 36px;
+    max-width: 36px;
+    width: auto;
+    height: 36px;
+  }
+
+  .quickbar__slot--empty {
+    flex-basis: 28px;
+    max-width: 28px;
+  }
+
+  .quickbar__activate {
+    padding: 4px;
+  }
+
+  .quickbar__icon {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+
+  .quickbar__cooldown,
+  .quickbar__hotkey {
+    font-size: 9px;
+  }
+
+  .quickbar__remap {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 @media (width <= 768px) {
@@ -189,12 +273,14 @@ export default {
   }
 
   .quickbar__slot {
-    min-width: 44px;
+    flex-basis: 34px;
+    max-width: 34px;
+    height: 34px;
   }
 
-  .quickbar__label {
-    font-size: 8px;
-    max-width: 44px;
+  .quickbar__slot--empty {
+    flex-basis: 26px;
+    max-width: 26px;
   }
 }
 </style>

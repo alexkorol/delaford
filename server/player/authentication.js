@@ -1,6 +1,7 @@
 import Socket from '#server/socket.js';
 import axios from 'axios';
 import world from '#server/core/world.js';
+import { publicSceneMetadata } from '#server/core/world-transitions.js';
 
 class Authentication {
   /**
@@ -108,6 +109,7 @@ class Authentication {
         name: scene.name,
         type: scene.type,
         seed: scene.metadata && scene.metadata.seed,
+        metadata: publicSceneMetadata(scene.metadata || {}),
       },
     };
 

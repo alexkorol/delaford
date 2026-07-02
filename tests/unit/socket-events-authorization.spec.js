@@ -53,6 +53,8 @@ const createPlayer = (overrides = {}) => ({
   sceneId: 'town',
   queue: [],
   currentPane: 'inventory',
+  currentPaneData: [{ id: 1, slot: 0 }],
+  objectId: 'npc-shopkeeper',
   combat: { sequence: 0 },
   animation: { state: 'idle' },
   stats: { resources: { health: { current: 10, max: 10 }, mana: { current: 10, max: 10 } } },
@@ -136,7 +138,10 @@ describe('socket event authorization', () => {
     );
 
     expect(alice.currentPane).toBe(false);
+    expect(alice.currentPaneData).toBeNull();
+    expect(alice.objectId).toBeNull();
     expect(bob.currentPane).toBe('stats');
+    expect(bob.currentPaneData).toEqual([{ id: 1, slot: 0 }]);
   });
 
   it('rejects pane-close attempts that spoof another player uuid', () => {

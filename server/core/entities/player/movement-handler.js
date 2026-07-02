@@ -4,6 +4,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import playerEvent from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
+import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
@@ -205,10 +206,33 @@ const cancelPathfinding = (player) => {
   setAnimationState(player, 'idle', { direction: player.facing });
 };
 
+const hasBlockingHealth = (actor) => {
+  const current = actor && actor.stats && actor.stats.resources
+    && actor.stats.resources.health
+    && actor.stats.resources.health.current;
+
+  return !Number.isFinite(current) || current > 0;
+};
+
+const hasLivingMonsterAt = (player, tileX, tileY) => {
+  const scene = world.getSceneForPlayer(player);
+  const monsters = scene && Array.isArray(scene.monsters) ? scene.monsters : [];
+
+  return monsters.some(monster => monster
+    && monster.x === tileX
+    && monster.y === tileY
+    && monster.isAlive !== false
+    && hasBlockingHealth(monster));
+};
+
 const canMoveTo = (player, tileX, tileY) => {
   const { size } = config.map;
 
   if (tileX < 0 || tileY < 0 || tileX >= size.x || tileY >= size.y) {
+    return false;
+  }
+
+  if (hasLivingMonsterAt(player, tileX, tileY)) {
     return false;
   }
 
@@ -222,7 +246,7 @@ const canMoveTo = (player, tileX, tileY) => {
 
   const tiles = {
     background: steppedOn.background,
-    foreground: steppedOn.foreground - 252,
+    foreground: steppedOn.foreground,
   };
 
   return MapUtils.gridWalkable(tiles, player, tileIndex, 0, 0, mapLayers) === 0;
@@ -332,6 +356,7 @@ const move = (player, direction, options = {}) => {
     blocked: false,
   });
   setAnimationState(player, 'run', { direction: facing, duration });
+  transitionPlayerIfOnPortal(player);
 
   return true;
 };
@@ -424,6 +449,16 @@ const walkPath = (player, playerIndex) => {
       const playerChanging = world.players[playerIndex];
       if (playerChanging) {
         broadcastMovement(playerChanging);
+      }
+
+      if (player.movementStep && player.movementStep.blocked) {
+        path.current.interrupted = true;
+        path.current.path.walking = [];
+        path.current.path.set = [];
+        path.current.length = 0;
+        path.current.walkable = false;
+        player.moving = false;
+        return;
       }
 
       path.current.step += 1;

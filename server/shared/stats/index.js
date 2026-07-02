@@ -118,7 +118,6 @@ function parseNumber(value) {
 
 function normaliseMeter(input = {}, derivedMax = 0, options = {}) {
   const { allowMinZero = false } = options;
-  const fallbackCurrent = allowMinZero ? 0 : derivedMax;
 
   const current = parseNumber(input.current);
   const max = parseNumber(input.max);
@@ -141,7 +140,7 @@ function normaliseMeter(input = {}, derivedMax = 0, options = {}) {
     resolvedMax = derivedMax;
   }
 
-  const resolvedCurrent = current !== null ? current : fallbackCurrent;
+  const resolvedCurrent = current !== null ? current : derivedMax;
 
   return {
     current: Math.max(allowMinZero ? 0 : 1, Math.min(resolvedCurrent, resolvedMax)),

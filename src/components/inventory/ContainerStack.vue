@@ -22,7 +22,9 @@
 </template>
 
 <script>
-import { inject, computed } from 'vue';
+import { inject, computed, unref } from 'vue';
+
+const storeValue = value => unref(value);
 
 export default {
   name: 'ContainerStack',
@@ -47,7 +49,7 @@ export default {
 
     const containers = computed(() => (
       inventoryStore && inventoryStore.containerStack
-        ? (inventoryStore.containerStack.value || [])
+        ? (storeValue(inventoryStore.containerStack) || [])
         : []
     ));
 

@@ -5,12 +5,23 @@ import world from '#server/core/world.js';
 import Monster from '#server/core/monster.js';
 import Player from '#server/core/player.js';
 import { getSkillExecutionProfile } from '#shared/skills/index.js';
+import { DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { directionDelta } from '#server/core/entities/player/movement-handler.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
+import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
 const DEFAULT_PROJECTILE_RANGE = 5;
 const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
+const AUTO_ATTACK_RANGE = 1;
+const DEFAULT_DASH_DISTANCE = 3;
+
+const ensureCombatState = (player) => {
+  if (!player.combat) {
+    player.combat = {};
+  }
+  return player.combat;
+};
 
 export const isPlayerAlive = (player) => Boolean(
   player
@@ -65,12 +76,144 @@ export const getMeleeArcTiles = (player, direction) => {
 };
 
 const getAliveSceneMonsters = (sceneId) => {
+  if (!world || typeof world.getScene !== 'function') {
+    return [];
+  }
+
   const scene = world.getScene(sceneId);
   if (!scene || !Array.isArray(scene.monsters)) {
     return [];
   }
 
   return scene.monsters.filter(monster => monster && monster.isAlive);
+};
+
+const getSceneMonsterByUuid = (sceneId, monsterUuid) => (
+  getAliveSceneMonsters(sceneId).find(monster => monster.uuid === monsterUuid) || null
+);
+
+const adjacentDistance = (a, b) => {
+  if (!a || !b) {
+    return Infinity;
+  }
+
+  return Math.max(Math.abs((a.x || 0) - (b.x || 0)), Math.abs((a.y || 0) - (b.y || 0)));
+};
+
+const directionToward = (from, to, fallback = 'down') => {
+  if (!from || !to) {
+    return fallback;
+  }
+
+  const dx = Math.max(-1, Math.min(1, (to.x || 0) - (from.x || 0)));
+  const dy = Math.max(-1, Math.min(1, (to.y || 0) - (from.y || 0)));
+  const key = `${dx}:${dy}`;
+  const directions = {
+    '1:0': 'right',
+    '-1:0': 'left',
+    '0:-1': 'up',
+    '0:1': 'down',
+    '1:-1': 'up-right',
+    '1:1': 'down-right',
+    '-1:-1': 'up-left',
+    '-1:1': 'down-left',
+  };
+
+  return directions[key] || fallback;
+};
+
+const getSceneMap = (player) => {
+  const scene = player && world.getScene(player.sceneId);
+  if (scene && scene.map) {
+    return scene.map;
+  }
+  return world.map;
+};
+
+const isMonsterOnTile = (player, x, y) => (
+  getAliveSceneMonsters(player.sceneId)
+    .some(monster => monster.x === x && monster.y === y)
+);
+
+const canMoveToTile = (player, x, y) => {
+  if (!player || isMonsterOnTile(player, x, y)) {
+    return false;
+  }
+
+  if (typeof player.canMoveTo === 'function') {
+    try {
+      return player.canMoveTo(x, y);
+    } catch (_error) {
+      // Unit-test doubles often do not carry full map state. Fall back below.
+    }
+  }
+
+  return !tileBlocked(getSceneMap(player), x, y);
+};
+
+const canDashStep = (player, delta) => {
+  const targetX = player.x + delta.x;
+  const targetY = player.y + delta.y;
+
+  if (!canMoveToTile(player, targetX, targetY)) {
+    return false;
+  }
+
+  if (delta.x !== 0 && delta.y !== 0) {
+    const horizontalOpen = canMoveToTile(player, player.x + delta.x, player.y);
+    const verticalOpen = canMoveToTile(player, player.x, player.y + delta.y);
+    if (!horizontalOpen && !verticalOpen) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+export const findAreaTargets = (player, radius = 1) => {
+  const range = Math.max(0, Math.floor(radius));
+  return getAliveSceneMonsters(player.sceneId)
+    .filter(monster => adjacentDistance(player, monster) <= range);
+};
+
+export const clearAutoAttack = (player, reason = 'manual') => {
+  if (!player || !player.combat || !player.combat.autoAttack) {
+    return false;
+  }
+
+  player.combat.autoAttack = null;
+  player.combat.autoAttackStoppedReason = reason;
+  return true;
+};
+
+export const setAutoAttackTarget = (player, monster, options = {}) => {
+  if (!player || !monster || !monster.uuid) {
+    return null;
+  }
+
+  const combat = ensureCombatState(player);
+  combat.autoAttack = {
+    targetId: monster.uuid,
+    targetName: monster.name || 'Monster',
+    sceneId: player.sceneId,
+    skillId: options.skillId || DEFAULT_SKILL_IDS.primary,
+    startedAt: Number.isFinite(options.startedAt) ? options.startedAt : Date.now(),
+    lastTriggeredAt: Number.isFinite(options.lastTriggeredAt) ? options.lastTriggeredAt : 0,
+  };
+  combat.autoAttackStoppedReason = null;
+  return combat.autoAttack;
+};
+
+export const findStepTarget = (player, direction) => {
+  const delta = directionDelta(direction);
+  if (!player || !delta) {
+    return null;
+  }
+
+  const targetX = player.x + delta.x;
+  const targetY = player.y + delta.y;
+  return getAliveSceneMonsters(player.sceneId)
+    .find(monster => monster.x === targetX && monster.y === targetY) || null;
 };
 
 /**
@@ -162,24 +305,189 @@ const applyHitToMonster = (player, monster, skill, now) => {
   }
 
   const died = result.type === 'death' || result.type === 'permadeath';
+  let experience = null;
 
   if (died) {
-    awardSkillExperience(player, 'attack', experienceForKill(monster));
+    experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
   }
 
   return {
     attackerId: player.uuid,
+    attackerName: player.username || 'Adventurer',
     targetId: monster.uuid,
+    targetName: monster.name || 'Monster',
     targetType: 'monster',
     skillId: skill.id,
+    skillName: skill.label || skill.name || skill.id,
     amount: result.amount !== undefined ? result.amount : damage,
     health: {
       current: monster.stats.resources.health.current,
       max: monster.stats.resources.health.max,
     },
     died,
+    experience,
   };
+};
+
+const broadcastHits = (player, hits) => {
+  if (!Array.isArray(hits) || !hits.length) {
+    return;
+  }
+
+  const scenePlayers = world.getScenePlayers(player.sceneId);
+  hits.forEach((hit) => {
+    Socket.broadcast('combat:hit', hit, scenePlayers);
+  });
+
+  const scene = world.getScene(player.sceneId);
+  if (scene && Array.isArray(scene.monsters) && scene.monsters.length) {
+    Monster.broadcast(scene.monsters, { players: scenePlayers });
+  }
+};
+
+const applyAreaEffect = (player, skill, now, outcome) => {
+  const area = skill.behaviour && skill.behaviour.area;
+  if (!area) {
+    return false;
+  }
+
+  const targets = findAreaTargets(player, area.radius || 1);
+  outcome.hits = targets
+    .map(monster => applyHitToMonster(player, monster, skill, now))
+    .filter(Boolean);
+
+  if (area.slowMultiplier && area.durationMs) {
+    targets.forEach((monster) => {
+      monster.state = monster.state || {};
+      monster.state.effects = monster.state.effects || {};
+      monster.state.effects.frostNova = {
+        sourceId: player.uuid,
+        skillId: skill.id,
+        slowMultiplier: Math.max(0.1, Math.min(1, area.slowMultiplier)),
+        expiresAt: now + area.durationMs,
+      };
+    });
+    outcome.effects = targets.map(monster => ({
+      targetId: monster.uuid,
+      type: 'slow',
+      slowMultiplier: Math.max(0.1, Math.min(1, area.slowMultiplier)),
+      expiresAt: now + area.durationMs,
+    }));
+  }
+
+  return true;
+};
+
+const applyDefensiveBuff = (player, skill, now, outcome) => {
+  const buff = skill.behaviour && skill.behaviour.buff;
+  if (!buff) {
+    return false;
+  }
+
+  const combat = ensureCombatState(player);
+  combat.buffs = combat.buffs || {};
+  combat.buffs[skill.id] = {
+    id: skill.id,
+    name: skill.label || skill.name || skill.id,
+    armourBonus: Math.max(0, Math.floor(buff.armourBonus || 0)),
+    startedAt: now,
+    expiresAt: now + Math.max(0, Math.floor(buff.durationMs || 0)),
+  };
+  outcome.buff = combat.buffs[skill.id];
+  return true;
+};
+
+const applyHealingEffect = (player, skill, now, outcome) => {
+  const heal = skill.behaviour && skill.behaviour.heal;
+  if (!heal) {
+    return false;
+  }
+
+  const attributes = (player.stats && player.stats.attributes && player.stats.attributes.total) || {};
+  const scalingAttribute = heal.scaling || 'intelligence';
+  const scalingValue = Number.isFinite(attributes[scalingAttribute])
+    ? attributes[scalingAttribute]
+    : 0;
+  const amount = Math.max(0, Math.floor((heal.base || 0) + (scalingValue * 0.35)));
+  const result = typeof player.applyHealing === 'function'
+    ? player.applyHealing(amount, { now })
+    : null;
+
+  if (result) {
+    broadcastStats(player);
+  }
+
+  outcome.healing = {
+    targetId: player.uuid,
+    amount: result && result.amount !== undefined ? result.amount : amount,
+    health: player.stats && player.stats.resources ? player.stats.resources.health : null,
+  };
+  return true;
+};
+
+const applyMovementEffect = (player, skill, profile, payload, now, outcome) => {
+  const movement = skill.behaviour && skill.behaviour.movement;
+  if (!movement) {
+    return false;
+  }
+
+  const direction = payload.direction || player.facing || 'down';
+  const delta = directionDelta(direction);
+  if (!delta) {
+    outcome.movement = { moved: false, steps: 0, blocked: true, direction };
+    return true;
+  }
+
+  const maxSteps = Math.max(1, Math.floor(movement.distance || DEFAULT_DASH_DISTANCE));
+  const path = [];
+
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (!canDashStep(player, delta)) {
+      break;
+    }
+    player.x += delta.x;
+    player.y += delta.y;
+    path.push({ x: player.x, y: player.y });
+  }
+
+  const moved = path.length > 0;
+  const blocked = path.length < maxSteps;
+  const duration = Number.isFinite(profile.duration)
+    ? profile.duration
+    : (moved ? 300 : 0);
+
+  if (typeof player.cancelPathfinding === 'function') {
+    player.cancelPathfinding();
+  }
+  if (typeof player.setFacing === 'function') {
+    player.setFacing(direction);
+  }
+  if (typeof player.registerMovementStep === 'function') {
+    player.registerMovementStep({
+      duration: moved ? duration : 0,
+      startedAt: now,
+      direction,
+      blocked,
+      steps: path.length,
+    });
+  }
+
+  let transitioned = false;
+  if (moved) {
+    transitioned = transitionPlayerIfOnPortal(player);
+    Player.broadcastMovement(player);
+  }
+
+  outcome.movement = {
+    moved,
+    steps: path.length,
+    blocked,
+    path,
+    direction,
+    transitioned,
+  };
+  return true;
 };
 
 /**
@@ -190,7 +498,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
  * @param {object} payload The client skill payload
  * @returns {object|null} Outcome with triggered flag and hits
  */
-export const tryUseSkill = (player, payload = {}) => {
+export const tryUseSkill = (player, payload = {}, options = {}) => {
   const profile = getSkillExecutionProfile(payload.skillId);
   if (!profile) {
     return null;
@@ -200,11 +508,12 @@ export const tryUseSkill = (player, payload = {}) => {
     return null;
   }
 
-  const now = Date.now();
+  const now = Number.isFinite(options.now) ? options.now : Date.now();
   const { skill } = profile;
+  const combat = ensureCombatState(player);
 
-  player.combat.cooldowns = player.combat.cooldowns || {};
-  const readyAt = player.combat.cooldowns[skill.id] || 0;
+  combat.cooldowns = combat.cooldowns || {};
+  const readyAt = combat.cooldowns[skill.id] || 0;
   if (readyAt > now) {
     return null;
   }
@@ -218,6 +527,7 @@ export const tryUseSkill = (player, payload = {}) => {
   }
 
   const triggered = player.recordSkillInput(payload.skillId, {
+    now,
     direction: payload.direction,
     modifiers: payload.modifiers,
     animationState: payload.animationState || profile.animationState,
@@ -236,17 +546,31 @@ export const tryUseSkill = (player, payload = {}) => {
   }
 
   if (Number.isFinite(skill.cooldown) && skill.cooldown > 0) {
-    player.combat.cooldowns[skill.id] = now + (skill.cooldown * 1000);
+    combat.cooldowns[skill.id] = now + (skill.cooldown * 1000);
   }
 
   const outcome = { triggered: true, skillId: skill.id, hits: [] };
+  const direction = payload.direction || player.facing || 'down';
+  const behaviour = skill.behaviour || {};
 
-  if (skill.category !== 'combat') {
+  if (applyMovementEffect(player, skill, profile, payload, now, outcome)) {
     return outcome;
   }
 
-  const direction = player.facing || payload.direction || 'down';
-  const projectile = skill.behaviour && skill.behaviour.projectile;
+  if (applyDefensiveBuff(player, skill, now, outcome)) {
+    return outcome;
+  }
+
+  if (applyHealingEffect(player, skill, now, outcome)) {
+    return outcome;
+  }
+
+  if (applyAreaEffect(player, skill, now, outcome)) {
+    broadcastHits(player, outcome.hits);
+    return outcome;
+  }
+
+  const projectile = behaviour.projectile;
 
   let targets = [];
   if (projectile) {
@@ -264,19 +588,113 @@ export const tryUseSkill = (player, payload = {}) => {
     .map(monster => applyHitToMonster(player, monster, skill, now))
     .filter(Boolean);
 
-  if (outcome.hits.length) {
-    const scenePlayers = world.getScenePlayers(player.sceneId);
-    outcome.hits.forEach((hit) => {
-      Socket.broadcast('combat:hit', hit, scenePlayers);
-    });
-
-    const scene = world.getScene(player.sceneId);
-    if (scene && Array.isArray(scene.monsters) && scene.monsters.length) {
-      Monster.broadcast(scene.monsters, { players: scenePlayers });
+  if (skill.id === DEFAULT_SKILL_IDS.primary && targets.length) {
+    const primaryTarget = targets[0];
+    const primaryTargetDied = outcome.hits.some(hit => hit.targetId === primaryTarget.uuid && hit.died);
+    if (!primaryTargetDied && primaryTarget.isAlive) {
+      setAutoAttackTarget(player, primaryTarget, {
+        skillId: skill.id,
+        startedAt: now,
+        lastTriggeredAt: now,
+      });
+    } else {
+      clearAutoAttack(player, 'target-dead');
     }
   }
 
+  broadcastHits(player, outcome.hits);
+
   return outcome;
+};
+
+export const tryPrimaryAttackIntoStep = (player, direction) => {
+  const target = findStepTarget(player, direction);
+  if (!target) {
+    return null;
+  }
+
+  setAutoAttackTarget(player, target);
+  return tryUseSkill(player, {
+    skillId: 'primary-attack',
+    direction,
+  });
+};
+
+export const processAutoAttacks = (now = Date.now()) => {
+  const players = Array.isArray(world.players) ? world.players : [];
+  const summary = {
+    processed: 0,
+    triggered: 0,
+    cleared: 0,
+  };
+
+  players.forEach((player) => {
+    const autoAttack = player && player.combat ? player.combat.autoAttack : null;
+    if (!autoAttack) {
+      return;
+    }
+
+    summary.processed += 1;
+
+    if (!isPlayerAlive(player)) {
+      if (clearAutoAttack(player, 'player-dead')) {
+        summary.cleared += 1;
+      }
+      return;
+    }
+
+    const target = getSceneMonsterByUuid(autoAttack.sceneId || player.sceneId, autoAttack.targetId);
+    if (!target) {
+      if (clearAutoAttack(player, 'target-missing')) {
+        summary.cleared += 1;
+      }
+      return;
+    }
+
+    if (target.sceneId && target.sceneId !== player.sceneId) {
+      if (clearAutoAttack(player, 'target-scene-changed')) {
+        summary.cleared += 1;
+      }
+      return;
+    }
+
+    if (adjacentDistance(player, target) > AUTO_ATTACK_RANGE) {
+      if (clearAutoAttack(player, 'target-out-of-range')) {
+        summary.cleared += 1;
+      }
+      return;
+    }
+
+    const direction = directionToward(player, target, player.facing || 'down');
+    const outcome = tryUseSkill(player, {
+      skillId: autoAttack.skillId || DEFAULT_SKILL_IDS.primary,
+      direction,
+      modifiers: { auto: true },
+    }, { now });
+
+    if (!outcome || !outcome.triggered) {
+      return;
+    }
+
+    const killedTarget = outcome.hits.some(hit => hit.targetId === autoAttack.targetId && hit.died);
+    if (killedTarget && player.combat && player.combat.autoAttack === null) {
+      summary.cleared += 1;
+    }
+
+    if (player.combat && player.combat.autoAttack) {
+      player.combat.autoAttack.lastTriggeredAt = now;
+    }
+    summary.triggered += 1;
+
+    Player.broadcastAnimation(player);
+    Socket.broadcast('player:combat:update', {
+      playerId: player.uuid,
+      combat: player.combat,
+      animation: player.animation,
+    }, world.getScenePlayers(player.sceneId));
+  });
+
+  return summary;
 };
 
 /**
@@ -322,9 +740,15 @@ export const processPlayerRespawns = (now = Date.now()) => {
 export default {
   tryUseSkill,
   processPlayerRespawns,
+  processAutoAttacks,
   isPlayerAlive,
   rollPlayerDamage,
   findMeleeTargets,
   findProjectileTarget,
+  findAreaTargets,
   getMeleeArcTiles,
+  findStepTarget,
+  tryPrimaryAttackIntoStep,
+  clearAutoAttack,
+  setAutoAttackTarget,
 };

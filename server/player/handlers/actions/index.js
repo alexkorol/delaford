@@ -12,6 +12,7 @@ import ContextMenu from '#server/core/context-menu.js';
 import Item from '#server/core/item.js';
 import Map from '#server/core/map.js';
 import Player from '#server/core/player.js';
+import Wear from '#server/core/utilities/wear.js';
 import Mining from '#server/core/skills/mining.js';
 import Smithing from '#server/core/skills/smithing.js';
 import Query from '#server/core/data/query.js';
@@ -53,7 +54,7 @@ const sendInventoryError = (player, text) => {
 const getPlayerFromPayload = (incoming) => {
   const payload = incoming.data || {};
   const socketId = payload.player?.socket_id || incoming.player?.socket_id;
-  const playerId = payload.id || incoming.id;
+  const playerId = payload.id || incoming.id || payload.player?.uuid || incoming.player?.uuid;
 
   return world.players.find((player) => (
     (playerId && player.uuid === playerId)
@@ -61,12 +62,50 @@ const getPlayerFromPayload = (incoming) => {
   ));
 };
 
+const getPlayerScene = player => (
+  world.getSceneForPlayer(player) || world.getDefaultTown()
+);
+
+const getSceneItems = (scene) => {
+  if (!scene) {
+    return world.items;
+  }
+
+  if (!Array.isArray(scene.items)) {
+    scene.items = [];
+  }
+
+  return scene.items;
+};
+
+const getSceneRespawns = (scene) => {
+  if (!scene.respawns) {
+    scene.respawns = {
+      items: [],
+      monsters: [],
+      resources: [],
+    };
+  }
+
+  if (!Array.isArray(scene.respawns.items)) {
+    scene.respawns.items = [];
+  }
+
+  return scene.respawns;
+};
+
+const getSceneRecipients = scene => (
+  scene && scene.id ? world.getScenePlayers(scene.id) : []
+);
+
+const broadcastSceneItems = (scene, eventName) => {
+  const items = getSceneItems(scene);
+  Socket.broadcast(eventName, items, getSceneRecipients(scene));
+};
+
 const getInventoryItemIndex = (slots = [], reference = {}) => {
   if (reference.uuid) {
-    const uuidIndex = slots.findIndex(item => item && item.uuid === reference.uuid);
-    if (uuidIndex !== -1) {
-      return uuidIndex;
-    }
+    return slots.findIndex(item => item && item.uuid === reference.uuid);
   }
 
   if (Number.isInteger(reference.slot)) {
@@ -133,10 +172,60 @@ const dropInventoryItem = (player, itemIndex) => {
     timestamp: Date.now(),
   });
 
-  world.items.push(dropped);
-  Socket.broadcast('world:itemDropped', world.items);
-  Socket.broadcast('item:change', world.items);
+  const scene = getPlayerScene(player);
+  world.addItem(dropped, scene.id);
+  broadcastSceneItems(scene, 'world:itemDropped');
+  broadcastSceneItems(scene, 'item:change');
   refreshInventory(player);
+
+  return dropped;
+};
+
+const refreshEquipmentStats = (player) => {
+  const playerIndex = world.players.findIndex(p => p.uuid === player.uuid);
+  if (playerIndex === -1) {
+    return;
+  }
+
+  const combatStats = Wear.updateCombat(playerIndex);
+  player.combat = {
+    ...player.combat,
+    attack: combatStats.attack,
+    defense: combatStats.defense,
+  };
+
+  if (typeof player.refreshDerivedStats === 'function') {
+    player.refreshDerivedStats();
+  }
+};
+
+const dropEquippedItem = (player, slotId) => {
+  if (!player || !slotId || !player.wear || !player.wear[slotId]) {
+    return null;
+  }
+
+  const equipped = player.wear[slotId];
+  const baseItem = wearableItems.find(i => i.id === equipped.id);
+  if (!baseItem || baseItem.slot !== slotId) {
+    return null;
+  }
+
+  const item = ItemFactory.adoptExisting(equipped, { baseItem });
+  const dropped = ItemFactory.toWorldInstance(item, {
+    x: player.x,
+    y: player.y,
+  }, {
+    timestamp: Date.now(),
+  });
+
+  player.wear[slotId] = null;
+  refreshEquipmentStats(player);
+
+  const scene = getPlayerScene(player);
+  world.addItem(dropped, scene.id);
+  broadcastSceneItems(scene, 'world:itemDropped');
+  broadcastSceneItems(scene, 'item:change');
+  Socket.broadcast('player:unequippedAnItem', player);
 
   return dropped;
 };
@@ -356,7 +445,14 @@ const actionEvents = {
       }
 
       const maxStack = targetItem.maxStack || inventoryItem.maxStack || Infinity;
-      const combinedQty = (targetItem.qty || 1) + (inventoryItem.qty || 1);
+      const targetQty = Number.isFinite(targetItem.qty) ? targetItem.qty : 1;
+      const sourceQty = Number.isFinite(inventoryItem.qty) ? inventoryItem.qty : 1;
+      if (targetQty >= maxStack) {
+        sendInventoryError(player, 'That stack is already full.');
+        return;
+      }
+
+      const combinedQty = targetQty + sourceQty;
       targetItem.qty = Math.min(combinedQty, maxStack);
 
       const remainder = Math.max(0, combinedQty - maxStack);
@@ -405,21 +501,57 @@ const actionEvents = {
     if (playerIndex === -1) {
       return;
     }
-    const getItem = wearableItems.find(i => i.id === data.item.id);
+    const player = world.players[playerIndex];
+    const itemPayload = data.item || {};
+    const miscData = itemPayload.miscData || {};
+    const getItem = wearableItems.find(i => i.id === itemPayload.id);
     if (!getItem) {
       return;
     }
-    const alreadyWearing = world.players[playerIndex].wear[getItem.slot];
+    const targetSlot = itemPayload.targetSlot || miscData.targetSlot || null;
+    if (targetSlot && targetSlot !== getItem.slot) {
+      sendInventoryError(player, 'That item cannot be equipped there.');
+      return;
+    }
+    const inventoryItem = Array.isArray(player.inventory?.slots)
+      ? player.inventory.slots.find(item => (
+        item
+        && (
+          (itemPayload.uuid && item.uuid === itemPayload.uuid)
+          || (Number.isInteger(miscData.slot) && item.slot === miscData.slot && item.id === itemPayload.id)
+          || (!itemPayload.uuid && item.id === itemPayload.id)
+        )
+      ))
+      : null;
+    if (!inventoryItem) {
+      sendInventoryError(player, 'That item is no longer in your inventory.');
+      return;
+    }
+    const sourceSlot = Number.isInteger(miscData.slot)
+      ? miscData.slot
+      : Number.isInteger(itemPayload.slot)
+        ? itemPayload.slot
+        : inventoryItem?.slot;
+    const alreadyWearing = player.wear[getItem.slot];
     if (alreadyWearing) {
-      await pipe.player.unequipItem({
+      const status = await pipe.player.unequipItem({
         item: {
           uuid: alreadyWearing.uuid,
           id: alreadyWearing.id,
-          slot: data.item.miscData.slot,
+          slot: sourceSlot,
+        },
+        replacingItem: {
+          uuid: itemPayload.uuid,
+          id: itemPayload.id,
+          slot: sourceSlot,
         },
         replacing: true,
         id: data.id,
       });
+
+      if (status !== 200) {
+        return;
+      }
 
       pipe.player.equippedAnItem(data);
     } else {
@@ -431,12 +563,39 @@ const actionEvents = {
    * A player unequips an item from their wear tab
    */
   'item:unequip': (data) => {
-    const itemUnequipping = data.player.wear[data.item.miscData.slot];
+    const player = getPlayerFromPayload(data);
+    const itemPayload = data.item || {};
+    const miscData = itemPayload.miscData || {};
+    const slotId = miscData.slot || itemPayload.slot || null;
+    if (!player || !slotId || !player.wear) {
+      return;
+    }
+
+    const itemUnequipping = player.wear[slotId];
+    if (!itemUnequipping) {
+      return;
+    }
+
+    if (miscData.action === 'world-drop' || itemPayload.action === 'world-drop') {
+      dropEquippedItem(player, slotId);
+      return;
+    }
+
     const newData = Object.assign(data, {
+      id: player.uuid,
+      player: {
+        ...(data.player || {}),
+        socket_id: player.socket_id,
+      },
       item: {
         id: itemUnequipping.id,
         uuid: itemUnequipping.uuid,
-        slot: data.item.miscData.slot,
+        slot: slotId,
+        miscData: {
+          ...miscData,
+          slot: slotId,
+          targetInventorySlot: miscData.targetInventorySlot,
+        },
       },
     });
     pipe.player.unequipItem(newData);
@@ -651,12 +810,14 @@ const actionEvents = {
       { timestamp: Date.now() },
     );
 
-    world.items.push(spawned);
+    const player = world.players[playerIndex];
+    const scene = getPlayerScene(player);
 
-    Socket.broadcast('world:itemDropped', world.items);
+    world.addItem(spawned, scene.id);
+    broadcastSceneItems(scene, 'world:itemDropped');
 
     Socket.emit('game:send:message', {
-      player: { socket_id: world.players[playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       text:
         'You feel a magical aurora as an item starts to appear from the ground...',
     });
@@ -690,10 +851,18 @@ const actionEvents = {
     const baseData = Query.getItemData(todo.item.id) || {};
     const itemId = baseData.id || todo.item.id;
 
-    const itemToTake = world.items.findIndex(
-      e => e.x === todo.at.x && e.y === todo.at.y && e.uuid === todo.item.uuid,
+    const scene = getPlayerScene(player);
+    const sceneItems = getSceneItems(scene);
+    const itemToTake = sceneItems.findIndex(
+      e => e
+        && e.x === todo.at.x
+        && e.y === todo.at.y
+        && (
+          (todo.item.uuid && e.uuid === todo.item.uuid)
+          || (!todo.item.uuid && e.id === todo.item.id)
+        ),
     );
-    const worldItem = world.items[itemToTake];
+    const worldItem = sceneItems[itemToTake];
     if (!worldItem) {
       return;
     }
@@ -706,15 +875,22 @@ const actionEvents = {
       return;
     }
 
+    const candidateInventoryItem = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
+      || { ...baseData, ...worldItem };
+    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidateInventoryItem);
+    if (openSlot === false && openSlot !== 0) {
+      sendInventoryError(player, 'There is no room in your backpack.');
+      return;
+    }
+
     // If qty not specified, we are picking up 1 item.
     const quantity = worldItem.qty || 1;
-    world.items.splice(itemToTake, 1);
+    sceneItems.splice(itemToTake, 1);
 
-    Socket.broadcast('item:change', world.items);
+    broadcastSceneItems(scene, 'item:change');
 
-    console.log(
-      `Picking up: ${todo.item.id} (${todo.item.uuid.substr(0, 5)}...)`,
-    );
+    const itemUuidLabel = todo.item.uuid ? `${todo.item.uuid.substr(0, 5)}...` : 'no-uuid';
+    console.log(`Picking up: ${todo.item.id} (${itemUuidLabel})`);
 
     world.players[playerIndex].inventory.add(itemId, quantity, {
       uuid: todo.item.uuid,
@@ -722,16 +898,15 @@ const actionEvents = {
     });
 
     // Add respawn timer on item (if is a respawn)
-    const resetItemIndex = world.respawns.items.findIndex(
+    const sceneRespawns = getSceneRespawns(scene);
+    const resetItemIndex = sceneRespawns.items.findIndex(
       i => i.respawn && i.x === todo.at.x && i.y === todo.at.y,
     );
 
     if (resetItemIndex !== -1) {
-      world.respawns.items[resetItemIndex].pickedUp = true;
-      world.respawns.items[
-        resetItemIndex
-      ].willRespawnIn = Item.calculateRespawnTime(
-        world.respawns.items[resetItemIndex].respawnIn,
+      sceneRespawns.items[resetItemIndex].pickedUp = true;
+      sceneRespawns.items[resetItemIndex].willRespawnIn = Item.calculateRespawnTime(
+        sceneRespawns.items[resetItemIndex].respawnIn,
       );
     }
 
@@ -765,39 +940,66 @@ const actionEvents = {
   },
 
   'player:screen:npc:trade:action:value': (data) => {
+    const player = getPlayerFromPayload(data);
+    if (!player || !player.objectId || !data.item?.id) {
+      return;
+    }
+
     const rawQty = data.item.params ? data.item.params.quantity : 0;
     const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
-    const shop = new Shop(
-      data.player.objectId,
-      data.id,
-      data.item.id,
-      data.doing,
-      quantity,
-    );
-    shop.value();
+    try {
+      const shop = new Shop(
+        player.objectId,
+        player.uuid,
+        data.item.id,
+        'value',
+        quantity,
+      );
+      shop.value();
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+    }
   },
   /**
    * A player wants to buy or sell an item (and sometimes check its value)
    */
   'player:screen:npc:trade:action': (data) => {
-    const rawQty = data.item.params ? data.item.params.quantity : 0;
-    const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
-    const shop = new Shop(
-      data.player.objectId,
-      data.id,
-      data.item.id,
-      data.doing,
-      quantity,
-    );
+    const player = getPlayerFromPayload(data);
+    if (!player || !player.objectId || !data.item?.id) {
+      return;
+    }
 
-    // Validate action type before dynamic dispatch
+    // Validate action type before constructing the shop operation.
     const allowedShopActions = ['buy', 'sell', 'value'];
     if (!allowedShopActions.includes(data.doing)) {
       return;
     }
 
-    // We will be buying or selling an item
-    const response = shop[data.doing]();
+    const rawQty = data.item.params ? data.item.params.quantity : 0;
+    const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
+    let shop;
+    let response;
+    try {
+      shop = new Shop(
+        player.objectId,
+        player.uuid,
+        data.item.id,
+        data.doing,
+        quantity,
+      );
+
+      // We will be buying or selling an item
+      response = shop[data.doing]();
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+      return;
+    }
 
     /** UPDATE PLAYER DATA */
     if (Shop.successfulSale(response)) {
@@ -859,19 +1061,23 @@ const actionEvents = {
    * A player withdraws or deposits items from their bank or inventory
    */
   'player:screen:bank:action': async (data) => {
-    const bank = new Bank(
-      data.id,
-      data.item.id,
-      data.item.params.quantity,
-      data.doing,
-    );
-
     const allowedBankActions = ['deposit', 'withdraw'];
     if (!allowedBankActions.includes(data.doing)) {
       return;
     }
 
+    const player = getPlayerFromPayload(data);
+    if (!player || !data.item?.id) {
+      return;
+    }
+
     try {
+      const bank = new Bank(
+        player.uuid,
+        data.item.id,
+        data.item.params?.quantity,
+        data.doing,
+      );
       const { inventory, bankItems } = await bank[data.doing]();
 
       /** UPDATE PLAYER DATA */
@@ -890,7 +1096,7 @@ const actionEvents = {
       });
     } catch (err) {
       Socket.emit('game:send:message', {
-        player: { socket_id: data.player.socket_id },
+        player: { socket_id: player.socket_id },
         text: err.message,
       });
     }
@@ -934,15 +1140,12 @@ const actionEvents = {
       });
 
       // Update client of dead rock
-      const scenePlayers = scene.id === world.defaultTownId
-        ? null
-        : world.getScenePlayers(scene.id);
       Socket.broadcast(
         'world:foreground:update',
         mapLayers && Array.isArray(mapLayers.foreground)
           ? mapLayers.foreground
           : world.map.foreground,
-        scenePlayers,
+        world.getScenePlayers(scene.id),
       );
 
       // Add this resource to respawn clock

@@ -9,6 +9,7 @@ vi.mock('#server/core/world.js', () => ({
     players: [],
     defaultTownId: 'town-1',
     getScene: (id) => scenes.get(id) || null,
+    getSceneForPlayer: (player) => scenes.get(player.sceneId) || null,
     getScenePlayers: (id) => {
       const scene = scenes.get(id);
       return scene && Array.isArray(scene.players) ? scene.players : [];
@@ -45,8 +46,10 @@ vi.mock('#server/core/entities/player/stats-manager.js', () => ({
 
 const { default: Combat } = await import('#server/core/combat/index.js');
 const { default: Socket } = await import('#server/socket.js');
+const { default: Player } = await import('#server/core/player.js');
 const { default: world } = await import('#server/core/world.js');
 const { default: UI } = await import('#shared/ui.js');
+const { broadcastStats } = await import('#server/core/entities/player/stats-manager.js');
 
 const makeMonster = (overrides = {}) => {
   const monster = {
@@ -75,43 +78,67 @@ const makeMonster = (overrides = {}) => {
   return monster;
 };
 
-const makePlayer = (overrides = {}) => ({
-  uuid: 'player-1',
-  socket_id: 'socket-1',
-  username: 'Hero',
-  x: 10,
-  y: 10,
-  level: 1,
-  facing: 'right',
-  sceneId: 'scene-1',
-  combat: {
-    attack: { stab: 0, slash: 0, crush: 0, range: 0 },
-    globalCooldown: 0,
-    sequence: 0,
-  },
-  skills: {
-    attack: { level: 1, exp: 0 },
-    defence: { level: 1, exp: 0 },
-  },
-  stats: {
+const makePlayer = (overrides = {}) => {
+  const player = {
+    uuid: 'player-1',
+    socket_id: 'socket-1',
+    username: 'Hero',
+    x: 10,
+    y: 10,
     level: 1,
-    attributes: { total: { strength: 10, dexterity: 10, intelligence: 10 } },
-    resources: {
-      health: { current: 50, max: 50 },
-      mana: { current: 40, max: 40 },
+    facing: 'right',
+    sceneId: 'scene-1',
+    combat: {
+      attack: { stab: 0, slash: 0, crush: 0, range: 0 },
+      globalCooldown: 0,
+      sequence: 0,
     },
-    lifecycle: { state: 'alive' },
-  },
-  recordSkillInput: vi.fn(() => true),
-  refreshDerivedStats: vi.fn(),
-  tryRespawn: vi.fn(),
-  ...overrides,
-});
+    skills: {
+      attack: { level: 1, exp: 0 },
+      defence: { level: 1, exp: 0 },
+    },
+    stats: {
+      level: 1,
+      attributes: { total: { strength: 10, dexterity: 10, intelligence: 10 } },
+      resources: {
+        health: { current: 50, max: 50 },
+        mana: { current: 40, max: 40 },
+      },
+      lifecycle: { state: 'alive' },
+    },
+    recordSkillInput: vi.fn(() => true),
+    refreshDerivedStats: vi.fn(),
+    tryRespawn: vi.fn(),
+    cancelPathfinding: vi.fn(),
+    setFacing: vi.fn((direction) => {
+      player.facing = direction;
+      return direction;
+    }),
+    registerMovementStep: vi.fn((step) => {
+      player.movementStep = step;
+      return step;
+    }),
+    applyHealing: vi.fn((amount) => {
+      const health = player.stats.resources.health;
+      const before = health.current;
+      health.current = Math.min(health.max, health.current + Math.max(0, Math.floor(amount)));
+      return {
+        type: 'heal',
+        amount: health.current - before,
+        health: { ...health },
+      };
+    }),
+    ...overrides,
+  };
+
+  return player;
+};
 
 describe('combat hit detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     scenes.clear();
+    world.players.length = 0;
   });
 
   it('melee arc covers the front tile and both flanks', () => {
@@ -228,6 +255,10 @@ describe('tryUseSkill', () => {
 
     expect(outcome.triggered).toBe(true);
     expect(outcome.hits).toHaveLength(1);
+    expect(player.combat.autoAttack).toEqual(expect.objectContaining({
+      targetId: monster.uuid,
+      skillId: 'primary-attack',
+    }));
     expect(monster.takeDamage).toHaveBeenCalled();
     expect(Socket.broadcast).toHaveBeenCalledWith(
       'combat:hit',
@@ -249,11 +280,43 @@ describe('tryUseSkill', () => {
     const outcome = Combat.tryUseSkill(player, { skillId: 'primary-attack', direction: 'right' });
 
     expect(outcome.hits[0].died).toBe(true);
+    expect(outcome.hits[0]).toEqual(expect.objectContaining({
+      targetName: 'Test Fiend',
+      skillName: 'Blade Sweep',
+      experience: expect.objectContaining({
+        skillId: 'attack',
+        amount: 80,
+      }),
+    }));
     expect(player.skills.attack.exp).toBe(80);
     expect(Socket.emit).toHaveBeenCalledWith(
       'resource:skills:update',
       expect.objectContaining({ data: player.skills }),
     );
+  });
+
+  it('clears auto attack immediately when the primary hit kills its target', () => {
+    const player = makePlayer({ facing: 'right' });
+    const monster = makeMonster({
+      x: 11,
+      y: 10,
+      stats: { resources: { health: { current: 1, max: 30 } } },
+    });
+    player.combat.autoAttack = {
+      targetId: monster.uuid,
+      targetName: monster.name,
+      sceneId: 'scene-1',
+      skillId: 'primary-attack',
+      startedAt: 1_000,
+      lastTriggeredAt: 1_000,
+    };
+    setupScene(player, [monster]);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'primary-attack', direction: 'right' });
+
+    expect(outcome.hits[0].died).toBe(true);
+    expect(player.combat.autoAttack).toBeNull();
+    expect(player.combat.autoAttackStoppedReason).toBe('target-dead');
   });
 
   it('raises the character level once combat experience crosses the curve', () => {
@@ -300,6 +363,109 @@ describe('tryUseSkill', () => {
     expect(player.combat.cooldowns['ability-1']).toBeGreaterThan(Date.now());
   });
 
+  it('moves dash skills across open tiles and stops before blocked collision', () => {
+    const player = makePlayer({
+      facing: 'right',
+      canMoveTo: vi.fn((x) => x <= 12),
+    });
+    setupScene(player, []);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'dash', direction: 'right' });
+
+    expect(outcome.triggered).toBe(true);
+    expect(outcome.movement).toEqual(expect.objectContaining({
+      moved: true,
+      steps: 2,
+      blocked: true,
+      direction: 'right',
+    }));
+    expect(player.x).toBe(12);
+    expect(player.registerMovementStep).toHaveBeenCalledWith(expect.objectContaining({
+      direction: 'right',
+      blocked: true,
+      steps: 2,
+    }));
+    expect(Player.broadcastMovement).toHaveBeenCalledWith(player);
+  });
+
+  it('damages and slows only monsters inside Frost Nova radius', () => {
+    const player = makePlayer({ facing: 'right' });
+    const near = makeMonster({ x: 11, y: 10, state: {} });
+    const diagonal = makeMonster({ x: 12, y: 12, state: {} });
+    const far = makeMonster({ x: 14, y: 10, state: {} });
+    setupScene(player, [near, diagonal, far]);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'ability-2', direction: 'right' });
+
+    expect(outcome.triggered).toBe(true);
+    expect(outcome.hits.map(hit => hit.targetId)).toEqual(expect.arrayContaining([
+      near.uuid,
+      diagonal.uuid,
+    ]));
+    expect(outcome.hits.map(hit => hit.targetId)).not.toContain(far.uuid);
+    expect(near.state.effects.frostNova).toEqual(expect.objectContaining({
+      sourceId: player.uuid,
+      slowMultiplier: 0.6,
+    }));
+    expect(diagonal.state.effects.frostNova).toEqual(expect.objectContaining({
+      sourceId: player.uuid,
+      slowMultiplier: 0.6,
+    }));
+    expect(far.takeDamage).not.toHaveBeenCalled();
+  });
+
+  it('stores Stoneguard as a timed defensive buff', () => {
+    const player = makePlayer();
+    setupScene(player, []);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'ability-3', direction: 'right' });
+
+    expect(outcome.triggered).toBe(true);
+    expect(outcome.buff).toEqual(expect.objectContaining({
+      id: 'ability-3',
+      armourBonus: 12,
+    }));
+    expect(player.combat.buffs['ability-3']).toBe(outcome.buff);
+    expect(player.stats.resources.mana.current).toBe(30);
+  });
+
+  it('heals the player with Celestial Mend and broadcasts stat changes', () => {
+    const player = makePlayer({
+      stats: {
+        ...makePlayer().stats,
+        resources: {
+          health: { current: 20, max: 50 },
+          mana: { current: 40, max: 40 },
+        },
+      },
+    });
+    setupScene(player, []);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'ability-4', direction: 'right' });
+
+    expect(outcome.triggered).toBe(true);
+    expect(outcome.healing).toEqual(expect.objectContaining({
+      targetId: player.uuid,
+      amount: 21,
+    }));
+    expect(player.stats.resources.health.current).toBe(41);
+    expect(player.stats.resources.mana.current).toBe(18);
+    expect(broadcastStats).toHaveBeenCalledWith(player);
+  });
+
+  it('initialises missing combat state before using a skill', () => {
+    const player = makePlayer({ facing: 'right' });
+    delete player.combat;
+    setupScene(player, []);
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'primary-attack', direction: 'right' });
+
+    expect(outcome.triggered).toBe(true);
+    expect(player.combat).toEqual(expect.objectContaining({
+      cooldowns: expect.any(Object),
+    }));
+  });
+
   it('does not hit monsters in other scenes', () => {
     const player = makePlayer({ facing: 'right' });
     const monster = makeMonster({ x: 11, y: 10, sceneId: 'scene-2' });
@@ -314,6 +480,102 @@ describe('tryUseSkill', () => {
     const outcome = Combat.tryUseSkill(player, { skillId: 'primary-attack', direction: 'right' });
     expect(outcome.hits).toHaveLength(0);
     expect(monster.takeDamage).not.toHaveBeenCalled();
+  });
+
+  it('turns a movement step into a primary attack when a monster occupies the target tile', () => {
+    const player = makePlayer({ facing: 'down' });
+    const monster = makeMonster({ x: 11, y: 10 });
+    setupScene(player, [monster]);
+
+    const target = Combat.findStepTarget(player, 'right');
+    const outcome = Combat.tryPrimaryAttackIntoStep(player, 'right');
+
+    expect(target).toBe(monster);
+    expect(outcome.triggered).toBe(true);
+    expect(outcome.hits).toHaveLength(1);
+    expect(monster.takeDamage).toHaveBeenCalled();
+  });
+
+  it('continues primary attacks against the engaged adjacent target', () => {
+    const player = makePlayer({ facing: 'right' });
+    const monster = makeMonster({ x: 11, y: 10 });
+    player.combat.autoAttack = {
+      targetId: monster.uuid,
+      targetName: monster.name,
+      sceneId: 'scene-1',
+      skillId: 'primary-attack',
+      startedAt: 1_000,
+      lastTriggeredAt: 1_000,
+    };
+    setupScene(player, [monster]);
+    world.players.splice(0, world.players.length, player);
+
+    const summary = Combat.processAutoAttacks(1_500);
+
+    expect(summary).toEqual(expect.objectContaining({ processed: 1, triggered: 1, cleared: 0 }));
+    expect(monster.takeDamage).toHaveBeenCalled();
+    expect(player.recordSkillInput).toHaveBeenCalledWith('primary-attack', expect.objectContaining({
+      now: 1_500,
+      direction: 'right',
+      modifiers: { auto: true },
+    }));
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'player:combat:update',
+      expect.objectContaining({ playerId: player.uuid, combat: player.combat }),
+      expect.anything(),
+    );
+  });
+
+  it('clears auto attack when the target leaves melee range', () => {
+    const player = makePlayer({ facing: 'right' });
+    const monster = makeMonster({ x: 14, y: 10 });
+    player.combat.autoAttack = {
+      targetId: monster.uuid,
+      targetName: monster.name,
+      sceneId: 'scene-1',
+      skillId: 'primary-attack',
+      startedAt: 1_000,
+      lastTriggeredAt: 1_000,
+    };
+    setupScene(player, [monster]);
+    world.players.splice(0, world.players.length, player);
+
+    const summary = Combat.processAutoAttacks(1_500);
+
+    expect(summary).toEqual(expect.objectContaining({ processed: 1, triggered: 0, cleared: 1 }));
+    expect(player.combat.autoAttack).toBeNull();
+    expect(player.combat.autoAttackStoppedReason).toBe('target-out-of-range');
+    expect(monster.takeDamage).not.toHaveBeenCalled();
+  });
+
+  it('counts auto attack cleanup immediately when the auto swing kills its target', () => {
+    const player = makePlayer({ facing: 'right' });
+    const monster = makeMonster({
+      x: 11,
+      y: 10,
+      stats: { resources: { health: { current: 1, max: 30 } } },
+    });
+    player.combat.autoAttack = {
+      targetId: monster.uuid,
+      targetName: monster.name,
+      sceneId: 'scene-1',
+      skillId: 'primary-attack',
+      startedAt: 1_000,
+      lastTriggeredAt: 1_000,
+    };
+    setupScene(player, [monster]);
+    world.players.splice(0, world.players.length, player);
+
+    const summary = Combat.processAutoAttacks(2_000);
+
+    expect(summary).toEqual(expect.objectContaining({ processed: 1, triggered: 1, cleared: 1 }));
+    expect(player.recordSkillInput).toHaveBeenCalledWith('primary-attack', expect.objectContaining({
+      now: 2_000,
+      direction: 'right',
+      modifiers: { auto: true },
+    }));
+    expect(player.combat.autoAttack).toBeNull();
+    expect(player.combat.autoAttackStoppedReason).toBe('target-dead');
   });
 });
 

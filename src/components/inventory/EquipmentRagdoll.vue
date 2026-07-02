@@ -10,6 +10,7 @@
         :style="slotStyle(descriptor)"
         class="equipment-ragdoll__slot"
         @open-context-menu="showContextMenu"
+        @commit="$emit('commit', $event)"
       />
       <div
         class="slot arrows equipment-ragdoll__slot"
@@ -48,6 +49,7 @@ export default {
   components: {
     EquipmentSlot,
   },
+  emits: ['commit'],
   props: {
     game: {
       type: Object,

@@ -59,30 +59,48 @@ export default class Bank {
    */
   getTrueQuantity(quantity, type) {
     const getItem = this.source.filter(e => e.id === this.itemId);
-    const itemFound = (type === 'withdraw' || this.stackable) ? getItem[0].qty : getItem.length;
+    const itemFound = (type === 'withdraw' || this.stackable)
+      ? Math.max(0, Math.floor(getItem[0]?.qty || 0))
+      : getItem.length;
+    if (itemFound <= 0) {
+      return 0;
+    }
 
     // First we get the number of available slots open in our inventory or bank
     const availableSlots = this.checkCorrectSpace(type);
+    const canMergeDestination = this.canMergeIntoDestination(type);
+
+    if (availableSlots <= 0 && !canMergeDestination) {
+      return 0;
+    }
 
     if (quantity === 'All') {
       // If we are withdrawing and its not stackable
       // then we want to see whats available in the inventory
       // but if we are depositing, all items have a QTY counter
       // and thus we can get the number of items we found
-      return type === 'withdraw' && !this.stackable ? availableSlots : itemFound;
+      return type === 'withdraw' && !this.stackable
+        ? Math.min(itemFound, availableSlots)
+        : itemFound;
     }
 
-    // If we have no slots available -- just return zero.
-    if (availableSlots === 0) return 0;
+    const requested = Number.isFinite(quantity)
+      ? Math.max(0, Math.floor(quantity))
+      : 0;
+    if (requested <= 0) {
+      return 0;
+    }
 
     // Based on what we are enacting on,
     // we need to determine the correct quantity
     // we can deposit or withdraw
-    const amount = this.stackable || type === 'deposit' ? itemFound : availableSlots;
+    const amount = type === 'withdraw' && !this.stackable
+      ? Math.min(itemFound, availableSlots)
+      : itemFound;
 
     // If our quantity is more than we want to deposit/withdraw
     // set accordingly. Withdraw 5; only have 3? Withdraw 3.
-    return quantity < amount ? quantity : amount;
+    return Math.min(requested, amount);
   }
 
   /**
@@ -92,6 +110,18 @@ export default class Bank {
    */
   notEnoughSpace() {
     return this.quantity === 0;
+  }
+
+  /**
+   * Stackable transfers and bank quantity entries can merge into an
+   * existing destination entry without needing a free destination slot.
+   */
+  canMergeIntoDestination(type) {
+    if (type === 'withdraw') {
+      return this.stackable && this.itemAlreadyInInventory();
+    }
+
+    return this.itemAlreadyInBank();
   }
 
   /**
@@ -144,6 +174,10 @@ export default class Bank {
    * Deposit items in bank
    */
   deposit() {
+    if (this.notEnoughSpace()) {
+      throw new Error('Not enough space to deposit.');
+    }
+
     // First, are we depositing a stackable item?
     if (this.stackable) {
       // Let's remove its quantity accordingly

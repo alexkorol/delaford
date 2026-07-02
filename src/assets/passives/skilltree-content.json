@@ -1,0 +1,253 @@
+{
+  "nodeTypeLabels": {
+    "core": "Nexus",
+    "cluster": "Glyph",
+    "notable": "Bloom",
+    "keystone": "Keystone"
+  },
+  "nodeTypeScaling": {
+    "core": { "primary": 1.15, "hybrid": 1.2, "special": 1.05, "cost": 1 },
+    "cluster": { "primary": 1.0, "hybrid": 1.0, "special": 0.9, "cost": 1 },
+    "notable": { "primary": 1.45, "hybrid": 1.3, "special": 1.4, "cost": 2 },
+    "keystone": { "primary": 1.9, "hybrid": 1.6, "special": 2.35, "cost": 3 }
+  },
+  "fallbackFocus": {
+    "default": {
+      "focusTitle": "Resonant",
+      "special": "adaptive resonance flow",
+      "specialScaling": 1
+    }
+  },
+  "rings": [
+    {
+      "ring": 0,
+      "themeId": "seed-core",
+      "name": "Seed Core",
+      "description": "Foundational survival and resource nodes anchored at the Seed center.",
+      "archetype": "Genesis Ward",
+      "primaryBase": 6,
+      "primaryGrowth": 1.8,
+      "hybridBase": 8,
+      "hybridGrowth": 1.2,
+      "specialBase": 12,
+      "specialGrowth": 3,
+      "radialBonus": 0.06,
+      "hybridWeightFloor": 0.25,
+      "hybridWeightScale": 0.9,
+      "hybridDescriptor": "shared lifeforce",
+      "specialDescriptor": "resource circulation",
+      "naming": {
+        "core": "{focusTitle} Nexus",
+        "cluster": "{focusTitle} Root",
+        "notable": "{focusTitle} Bloom",
+        "keystone": "{focusTitle} Keystone"
+      },
+      "focus": {
+        "STR": { "focusTitle": "Bulwark", "special": "guard uptime", "specialScaling": 1.1 },
+        "DEX": { "focusTitle": "Flowstep", "special": "reaction cadence", "specialScaling": 1.0 },
+        "INT": { "focusTitle": "Infusion", "special": "mana conduit", "specialScaling": 1.05 }
+      }
+    },
+    {
+      "ring": 1,
+      "themeId": "seed-petals",
+      "name": "Seed Petals",
+      "description": "Primary offensive and defensive skills formed by the Seed of Life petals.",
+      "archetype": "Petal Vanguard",
+      "primaryBase": 9,
+      "primaryGrowth": 2.4,
+      "hybridBase": 7,
+      "hybridGrowth": 1.15,
+      "specialBase": 15,
+      "specialGrowth": 3.2,
+      "radialBonus": 0.08,
+      "hybridWeightFloor": 0.22,
+      "hybridWeightScale": 0.85,
+      "hybridDescriptor": "petal resonance",
+      "specialDescriptor": "petal surge",
+      "naming": {
+        "core": "{focusTitle} Petal",
+        "cluster": "{focusTitle} Spur",
+        "notable": "{focusTitle} Bloom",
+        "keystone": "{focusTitle} Keystone"
+      },
+      "focus": {
+        "STR": { "focusTitle": "Spear", "special": "impact burst", "specialScaling": 1.05 },
+        "DEX": { "focusTitle": "Vine", "special": "evasion weave", "specialScaling": 1.1 },
+        "INT": { "focusTitle": "Lens", "special": "critical refraction", "specialScaling": 1.15 }
+      }
+    },
+    {
+      "ring": 2,
+      "themeId": "inner-flower",
+      "name": "Inner Flower",
+      "description": "Advanced hybrid branches that weave the inner Flower of Life lattice.",
+      "archetype": "Lattice Savant",
+      "primaryBase": 11,
+      "primaryGrowth": 2.8,
+      "hybridBase": 10,
+      "hybridGrowth": 1.8,
+      "specialBase": 18,
+      "specialGrowth": 3.8,
+      "radialBonus": 0.1,
+      "hybridWeightFloor": 0.3,
+      "hybridWeightScale": 1.2,
+      "hybridDescriptor": "lattice infusion",
+      "specialDescriptor": "harmonic weave",
+      "naming": {
+        "core": "{focusTitle} Weave",
+        "cluster": "{focusTitle} Lattice",
+        "notable": "{focusTitle} Bloom",
+        "keystone": "{focusTitle} Keystone"
+      },
+      "focus": {
+        "STR": { "focusTitle": "Chord", "special": "fortified pulses", "specialScaling": 1.15 },
+        "DEX": { "focusTitle": "Spiral", "special": "tempo flow", "specialScaling": 1.05 },
+        "INT": { "focusTitle": "Prism", "special": "sigil capacity", "specialScaling": 1.2 }
+      }
+    },
+    {
+      "ring": 3,
+      "themeId": "outer-flower",
+      "name": "Outer Flower",
+      "description": "Expert specialisations occupying the outer Flower petals.",
+      "archetype": "Spire Adept",
+      "primaryBase": 13,
+      "primaryGrowth": 3.1,
+      "hybridBase": 9,
+      "hybridGrowth": 1.4,
+      "specialBase": 22,
+      "specialGrowth": 4.2,
+      "radialBonus": 0.12,
+      "hybridWeightFloor": 0.18,
+      "hybridWeightScale": 0.85,
+      "hybridDescriptor": "spire conduit",
+      "specialDescriptor": "focus overcharge",
+      "naming": {
+        "core": "{focusTitle} Bastion",
+        "cluster": "{focusTitle} Spire",
+        "notable": "{focusTitle} Bloom",
+        "keystone": "{focusTitle} Keystone"
+      },
+      "focus": {
+        "STR": { "focusTitle": "Aegis", "special": "overguard uptime", "specialScaling": 1.25 },
+        "DEX": { "focusTitle": "Sirocco", "special": "windstep speed", "specialScaling": 1.2 },
+        "INT": { "focusTitle": "Pulse", "special": "spell echo cadence", "specialScaling": 1.3 }
+      }
+    },
+    {
+      "ring": 4,
+      "themeId": "celestial-ring",
+      "name": "Celestial Ring",
+      "description": "Mythic capstones placed on the outermost concentric construction ring.",
+      "archetype": "Celestial Architect",
+      "primaryBase": 16,
+      "primaryGrowth": 3.5,
+      "hybridBase": 7,
+      "hybridGrowth": 1.0,
+      "specialBase": 30,
+      "specialGrowth": 5.0,
+      "radialBonus": 0.18,
+      "hybridWeightFloor": 0.12,
+      "hybridWeightScale": 0.65,
+      "hybridDescriptor": "celestial resonance",
+      "specialDescriptor": "halo ascension",
+      "naming": {
+        "core": "{focusTitle} Orbit",
+        "cluster": "{focusTitle} Halo",
+        "notable": "{focusTitle} Bloom",
+        "keystone": "{focusTitle} Keystone"
+      },
+      "focus": {
+        "STR": { "focusTitle": "Solar", "special": "nova ignition", "specialScaling": 1.4 },
+        "DEX": { "focusTitle": "Aether", "special": "phase stride", "specialScaling": 1.35 },
+        "INT": { "focusTitle": "Lumen", "special": "stellar recharge", "specialScaling": 1.5 }
+      }
+    }
+  ],
+  "nodeOverrides": {
+    "n0": {
+      "title": "Prime Seed Nexus",
+      "effectSegments": [
+        "+10 to all Attributes",
+        "+20% shared lifeforce to adjacent petals",
+        "+15% resource circulation while above 90% life"
+      ],
+      "cost": 0
+    }
+  },
+  "keystones": {
+    "n7": {
+      "name": "Helios Anchor Keystone",
+      "modifier": "Helios Anchor Keystone",
+      "bonus": "Strength scaling also grants +90% fireguard mitigation",
+      "penalty": "-30% cooldown recovery speed",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 2, "count": 4 } ]
+      }
+    },
+    "n8": {
+      "name": "Noctilux Prism Keystone",
+      "modifier": "Noctilux Prism Keystone",
+      "bonus": "Spells deal +120% astral damage and always shock",
+      "penalty": "-35% physical damage reduction",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 2, "count": 4 } ]
+      }
+    },
+    "n9": {
+      "name": "Fractal Bastion Keystone",
+      "modifier": "Fractal Bastion Keystone",
+      "bonus": "Gain ward equal to 45% of Strength and Intellect",
+      "penalty": "-20% movement speed",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 2, "count": 5 } ]
+      }
+    },
+    "n10": {
+      "name": "Aether Spindle Keystone",
+      "modifier": "Aether Spindle Keystone",
+      "bonus": "Projectiles always fork with +70% damage",
+      "penalty": "Projectiles cannot chain",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 3, "count": 6 } ]
+      }
+    },
+    "n11": {
+      "name": "Ecliptic Archive Keystone",
+      "modifier": "Ecliptic Archive Keystone",
+      "bonus": "+3 maximum spell echoes and +150% mana regeneration",
+      "penalty": "-40% cast speed",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 3, "count": 6 } ]
+      }
+    },
+    "n12": {
+      "name": "Myriad Bloom Keystone",
+      "modifier": "Myriad Bloom Keystone",
+      "bonus": "Summons gain +200% aura effect",
+      "penalty": "Summons lose 35% of their life every second",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 3, "count": 6 } ]
+      }
+    },
+    "n13": {
+      "name": "Zephyr Crown Keystone",
+      "modifier": "Zephyr Crown Keystone",
+      "bonus": "+75% evasion and dodge chance while moving",
+      "penalty": "Cannot gain block chance",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 3, "count": 5 } ]
+      }
+    },
+    "n15": {
+      "name": "Hexafoil Apex Keystone",
+      "modifier": "Hexafoil Apex Keystone",
+      "bonus": "+140% damage for the last ability used within the ring",
+      "penalty": "Abilities repeat once with -40% damage",
+      "prerequisites": {
+        "minTierTotals": [ { "tier": 3, "count": 5 } ]
+      }
+    }
+  }
+}

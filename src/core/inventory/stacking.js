@@ -39,7 +39,13 @@ export const applyStacking = (source, target) => {
   }
 
   const maxStack = target.maxStack || source.maxStack || Infinity;
-  const combined = (target.qty || 0) + (source.qty || 0);
+  const targetQty = Number.isFinite(target.qty) ? target.qty : 1;
+  const sourceQty = Number.isFinite(source.qty) ? source.qty : 1;
+  if (targetQty >= maxStack) {
+    return null;
+  }
+
+  const combined = targetQty + sourceQty;
   const newQty = Math.min(combined, maxStack);
 
   return {

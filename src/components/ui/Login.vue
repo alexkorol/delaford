@@ -225,61 +225,121 @@ div.form {
     flex-direction: column;
 
     input {
-      font-size: 15pt;
+      font-size: 14pt;
       outline: none;
-      padding: 5px 8px;
-      background: transparent;
+      padding: 6px 8px;
+      background: rgba(8, 6, 5, 0.45);
       border-style: solid;
-      color: rgb(192, 192, 83);
-      border-color: white;
+      color: #f2d88f;
+      caret-color: #f2d88f;
+      border-color: rgba(212, 173, 90, 0.55);
       border-width: 0 0 2px 0;
       margin-bottom: 1em;
       font-family: "ChatFont", sans-serif;
       text-shadow: 1px 1px 0 #000;
+
+      &::placeholder {
+        color: rgba(228, 214, 188, 0.55);
+      }
 
       &:last-child {
         margin-bottom: 0;
       }
 
       &:focus {
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(212, 173, 90, 0.07);
+        border-bottom-color: var(--color-accent-strong);
+        box-shadow: 0 10px 18px -12px rgba(212, 173, 90, 0.45);
       }
     }
   }
 
   form.hasErrors {
     input {
-      background: rgba(255, 0, 0, 0.5);
-      border-bottom-color: rgba(255, 0, 0, 0.7);
+      background: rgba(204, 58, 58, 0.12);
+      border-bottom-color: var(--color-danger);
     }
   }
 
   .error_message {
     margin-top: 1em;
-    background: #F44336;
-    padding: 0.25em 0;
-    color: #FAFAFA;
+    background: rgba(96, 22, 22, 0.85);
+    border: 1px solid rgba(204, 58, 58, 0.7);
+    padding: 0.4em 0.6em;
+    color: #f0d8d2;
+    font-family: "ChatFont", sans-serif;
+    text-shadow: 1px 1px 0 #000;
   }
 
   .action_buttons {
     display: inline-flex;
     width: 100%;
-    margin-top: 1em;
+    margin-top: 1.25em;
     justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
 
     button {
-      font-size: 1.5em;
+      font-family: 'GameFont', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #f7eeda;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85);
+      background: linear-gradient(180deg, #84704c 0%, #5a4830 55%, #443723 100%);
+      border: 2px solid #20180d;
+      border-top-color: rgba(238, 216, 166, 0.55);
+      border-left-color: rgba(238, 216, 166, 0.35);
+      border-radius: 0;
+      padding: var(--space-sm) var(--space-xl);
+      cursor: pointer;
+      box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.45),
+        inset 0 0 12px rgba(0, 0, 0, 0.25);
+
+      &:hover {
+        background: linear-gradient(180deg, #97825a 0%, #6a5538 55%, #4e3f28 100%);
+        box-shadow:
+          0 4px 10px rgba(0, 0, 0, 0.45),
+          0 0 14px rgba(212, 173, 90, 0.25),
+          inset 0 0 12px rgba(0, 0, 0, 0.25);
+      }
+
+      &:active {
+        transform: translateY(1px);
+        border-top-color: #20180d;
+        border-left-color: #20180d;
+        border-bottom-color: rgba(230, 205, 150, 0.3);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-accent-strong);
+        outline-offset: 2px;
+      }
     }
   }
 
   .checkbox {
-    background: #b93636;
-    border: 2px solid #521414;
-    color: #c0c053;
+    display: inline-flex;
+    width: fit-content;
+    background: rgba(30, 25, 19, 0.9);
+    border: 1px solid rgba(190, 160, 110, 0.5);
+    color: #e6d8ba;
     margin-top: 0.25em;
-    padding: 0.25em;
+    padding: 0.3em 0.55em;
     font-family: "ChatFont", sans-serif;
     text-shadow: 1px 1px 0 #000;
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 0.45em;
+      cursor: pointer;
+    }
+
+    input[type='checkbox'] {
+      accent-color: var(--color-accent);
+    }
   }
 
   .guest_account {

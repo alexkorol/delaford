@@ -4,6 +4,67 @@ import bus from '../../utilities/bus.js';
 import MovementController from '../../utilities/movement-controller.js';
 import { now } from '../../config/movement.js';
 
+const applyActorLevel = (actor, snapshot = {}) => {
+  const statsLevel = snapshot.stats && Number.isFinite(snapshot.stats.level)
+    ? snapshot.stats.level
+    : null;
+  const payloadLevel = Number.isFinite(snapshot.level) ? snapshot.level : null;
+  const level = statsLevel !== null ? statsLevel : payloadLevel;
+
+  if (Number.isFinite(level)) {
+    actor.level = level;
+  }
+};
+
+const applyPlayerSnapshot = (actor, snapshot = {}) => {
+  if (!actor || !snapshot) {
+    return;
+  }
+
+  if (snapshot.inventory) {
+    actor.inventory = Array.isArray(snapshot.inventory)
+      ? snapshot.inventory
+      : snapshot.inventory.slots || actor.inventory;
+  }
+
+  if (snapshot.wear) {
+    actor.wear = snapshot.wear;
+  }
+
+  if (snapshot.combat) {
+    actor.combat = snapshot.combat;
+  }
+
+  if (snapshot.stats) {
+    actor.stats = snapshot.stats;
+  }
+
+  applyActorLevel(actor, snapshot);
+
+  const resources = snapshot.resources || (snapshot.stats && snapshot.stats.resources) || {};
+  if (resources.health) {
+    actor.hp = resources.health;
+    if (actor.stats && actor.stats.resources) {
+      actor.stats.resources.health = resources.health;
+    }
+  }
+
+  if (resources.mana) {
+    actor.mana = resources.mana;
+    if (actor.stats && actor.stats.resources) {
+      actor.stats.resources.mana = resources.mana;
+    }
+  }
+
+  const lifecycle = snapshot.lifecycle || (snapshot.stats && snapshot.stats.lifecycle) || null;
+  if (lifecycle) {
+    actor.lifecycle = lifecycle;
+    if (actor.stats) {
+      actor.stats.lifecycle = lifecycle;
+    }
+  }
+};
+
 export default {
   /**
    * A player logins into the game
@@ -124,9 +185,7 @@ export default {
    */
   'player:equippedAnItem': (data, context) => {
     if (data.data.uuid === context.game.player.uuid) {
-      context.game.player.inventory = data.data.inventory.slots;
-      context.game.player.wear = data.data.wear;
-      context.game.player.combat = data.data.combat;
+      applyPlayerSnapshot(context.game.player, data.data);
     }
   },
 
@@ -142,9 +201,7 @@ export default {
    */
   'player:unequippedAnItem': (data, context) => {
     if (data.data.uuid === context.game.player.uuid) {
-      context.game.player.inventory = data.data.inventory.slots;
-      context.game.player.wear = data.data.wear;
-      context.game.player.combat = data.data.combat;
+      applyPlayerSnapshot(context.game.player, data.data);
     }
   },
   'player:animation': (message, context) => {
@@ -237,6 +294,8 @@ export default {
       if (stats) {
         actor.stats = stats;
       }
+
+      applyActorLevel(actor, { level: payload.level, stats });
 
       if (resources && resources.health) {
         actor.hp = resources.health;

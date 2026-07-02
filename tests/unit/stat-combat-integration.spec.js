@@ -8,6 +8,7 @@ import {
   tryRespawn,
   syncShortcuts,
 } from '#shared/stats/index.js';
+import createPlayerStatsManager from '#server/core/entities/player/stats-manager.js';
 
 describe('stat pipeline → combat integration', () => {
   const makePlayerState = (overrides = {}) => createCharacterState({
@@ -46,6 +47,22 @@ describe('stat pipeline → combat integration', () => {
     // = 30 + 12 + 60 = 102
     expect(state.resources.mana.max).toBe(102);
     expect(state.resources.mana.current).toBe(102);
+  });
+
+  it('defaults missing mana current to full while preserving explicit zero mana', () => {
+    const missingCurrent = makePlayerState({
+      resources: {
+        mana: {},
+      },
+    });
+    expect(missingCurrent.resources.mana.current).toBe(missingCurrent.resources.mana.max);
+
+    const explicitZero = makePlayerState({
+      resources: {
+        mana: { current: 0 },
+      },
+    });
+    expect(explicitZero.resources.mana.current).toBe(0);
   });
 
   it('applies damage and reduces health', () => {
@@ -147,5 +164,34 @@ describe('stat pipeline → combat integration', () => {
 
     expect(state.attributes.total.strength).toBe(10);
     expect(state.resources.health.max).toBeGreaterThan(0);
+  });
+
+  it('recalculates max resources downward when stat gear is removed', () => {
+    const player = {
+      level: 1,
+      wear: {
+        armor: {
+          attributes: { strength: 10 },
+        },
+      },
+    };
+    player.stats = createCharacterState({
+      level: 1,
+      attributes: {
+        base: { strength: 10, dexterity: 10, intelligence: 10 },
+      },
+    });
+    syncShortcuts(player.stats, player);
+
+    const manager = createPlayerStatsManager(player);
+    manager.refreshDerivedStats();
+
+    expect(player.stats.resources.health.max).toBe(160);
+
+    player.wear.armor = null;
+    manager.refreshDerivedStats();
+
+    expect(player.stats.resources.health.max).toBe(110);
+    expect(player.stats.resources.health.current).toBe(110);
   });
 });

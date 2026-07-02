@@ -24,6 +24,34 @@ const isSpoofedPlayerPayload = (player, payload = {}) => (
   || Boolean(payload.socket_id && payload.socket_id !== player.socket_id)
 );
 
+const registerBlockedCombatStep = (player, direction, startedAt) => {
+  if (typeof player.setFacing === 'function') {
+    player.setFacing(direction);
+  }
+
+  if (typeof player.registerMovementStep === 'function') {
+    player.registerMovementStep({
+      duration: 0,
+      startedAt,
+      direction,
+      blocked: true,
+    });
+  }
+};
+
+const broadcastCombatInput = (player, outcome) => {
+  Player.broadcastAnimation(player);
+  if (!outcome || !outcome.triggered) {
+    return;
+  }
+
+  Socket.broadcast('player:combat:update', {
+    playerId: player.uuid,
+    combat: player.combat,
+    animation: player.animation,
+  }, world.getScenePlayers(player.sceneId));
+};
+
 export default {
   /**
    * A player logins into the game
@@ -112,9 +140,21 @@ export default {
       return;
     }
     const startedAt = Date.now();
+
+    if (Combat.findStepTarget(player, payload.direction)) {
+      registerBlockedCombatStep(player, payload.direction, startedAt);
+      const outcome = Combat.tryPrimaryAttackIntoStep(player, payload.direction);
+      Player.broadcastMovement(player);
+      broadcastCombatInput(player, outcome);
+      return;
+    }
+
+    Combat.clearAutoAttack(player, 'movement');
     player.move(payload.direction, { startedAt, direction: payload.direction });
 
-    Player.broadcastMovement(player);
+    if (!player.lastPortalTransitionAt || player.lastPortalTransitionAt < startedAt) {
+      Player.broadcastMovement(player);
+    }
   },
 
   'player:skill:trigger': (data, ws) => {
@@ -129,12 +169,7 @@ export default {
       return;
     }
 
-    Player.broadcastAnimation(player);
-    Socket.broadcast('player:combat:update', {
-      playerId: player.uuid,
-      combat: player.combat,
-      animation: player.animation,
-    }, world.getScenePlayers(player.sceneId));
+    broadcastCombatInput(player, outcome);
   },
 
   /**
@@ -162,5 +197,7 @@ export default {
     }
 
     player.currentPane = false;
+    player.currentPaneData = null;
+    player.objectId = null;
   },
 };

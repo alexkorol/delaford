@@ -98,6 +98,11 @@ const createFromBase = (baseItem, options = {}) => {
   instance.displayName = instance.name;
   instance.size = resolveItemSize(instance);
 
+  if (typeof baseItem.slot === 'string') {
+    instance.equipSlot = baseItem.slot;
+    instance.slotType = baseItem.slot;
+  }
+
   if (typeof quantity !== 'undefined') {
     instance.qty = quantity;
   }
@@ -144,6 +149,12 @@ const adoptExisting = (existingItem, options = {}) => {
   clone.name = clone.name || clone.displayName || clone.baseName || existingItem.name;
   clone.displayName = clone.displayName || clone.name;
   clone.size = resolveItemSize(baseItem || clone);
+
+  const equipSlot = clone.equipSlot || clone.slotType || (typeof baseItem?.slot === 'string' ? baseItem.slot : null);
+  if (equipSlot) {
+    clone.equipSlot = equipSlot;
+    clone.slotType = equipSlot;
+  }
 
   if (!clone.affixes && eligibleForAffixes(bindingReference)) {
     clone.affixes = { brand: null, bond: null };

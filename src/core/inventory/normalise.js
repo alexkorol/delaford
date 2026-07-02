@@ -2,6 +2,9 @@ import { coordsFromIndex, indexFromCoords, normaliseSize } from './grid-math.js'
 import { ORIENTATION_DEFAULT } from './constants.js';
 import { isStackableItem } from './stacking.js';
 import { resolveItemSize } from '@shared/inventory-footprints.js';
+import { general, smithing, wearableItems } from '@server/core/data/items/index.js';
+
+const FALLBACK_ITEM_CATALOGUE = [...wearableItems, ...general, ...smithing];
 
 const deriveUuid = (item) => {
   if (item.uuid) {
@@ -40,22 +43,67 @@ const deriveSlot = (item, grid) => {
   return 0;
 };
 
-export const normaliseInventoryItem = (item, grid, orientationMap = new Map()) => {
-  const uuid = deriveUuid(item);
-  const baseSize = normaliseSize(item.size || item.baseSize || resolveItemSize(item));
-  const orientation = orientationMap.get(uuid) || item.orientation || ORIENTATION_DEFAULT;
-  const position = derivePosition(item, grid);
-  const slot = deriveSlot(item, grid);
-  const stackable = isStackableItem(item);
+const resolveCatalogueItem = (item) => {
+  if (!item || !item.id) {
+    return null;
+  }
+
+  const runtimeCatalogue = typeof window !== 'undefined' && Array.isArray(window.allItems)
+    ? window.allItems
+    : [];
+
+  return runtimeCatalogue.find(entry => entry && entry.id === item.id)
+    || FALLBACK_ITEM_CATALOGUE.find(entry => entry && entry.id === item.id)
+    || null;
+};
+
+const enrichFromCatalogue = (item = {}) => {
+  const baseItem = resolveCatalogueItem(item);
+  if (!baseItem) {
+    return item;
+  }
+
+  const equipSlot = item.equipSlot
+    || item.slotType
+    || item.wearSlot
+    || item.equipmentSlot
+    || (typeof baseItem.slot === 'string' ? baseItem.slot : null);
 
   return {
+    ...baseItem,
     ...item,
+    name: item.name || item.displayName || baseItem.name,
+    displayName: item.displayName || item.name || baseItem.name,
+    graphics: item.graphics || baseItem.graphics,
+    stats: item.stats || baseItem.stats,
+    type: item.type || baseItem.type,
+    wearable: item.wearable || baseItem.wearable,
+    stackable: item.stackable ?? baseItem.stackable,
+    maxStack: item.maxStack ?? baseItem.maxStack,
+    equipSlot,
+    slotType: item.slotType || equipSlot,
+  };
+};
+
+export const normaliseInventoryItem = (item, grid, orientationMap = new Map()) => {
+  const enrichedItem = enrichFromCatalogue(item);
+  const uuid = deriveUuid(enrichedItem);
+  const baseSize = normaliseSize(
+    enrichedItem.size || enrichedItem.baseSize || resolveItemSize(enrichedItem),
+  );
+  const orientation = orientationMap.get(uuid) || enrichedItem.orientation || ORIENTATION_DEFAULT;
+  const position = derivePosition(enrichedItem, grid);
+  const slot = deriveSlot(enrichedItem, grid);
+  const stackable = isStackableItem(enrichedItem);
+
+  return {
+    ...enrichedItem,
     uuid,
     slot,
     position,
     baseSize,
     orientation,
     stackable,
-    qty: typeof item.qty === 'number' ? item.qty : (stackable ? 0 : 1),
+    qty: typeof item.qty === 'number' ? item.qty : 1,
   };
 };

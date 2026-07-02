@@ -172,8 +172,16 @@ const buildStats = (monster, attributeOverrides = {}) => {
       mode: 'soft',
       state: 'alive',
       livesRemaining: 0,
+      cheatDeath: {
+        charges: 0,
+        cooldownMs: 0,
+        lastTriggerAt: null,
+      },
     },
   });
+
+  state.resources.health.current = state.resources.health.max;
+  state.resources.mana.current = state.resources.mana.max;
 
   if (rarity && rarity.healthMultiplier && rarity.healthMultiplier !== 1) {
     const health = state.resources.health;
@@ -196,7 +204,25 @@ const takeDamage = (monster, amount, options = {}) => {
     monster.stats = buildStats(monster);
   }
 
-  const result = applyStatDamage(monster.stats, amount, options);
+  const health = monster.stats.resources && monster.stats.resources.health;
+  const lifecycle = monster.stats.lifecycle || {};
+  if (!health || health.current <= 0 || lifecycle.state === 'awaiting-respawn' || lifecycle.state === 'permadead') {
+    return null;
+  }
+
+  const result = applyStatDamage(monster.stats, amount, {
+    ...options,
+    allowCheatDeath: false,
+    respawnDelayMs: Number.isFinite(options.respawnDelayMs)
+      ? options.respawnDelayMs
+      : monster.respawn.delayMs,
+    respawnHealthFraction: Number.isFinite(options.respawnHealthFraction)
+      ? options.respawnHealthFraction
+      : monster.respawn.healthFraction,
+    respawnManaFraction: Number.isFinite(options.respawnManaFraction)
+      ? options.respawnManaFraction
+      : monster.respawn.manaFraction,
+  });
   syncShortcuts(monster.stats, monster);
 
   if (result && (result.type === 'death' || result.type === 'permadeath')) {
@@ -225,6 +251,13 @@ const handleDeath = (monster, now = Date.now()) => {
 
 const respawnNow = (monster, now = Date.now()) => {
   monster.stats.lifecycle.state = 'alive';
+  monster.stats.lifecycle.respawn.pending = false;
+  monster.stats.lifecycle.respawn.at = null;
+  monster.stats.lifecycle.respawn.lastAt = now;
+  monster.stats.lifecycle.lastEvent = {
+    type: 'respawn',
+    occurredAt: now,
+  };
   monster.stats.resources.health.current = Math.max(
     1,
     Math.round(monster.stats.resources.health.max * monster.respawn.healthFraction),

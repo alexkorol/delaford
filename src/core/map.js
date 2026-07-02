@@ -965,12 +965,10 @@ class Map {
       };
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
-      const animator = this.ensureAnimation(monster);
-      const frame = animator ? animator.getCurrentFrame() : null;
       const fallbackColumn = Number.isFinite(monster.column) ? monster.column : 0;
       const fallbackRow = Number.isFinite(monster.row) ? monster.row : 0;
-      const sourceX = frame ? frame.column * tileSize : (fallbackColumn * tileSize);
-      const sourceY = frame ? frame.row * tileSize : (fallbackRow * tileSize);
+      const sourceX = fallbackColumn * tileSize;
+      const sourceY = fallbackRow * tileSize;
 
       ctx.drawImage(
         spriteSheet,

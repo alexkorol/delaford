@@ -9,6 +9,7 @@ import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
+import createWorldLayout from './world-layout.js';
 
 const DEFAULT_INSTANCE_ROOM_COUNT = 6;
 const DEFAULT_CORRIDOR_WIDTH = 3;
@@ -605,13 +606,22 @@ class Map {
   /**
    * Set up the map
    */
-  async setUp() {
-    // Load the board
-    const board = await Map.load();
+  setUp() {
+    const layout = createWorldLayout();
+    const town = layout.town;
+    const townScene = world.getDefaultTown();
 
-    // Set background and foreground tile data
-    this.background = board[0].data;
-    this.foreground = board[1].data;
+    this.background = town.map.background;
+    this.foreground = town.map.foreground;
+
+    townScene.name = town.name;
+    townScene.type = town.type;
+    townScene.persistent = town.persistent;
+    townScene.metadata = town.metadata;
+
+    layout.scenes.forEach((scene) => {
+      world.ensureScene(scene.id, scene);
+    });
 
     // Set items on map
     const itemsOnMap = [

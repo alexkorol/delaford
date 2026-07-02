@@ -185,7 +185,6 @@ const refreshDerivedStats = (player, overrides = {}) => {
 
   const healthOverride = {
     current: player.hp && player.hp.current !== undefined ? player.hp.current : undefined,
-    max: player.hp && player.hp.max !== undefined ? player.hp.max : undefined,
   };
   if (healthOverride.current === 0) {
     healthOverride.allowZero = true;
@@ -193,7 +192,6 @@ const refreshDerivedStats = (player, overrides = {}) => {
 
   const manaOverride = {
     current: player.mana && player.mana.current !== undefined ? player.mana.current : undefined,
-    max: player.mana && player.mana.max !== undefined ? player.mana.max : undefined,
   };
 
   const resources = computeResources(

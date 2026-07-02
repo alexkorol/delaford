@@ -9,17 +9,25 @@ class ContextMenu {
   constructor(player, tile, miscData) {
     // Player
     this.player = world.players.find(p => p.socket_id === player.socket_id);
+    this.scene = this.player
+      ? world.getSceneForPlayer(this.player)
+      : world.getDefaultTown();
 
     this.tileData = tile;
     this.tile = tile;
 
     // Map layers
-    this.background = world.map.background;
-    this.foreground = world.map.foreground;
+    const mapLayers = this.scene && this.scene.map ? this.scene.map : world.map;
+    this.background = mapLayers.background;
+    this.foreground = mapLayers.foreground;
 
     // Moving map objects (npcs, items, etc.)
-    this.npcs = world.npcs;
-    this.droppedItems = world.items;
+    this.npcs = this.scene && Array.isArray(this.scene.npcs)
+      ? this.scene.npcs
+      : world.npcs;
+    this.droppedItems = this.scene && Array.isArray(this.scene.items)
+      ? this.scene.items
+      : world.items;
     this.shops = world.shops;
 
     // Only generate the first item?
@@ -218,9 +226,10 @@ class ContextMenu {
       shopSlot: this.getShopInventory(),
     };
 
+    const activePaneItems = this.currentPane ? this.currentPaneData : null;
     const itemsToSearch =
       itemSource[this.context[3]]
-      || this.currentPaneData
+      || activePaneItems
       || this.player.inventory.slots;
 
     const selectedItem =

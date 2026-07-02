@@ -13,6 +13,7 @@
         :game="game"
         :images="resolvedImages"
         class="inventory-pane__ragdoll"
+        @commit="handleInventoryCommit"
       />
 
       <div class="inventory-pane__grid">
@@ -163,8 +164,47 @@ export default {
         item: {
           uuid: item.uuid,
           id: item.id,
+          targetSlot: result.slotId,
           miscData: {
             slot: item.slot,
+            targetSlot: result.slotId,
+          },
+        },
+      });
+    },
+    emitUnequipCommit(result) {
+      const player = this.game?.player;
+      const item = result?.item;
+      const sourceSlot = result?.slotId;
+
+      if (!player || !item || !sourceSlot) {
+        return;
+      }
+
+      const target = result.target || {};
+      const position = target.position && Number.isFinite(target.position.x) && Number.isFinite(target.position.y)
+        ? {
+          x: Math.floor(target.position.x),
+          y: Math.floor(target.position.y),
+        }
+        : null;
+
+      Socket.emit('item:unequip', {
+        id: player.uuid,
+        player: {
+          socket_id: player.socket_id,
+        },
+        item: {
+          uuid: item.uuid,
+          id: item.id,
+          slot: sourceSlot,
+          miscData: {
+            slot: sourceSlot,
+            action: result.type === 'unequip-world-drop' ? 'world-drop' : 'inventory',
+            targetInventorySlot: position
+              ? indexFromCoords(position.x, position.y, this.grid.columns)
+              : target.slot,
+            targetPosition: position,
           },
         },
       });
@@ -176,6 +216,8 @@ export default {
 
       if (result.type === 'equip') {
         this.emitEquipCommit(result);
+      } else if (result.type === 'unequip' || result.type === 'unequip-world-drop') {
+        this.emitUnequipCommit(result);
       } else {
         this.emitInventoryCommit(result);
       }

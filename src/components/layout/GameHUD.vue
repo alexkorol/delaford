@@ -1,11 +1,5 @@
 <template>
   <div class="hud-shell">
-    <div class="hud-shell__hint" aria-label="Controls hint">
-      <span>WASD / Arrows move</span>
-      <span>1–6 skills</span>
-      <span>/ chat</span>
-      <span>Esc close</span>
-    </div>
     <div class="hud-shell__row">
       <HudOrb
         class="hud-shell__orb hud-shell__orb--left"
@@ -16,7 +10,7 @@
       />
       <div
         class="hud-shell__level"
-        :title="`Level ${playerProgress.level} — ${Math.floor(playerProgress.fraction * 100)}% to next level`"
+        :title="`Level ${playerProgress.level} - ${Math.floor(playerProgress.fraction * 100)}% to next level`"
       >
         <span class="hud-shell__level-value">Lv {{ playerProgress.level }}</span>
         <span class="hud-shell__level-bar">
@@ -94,63 +88,57 @@ export default {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0;
   align-items: center;
   pointer-events: none;
 }
 
-.hud-shell__hint {
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-xs);
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(12, 16, 28, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  pointer-events: auto;
-}
-
-.hud-shell__hint span + span::before {
-  content: '•';
-  margin-right: var(--space-xs);
-  opacity: 0.55;
-}
-
 .hud-shell__row {
+  position: relative;
+  box-sizing: border-box;
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
-  background: linear-gradient(180deg, #342e24 0%, #221e18 100%);
-  border: 2px solid var(--color-frame-dark);
-  border-top-color: var(--color-bevel-light);
-  border-left-color: var(--color-bevel-light);
-  border-radius: var(--radius-md);
-  box-shadow:
-    inset 1px 1px 0 rgba(200, 180, 140, 0.1),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.6);
-  pointer-events: auto;
+  gap: clamp(6px, 1vw, 14px);
+  min-height: clamp(58px, calc(var(--hud-orb-size, 152px) * 0.48), 76px);
+  padding: 0 calc(var(--hud-orb-size, 152px) * 0.74) 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  pointer-events: none;
+  overflow: visible;
 }
 
 .hud-shell__orb {
+  position: absolute;
+  bottom: -8px;
+  z-index: 2;
   flex: 0 0 auto;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.hud-shell__orb--left {
+  left: clamp(4px, 1.2vw, 18px);
+}
+
+.hud-shell__orb--right {
+  right: clamp(4px, 1.2vw, 18px);
 }
 
 .hud-shell__level {
+  position: absolute;
+  left: calc((var(--hud-orb-size, 152px) * 0.86) + 12px);
+  bottom: 14px;
+  z-index: 3;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   min-width: 52px;
+  pointer-events: none;
 }
 
 .hud-shell__level-value {
@@ -178,26 +166,52 @@ export default {
 }
 
 .hud-shell__quickbar {
-  flex: 1 1 auto;
-  margin: 0 var(--space-xs);
+  position: relative;
+  z-index: 3;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(100%, 460px);
+  align-self: center;
+  margin: 0;
+  pointer-events: auto;
 }
 
-@media (width <= 767px) {
-  .hud-shell__hint {
-    display: none;
-  }
-
+@media (width <= 1100px) {
   .hud-shell__row {
-    flex-direction: column;
-    align-items: stretch;
+    gap: 4px;
+    min-height: clamp(52px, calc(var(--hud-orb-size, 136px) * 0.46), 64px);
+    padding: 0 calc(var(--hud-orb-size, 136px) * 0.68) 5px;
   }
 
-  .hud-shell__orb {
-    align-self: center;
+  .hud-shell__level {
+    min-width: 44px;
+  }
+
+  .hud-shell__level-value {
+    font-size: 0.68rem;
   }
 
   .hud-shell__quickbar {
-    margin: var(--space-xs) 0 0;
+    max-width: min(100%, 380px);
+    margin: 0;
+  }
+}
+
+@media (width <= 767px) {
+  .hud-shell__row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 0;
+    padding: 0 calc(var(--hud-orb-size, 118px) * 0.64) 5px;
+  }
+
+  .hud-shell__orb {
+    bottom: -4px;
+  }
+
+  .hud-shell__quickbar {
+    max-width: min(100%, 320px);
+    margin: 0;
   }
 }
 </style>

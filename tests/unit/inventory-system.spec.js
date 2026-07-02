@@ -1,11 +1,12 @@
 /** @vitest-environment node */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { normaliseInventoryItem } from '@/core/inventory/normalise.js';
 import { createFootprint, rotateOrientation, getItemDimensions } from '@/core/inventory/footprint.js';
 import { canPlaceItem } from '@/core/inventory/collision.js';
 import { applyStacking, canStackWith, isStackableItem } from '@/core/inventory/stacking.js';
+import { canEquipInventoryItemToSlot } from '@/stores/inventory.js';
 import { DEFAULT_GRID, ORIENTATION_DEFAULT, ORIENTATION_ROTATED } from '@/core/inventory/constants.js';
 import { canPlaceInventoryItem, packInventoryItems, resolveItemSize } from '@shared/inventory-footprints.js';
 
@@ -15,6 +16,10 @@ const mockItem = (overrides = {}) => ({
   size: { width: 2, height: 1 },
   graphics: { tileset: 'weapons', column: 0, row: 0 },
   ...overrides,
+});
+
+afterEach(() => {
+  delete globalThis.window;
 });
 
 describe('inventory footprint utilities', () => {
@@ -43,10 +48,70 @@ describe('inventory normalisation', () => {
     expect(normalised.baseSize).toEqual({ width: 2, height: 1 });
   });
 
+  it('defaults stackable item quantity to one when the server omits qty', () => {
+    const item = mockItem({
+      id: 'coins',
+      uuid: 'coins-1',
+      slot: 2,
+      stackable: true,
+      qty: undefined,
+    });
+
+    const normalised = normaliseInventoryItem(item, DEFAULT_GRID);
+
+    expect(normalised.stackable).toBe(true);
+    expect(normalised.qty).toBe(1);
+  });
+
   it('infers footprint sizes for equipment without explicit size metadata', () => {
     expect(resolveItemSize({ id: 'bronze-dagger', slot: 'right_hand', type: 'weapon' })).toEqual({ width: 1, height: 2 });
     expect(resolveItemSize({ id: 'iron-halberd', slot: 'right_hand', type: 'weapon', twoHanded: true })).toEqual({ width: 2, height: 4 });
     expect(resolveItemSize({ id: 'bronze-armor', slot: 'armor', type: 'armor' })).toEqual({ width: 2, height: 3 });
+  });
+
+  it('enriches bare server inventory records from the client item catalogue for paperdoll drops', () => {
+    globalThis.window = {
+      allItems: [{
+        id: 'bronze-pickaxe',
+        name: 'Bronze Pickaxe',
+        type: 'weapon',
+        slot: 'right_hand',
+        graphics: { tileset: 'weapons', row: 0, column: 2 },
+      }],
+    };
+
+    const normalised = normaliseInventoryItem({
+      id: 'bronze-pickaxe',
+      uuid: 'starter-pickaxe',
+      slot: 0,
+    }, DEFAULT_GRID);
+
+    expect(normalised.slot).toBe(0);
+    expect(normalised.name).toBe('Bronze Pickaxe');
+    expect(normalised.equipSlot).toBe('right_hand');
+    expect(normalised.slotType).toBe('right_hand');
+    expect(normalised.graphics).toEqual({ tileset: 'weapons', row: 0, column: 2 });
+    expect(canEquipInventoryItemToSlot(normalised, 'right_hand')).toBe(true);
+    expect(canEquipInventoryItemToSlot(normalised, 'head')).toBe(false);
+
+    delete globalThis.window;
+  });
+
+  it('enriches bare equipment records from bundled item definitions when runtime catalogue is missing', () => {
+    const normalised = normaliseInventoryItem({
+      id: 'bronze-pickaxe',
+      uuid: 'starter-pickaxe',
+      slot: 0,
+    }, DEFAULT_GRID);
+
+    expect(normalised.slot).toBe(0);
+    expect(normalised.name).toBe('Bronze Pickaxe');
+    expect(normalised.equipSlot).toBe('right_hand');
+    expect(normalised.slotType).toBe('right_hand');
+    expect(normalised.graphics).toEqual(expect.objectContaining({
+      tileset: 'weapons',
+    }));
+    expect(canEquipInventoryItemToSlot(normalised, 'right_hand')).toBe(true);
   });
 
   it('packs legacy slot-only items around larger footprints', () => {
@@ -118,10 +183,27 @@ describe('stacking utilities', () => {
     expect(outcome).toEqual({ sourceRemainder: 0, targetQty: 9 });
   });
 
+  it('treats missing stack quantities as one item when merging', () => {
+    const source = { id: 'coins', stackable: true };
+    const target = { id: 'coins', stackable: true };
+
+    expect(applyStacking(source, target)).toEqual({
+      sourceRemainder: 0,
+      targetQty: 2,
+    });
+  });
+
   it('returns remainder when exceeding max stack', () => {
     const source = { id: 'potion', qty: 12, stackable: true, maxStack: 10 };
     const target = { id: 'potion', qty: 4, stackable: true, maxStack: 10 };
     const outcome = applyStacking(source, target);
     expect(outcome).toEqual({ sourceRemainder: 6, targetQty: 10 });
+  });
+
+  it('rejects no-op stacking onto a full stack', () => {
+    const source = { id: 'potion', qty: 3, stackable: true, maxStack: 10 };
+    const target = { id: 'potion', qty: 10, stackable: true, maxStack: 10 };
+
+    expect(applyStacking(source, target)).toBeNull();
   });
 });

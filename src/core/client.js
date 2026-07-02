@@ -2,6 +2,7 @@ import terrainTileset from '../assets/tiles/terrain.png';
 import objectsTileset from '../assets/tiles/objects.png';
 import dungeonTileset from '../assets/tiles/dungeon.png';
 
+import monsterImage from '../assets/graphics/actors/monsters.png';
 import npcImage from '../assets/graphics/actors/npcs.png';
 import playerImage from '../assets/graphics/actors/players/human.png';
 import weaponsImage from '../assets/graphics/items/weapons.png';
@@ -15,7 +16,8 @@ import Socket from './utilities/socket.js';
 import MovementController from './utilities/movement-controller.js';
 import SpriteAnimator from './utilities/sprite-animator.js';
 import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
-import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
+import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '@shared/combat.js';
+import { getSkillExecutionProfile } from '@shared/skills/index.js';
 import { createCharacterState, syncShortcuts } from '@shared/stats/index.js';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
 
@@ -113,6 +115,7 @@ class Client {
     this.npcs = data.npcs;
     this.monsters = data.monsters || [];
     this.sceneId = (data.scene && data.scene.id) || data.sceneId || null;
+    this.sceneName = (data.scene && data.scene.name) || '';
     this.sceneMetadata = data.scene && data.scene.metadata ? data.scene.metadata : {};
     this.cachedImages = null;
 
@@ -192,6 +195,8 @@ class Client {
       this.sceneId = playerState.sceneId;
     }
 
+    this.sceneName = scenePayload.name || this.sceneName || '';
+
     if (scenePayload.metadata) {
       this.sceneMetadata = scenePayload.metadata;
     }
@@ -246,6 +251,7 @@ class Client {
       jewelryImage,
       generalImage,
       dungeonTileset,
+      monsterImage,
     ];
 
     const images = Object.values(assets).map((asset) => this.constructor.uploadImage(asset));
@@ -423,11 +429,48 @@ class Client {
 
     Socket.emit('player:move', payload);
 
+    if (this.findLivingMonsterAtStep(direction)) {
+      this.resetOptimisticMovement();
+      const profile = getSkillExecutionProfile(DEFAULT_SKILL_IDS.primary) || {};
+      this.setLocalAnimation(profile.animationState || 'attack', {
+        direction,
+        skillId: DEFAULT_SKILL_IDS.primary,
+        duration: profile.duration,
+      });
+      return;
+    }
+
     if (options.optimistic === false) {
       return;
     }
 
     this.applyOptimisticMovement(direction);
+  }
+
+  findLivingMonsterAtStep(direction) {
+    const delta = directionDeltas[direction];
+    const actor = this.getOptimisticActor();
+    if (!delta || !actor || !Array.isArray(this.monsters)) {
+      return null;
+    }
+
+    const basePosition = Array.isArray(actor.optimisticQueue) && actor.optimisticQueue.length > 0
+      ? actor.optimisticQueue[actor.optimisticQueue.length - 1]
+      : actor.optimisticPosition || { x: actor.x, y: actor.y };
+
+    const targetX = (typeof basePosition.x === 'number' ? basePosition.x : actor.x) + delta.x;
+    const targetY = (typeof basePosition.y === 'number' ? basePosition.y : actor.y) + delta.y;
+
+    return this.monsters.find((monster) => {
+      if (!monster || monster.x !== targetX || monster.y !== targetY) {
+        return false;
+      }
+
+      const health = monster.stats && monster.stats.resources
+        ? monster.stats.resources.health
+        : null;
+      return !health || health.current > 0;
+    }) || null;
   }
 
   applyOptimisticMovement(direction) {
@@ -556,8 +599,15 @@ class Client {
       actor.optimisticScheduler = null;
     }
 
+    actor.optimisticQueue = [];
     actor.optimisticPosition = { x: actor.x, y: actor.y };
     actor.optimisticTarget = null;
+    actor.optimisticFacing = null;
+
+    if (actor.movement && typeof actor.movement.hardSync === 'function') {
+      actor.movement.hardSync(actor.x, actor.y);
+    }
+
     this.setLocalIdle();
   }
 }

@@ -2,6 +2,7 @@
   <div
     class="world-drop-zone"
     :class="{ 'world-drop-zone--active': isActive }"
+    data-world-drop-zone="true"
     title="Ground"
     aria-label="Ground drop target"
     @pointerenter="handlePointerEnter"
@@ -13,7 +14,10 @@
 </template>
 
 <script>
-import { inject, computed } from 'vue';
+import { inject, computed, unref } from 'vue';
+
+const storeValue = value => unref(value);
+const isStoreDragging = store => Boolean(store && storeValue(store.isDragging));
 
 export default {
   name: 'WorldDropZone',
@@ -22,11 +26,11 @@ export default {
 
     const isActive = computed(() => (
       inventoryStore
-      && inventoryStore.dragState.value?.hoverTarget?.type === 'world-drop'
+      && storeValue(inventoryStore.dragState)?.hoverTarget?.type === 'world-drop'
     ));
 
     const handlePointerEnter = () => {
-      if (!inventoryStore || !inventoryStore.isDragging.value) {
+      if (!isStoreDragging(inventoryStore)) {
         return;
       }
 
@@ -34,7 +38,7 @@ export default {
     };
 
     const handlePointerLeave = () => {
-      if (!inventoryStore || !inventoryStore.isDragging.value) {
+      if (!isStoreDragging(inventoryStore)) {
         return;
       }
 

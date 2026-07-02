@@ -88,23 +88,11 @@
 <script>
 import Socket from '../core/utilities/socket.js';
 import bus from '../core/utilities/bus.js';
+import { normaliseChatMessage } from '../core/chat-message.js';
 
 const formatTime = (timestamp) => {
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-const normaliseIncoming = (incoming) => {
-  if (Object.hasOwnProperty.call(incoming, 'text')) {
-    return incoming;
-  }
-  if (incoming && incoming.data) {
-    if (incoming.data.data) {
-      return incoming.data.data;
-    }
-    return incoming.data;
-  }
-  return incoming;
 };
 
 export default {
@@ -142,11 +130,11 @@ export default {
       messages: [
         {
           type: 'normal',
-          text: 'Welcome to Delaford.',
+          text: 'Welcome to Verdigris.',
           username: '',
           color: '#1D56F2',
           timestamp: Date.now(),
-          displayText: 'Welcome to Delaford.',
+          displayText: 'Welcome to Verdigris.',
           colorStyle: '',
           displayTime: formatTime(Date.now()),
         },
@@ -196,6 +184,8 @@ export default {
     this.messageHandler = (data) => this.pipeline(data);
     bus.$on('player:say', this.messageHandler);
     bus.$on('item:examine', this.messageHandler);
+    bus.$on('combat:log', this.messageHandler);
+    bus.$on('game:send:message', this.messageHandler);
   },
   mounted() {
     this.scrollToBottom();
@@ -203,11 +193,13 @@ export default {
   beforeUnmount() {
     bus.$off('player:say', this.messageHandler);
     bus.$off('item:examine', this.messageHandler);
+    bus.$off('combat:log', this.messageHandler);
+    bus.$off('game:send:message', this.messageHandler);
     this.stopCountdown();
   },
   methods: {
     pipeline(incoming) {
-      const normalised = normaliseIncoming(incoming);
+      const normalised = normaliseChatMessage(incoming);
       if (!normalised) {
         return;
       }
@@ -247,6 +239,9 @@ export default {
         : '';
       if (type === 'chat' && sanitisedColor) {
         return { displayText: text, colorStyle: `color:${sanitisedColor}` };
+      }
+      if (type === 'combat') {
+        return { displayText: text, colorStyle: `color:${sanitisedColor || '#ffd166'};font-weight:600` };
       }
       return { displayText: text, colorStyle: '' };
     },

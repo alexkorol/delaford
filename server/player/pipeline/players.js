@@ -1,9 +1,67 @@
 import Socket from '#server/socket.js';
-import UI from '#shared/ui.js';
 import { wearableItems } from '#server/core/data/items/index.js';
 import world from '#server/core/world.js';
 import Wear from '#server/core/utilities/wear.js';
 import ItemFactory from '#server/core/items/factory.js';
+import {
+  INVENTORY_COLUMNS,
+  canPlaceInventoryItem,
+  findOpenInventorySlot,
+  positionFromSlot,
+} from '#shared/inventory-footprints.js';
+
+const findInventoryItemIndex = (slots = [], reference = {}) => {
+  if (reference.uuid) {
+    const uuidIndex = slots.findIndex(item => item && item.uuid === reference.uuid);
+    if (uuidIndex !== -1) {
+      return uuidIndex;
+    }
+  }
+
+  if (Number.isInteger(reference.slot)) {
+    const slotIndex = slots.findIndex(item => (
+      item
+      && item.slot === reference.slot
+      && (!reference.id || item.id === reference.id)
+    ));
+    if (slotIndex !== -1) {
+      return slotIndex;
+    }
+  }
+
+  if (reference.id) {
+    return slots.findIndex(item => item && item.id === reference.id);
+  }
+
+  return -1;
+};
+
+const sendInventoryMessage = (player, text) => {
+  if (!player || !player.socket_id) {
+    return;
+  }
+
+  Socket.emit('game:send:message', {
+    player: { socket_id: player.socket_id },
+    text,
+  });
+};
+
+const isNumericSlot = slot => Number.isInteger(slot) && slot >= 0;
+
+const resolveRequestedInventorySlot = (data = {}) => {
+  const item = data.item || {};
+  const miscData = item.miscData || {};
+  const candidates = [
+    item.targetInventorySlot,
+    miscData.targetInventorySlot,
+    data.targetInventorySlot,
+    data.target && data.target.slot,
+  ];
+
+  const slot = candidates.find(isNumericSlot);
+  return isNumericSlot(slot) ? slot : null;
+};
 
 export default {
   /**
@@ -17,7 +75,13 @@ export default {
       return;
     }
     const player = world.players[playerIndex];
-    const equippingItem = player.inventory.slots.find(s => s.slot === data.item.miscData.slot);
+    const itemReference = {
+      uuid: data.item.uuid,
+      id: data.item.id,
+      slot: data.item.miscData?.slot,
+    };
+    const inventoryIndex = findInventoryItemIndex(player.inventory.slots, itemReference);
+    const equippingItem = player.inventory.slots[inventoryIndex];
     const baseItem = wearableItems.find(i => i.id === data.item.id) || equippingItem;
 
     if (!equippingItem || !baseItem) {
@@ -32,7 +96,6 @@ export default {
 
     player.wear[baseItem.slot] = wearItem;
 
-    const inventoryIndex = player.inventory.slots.findIndex(i => i.uuid === wearItem.uuid);
     if (inventoryIndex > -1) {
       player.inventory.slots.splice(inventoryIndex, 1);
     }
@@ -75,14 +138,60 @@ export default {
         return;
       }
 
-      const slot = UI.getOpenSlot(player.inventory.slots, 'inventory', equipped);
-      const targetSlot = (data.replacing && UI.isNumeric(slot) && slot >= data.item.slot)
-        ? data.item.slot
-        : slot;
-
       const inventoryItem = ItemFactory.adoptExisting(equipped, { baseItem });
-      inventoryItem.slot = targetSlot;
       inventoryItem.context = 'item';
+
+      const sourceSlot = isNumericSlot(data.item.slot) ? data.item.slot : null;
+      const requestedInventorySlot = resolveRequestedInventorySlot(data);
+      const replacingReference = data.replacingItem || {};
+      let targetSlot = false;
+
+      if (requestedInventorySlot !== null && !data.replacing) {
+        const requestedPosition = positionFromSlot(requestedInventorySlot, INVENTORY_COLUMNS);
+        const placement = canPlaceInventoryItem(
+          player.inventory.slots,
+          inventoryItem,
+          requestedPosition,
+        );
+
+        if (!placement.valid) {
+          sendInventoryMessage(player, 'There is no room to place that item there.');
+          resolve(409);
+          return;
+        }
+
+        targetSlot = requestedInventorySlot;
+      }
+
+      if (targetSlot === false && data.replacing && sourceSlot !== null) {
+        const sourcePosition = positionFromSlot(sourceSlot, INVENTORY_COLUMNS);
+        const placement = canPlaceInventoryItem(
+          player.inventory.slots,
+          inventoryItem,
+          sourcePosition,
+          {
+            ignoreUuid: replacingReference.uuid,
+            ignoreSlot: sourceSlot,
+          },
+        );
+
+        if (placement.valid) {
+          targetSlot = sourceSlot;
+        }
+      }
+
+      if (targetSlot === false) {
+        targetSlot = findOpenInventorySlot(player.inventory.slots, inventoryItem);
+      }
+
+      if (targetSlot === false || targetSlot === null || typeof targetSlot === 'undefined') {
+        sendInventoryMessage(player, 'You need more room in your backpack before unequipping that.');
+        resolve(409);
+        return;
+      }
+
+      inventoryItem.slot = targetSlot;
+      inventoryItem.position = positionFromSlot(targetSlot, INVENTORY_COLUMNS);
 
       player.inventory.slots.push(inventoryItem);
 

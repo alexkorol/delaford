@@ -28,6 +28,7 @@
       :is-desktop="isDesktop"
       :chat-shell-classes="chatShellClasses"
       :chat-toggle-label="chatToggleLabel"
+      :chat-preview="layout.chat.preview"
       :chat-unread-count="chatUnreadCount"
       :chat-pinned="layout.chat.isPinned"
       :chat-expanded="chatExpanded"
@@ -73,16 +74,18 @@ import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/in
 // Core assets
 import Client from './core/client.js';
 import Engine from './core/engine.js';
+import { buildCombatLogEntry } from './core/combat-log.js';
 import bus from './core/utilities/bus.js';
 import Event from './core/player/events.js';
 import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
+import { shouldRootHandleQuickbarHotkey } from './core/hotkeys.js';
 
 const createDefaultQuickSlots = () => createQuickbarSlots();
 
 const paneRegistry = {
-  stats: { component: StatsPane, title: 'Stats', slot: 'left' },
+  stats: { component: StatsPane, title: 'Character', slot: 'left' },
   inventory: { component: InventoryPane, title: 'Inventory', slot: 'right' },
   wear: { component: WearPane, title: 'Equipment' },
   friendlist: { component: FriendListPane, title: 'Friends' },
@@ -97,7 +100,7 @@ const defaultPaneAssignments = {
   right: null,
 };
 
-const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
+const DEFAULT_CHAT_PREVIEW = 'Welcome to Verdigris.';
 const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
 const DESKTOP_PANE_GUTTER = 8;
 const MOBILE_PANE_GUTTER = 6;
@@ -1041,10 +1044,7 @@ export default {
         }
       }
 
-      if (/^[1-8]$/.test(event.key)) {
-        if (this.shouldIgnoreHotkeys(event)) {
-          return;
-        }
+      if (shouldRootHandleQuickbarHotkey(event, this.shouldIgnoreHotkeys)) {
         const slotIndex = Number(event.key) - 1;
         this.activateQuickSlot(slotIndex);
         event.preventDefault();
@@ -1219,6 +1219,73 @@ export default {
       }
 
       this.game.map.registerCombatHit(payload);
+      this.emitCombatLog(payload);
+    },
+
+    resolveCombatActorName(actorId, actorType = null, fallbackName = null) {
+      if (!actorId || !this.game) {
+        return fallbackName || 'Unknown';
+      }
+
+      const self = this.game.player;
+      if (self && self.uuid === actorId) {
+        return 'You';
+      }
+
+      const players = this.game.map && Array.isArray(this.game.map.players)
+        ? this.game.map.players
+        : [];
+      const player = players.find((entry) => entry.uuid === actorId);
+      if (player) {
+        return player.username || fallbackName || 'Adventurer';
+      }
+
+      if (actorType === 'player') {
+        return fallbackName || 'Adventurer';
+      }
+
+      const monsters = this.game.map && Array.isArray(this.game.map.monsters)
+        ? this.game.map.monsters
+        : [];
+      const monster = monsters.find((entry) => entry.uuid === actorId);
+      return monster ? monster.name || fallbackName || 'Monster' : fallbackName || 'Monster';
+    },
+
+    emitCombatLog(payload = {}) {
+      if (!payload || !payload.targetId) {
+        return;
+      }
+
+      const attacker = this.resolveCombatActorName(
+        payload.attackerId,
+        payload.attackerType,
+        payload.attackerName,
+      );
+      const target = this.resolveCombatActorName(
+        payload.targetId,
+        payload.targetType,
+        payload.targetName,
+      );
+
+      bus.$emit('combat:log', buildCombatLogEntry(payload, { attacker, target }));
+    },
+
+    async handleWorldSceneTransition(scene, playerState = {}, portal = null) {
+      if (!scene || !this.game) {
+        return;
+      }
+
+      await this.game.loadScene(scene, playerState);
+      this.applyWorldViewportToMap();
+
+      if (portal && portal.message) {
+        bus.$emit('item:examine', {
+          data: {
+            type: 'normal',
+            text: portal.message,
+          },
+        });
+      }
     },
 
     pruneExpiredInvites() {

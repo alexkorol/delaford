@@ -12,7 +12,7 @@ import createMonsterAIController from '#server/core/entities/monster/ai-controll
 import createMonsterStatsManager, {
   clone,
 } from '#server/core/entities/monster/stats-manager.js';
-import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
+import { sendMessage } from '#server/core/combat/experience.js';
 
 
 class Monster {
@@ -166,12 +166,14 @@ class Monster {
     const died = result.type === 'death' || result.type === 'permadeath';
     const amount = result.amount !== undefined ? result.amount : damage;
 
-    awardSkillExperience(target, 'defence', amount);
-
     Socket.broadcast('combat:hit', {
       attackerId: this.uuid,
+      attackerName: this.name || 'Monster',
       targetId: target.uuid,
+      targetName: target.username || 'Adventurer',
       targetType: 'player',
+      skillId: 'monster:attack',
+      skillName: 'Attack',
       amount,
       health: {
         current: target.stats.resources.health.current,
@@ -250,6 +252,7 @@ class Monster {
       state: {
         mode: this.state.mode,
         targetId: this.state.targetId,
+        effects: clone(this.state.effects || {}),
       },
       rewards: this.rewards,
       rarityLabel: this.rarity.label,
@@ -259,28 +262,68 @@ class Monster {
   }
 
   static load() {
-    const scene = world.getDefaultTown();
-    const monsters = monsterDefinitions.map(definition => new Monster(definition));
-    scene.monsters = monsters;
-    world.monsters = monsters;
+    const sceneDefinitions = [];
 
-    const respawns = scene.respawns || {
-      items: [],
-      monsters: [],
-      resources: [],
-    };
-    respawns.monsters = monsterDefinitions.map(definition => ({
-      id: definition.id,
-      spawn: clone(definition.spawn),
-      respawn: clone(definition.respawn),
-      archetype: definition.archetype,
-      rarity: definition.rarity,
-    }));
-    scene.respawns = respawns;
-    world.respawns = respawns;
+    world.forEachScene((scene) => {
+      const definitions = scene
+        && scene.metadata
+        && Array.isArray(scene.metadata.monsterDefinitions)
+        ? scene.metadata.monsterDefinitions
+        : [];
 
-    Monster.broadcast(scene.monsters);
-    return monsters;
+      definitions.forEach((definition) => {
+        sceneDefinitions.push({
+          ...definition,
+          sceneId: scene.id,
+        });
+      });
+    });
+
+    const definitionsToLoad = sceneDefinitions.length > 0
+      ? sceneDefinitions
+      : monsterDefinitions;
+
+    const grouped = new Map();
+    definitionsToLoad.forEach((definition) => {
+      const scene = world.getScene(definition.sceneId || world.defaultTownId);
+      const monster = new Monster({
+        ...definition,
+        sceneId: scene.id,
+      });
+
+      if (!grouped.has(scene.id)) {
+        grouped.set(scene.id, []);
+      }
+      grouped.get(scene.id).push(monster);
+    });
+
+    const allMonsters = [];
+    world.forEachScene((scene) => {
+      const monsters = grouped.get(scene.id) || [];
+      scene.monsters = monsters;
+      allMonsters.push(...monsters);
+
+      const respawns = scene.respawns || {
+        items: [],
+        monsters: [],
+        resources: [],
+      };
+
+      respawns.monsters = monsters.map(monster => ({
+        id: monster.templateId || monster.id,
+        spawn: clone(monster.spawn),
+        respawn: clone(monster.respawn),
+        archetype: monster.archetypeId,
+        rarity: monster.rarityId,
+      }));
+      scene.respawns = respawns;
+
+      if (monsters.length) {
+        Monster.broadcast(monsters, { players: world.getScenePlayers(scene.id) });
+      }
+    });
+
+    return allMonsters;
   }
 
   static broadcast(monsters, options = {}) {

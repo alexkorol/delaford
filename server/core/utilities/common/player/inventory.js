@@ -14,6 +14,10 @@ const hydrateInventoryItem = (item = {}) => {
     return item;
   }
 
+  const equipSlot = item.equipSlot
+    || item.slotType
+    || (typeof baseItem.slot === 'string' ? baseItem.slot : null);
+
   return {
     ...baseItem,
     ...item,
@@ -22,6 +26,7 @@ const hydrateInventoryItem = (item = {}) => {
     graphics: item.graphics || baseItem.graphics,
     stats: item.stats || baseItem.stats,
     actions: item.actions || baseItem.actions,
+    ...(equipSlot ? { equipSlot, slotType: equipSlot } : {}),
   };
 };
 

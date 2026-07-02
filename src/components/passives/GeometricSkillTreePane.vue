@@ -1,39 +1,212 @@
 <template>
   <div class="geometric-skill-tree">
-    <div class="ui-layer" ref="uiLayer">
+    <div class="ui-layer">
       <div class="hud-panel stats-panel">
-        <h1>Flower of Life</h1>
-        <div class="stat-row">
-          <span>Harmony (Nodes)</span>
-          <span class="stat-value" ref="nodePointsDisplay">20</span>
+        <h1>Verdigris Tree</h1>
+
+        <div class="point-grid" aria-label="Passive points">
+          <div>
+            <span>Skill Points</span>
+            <strong>{{ treeState.points.nodes }}</strong>
+          </div>
+          <div>
+            <span>Conduits</span>
+            <strong>{{ treeState.points.conduits }}</strong>
+          </div>
+          <div>
+            <span>Nodes</span>
+            <strong>{{ treeState.activeNodes }}</strong>
+          </div>
+          <div>
+            <span>Paths</span>
+            <strong>{{ treeState.allocatedConduits }}</strong>
+          </div>
         </div>
-        <div class="stat-row">
-          <span>Flow (Arcs)</span>
-          <span class="stat-value" ref="arcPointsDisplay">15</span>
+
+        <label class="sr-only" for="verdigris-search">Search</label>
+        <input
+          id="verdigris-search"
+          v-model="searchTerm"
+          class="search-input"
+          type="search"
+          placeholder="Search"
+          @input="onSearchInput"
+        >
+
+        <div class="attribute-grid" aria-label="Allocated attributes">
+          <span>STR <b>{{ treeState.stats.attrs.STR }}</b></span>
+          <span>DEX <b>{{ treeState.stats.attrs.DEX }}</b></span>
+          <span>INT <b>{{ treeState.stats.attrs.INT }}</b></span>
         </div>
-        <div class="hud-hints">
-          <strong>Left Click Node:</strong> Toggle (Awaken/Refund)<br>
-          <strong>Click Ghost Path:</strong> Confirm Choice<br>
-          <strong>Click Arcs:</strong> Channel Flow
+
+        <div class="derived-grid" aria-label="Derived passive stats">
+          <span
+            v-for="row in derivedRows"
+            :key="row.key"
+          >
+            <b>{{ row.label }}</b>
+            <strong>{{ row.value }}</strong>
+          </span>
+        </div>
+
+        <div class="delta-list" aria-label="Recent changes">
+          <p
+            v-for="line in treeState.lastDeltas"
+            :key="line"
+          >
+            {{ line }}
+          </p>
         </div>
       </div>
+
+      <div class="hud-panel details-panel">
+        <header class="node-header">
+          <span>{{ treeState.selectedNode.axisLabel }}</span>
+          <strong>{{ treeState.selectedNode.name }}</strong>
+          <small>
+            Ring {{ treeState.selectedNode.ring }}
+            / {{ treeState.selectedNode.type }}
+            / Cost {{ treeState.selectedNode.cost }}
+          </small>
+        </header>
+
+        <div class="tag-row" aria-label="Selected tags">
+          <span
+            v-for="tag in treeState.selectedNode.tags"
+            :key="tag"
+          >
+            {{ tag }}
+          </span>
+        </div>
+
+        <ul class="effect-list">
+          <li
+            v-for="effect in treeState.selectedNode.effects"
+            :key="effect"
+          >
+            {{ effect }}
+          </li>
+        </ul>
+
+        <div
+          v-if="treeState.selectedNode.boostLines.length"
+          class="boost-list"
+        >
+          <strong>Empowered Center</strong>
+          <p
+            v-for="line in treeState.selectedNode.boostLines"
+            :key="line"
+          >
+            {{ line }}
+          </p>
+        </div>
+
+        <button
+          v-if="treeState.selectedNode.canRefund"
+          type="button"
+          class="btn danger"
+          @click="refundSelectedNode"
+        >
+          Refund Node
+        </button>
+
+        <section class="bonus-panel" aria-label="Geometry bonuses">
+          <header>Geometry</header>
+          <div
+            v-for="bonus in treeState.shapeBonuses"
+            :key="bonus.id"
+            class="bonus-row"
+            :class="{ active: bonus.active }"
+          >
+            <strong>{{ bonus.name }}</strong>
+            <span>{{ bonus.progress }}</span>
+          </div>
+        </section>
+
+        <section class="log-panel" aria-label="Build log">
+          <header>Log</header>
+          <p
+            v-for="entry in visibleLog"
+            :key="entry"
+          >
+            {{ entry }}
+          </p>
+        </section>
+      </div>
+
+      <div
+        v-if="treeState.pendingChoices.length"
+        class="hud-panel choice-panel"
+      >
+        <header>{{ pendingTitle }}</header>
+        <button
+          v-for="choice in treeState.pendingChoices"
+          :key="choice.choiceId"
+          type="button"
+          class="choice-btn"
+          :class="{ current: choice.current }"
+          @click="choosePending(choice)"
+        >
+          <strong>{{ choice.title }}</strong>
+          <span>{{ choice.meta }}</span>
+        </button>
+        <button
+          v-if="treeState.pending && treeState.pending.mode === 'conduit'"
+          type="button"
+          class="choice-btn danger"
+          @click="refundPendingConduit"
+        >
+          <strong>Refund Conduit</strong>
+          <span>{{ pendingRefundState }}</span>
+        </button>
+      </div>
+
       <div class="hud-panel controls-panel">
-        <button class="btn" type="button" @click="resetTree">Rebirth</button>
-        <button class="btn" type="button" @click="centerView">Center</button>
+        <button
+          class="btn"
+          type="button"
+          @click="undoTree"
+        >
+          Undo
+        </button>
+        <button
+          class="btn"
+          type="button"
+          @click="resetTree"
+        >
+          Reset
+        </button>
+        <button
+          class="btn"
+          type="button"
+          @click="centerView"
+        >
+          Center
+        </button>
       </div>
-      <div ref="choiceHint" class="choice-hint">Choose a path to connect</div>
     </div>
 
-    <div ref="tooltip" class="tooltip">
+    <div
+      ref="tooltip"
+      class="tooltip"
+    >
       <div class="tt-header"></div>
       <div class="tt-body"></div>
     </div>
 
-    <div ref="canvasContainer" class="canvas-container">
-      <svg ref="mainSvg" class="main-svg" width="100%" height="100%">
-        <g ref="viewportGroup" id="viewport-group">
-          <g ref="arcsLayer"></g>
-          <g ref="straightLayer"></g>
+    <div
+      ref="canvasContainer"
+      class="canvas-container"
+    >
+      <svg
+        ref="mainSvg"
+        class="main-svg"
+        width="100%"
+        height="100%"
+      >
+        <g ref="viewportGroup">
+          <g ref="backgroundLayer"></g>
+          <g ref="conduitsLayer"></g>
           <g ref="nodesLayer"></g>
         </g>
       </svg>
@@ -42,450 +215,267 @@
 </template>
 
 <script>
-const RADIUS = 80;
+import {
+  VERDIGRIS_AXIS_META,
+  VerdigrisGeometricTree,
+  axisColor,
+  createDerivedRows,
+  edgeKey,
+  formatAttrs,
+  nodeRadius,
+  round,
+} from '@/core/passives/verdigris-geometric-tree.js';
+import {
+  VERDIGRIS_SKILL_TREE_POINTS,
+  VERDIGRIS_SKILL_TREE_TOTALS,
+} from '@/core/passives/verdigris-skill-tree.js';
 
-class Hex {
-  constructor(q, r) {
-    this.q = q;
-    this.r = r;
-  }
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const SEARCH_DIM_OPACITY = '0.18';
 
-  getKey() {
-    return `${this.q},${this.r}`;
-  }
-
-  toPixel() {
-    const x = RADIUS * (this.q + this.r / 2);
-    const y = RADIUS * (this.r * Math.sqrt(3) / 2);
-    return { x, y };
-  }
-
-  static neighbor(hex, i) {
-    const dirs = [
-      { q: 1, r: 0 },
-      { q: 0, r: 1 },
-      { q: -1, r: 1 },
-      { q: -1, r: 0 },
-      { q: 0, r: -1 },
-      { q: 1, r: -1 },
-    ];
-    const d = dirs[i % 6];
-    return new Hex(hex.q + d.q, hex.r + d.r);
-  }
-}
-
-class Node {
-  constructor(hex, type = 'small') {
-    this.hex = hex;
-    this.id = hex.getKey();
-    this.type = type;
-    this.active = false;
-    this.connections = [];
-    this.data = { name: 'Cosmic Point', desc: 'A point of power.' };
-  }
-}
-
-class Connection {
-  constructor(nodeA, nodeB) {
-    const sorted = [nodeA.id, nodeB.id].sort();
-    this.id = `${sorted[0]}:${sorted[1]}`;
-    this.fromId = sorted[0];
-    this.toId = sorted[1];
-    this.straight = false;
-    this.curve1 = false;
-    this.curve2 = false;
-  }
-}
-
-class SkillTree {
-  constructor(options) {
-    const { layers, tooltipEl, choiceHintEl, nodePointsEl, arcPointsEl } = options;
-    this.nodes = new Map();
-    this.connections = new Map();
-    this.points = { nodes: 20, arcs: 15 };
-    this.startId = '0,0';
-    this.pendingNodeId = null;
-
-    this.choiceHintEl = choiceHintEl;
-    this.nodePointsEl = nodePointsEl;
-    this.arcPointsEl = arcPointsEl;
-
-    this.generateTree(3);
-
-    this.renderer = new SVGRenderer(this, { layers, tooltipEl });
-    this.renderer.draw();
-    this.updateUI();
-  }
-
-  generateTree(layers) {
-    const center = new Hex(0, 0);
-    this.addNode(center, 'center');
-    this.nodes.get(center.getKey()).active = true;
-
-    for (let l = 1; l <= layers; l += 1) {
-      let cursor = new Hex(0, 0);
-      for (let k = 0; k < l; k += 1) cursor = Hex.neighbor(cursor, 4);
-
-      for (let i = 0; i < 6; i += 1) {
-        for (let j = 0; j < l; j += 1) {
-          let type = 'small';
-          if (l === layers) type = 'keystone';
-          this.addNode(cursor, type);
-          this.connectNeighbors(cursor);
-          cursor = Hex.neighbor(cursor, i);
-        }
-      }
-    }
-  }
-
-  addNode(hex, type) {
-    const key = hex.getKey();
-    if (!this.nodes.has(key)) this.nodes.set(key, new Node(hex, type));
-  }
-
-  connectNeighbors(hex) {
-    for (let i = 0; i < 6; i += 1) {
-      const nHex = Hex.neighbor(hex, i);
-      if (this.nodes.has(nHex.getKey())) {
-        const nodeA = this.nodes.get(hex.getKey());
-        const nodeB = this.nodes.get(nHex.getKey());
-        this.createConnection(nodeA, nodeB);
-      }
-    }
-  }
-
-  createConnection(n1, n2) {
-    const conn = new Connection(n1, n2);
-    if (!this.connections.has(conn.id)) {
-      this.connections.set(conn.id, conn);
-      if (!n1.connections.includes(n2.id)) n1.connections.push(n2.id);
-      if (!n2.connections.includes(n1.id)) n2.connections.push(n1.id);
-    }
-  }
-
-  isConnectedToStart(targetId, simulate = {}) {
-    if (targetId === this.startId) return true;
-    if (simulate.disableNode === targetId) return false;
-
-    const queue = [this.startId];
-    const visited = new Set([this.startId]);
-
-    while (queue.length > 0) {
-      const currId = queue.shift();
-      if (currId === targetId) return true;
-      const currNode = this.nodes.get(currId);
-
-      for (const neighborId of currNode.connections) {
-        if (visited.has(neighborId)) continue;
-        if (neighborId === simulate.disableNode) continue;
-
-        const neighbor = this.nodes.get(neighborId);
-        const connId = [currId, neighborId].sort().join(':');
-        const conn = this.connections.get(connId);
-
-        const isNodeActive = neighbor.active;
-        const isConnActive = conn.straight && simulate.disableStraight !== connId;
-
-        if (isNodeActive && isConnActive) {
-          visited.add(neighborId);
-          queue.push(neighborId);
-        }
-      }
-    }
-    return false;
-  }
-
-  handleNodeClick(id) {
-    const node = this.nodes.get(id);
-
-    if (this.pendingNodeId === id) {
-      this.pendingNodeId = null;
-      this.refresh();
-      return;
-    }
-    if (this.pendingNodeId) this.pendingNodeId = null;
-
-    if (node.active) {
-      this.deactivateNode(id);
-      return;
-    }
-
-    this.attemptActivateNode(id);
-  }
-
-  attemptActivateNode(id) {
-    const node = this.nodes.get(id);
-    if (this.points.nodes <= 0) {
-      alert('Not enough Node Points.');
-      return;
-    }
-
-    const potentialSources = [];
-
-    for (const nid of node.connections) {
-      const n = this.nodes.get(nid);
-      if (n.active) {
-        const c = this.connections.get([id, nid].sort().join(':'));
-        potentialSources.push({ node: n, conn: c });
-      }
-    }
-
-    if (potentialSources.length === 0) {
-      alert('Must be adjacent to an active node.');
-      return;
-    }
-
-    if (potentialSources.length === 1) {
-      this.finalizeActivation(node, potentialSources[0].conn);
+const makeSvgEl = (tag, attrs = {}) => {
+  const el = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs).forEach(([key, value]) => {
+    if (key === 'className') {
+      el.setAttribute('class', value);
     } else {
-      this.pendingNodeId = id;
-      this.refresh();
-      if (this.choiceHintEl) {
-        this.choiceHintEl.style.display = 'block';
-        setTimeout(() => { if (this.choiceHintEl) this.choiceHintEl.style.display = 'none'; }, 3000);
-      }
+      el.setAttribute(key, value);
     }
-  }
+  });
+  return el;
+};
 
-  confirmPath(connId) {
-    const conn = this.connections.get(connId);
-    if (!this.pendingNodeId) return;
+const formatNodeType = value => String(value || '')
+  .replace(/-/g, ' ')
+  .replace(/\b\w/g, char => char.toUpperCase());
 
-    const targetNode = this.nodes.get(this.pendingNodeId);
+const nodeIcon = node => ({
+  origin: 'O',
+  notable: '*',
+  mastery: 'M',
+  gateway: 'G',
+  keystone: '!',
+}[node.type] || VERDIGRIS_AXIS_META[node.axis]?.short.slice(0, 1) || '+');
 
-    if (conn.fromId !== this.pendingNodeId && conn.toId !== this.pendingNodeId) return;
-
-    this.finalizeActivation(targetNode, conn);
-    this.pendingNodeId = null;
-  }
-
-  finalizeActivation(node, conn) {
-    const costArc = !conn.straight;
-
-    if (costArc) {
-      if (this.points.arcs <= 0) {
-        alert('Not enough Flow (Arc Points) to build connection.');
-        return;
-      }
-      conn.straight = true;
-      this.points.arcs -= 1;
-    }
-
-    node.active = true;
-    this.points.nodes -= 1;
-    this.refresh();
-  }
-
-  deactivateNode(id) {
-    if (id === this.startId) return;
-    const node = this.nodes.get(id);
-
-    const otherActive = Array.from(this.nodes.values()).filter(n => n.active && n.id !== id);
-    for (const other of otherActive) {
-      if (!this.isConnectedToStart(other.id, { disableNode: id })) {
-        alert('Cannot refund: This node supports other paths.');
-        return;
-      }
-    }
-
-    node.active = false;
-    this.points.nodes += 1;
-
-    for (const nid of node.connections) {
-      const c = this.connections.get([id, nid].sort().join(':'));
-      if (c.straight) {
-        c.straight = false;
-        this.points.arcs += 1;
-        if (c.curve1) {
-          c.curve1 = false;
-          this.points.arcs += 1;
-        }
-        if (c.curve2) {
-          c.curve2 = false;
-          this.points.arcs += 1;
-        }
-      }
-    }
-
-    this.refresh();
-  }
-
-  toggleArc(connId, curveIndex) {
-    const conn = this.connections.get(connId);
-    if (!conn.straight) return;
-
-    const prop = curveIndex === 1 ? 'curve1' : 'curve2';
-
-    if (conn[prop]) {
-      conn[prop] = false;
-      this.points.arcs += 1;
-    } else if (this.points.arcs > 0) {
-      conn[prop] = true;
-      this.points.arcs -= 1;
-    } else {
-      alert('Not enough Flow.');
-    }
-    this.refresh();
-  }
-
-  reset() {
-    this.pendingNodeId = null;
-    this.nodes.forEach((n) => { if (n.id !== this.startId) n.active = false; });
-    this.connections.forEach((c) => { c.straight = false; c.curve1 = false; c.curve2 = false; });
-    this.points = { nodes: 20, arcs: 15 };
-    this.refresh();
-  }
-
-  refresh() {
-    this.renderer.update();
-    this.updateUI();
-  }
-
-  updateUI() {
-    if (this.nodePointsEl) this.nodePointsEl.innerText = this.points.nodes;
-    if (this.arcPointsEl) this.arcPointsEl.innerText = this.points.arcs;
-  }
-}
+const conduitPath = (from, to, option) => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const offset = option.side * Math.min(42, Math.max(20, length * 0.34));
+  const mid = {
+    x: (from.x + to.x) / 2,
+    y: (from.y + to.y) / 2,
+  };
+  const control = {
+    x: mid.x + (-dy / length) * offset,
+    y: mid.y + (dx / length) * offset,
+  };
+  return `M ${round(from.x)} ${round(from.y)} Q ${round(control.x)} ${round(control.y)} ${round(to.x)} ${round(to.y)}`;
+};
 
 class SVGRenderer {
   constructor(tree, options) {
-    const { layers, tooltipEl } = options;
     this.tree = tree;
-    this.layers = layers;
-    this.tooltipEl = tooltipEl;
-    this.cache = { nodes: new Map(), straight: new Map(), arcs: new Map() };
+    this.layers = options.layers;
+    this.tooltipEl = options.tooltipEl;
+    this.onChange = options.onChange || (() => {});
+    this.cache = { nodes: new Map(), conduits: new Map() };
   }
 
   draw() {
-    this.tree.connections.forEach((conn) => {
-      const n1 = this.tree.nodes.get(conn.fromId);
-      const n2 = this.tree.nodes.get(conn.toId);
-      const p1 = n1.hex.toPixel();
-      const p2 = n2.hex.toPixel();
-
-      const gStraight = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      const straightLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      straightLine.setAttribute('x1', p1.x);
-      straightLine.setAttribute('y1', p1.y);
-      straightLine.setAttribute('x2', p2.x);
-      straightLine.setAttribute('y2', p2.y);
-      straightLine.setAttribute('class', 'straight-path');
-
-      const straightHit = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      straightHit.setAttribute('x1', p1.x);
-      straightHit.setAttribute('y1', p1.y);
-      straightHit.setAttribute('x2', p2.x);
-      straightHit.setAttribute('y2', p2.y);
-      straightHit.setAttribute('class', 'hit-area');
-      straightHit.onclick = (e) => {
-        e.stopPropagation();
-        if (this.tree.pendingNodeId) {
-          this.tree.confirmPath(conn.id);
-        }
-      };
-
-      gStraight.appendChild(straightLine);
-      gStraight.appendChild(straightHit);
-      this.layers.straight.appendChild(gStraight);
-      this.cache.straight.set(conn.id, straightLine);
-
-      const gArcs = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      const createArc = (sweep, index) => {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const d = `M ${p1.x} ${p1.y} A ${RADIUS} ${RADIUS} 0 0 ${sweep} ${p2.x} ${p2.y}`;
-        path.setAttribute('d', d);
-        path.setAttribute('class', 'curve-path');
-        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        hit.setAttribute('d', d);
-        hit.setAttribute('class', 'hit-area');
-        hit.onclick = (e) => { e.stopPropagation(); this.tree.toggleArc(conn.id, index); };
-        return { path, hit };
-      };
-      const c1 = createArc(0, 1);
-      const c2 = createArc(1, 2);
-
-      gArcs.appendChild(c1.path);
-      gArcs.appendChild(c1.hit);
-      gArcs.appendChild(c2.path);
-      gArcs.appendChild(c2.hit);
-      this.layers.arcs.appendChild(gArcs);
-      this.cache.arcs.set(conn.id, { c1: c1.path, c2: c2.path });
+    Object.values(this.layers).forEach((layer) => {
+      layer.innerHTML = '';
     });
-
-    this.tree.nodes.forEach((node) => {
-      const pos = node.hex.toPixel();
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
-      g.setAttribute('class', `node-group type-${node.type}`);
-
-      g.onclick = (e) => { e.stopPropagation(); this.tree.handleNodeClick(node.id); };
-      g.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); this.tree.deactivateNode(node.id); };
-      g.onmouseenter = (e) => this.showTooltip(e, node);
-      g.onmouseleave = () => this.hideTooltip();
-
-      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      bg.setAttribute('r', node.type === 'keystone' ? 12 : 6);
-      bg.setAttribute('class', 'node-bg');
-      const fill = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      fill.setAttribute('r', node.type === 'keystone' ? 8 : 4);
-      fill.setAttribute('class', 'node-fill');
-
-      g.appendChild(bg);
-      g.appendChild(fill);
-      this.layers.nodes.appendChild(g);
-      this.cache.nodes.set(node.id, g);
-    });
+    this.cache.nodes.clear();
+    this.cache.conduits.clear();
+    this.drawBackground();
+    this.drawConduits();
+    this.drawNodes();
     this.update();
   }
 
-  update() {
-    const pendingId = this.tree.pendingNodeId;
-
-    this.tree.nodes.forEach((node) => {
-      const el = this.cache.nodes.get(node.id);
-      el.classList.remove('active', 'available', 'pending');
-
-      if (node.active) {
-        el.classList.add('active');
-      } else if (node.id === pendingId) {
-        el.classList.add('pending');
-      } else {
-        const isAvail = this.tree.points.nodes > 0 && node.connections.some(nid => this.tree.nodes.get(nid).active);
-        if (isAvail) el.classList.add('available');
-      }
-    });
-
-    this.tree.connections.forEach((conn) => {
-      const elStraight = this.cache.straight.get(conn.id);
-      const elArcs = this.cache.arcs.get(conn.id);
-
-      elStraight.classList.remove('active', 'ghost');
-      elArcs.c1.classList.remove('active', 'available');
-      elArcs.c2.classList.remove('active', 'available');
-
-      if (conn.straight) {
-        elStraight.classList.add('active');
-        if (conn.curve1) elArcs.c1.classList.add('active');
-        else elArcs.c1.classList.add('available');
-
-        if (conn.curve2) elArcs.c2.classList.add('active');
-        else elArcs.c2.classList.add('available');
-      } else if (pendingId && (conn.fromId === pendingId || conn.toId === pendingId)) {
-        const otherId = conn.fromId === pendingId ? conn.toId : conn.fromId;
-        if (this.tree.nodes.get(otherId).active) {
-          elStraight.classList.add('ghost');
-        }
-      }
+  drawBackground() {
+    const length = VERDIGRIS_SKILL_TREE_TOTALS.layers * 88;
+    [
+      ['INT', { x: 0, y: -length }],
+      ['DEX', { x: -length * 0.866, y: length * 0.5 }],
+      ['STR', { x: length * 0.866, y: length * 0.5 }],
+    ].forEach(([axis, end]) => {
+      const group = makeSvgEl('g', { className: 'axis-guide' });
+      group.style.setProperty('--axis-color', axisColor(axis));
+      group.appendChild(makeSvgEl('line', {
+        x1: 0,
+        y1: 0,
+        x2: end.x,
+        y2: end.y,
+        className: 'axis-line',
+      }));
+      const label = makeSvgEl('text', {
+        x: end.x,
+        y: end.y,
+        className: 'axis-label',
+      });
+      label.textContent = VERDIGRIS_AXIS_META[axis].short;
+      group.appendChild(label);
+      this.layers.background.appendChild(group);
     });
   }
 
-  showTooltip(e, node) {
+  drawConduits() {
+    this.tree.conduits.forEach((conduit) => {
+      const from = this.tree.nodes.get(conduit.fromId);
+      const to = this.tree.nodes.get(conduit.toId);
+      if (!from || !to) return;
+
+      conduit.options.forEach((option) => {
+        const group = makeSvgEl('g', { className: 'conduit-group' });
+        const d = conduitPath(from.pos, to.pos, option);
+        const hit = makeSvgEl('path', { d, className: 'conduit-hit' });
+        const line = makeSvgEl('path', { d, className: 'conduit-path' });
+
+        hit.addEventListener('click', (event) => {
+          event.stopPropagation();
+          this.tree.handleConduitClick(conduit.id, option.id);
+          this.onChange();
+        });
+        hit.addEventListener('mouseenter', event => this.showConduitTooltip(event, conduit, option));
+        hit.addEventListener('mousemove', event => this.placeTooltip(event));
+        hit.addEventListener('mouseleave', () => this.hideTooltip());
+
+        group.appendChild(hit);
+        group.appendChild(line);
+        this.layers.conduits.appendChild(group);
+        this.cache.conduits.set(`${conduit.id}|${option.id}`, { line, hit });
+      });
+    });
+  }
+
+  drawNodes() {
+    this.tree.nodes.forEach((node) => {
+      const group = makeSvgEl('g', {
+        transform: `translate(${node.pos.x},${node.pos.y})`,
+        className: `node-group type-${node.type}`,
+      });
+      group.style.setProperty('--node-axis', axisColor(node.axis));
+
+      const shell = makeSvgEl('circle', { r: nodeRadius(node) + 4, className: 'node-shell' });
+      const ring = makeSvgEl('circle', { r: nodeRadius(node) + 8, className: 'node-ring' });
+      const core = makeSvgEl('circle', { r: Math.max(4, nodeRadius(node) - 2), className: 'node-core' });
+      const icon = makeSvgEl('text', { y: 0, className: 'node-icon' });
+      icon.textContent = nodeIcon(node);
+
+      group.appendChild(ring);
+      group.appendChild(shell);
+      group.appendChild(core);
+      group.appendChild(icon);
+
+      group.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.tree.handleNodeClick(node.id);
+        this.onChange();
+      });
+      group.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.tree.refundNode(node.id);
+        this.onChange();
+      });
+      group.addEventListener('mouseenter', event => this.showNodeTooltip(event, node));
+      group.addEventListener('mousemove', event => this.placeTooltip(event));
+      group.addEventListener('mouseleave', () => this.hideTooltip());
+
+      this.layers.nodes.appendChild(group);
+      this.cache.nodes.set(node.id, { group, shell, core, ring });
+    });
+  }
+
+  update() {
+    const pendingChoices = new Set(this.tree.pending?.choices || []);
+    const searchTerm = this.tree.searchTerm;
+
+    this.tree.conduits.forEach((conduit) => {
+      conduit.options.forEach((option) => {
+        const cache = this.cache.conduits.get(`${conduit.id}|${option.id}`);
+        if (!cache) return;
+        const { line } = cache;
+        line.setAttribute('class', 'conduit-path');
+        line.style.setProperty('--path-color', option.color);
+        line.style.setProperty('--path-depth', conduit.depth);
+
+        const choiceId = this.tree.choiceId(conduit.id, option.id);
+        if (conduit.allocatedVariant === option.id) {
+          line.classList.add('allocated');
+        } else if (conduit.allocated) {
+          line.classList.add('swap-option');
+        } else if (pendingChoices.has(choiceId)) {
+          line.classList.add('pending');
+        } else if (this.tree.isAvailableConduit(conduit, option.id)) {
+          line.classList.add('available');
+        }
+      });
+    });
+
+    this.tree.nodes.forEach((node) => {
+      const cache = this.cache.nodes.get(node.id);
+      if (!cache) return;
+      const { group, shell, core, ring } = cache;
+      group.classList.remove('active', 'available', 'pending', 'selected', 'empowered');
+      group.style.opacity = this.matchesSearch(node, searchTerm) ? '1' : SEARCH_DIM_OPACITY;
+
+      const empowered = this.tree.empoweredNodes.has(node.id);
+      shell.setAttribute('r', nodeRadius(node, empowered) + 4);
+      core.setAttribute('r', Math.max(4, nodeRadius(node, empowered) - 2));
+      ring.setAttribute('r', nodeRadius(node, empowered) + 8);
+
+      if (node.active) group.classList.add('active');
+      if (!node.active && this.tree.isAvailableNode(node)) group.classList.add('available');
+      if (this.tree.pending?.mode === 'node' && this.tree.pending.nodeId === node.id) group.classList.add('pending');
+      if (this.tree.selectedNodeId === node.id) group.classList.add('selected');
+      if (empowered) group.classList.add('empowered');
+    });
+  }
+
+  matchesSearch(node, term) {
+    if (!term) return true;
+    const haystack = `${node.name} ${node.axis} ${node.type} ${node.tags.join(' ')} ${node.effects.join(' ')}`.toLowerCase();
+    return haystack.includes(term);
+  }
+
+  showNodeTooltip(event, node) {
     if (!this.tooltipEl) return;
-    this.tooltipEl.querySelector('.tt-header').innerText = node.data.name;
-    this.tooltipEl.querySelector('.tt-body').innerText = node.data.desc;
+    this.tooltipEl.querySelector('.tt-header').innerText = node.name;
+    this.tooltipEl.querySelector('.tt-body').innerText = [
+      `${formatNodeType(node.type)} / ring ${node.ring} / ${VERDIGRIS_AXIS_META[node.axis]?.label || 'Hybrid'}`,
+      ...node.effects,
+      `Cost: ${node.cost}`,
+    ].join('\n');
+    this.tooltipEl.style.setProperty('--tip-axis', axisColor(node.axis));
     this.tooltipEl.style.display = 'block';
-    this.tooltipEl.style.left = `${e.clientX + 15}px`;
-    this.tooltipEl.style.top = `${e.clientY + 15}px`;
+    this.placeTooltip(event);
+  }
+
+  showConduitTooltip(event, conduit, option) {
+    if (!this.tooltipEl) return;
+    const state = conduit.allocatedVariant === option.id
+      ? 'Allocated'
+      : conduit.allocated
+        ? 'Alternate'
+        : this.tree.isAvailableConduit(conduit, option.id)
+          ? 'Available'
+          : 'Locked';
+    this.tooltipEl.querySelector('.tt-header').innerText = option.name;
+    this.tooltipEl.querySelector('.tt-body').innerText = `${state} conduit\n${formatAttrs(option.attrs)}`;
+    this.tooltipEl.style.setProperty('--tip-axis', option.color);
+    this.tooltipEl.style.display = 'block';
+    this.placeTooltip(event);
+  }
+
+  placeTooltip(event) {
+    if (!this.tooltipEl || this.tooltipEl.style.display !== 'block') return;
+    const x = Math.min(Math.max(event.clientX + 16, 12), window.innerWidth - 300);
+    const y = Math.min(Math.max(event.clientY + 16, 12), window.innerHeight - 180);
+    this.tooltipEl.style.left = `${x}px`;
+    this.tooltipEl.style.top = `${y}px`;
   }
 
   hideTooltip() {
@@ -495,92 +485,122 @@ class SVGRenderer {
 
 class ViewController {
   constructor(options) {
-    const { canvas, svg, group, tooltipEl } = options;
-    this.canvas = canvas;
-    this.svg = svg;
-    this.group = group;
-    this.tooltipEl = tooltipEl;
-
+    this.canvas = options.canvas;
+    this.svg = options.svg;
+    this.group = options.group;
     this.x = 0;
     this.y = 0;
-    this.scale = 0.9;
-
-    this.isDrag = false;
+    this.scale = 0.72;
+    this.dragging = false;
     this.last = { x: 0, y: 0 };
 
-    this.handleMouseMove = (e) => this.onMouseMove(e);
-    this.handleMouseUp = () => { this.isDrag = false; };
-    this.handleWheel = (e) => this.onWheel(e);
+    this.handlePointerDown = event => this.onPointerDown(event);
+    this.handlePointerMove = event => this.onPointerMove(event);
+    this.handlePointerUp = event => this.onPointerUp(event);
+    this.handleWheel = event => this.onWheel(event);
     this.handleResize = () => this.center();
 
+    this.bind();
     this.center();
-    setTimeout(() => this.center(), 100);
+    setTimeout(() => this.center(), 80);
+  }
+
+  bind() {
+    this.canvas.addEventListener('pointerdown', this.handlePointerDown);
+    this.canvas.addEventListener('pointermove', this.handlePointerMove);
+    this.canvas.addEventListener('pointerup', this.handlePointerUp);
+    this.canvas.addEventListener('pointercancel', this.handlePointerUp);
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
     window.addEventListener('resize', this.handleResize);
-    this.events();
   }
 
   destroy() {
+    this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
+    this.canvas.removeEventListener('pointermove', this.handlePointerMove);
+    this.canvas.removeEventListener('pointerup', this.handlePointerUp);
+    this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
+    this.canvas.removeEventListener('wheel', this.handleWheel);
     window.removeEventListener('resize', this.handleResize);
-    window.removeEventListener('mousemove', this.handleMouseMove);
-    window.removeEventListener('mouseup', this.handleMouseUp);
-    if (this.canvas) {
-      this.canvas.removeEventListener('mousedown', this.handleMouseDown);
-      this.canvas.removeEventListener('wheel', this.handleWheel);
-    }
   }
 
-  center() {
-    const rect = this.svg?.getBoundingClientRect() || {};
-    const w = rect.width || window.innerWidth;
-    const h = rect.height || window.innerHeight;
+  onPointerDown(event) {
+    if (event.target.closest('.node-group') || event.target.classList.contains('conduit-hit')) return;
+    this.dragging = true;
+    this.canvas.classList.add('dragging');
+    this.canvas.setPointerCapture(event.pointerId);
+    this.last = { x: event.clientX, y: event.clientY };
+  }
 
-    if (w > 0 && h > 0) {
-      this.x = w / 2;
-      this.y = h / 2;
-    }
+  onPointerMove(event) {
+    if (!this.dragging) return;
+    this.x += event.clientX - this.last.x;
+    this.y += event.clientY - this.last.y;
+    this.last = { x: event.clientX, y: event.clientY };
     this.transform();
   }
 
-  events() {
-    if (!this.canvas) return;
-    this.handleMouseDown = (e) => {
-      if (e.target === this.canvas || e.target.tagName === 'svg') {
-        this.isDrag = true;
-        this.last = { x: e.clientX, y: e.clientY };
-      }
-    };
-
-    this.canvas.addEventListener('mousedown', this.handleMouseDown);
-    window.addEventListener('mousemove', this.handleMouseMove);
-    window.addEventListener('mouseup', this.handleMouseUp);
-    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
-  }
-
-  onMouseMove(e) {
-    if (this.isDrag) {
-      this.x += e.clientX - this.last.x;
-      this.y += e.clientY - this.last.y;
-      this.last = { x: e.clientX, y: e.clientY };
-      this.transform();
-    }
-    if (this.tooltipEl && this.tooltipEl.style.display === 'block') {
-      this.tooltipEl.style.left = `${e.clientX + 15}px`;
-      this.tooltipEl.style.top = `${e.clientY + 15}px`;
+  onPointerUp(event) {
+    if (!this.dragging) return;
+    this.dragging = false;
+    this.canvas.classList.remove('dragging');
+    try {
+      this.canvas.releasePointerCapture(event.pointerId);
+    } catch (_) {
+      // Pointer capture may already be released by the browser.
     }
   }
 
-  onWheel(e) {
-    e.preventDefault();
-    this.scale = Math.min(Math.max(0.2, this.scale + e.deltaY * -0.001), 4);
+  onWheel(event) {
+    event.preventDefault();
+    const next = this.scale * (event.deltaY > 0 ? 0.92 : 1.08);
+    this.scale = Math.min(Math.max(next, 0.24), 2.2);
+    this.transform();
+  }
+
+  center() {
+    const rect = this.svg.getBoundingClientRect();
+    this.x = (rect.width || window.innerWidth) / 2;
+    this.y = (rect.height || window.innerHeight) / 2 + 10;
     this.transform();
   }
 
   transform() {
-    if (this.group) {
-      this.group.setAttribute('transform', `translate(${this.x},${this.y}) scale(${this.scale})`);
-    }
+    this.group.setAttribute('transform', `translate(${round(this.x)},${round(this.y)}) scale(${round(this.scale)})`);
   }
 }
+
+const initialTreeState = () => ({
+  points: {
+    nodes: VERDIGRIS_SKILL_TREE_POINTS.nodes,
+    conduits: VERDIGRIS_SKILL_TREE_POINTS.conduits,
+  },
+  stats: {
+    attrs: { STR: 0, DEX: 0, INT: 0 },
+    derived: {},
+  },
+  selectedNode: {
+    id: '0,0',
+    name: 'Prime Seed Nexus',
+    type: 'origin',
+    axis: 'HYBRID',
+    axisLabel: 'Hybrid',
+    cost: 0,
+    ring: 0,
+    active: true,
+    effects: ['Starting point.'],
+    tags: ['HYB', 'origin'],
+    boostLines: [],
+    canRefund: false,
+  },
+  shapeBonuses: [],
+  log: [],
+  lastDeltas: [],
+  pending: null,
+  pendingChoices: [],
+  activeNodes: 1,
+  allocatedConduits: 0,
+  searchTerm: '',
+});
 
 export default {
   name: 'GeometricSkillTreePane',
@@ -590,34 +610,92 @@ export default {
       default: null,
     },
   },
+  data() {
+    return {
+      searchTerm: '',
+      treeState: initialTreeState(),
+    };
+  },
+  computed: {
+    derivedRows() {
+      return createDerivedRows(this.treeState.stats.derived);
+    },
+    pendingTitle() {
+      if (!this.treeState.pending) return '';
+      return this.treeState.pending.mode === 'conduit' ? 'Edit Conduit' : 'Choose Conduit';
+    },
+    pendingRefundState() {
+      if (!this.treeState.pending || this.treeState.pending.mode !== 'conduit') return '';
+      const conduit = this.skillTree?.conduits.get(this.treeState.pending.conduitId);
+      return conduit && this.skillTree.canRefundConduit(conduit.id) ? 'Available' : 'Blocked';
+    },
+    visibleLog() {
+      return this.treeState.log.length ? this.treeState.log : ['Build log empty.'];
+    },
+  },
   mounted() {
-    this.skillTree = new SkillTree({
+    this.skillTree = new VerdigrisGeometricTree();
+    this.treeState = this.skillTree.toState();
+
+    this.renderer = new SVGRenderer(this.skillTree, {
       layers: {
-        arcs: this.$refs.arcsLayer,
-        straight: this.$refs.straightLayer,
+        background: this.$refs.backgroundLayer,
+        conduits: this.$refs.conduitsLayer,
         nodes: this.$refs.nodesLayer,
       },
       tooltipEl: this.$refs.tooltip,
-      choiceHintEl: this.$refs.choiceHint,
-      nodePointsEl: this.$refs.nodePointsDisplay,
-      arcPointsEl: this.$refs.arcPointsDisplay,
+      onChange: () => this.syncTreeState(),
     });
+    this.renderer.draw();
 
     this.viewController = new ViewController({
       canvas: this.$refs.canvasContainer,
       svg: this.$refs.mainSvg,
       group: this.$refs.viewportGroup,
-      tooltipEl: this.$refs.tooltip,
     });
   },
   beforeUnmount() {
-    if (this.viewController) {
-      this.viewController.destroy();
-    }
+    if (this.viewController) this.viewController.destroy();
   },
   methods: {
+    syncTreeState() {
+      if (!this.skillTree) return;
+      this.treeState = this.skillTree.toState();
+      if (this.renderer) this.renderer.update();
+    },
+    onSearchInput() {
+      if (!this.skillTree) return;
+      this.skillTree.setSearchTerm(this.searchTerm);
+      this.syncTreeState();
+    },
+    choosePending(choice) {
+      if (!this.skillTree) return;
+      this.skillTree.handleConduitClick(choice.conduitId, choice.optionId);
+      this.syncTreeState();
+    },
+    refundPendingConduit() {
+      const conduitId = this.treeState.pending?.conduitId;
+      if (!this.skillTree || !conduitId) return;
+      this.skillTree.refundConduit(conduitId);
+      this.syncTreeState();
+    },
+    refundSelectedNode() {
+      const nodeId = this.treeState.selectedNode?.id;
+      if (!this.skillTree || !nodeId) return;
+      this.skillTree.refundNode(nodeId);
+      this.syncTreeState();
+    },
+    undoTree() {
+      if (!this.skillTree) return;
+      this.skillTree.undo();
+      this.syncTreeState();
+    },
     resetTree() {
-      if (this.skillTree) this.skillTree.reset();
+      if (!this.skillTree) return;
+      this.skillTree.reset();
+      this.searchTerm = '';
+      this.skillTree.setSearchTerm('');
+      this.syncTreeState();
     },
     centerView() {
       if (this.viewController) this.viewController.center();
@@ -627,302 +705,641 @@ export default {
 </script>
 
 <style lang="scss">
-  .geometric-skill-tree {
-    --bg-color: #0b0d12;
-    --node-center: #fff;
-  --node-inactive: #1f242e;
-  --node-available: #3b4c66;
-  --node-active: #d4b483;
-  --node-pending: #ffd700;
-  --path-inactive: #1a1f29;
-  --path-active: #d4b483;
-  --path-ghost: rgba(255, 255, 255, 0.4);
-  --arc-inactive: rgba(255, 255, 255, 0.05);
-  --arc-available: rgba(100, 200, 255, 0.3);
-  --arc-active: #ffd700;
+.geometric-skill-tree {
+  --bg-color: #0d0f0e;
+  --node-center: #f8efd0;
+  --node-inactive: #20241f;
+  --node-available: #556147;
+  --node-active: #c8aa66;
+  --node-pending: #e2c765;
+  --path-inactive: rgba(255, 238, 192, 0.08);
+  --path-active: #b8954d;
+  --path-ghost: rgba(226, 199, 101, 0.62);
+  --panel-border: rgba(196, 159, 86, 0.36);
 
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: var(--bg-color);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(85, 97, 71, 0.18), transparent 42%),
+    radial-gradient(circle at 20% 86%, rgba(184, 149, 77, 0.12), transparent 38%),
+    linear-gradient(180deg, #121611, var(--bg-color));
+  color: #e9dfc2;
   font-family: 'GameFont', sans-serif;
-  color: #e0e0e0;
   user-select: none;
 
   .ui-layer {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
+    inset: 0;
     z-index: 10;
+    pointer-events: none;
   }
 
   .hud-panel {
     position: absolute;
-    background: rgba(11, 13, 18, 0.95);
-    border: 1px solid #333;
+    border: 1px solid var(--panel-border);
     border-radius: 4px;
-    padding: 15px;
+    background:
+      linear-gradient(180deg, rgba(35, 30, 22, 0.96), rgba(14, 13, 10, 0.95)),
+      radial-gradient(circle at 50% 0, rgba(200, 170, 102, 0.12), transparent 70%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 238, 192, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.65),
+      0 4px 20px rgba(0, 0, 0, 0.8);
     pointer-events: auto;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
   }
 
   .stats-panel {
-    top: 20px;
-    left: 20px;
-    min-width: 220px;
+    top: 16px;
+    left: 16px;
+    display: grid;
+    width: 286px;
+    max-height: calc(100% - 32px);
+    gap: 12px;
+    overflow: auto;
+    padding: 14px;
+  }
+
+  .details-panel {
+    top: 16px;
+    right: 16px;
+    display: grid;
+    width: 320px;
+    max-height: calc(100% - 32px);
+    gap: 12px;
+    overflow: auto;
+    padding: 14px;
+  }
+
+  .choice-panel {
+    right: 352px;
+    bottom: 16px;
+    display: grid;
+    width: min(360px, calc(100% - 384px));
+    max-height: 44%;
+    gap: 8px;
+    overflow: auto;
+    padding: 12px;
   }
 
   .controls-panel {
-    bottom: 20px;
-    right: 20px;
+    right: 16px;
+    bottom: 16px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  h1,
+  header {
+    margin: 0;
+    color: var(--node-active);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
   }
 
   h1 {
-    margin: 0 0 15px 0;
-    font-size: 16px;
-    color: var(--node-active);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-align: center;
-    border-bottom: 1px solid #333;
     padding-bottom: 10px;
+    border-bottom: 1px solid rgba(196, 159, 86, 0.24);
+    text-align: center;
   }
 
-  .stat-row {
+  .point-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+
+    div {
+      display: grid;
+      gap: 3px;
+      padding: 7px;
+      border: 1px solid rgba(196, 159, 86, 0.2);
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    span {
+      color: #9e9479;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    strong {
+      color: #f8efd0;
+      font-size: 14px;
+    }
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 8px 9px;
+    border: 1px solid rgba(196, 159, 86, 0.28);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.32);
+    color: #f8efd0;
+    outline: none;
+  }
+
+  .search-input:focus {
+    border-color: rgba(226, 199, 101, 0.74);
+  }
+
+  .attribute-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+
+    span {
+      display: grid;
+      gap: 3px;
+      justify-items: center;
+      padding: 6px 4px;
+      border: 1px solid rgba(196, 159, 86, 0.22);
+      background: rgba(0, 0, 0, 0.22);
+      color: #8f846b;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+    }
+
+    b {
+      color: #f4dc93;
+      font-size: 13px;
+    }
+  }
+
+  .derived-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+
+    span {
+      display: flex;
+      min-width: 0;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 5px 6px;
+      border: 1px solid rgba(196, 159, 86, 0.18);
+      background: rgba(0, 0, 0, 0.18);
+      color: #b8ad8f;
+      font-size: 11px;
+    }
+
+    b {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      color: #f1d77b;
+      white-space: nowrap;
+    }
+  }
+
+  .delta-list,
+  .log-panel {
+    display: grid;
+    gap: 6px;
+  }
+
+  .delta-list p,
+  .log-panel p,
+  .boost-list p {
+    margin: 0;
+    color: rgba(226, 218, 196, 0.76);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .node-header {
+    display: grid;
+    gap: 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(196, 159, 86, 0.22);
+
+    span {
+      color: rgba(133, 178, 191, 0.82);
+      font-size: 10px;
+    }
+
+    strong {
+      color: #fff1c2;
+      font-size: 16px;
+      line-height: 1.18;
+      text-transform: none;
+    }
+
+    small {
+      color: rgba(239, 229, 203, 0.68);
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+  }
+
+  .tag-row {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #888;
+    flex-wrap: wrap;
+    gap: 5px;
+
+    span {
+      padding: 3px 6px;
+      border: 1px solid rgba(196, 159, 86, 0.22);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
+      color: rgba(235, 226, 203, 0.78);
+      font-size: 10px;
+    }
   }
 
-  .stat-value {
-    font-weight: bold;
-    color: #fff;
+  .effect-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      padding-left: 9px;
+      border-left: 2px solid rgba(200, 170, 102, 0.34);
+      color: #d8c99d;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  }
+
+  .boost-list {
+    display: grid;
+    gap: 6px;
+    padding: 9px;
+    border: 1px solid rgba(106, 168, 111, 0.34);
+    background: rgba(31, 54, 38, 0.28);
+
+    strong {
+      color: #a9d58c;
+      font-size: 12px;
+    }
+  }
+
+  .bonus-panel,
+  .log-panel {
+    display: grid;
+    gap: 7px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(196, 159, 86, 0.2);
+  }
+
+  .bonus-row {
+    display: grid;
+    gap: 3px;
+    padding: 7px;
+    border: 1px solid rgba(196, 159, 86, 0.18);
+    background: rgba(0, 0, 0, 0.2);
+    opacity: 0.58;
+
+    &.active {
+      border-color: rgba(122, 190, 128, 0.52);
+      background: rgba(37, 64, 42, 0.32);
+      opacity: 1;
+    }
+
+    strong {
+      color: #f1d77b;
+      font-size: 12px;
+    }
+
+    span {
+      color: rgba(226, 218, 196, 0.72);
+      font-size: 11px;
+    }
+  }
+
+  .btn,
+  .choice-btn {
+    border: 1px solid rgba(196, 159, 86, 0.36);
+    background: #1a1710;
+    color: #d8c99d;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
   }
 
   .btn {
-    background: #1a1f29;
-    border: 1px solid #444;
-    color: #ccc;
-    padding: 8px 20px;
-    cursor: pointer;
-    transition: all 0.2s;
+    padding: 8px 14px;
     font-size: 11px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 1px;
   }
 
-  .btn:hover {
+  .choice-btn {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 9px 10px;
+    text-align: left;
+
+    strong {
+      font-size: 12px;
+    }
+
+    span {
+      color: rgba(216, 201, 157, 0.72);
+      font-size: 11px;
+    }
+
+    &.current {
+      border-color: rgba(122, 190, 128, 0.58);
+      background: rgba(34, 58, 39, 0.42);
+    }
+  }
+
+  .btn:hover,
+  .choice-btn:hover {
+    border-color: rgba(226, 199, 101, 0.8);
     background: var(--node-active);
     color: #000;
   }
 
-  .hud-hints {
-    margin-top: 15px;
-    font-size: 11px;
-    color: #666;
-    border-top: 1px solid #333;
-    padding-top: 10px;
-    line-height: 1.6;
+  .btn.danger,
+  .choice-btn.danger {
+    border-color: rgba(188, 89, 75, 0.56);
+    color: #f0a28f;
   }
 
-  .straight-path {
+  .axis-guide {
+    color: var(--axis-color);
+    opacity: 0.34;
+  }
+
+  .axis-line {
+    stroke: currentcolor;
+    stroke-width: 1.2;
+    stroke-dasharray: 10 10;
+  }
+
+  .axis-label {
+    fill: currentcolor;
+    font-size: 12px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.85);
+    stroke-width: 4px;
+    text-anchor: middle;
+  }
+
+  .conduit-path {
     fill: none;
     stroke: var(--path-inactive);
-    stroke-width: 4;
     stroke-linecap: round;
-    transition: all 0.3s;
+    stroke-width: calc(2.2px + var(--path-depth, 0) * 1px);
+    opacity: 0.44;
+    pointer-events: none;
+    transition: stroke 160ms ease, stroke-width 160ms ease, opacity 160ms ease;
   }
 
-  .straight-path.active {
-    stroke: var(--path-active);
-    filter: drop-shadow(0 0 3px var(--path-active));
+  .conduit-path.available {
+    stroke: color-mix(in srgb, var(--path-color) 52%, #d9d0bc);
+    stroke-dasharray: 7 8;
+    opacity: 0.52;
   }
 
-  .straight-path.ghost {
+  .conduit-path.pending {
     stroke: var(--path-ghost);
-    stroke-dasharray: 10, 5;
-    animation: dash 1s linear infinite;
-    cursor: pointer;
+    stroke-width: 4px;
+    stroke-dasharray: 6 7;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 4px rgba(226, 199, 101, 0.45));
   }
 
-  .straight-path.ghost:hover {
-    stroke: #fff;
-    stroke-width: 6;
+  .conduit-path.allocated {
+    stroke: var(--path-color);
+    stroke-width: calc(4.2px + var(--path-depth, 0) * 1.5px);
+    opacity: 1;
+    filter: drop-shadow(0 0 5px var(--path-color));
   }
 
-  @keyframes dash {
-    to {
-      stroke-dashoffset: -15;
-    }
+  .conduit-path.swap-option {
+    stroke: color-mix(in srgb, var(--path-color) 32%, #847b68);
+    stroke-dasharray: 3 10;
+    opacity: 0.28;
   }
 
-  .curve-path {
+  .conduit-hit {
     fill: none;
-    stroke: var(--arc-inactive);
-    stroke-width: 2;
-    transition: all 0.3s;
-    pointer-events: stroke;
-    cursor: pointer;
-  }
-
-  .curve-path.available {
-    stroke: var(--arc-available);
-    stroke-width: 3;
-  }
-
-  .curve-path.available:hover {
-    stroke: #fff;
-    stroke-width: 4;
-  }
-
-  .curve-path.active {
-    stroke: var(--arc-active);
-    stroke-width: 3;
-    filter: drop-shadow(0 0 4px var(--arc-active));
-  }
-
-  .hit-area {
     stroke: transparent;
     stroke-width: 20;
-    fill: none;
     cursor: pointer;
+    pointer-events: stroke;
+  }
+
+  .conduit-hit:hover + .conduit-path {
+    opacity: 0.9;
+    stroke-width: 4.5px;
   }
 
   .node-group {
+    --node-axis: var(--node-active);
+
     cursor: pointer;
+    transition: opacity 160ms ease;
   }
 
-  .node-group circle {
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    transform-origin: center;
+  .node-shell,
+  .node-core,
+  .node-ring {
+    transition: fill 180ms ease, stroke 180ms ease, r 180ms ease, opacity 180ms ease, transform 180ms ease;
     transform-box: fill-box;
+    transform-origin: center;
   }
 
-  .node-group:hover circle.node-fill {
-    transform: scale(1.4);
-  }
-
-  .node-bg {
+  .node-shell {
     fill: var(--bg-color);
     stroke: var(--node-inactive);
     stroke-width: 2;
   }
 
-  .node-fill {
+  .node-core {
     fill: var(--node-inactive);
+    stroke: rgba(0, 0, 0, 0.35);
+    stroke-width: 1;
   }
 
-  .node-group.active .node-fill {
-    fill: var(--node-active);
-    filter: drop-shadow(0 0 5px var(--node-active));
+  .node-ring {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 1.4;
   }
 
-  .node-group.active .node-bg {
-    stroke: var(--node-active);
+  .node-group.available .node-shell {
+    stroke: color-mix(in srgb, var(--node-axis) 52%, var(--node-available));
+    filter: drop-shadow(0 0 4px rgba(144, 186, 113, 0.34));
   }
 
-  .node-group.available .node-bg {
-    stroke: var(--node-available);
+  .node-group.available .node-core {
+    fill: color-mix(in srgb, var(--node-axis) 36%, var(--node-available));
   }
 
-  .node-group.available .node-fill {
-    fill: var(--node-available);
+  .node-group.active .node-shell {
+    stroke: var(--node-axis);
   }
 
-  .node-group.type-center .node-fill {
-    fill: var(--node-center);
-    filter: drop-shadow(0 0 10px var(--node-center));
+  .node-group.active .node-core {
+    fill: color-mix(in srgb, var(--node-axis) 72%, var(--node-active));
+    filter: drop-shadow(0 0 6px var(--node-axis));
   }
 
-  .node-group.pending .node-bg {
+  .node-group.pending .node-shell {
     stroke: var(--node-pending);
     stroke-dasharray: 4 2;
   }
 
-  .node-group.pending .node-fill {
-    fill: var(--node-pending);
-    animation: pulse 1s infinite;
+  .node-group.selected .node-ring,
+  .node-group.empowered .node-ring {
+    stroke: #fff5ce;
+    opacity: 0.95;
   }
 
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
-      opacity: 1;
-    }
+  .node-group.empowered .node-ring {
+    stroke-dasharray: 5 5;
+    filter: drop-shadow(0 0 6px var(--node-axis));
+    animation: verdigris-ring-spin 5.2s linear infinite;
+  }
 
-    50% {
-      transform: scale(1.2);
-      opacity: 0.8;
-    }
+  .node-group.type-origin .node-core {
+    fill: var(--node-center);
+    filter: drop-shadow(0 0 10px var(--node-center));
+  }
 
-    100% {
-      transform: scale(1);
-      opacity: 1;
-    }
+  .node-group.type-keystone .node-shell,
+  .node-group.type-gateway .node-shell {
+    stroke-width: 3;
+  }
+
+  .node-group:hover .node-shell {
+    transform: scale(1.12);
+  }
+
+  .node-icon {
+    fill: rgba(255, 245, 216, 0.84);
+    font-family: 'GameFont', sans-serif;
+    font-size: 8px;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+    text-shadow: 1px 1px 0 #000;
   }
 
   .tooltip {
     position: absolute;
-    display: none;
-    background: rgba(0, 0, 0, 0.95);
-    border: 1px solid #444;
-    padding: 12px;
-    border-radius: 2px;
-    pointer-events: none;
     z-index: 100;
-    min-width: 200px;
+    display: none;
+    min-width: 220px;
+    max-width: 286px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--tip-axis, #c8aa66) 52%, rgba(196, 159, 86, 0.4));
+    border-radius: 2px;
+    background: rgba(12, 11, 9, 0.96);
+    pointer-events: none;
+    white-space: pre-line;
   }
 
   .tt-header {
-    color: var(--node-active);
-    font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
+    color: var(--tip-axis, var(--node-active));
     font-size: 14px;
+    font-weight: 700;
   }
 
   .tt-body {
-    color: #aaa;
+    color: #c9bea0;
     font-size: 12px;
     line-height: 1.4;
-  }
-
-  .choice-hint {
-    position: absolute;
-    background: rgba(255, 215, 0, 0.2);
-    border: 1px solid #ffd700;
-    color: #ffd700;
-    padding: 10px;
-    border-radius: 4px;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    pointer-events: none;
-    display: none;
-    font-weight: bold;
-    z-index: 20;
   }
 
   .canvas-container {
     width: 100%;
     height: 100%;
     cursor: grab;
+    touch-action: none;
   }
 
-  .canvas-container:active {
+  .canvas-container.dragging {
     cursor: grabbing;
   }
 
   .main-svg {
+    display: block;
     width: 100%;
     height: 100%;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+@keyframes verdigris-ring-spin {
+  to {
+    stroke-dashoffset: -60;
+  }
+}
+
+@media (width <= 920px) {
+  .geometric-skill-tree {
+    .stats-panel,
+    .details-panel {
+      width: 248px;
+    }
+
+    .choice-panel {
+      right: 280px;
+      width: min(320px, calc(100% - 312px));
+    }
+  }
+}
+
+@media (width <= 720px) {
+  .geometric-skill-tree {
+    .stats-panel {
+      right: 12px;
+      left: 12px;
+      width: auto;
+      max-height: 38%;
+    }
+
+    .details-panel {
+      top: auto;
+      right: 12px;
+      bottom: 72px;
+      left: 12px;
+      width: auto;
+      max-height: 34%;
+    }
+
+    .choice-panel {
+      right: 12px;
+      bottom: 72px;
+      left: 12px;
+      width: auto;
+      max-height: 38%;
+    }
+
+    .controls-panel {
+      right: 12px;
+      left: 12px;
+      justify-content: flex-end;
+    }
+
+    .derived-grid {
+      grid-template-columns: 1fr;
+    }
   }
 }
 </style>

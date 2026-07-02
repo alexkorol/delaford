@@ -11,8 +11,8 @@ export default [
       'examine',
     ],
     spawn: {
-      x: 15,
-      y: 111,
+      x: 34,
+      y: 116,
       range: 3,
     },
   },
@@ -29,8 +29,8 @@ export default [
       'examine',
     ],
     spawn: {
-      x: 12,
-      y: 116,
+      x: 49,
+      y: 109,
       range: 2,
     },
   },
@@ -47,8 +47,8 @@ export default [
       'trade',
     ],
     spawn: {
-      x: 29,
-      y: 109,
+      x: 19,
+      y: 113,
       range: 4,
     },
   },
@@ -65,8 +65,8 @@ export default [
       'bank',
     ],
     spawn: {
-      x: 17,
-      y: 105,
+      x: 31,
+      y: 121,
       range: 2,
     },
   },

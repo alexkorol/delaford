@@ -10,6 +10,7 @@ import {
 const mockUI = vi.hoisted(() => ({
   getTileOverMouse: vi.fn(),
   getContextSubjectColor: vi.fn(),
+  tileWalkable: vi.fn(),
 }));
 
 vi.mock('#shared/ui.js', () => ({
@@ -27,6 +28,7 @@ vi.mock('#server/core/data/query.js', () => ({
 
 import ContextMenu, { actionCatalog } from '#server/core/context-menu.js';
 import Config from '#server/config.js';
+import Action from '#server/player/action.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_ACTIONS = [
@@ -51,11 +53,19 @@ const createBaseItem = (id) => ({
   actions: [...DEFAULT_ACTIONS],
 });
 
+const resetNonDefaultScenes = () => {
+  Array.from(world.scenes.keys())
+    .filter(sceneId => sceneId !== world.defaultTownId)
+    .forEach(sceneId => world.scenes.delete(sceneId));
+  world.instances.clear();
+};
+
 let player;
 
 beforeEach(() => {
   mockUI.getTileOverMouse.mockReturnValue(null);
   mockUI.getContextSubjectColor.mockReturnValue('inherit');
+  mockUI.tileWalkable.mockReturnValue(true);
   mockQuery.getItemData.mockImplementation(id => createBaseItem(id));
   mockQuery.getForegroundData.mockReturnValue(null);
 
@@ -64,6 +74,8 @@ beforeEach(() => {
   world.items = [];
   world.shops = [];
   world.map = { foreground: [], background: [] };
+  world.getDefaultTown().players = [];
+  resetNonDefaultScenes();
 
   player = {
     socket_id: 'socket-1',
@@ -83,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
   mockUI.getTileOverMouse.mockReset();
   mockUI.getContextSubjectColor.mockReset();
+  mockUI.tileWalkable.mockReset();
   mockQuery.getItemData.mockReset();
   mockQuery.getForegroundData.mockReset();
 
@@ -90,6 +103,8 @@ afterEach(() => {
   world.npcs = [];
   world.items = [];
   world.shops = [];
+  world.getDefaultTown().players = [];
+  resetNonDefaultScenes();
 });
 
 describe('ContextMenu strategies', () => {
@@ -148,6 +163,37 @@ describe('ContextMenu strategies', () => {
     expect(takeActions[0].type).toBe('item');
   });
 
+  it('produces take options from the active scene instead of default town items', async () => {
+    const scene = world.ensureScene('zone:context-menu-test', {
+      map: { foreground: [], background: [] },
+      items: [{
+        id: 4,
+        x: player.x,
+        y: player.y,
+        uuid: 'scene-ground-uuid',
+        timestamp: 222,
+      }],
+      respawns: { items: [], monsters: [], resources: [] },
+    });
+    world.items = [{
+      id: 5,
+      x: player.x,
+      y: player.y,
+      uuid: 'town-ground-uuid',
+      timestamp: 111,
+    }];
+    world.assignPlayerToScene(player, scene.id);
+
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    const takeActions = actions.filter(entry => entry.action.actionId === 'player:take');
+    expect(takeActions).toHaveLength(1);
+    expect(takeActions[0].id).toBe(4);
+    expect(takeActions[0].uuid).toBe('scene-ground-uuid');
+  });
+
   it('generates bank quantity options while on the bank pane', async () => {
     player.currentPane = 'bank';
     player.inventory.slots = [{ slot: 0, id: 3 }];
@@ -163,6 +209,29 @@ describe('ContextMenu strategies', () => {
     const bankActions = actions.filter(entry => entry.action.actionId === 'player:screen:bank:action');
     expect(bankActions).toHaveLength(4);
     expect(bankActions.map(entry => entry.params.quantity)).toEqual([1, 5, 10, 'All']);
+  });
+
+  it('does not use stale pane data after a pane has been closed', async () => {
+    player.currentPane = false;
+    player.currentPaneData = [{
+      slot: 0,
+      id: 3,
+      name: 'Stale Bank Item',
+      uuid: 'stale-bank-item',
+    }];
+    player.inventory.slots = [];
+
+    const miscData = {
+      clickedOn: { 0: 'inventorySlot' },
+      slot: 0,
+    };
+
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    expect(actions.some(entry => entry.uuid === 'stale-bank-item')).toBe(false);
+    expect(actions.filter(entry => entry.action.actionId === 'item:equip')).toHaveLength(0);
+    expect(actions.filter(entry => entry.action.actionId === 'player:inventory-drop')).toHaveLength(0);
   });
 
   it('exposes an action catalog entry for each strategy', () => {
@@ -214,5 +283,24 @@ describe('ContextMenu strategies', () => {
 
     const takeActions = actions.filter(entry => entry.action.actionId === 'player:take');
     expect(takeActions).toHaveLength(0);
+  });
+
+  it('handles immediate current-tile actions without a queue payload', () => {
+    const action = new Action(player.socket_id, { clickedOn: { 0: 'gameMap' } });
+
+    expect(() => action.do({
+      tile: {
+        x: Config.map.player.x,
+        y: Config.map.player.y,
+      },
+      item: {
+        action: {
+          name: 'Cancel',
+          actionId: null,
+          queueable: true,
+          nearby: false,
+        },
+      },
+    }, null)).not.toThrow();
   });
 });

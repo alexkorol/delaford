@@ -48,7 +48,7 @@ import { storeToRefs } from 'pinia';
 import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
-import { useInventoryStore } from '@/stores/inventory.js';
+import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
 
 export default {
   name: 'InventoryGrid',
@@ -128,6 +128,43 @@ export default {
       inventoryStore.clearHoverTarget();
     };
 
+    const externalDropTargetFromEvent = (event) => {
+      const targets = [];
+      if (event?.target) {
+        targets.push(event.target);
+      }
+      if (
+        typeof document !== 'undefined'
+        && Number.isFinite(event?.clientX)
+        && Number.isFinite(event?.clientY)
+      ) {
+        const pointTarget = document.elementFromPoint(event.clientX, event.clientY);
+        if (pointTarget && pointTarget !== event.target) {
+          targets.push(pointTarget);
+        }
+      }
+
+      const closest = selector => targets
+        .map(target => (target && typeof target.closest === 'function' ? target.closest(selector) : null))
+        .find(Boolean);
+
+      const equipmentSlot = closest('[data-equipment-slot]');
+      if (equipmentSlot) {
+        const slotId = equipmentSlot.getAttribute('data-equipment-slot');
+        return {
+          type: 'equipment',
+          slotId,
+          valid: canEquipInventoryItemToSlot(activeItem.value, slotId),
+        };
+      }
+
+      if (closest('[data-world-drop-zone]')) {
+        return { type: 'world-drop' };
+      }
+
+      return null;
+    };
+
     const handlePointerUp = (event) => {
       if (!isDragging.value) {
         return;
@@ -136,6 +173,11 @@ export default {
       const pointerCell = pointerCellFromEvent(event);
       if (pointerCell) {
         inventoryStore.updatePointerCell(pointerCell);
+      }
+
+      const externalTarget = externalDropTargetFromEvent(event);
+      if (externalTarget) {
+        inventoryStore.setHoverTarget(externalTarget);
       }
 
       const result = inventoryStore.commitDrop();

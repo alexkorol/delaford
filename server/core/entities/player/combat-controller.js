@@ -18,7 +18,7 @@ const recordSkillInput = (player, movement, skillId, data = {}) => {
     return false;
   }
 
-  const nowTs = Date.now();
+  const nowTs = Number.isFinite(data.now) ? data.now : Date.now();
   if (player.combat.globalCooldown && player.combat.globalCooldown > nowTs) {
     return false;
   }
@@ -57,6 +57,7 @@ const recordSkillInput = (player, movement, skillId, data = {}) => {
     duration,
     skillId,
     holdState,
+    startedAt: nowTs,
   });
 
   return true;

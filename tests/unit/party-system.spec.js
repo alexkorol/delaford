@@ -59,6 +59,11 @@ vi.mock('#server/socket.js', () => ({
   },
 }));
 
+vi.mock('#server/core/entities/player/stats-manager.js', () => ({
+  broadcastStats: vi.fn(),
+  default: vi.fn(),
+}));
+
 vi.mock('#server/core/map.js', () => ({
   default: {
     generateInstance: vi.fn().mockResolvedValue({

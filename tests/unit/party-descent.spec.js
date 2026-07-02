@@ -58,6 +58,11 @@ vi.mock('#server/socket.js', () => ({
   },
 }));
 
+vi.mock('#server/core/entities/player/stats-manager.js', () => ({
+  broadcastStats: vi.fn(),
+  default: vi.fn(),
+}));
+
 vi.mock('#server/core/map.js', () => ({
   default: {
     generateInstance: vi.fn().mockImplementation(async (options = {}) => {
@@ -96,11 +101,16 @@ vi.mock('#server/core/monster.js', () => ({
 }));
 
 vi.mock('#shared/ui.js', () => ({
-  default: { getLevel: () => 1 },
+  default: {
+    getLevel: exp => (exp >= 100 ? 2 : 1),
+    capitalizeFirstLetter: text => `${text.charAt(0).toUpperCase()}${text.slice(1)}`,
+  },
 }));
 
 const { partyService } = await import('#server/player/handlers/party.js');
 const { default: GameMap } = await import('#server/core/map.js');
+const { default: Socket } = await import('#server/socket.js');
+const { broadcastStats } = await import('#server/core/entities/player/stats-manager.js');
 const { default: world } = await import('#server/core/world.js');
 
 const PartyService = partyService.constructor;
@@ -209,6 +219,59 @@ describe('party dungeon descent', () => {
     // descending resets completion so the next floor can complete again
     await service.transitionFloor(party, 2);
     expect(party.metadata.completedAt).toBeNull();
+  });
+
+  it('routes instance experience rewards through skill and character level progression', async () => {
+    leader.skills = {
+      attack: { level: 1, exp: 90 },
+      defence: { level: 1, exp: 0 },
+    };
+    leader.level = 1;
+    leader.stats = {
+      resources: {
+        health: { current: 12, max: 50 },
+        mana: { current: 4, max: 30 },
+      },
+    };
+    leader.refreshDerivedStats = vi.fn(() => {
+      leader.stats.resources.health.max = 70;
+      leader.stats.resources.mana.max = 45;
+    });
+
+    const party = service.createParty(leader);
+    await service.startInstance(party, leader);
+    const scene = world.getInstance(party.id);
+
+    const completed = await service.completeInstance(party, {
+      scene,
+      rewards: {
+        experience: { skill: 'attack', amount: 15 },
+      },
+    });
+
+    expect(completed).toBe(true);
+    expect(leader.skills.attack).toMatchObject({ exp: 105, level: 2 });
+    expect(leader.level).toBe(2);
+    expect(leader.refreshDerivedStats).toHaveBeenCalled();
+    expect(leader.stats.resources.health.current).toBe(70);
+    expect(leader.stats.resources.mana.current).toBe(45);
+    expect(Socket.emit).toHaveBeenCalledWith('resource:skills:update', expect.objectContaining({
+      player: { socket_id: leader.socket_id },
+      data: leader.skills,
+    }));
+    expect(broadcastStats).toHaveBeenCalledWith(leader);
+    expect(Socket.emit).toHaveBeenCalledWith('party:instance:complete', expect.objectContaining({
+      rewards: [expect.objectContaining({
+        uuid: leader.uuid,
+        experience: expect.objectContaining({
+          skill: 'attack',
+          amount: 15,
+          level: 2,
+          levelledUp: true,
+          characterLevelledUp: true,
+        }),
+      })],
+    }));
   });
 
   it('ignores stair checks while a transition is already running', async () => {

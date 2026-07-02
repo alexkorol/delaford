@@ -1,15 +1,115 @@
 <template>
   <div class="stats_slot">
+    <section class="character-hero" aria-label="Character summary">
+      <div
+        class="character-hero__portrait"
+        role="img"
+        :aria-label="characterSheet.identity.tile.label"
+      >
+        <span
+          class="dcss-tile character-hero__sprite"
+          :style="dcssTileStyle(characterSheet.identity.tile)"
+        />
+      </div>
+      <div class="character-hero__identity">
+        <span class="eyebrow">Character</span>
+        <strong>{{ characterSheet.identity.name }}</strong>
+        <span class="character-hero__state">XL {{ characterSheet.identity.level }} / {{ lifecycleState }}</span>
+      </div>
+      <div class="character-hero__meters">
+        <span class="character-hero__meter">
+          <b class="character-hero__meter-value">{{ characterSheet.resources.hp.current }}</b>
+          / {{ characterSheet.resources.hp.max }} HP
+        </span>
+        <span class="character-hero__meter">
+          <b class="character-hero__meter-value">{{ characterSheet.resources.mp.current }}</b>
+          / {{ characterSheet.resources.mp.max }} MP
+        </span>
+      </div>
+    </section>
+
+    <section class="dcss-scoreboard" aria-label="Combat ratings">
+      <div
+        v-for="rating in characterSheet.defenses"
+        :key="rating.id"
+        class="score-pill"
+      >
+        <span class="score-pill__label">{{ rating.label }}</span>
+        <strong class="score-pill__value">{{ rating.value }}</strong>
+      </div>
+      <div
+        v-for="rating in characterSheet.offense"
+        :key="rating.id"
+        class="score-pill score-pill--offense"
+      >
+        <span class="score-pill__label">{{ rating.label }}</span>
+        <strong class="score-pill__value">{{ rating.value }}</strong>
+      </div>
+    </section>
+
+    <section class="equipment-summary">
+      <header>Equipment</header>
+      <ul class="equipment-summary__list">
+        <li
+          v-for="slot in characterSheet.equipment"
+          :key="slot.id"
+          class="equipment-summary__row"
+          :class="{ 'is-empty': !slot.item }"
+        >
+          <span
+            class="equipment-summary__tile"
+            :title="slot.tile.label"
+          >
+            <span
+              class="dcss-tile"
+              :style="dcssTileStyle(slot.tile)"
+            />
+          </span>
+          <span class="label">{{ slot.label }}</span>
+          <span class="value">{{ slot.name }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="resistances">
+      <header>Resistances</header>
+      <div class="resistance-grid">
+        <span
+          v-for="resistance in characterSheet.resistances"
+          :key="resistance.id"
+          class="resistance-pill"
+          :class="{ 'is-neutral': resistance.value === 0 }"
+        >
+          <b class="resistance-pill__label">{{ resistance.label }}</b>
+          <span class="resistance-pill__pips">{{ resistance.pips }}</span>
+        </span>
+      </div>
+    </section>
+
+    <section v-if="characterSheet.skills.length" class="skills">
+      <header>Skills</header>
+      <ul>
+        <li
+          v-for="skill in characterSheet.skills"
+          :key="skill.id"
+        >
+          <span class="label">{{ skill.label }}</span>
+          <span class="value">{{ skill.level }}</span>
+          <small>{{ formatExperience(skill.exp) }} XP</small>
+        </li>
+      </ul>
+    </section>
+
     <section class="skill-tree">
       <header>Skill Tree</header>
       <p class="summary">
-        <strong>{{ flowerSummary.spent }}</strong>
+        <strong>{{ skillTreeSummary.nodePoints }}</strong>
         <span>/</span>
-        <span>{{ flowerSummary.total }}</span>
-        petals spent
+        <span>{{ skillTreeSummary.totalNodes }}</span>
+        nodes
       </p>
       <p class="available">
-        {{ flowerSummary.available }} petal{{ flowerSummary.available === 1 ? '' : 's' }} available
+        {{ skillTreeSummary.conduits }} conduits available
       </p>
       <button
         type="button"
@@ -71,13 +171,20 @@
 import { mapStores } from 'pinia';
 import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats/index.js';
 import {
-  computeAvailablePetalCount,
-  sumAllocatedCost,
   computeFlowerAttributeBonuses,
   FLOWER_OF_LIFE_DEFAULT_PROGRESS,
 } from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
 import { useUiStore } from '@/stores/ui.js';
+import { buildCharacterSheet } from '@/core/character-sheet.js';
+import { VERDIGRIS_SKILL_TREE_POINTS, VERDIGRIS_SKILL_TREE_TOTALS } from '@/core/passives/verdigris-skill-tree.js';
+import dungeonAtlasUrl from '@/assets/tiles/dungeon.png';
+import objectsAtlasUrl from '@/assets/tiles/objects.png';
+
+const DCSS_ATLAS_URLS = {
+  dungeon: dungeonAtlasUrl,
+  objects: objectsAtlasUrl,
+};
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);
 const normaliseAttributes = (source = {}) => ATTRIBUTE_IDS.reduce((acc, attributeId) => {
@@ -100,14 +207,11 @@ export default {
     flowerProgress() {
       return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
-    flowerSummary() {
-      const summary = computeAvailablePetalCount(this.player, this.flowerProgress);
-      const spent = sumAllocatedCost(this.flowerProgress.allocatedNodes || []);
-      const available = Math.max(0, summary.total - spent);
+    skillTreeSummary() {
       return {
-        total: summary.total,
-        spent,
-        available,
+        nodePoints: VERDIGRIS_SKILL_TREE_POINTS.nodes,
+        conduits: VERDIGRIS_SKILL_TREE_POINTS.conduits,
+        totalNodes: VERDIGRIS_SKILL_TREE_TOTALS.nodes,
       };
     },
     stats() {
@@ -116,6 +220,9 @@ export default {
       }
 
       return this.player.stats || {};
+    },
+    characterSheet() {
+      return buildCharacterSheet(this.player);
     },
     attributeSources() {
       const sources = this.stats.attributes && this.stats.attributes.sources
@@ -222,6 +329,26 @@ export default {
     },
   },
   methods: {
+    formatExperience(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) {
+        return '0';
+      }
+      return Math.floor(number).toLocaleString();
+    },
+    dcssTileStyle(tile) {
+      if (!tile) {
+        return {};
+      }
+
+      const tileSize = Number.isFinite(Number(tile.tileSize)) ? Number(tile.tileSize) : 32;
+      const atlasUrl = DCSS_ATLAS_URLS[tile.atlas] || DCSS_ATLAS_URLS.objects;
+      return {
+        '--dcss-tile-size': `${tileSize}px`,
+        backgroundImage: `url(${atlasUrl})`,
+        backgroundPosition: `left -${tile.column * tileSize}px top -${tile.row * tileSize}px`,
+      };
+    },
     openSkillTree() {
       bus.$emit('skill-tree:open');
     },
@@ -230,25 +357,303 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-section.skill-tree {
+div.stats_slot {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
-  align-items: flex-start;
-  line-height: 1.7;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+  color: #f1f1f1;
+  font-family: "GameFont", sans-serif;
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  text-align: left;
+  text-shadow: 1px 1px 0 #000;
 
-  header {
-    font-size: var(--font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #f5d68a;
+  section {
+    padding: 10px;
+    border: 1px solid rgba(180, 145, 86, 0.24);
+    border-radius: 6px;
+    background:
+      linear-gradient(180deg, rgba(21, 23, 26, 0.82), rgba(5, 7, 9, 0.78)),
+      rgba(0, 0, 0, 0.36);
+    box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.46);
+
+    header {
+      margin-bottom: 8px;
+      color: #f5d68a;
+      font-size: var(--font-size-sm);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(78px, 0.55fr) minmax(0, 1fr);
+    gap: 5px 10px;
+    align-items: baseline;
+    min-width: 0;
+
+    .label {
+      color: rgba(235, 222, 190, 0.72);
+    }
+
+    .value {
+      min-width: 0;
+      overflow: hidden;
+      color: #f7e5b0;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      grid-column: 1 / -1;
+      color: rgba(160, 183, 203, 0.76);
+      font-size: 0.86em;
+    }
+  }
+}
+
+.dcss-tile {
+  display: block;
+  width: var(--dcss-tile-size, 32px);
+  height: var(--dcss-tile-size, 32px);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.character-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  background:
+    radial-gradient(circle at 18% 36%, rgba(87, 28, 30, 0.32), transparent 35%),
+    linear-gradient(135deg, rgba(30, 33, 35, 0.94), rgba(7, 9, 11, 0.9));
+
+  &__portrait {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border: 1px solid rgba(219, 181, 98, 0.38);
+    border-radius: 4px;
+    background:
+      radial-gradient(circle at 50% 38%, rgba(92, 121, 90, 0.38), transparent 44%),
+      linear-gradient(180deg, #191814, #080908);
+    box-shadow:
+      inset 0 0 14px rgba(0, 0, 0, 0.78),
+      0 3px 8px rgba(0, 0, 0, 0.36);
+    overflow: hidden;
+
+    .character-hero__sprite {
+      transform: scale(1.45);
+      transform-origin: center;
+      filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.84));
+    }
+  }
+
+  &__identity {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+
+    .eyebrow {
+      color: rgba(133, 178, 191, 0.8);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    strong {
+      overflow: hidden;
+      color: #fff1c2;
+      font-size: clamp(16px, 1.25vw, 20px);
+      line-height: 1.1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+  }
+
+  &__state {
+    color: rgba(239, 229, 203, 0.78);
+  }
+
+  &__meters {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+
+  }
+
+  &__meter {
+    display: block;
+    padding: 5px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.34);
+    color: rgba(235, 226, 203, 0.8);
+    text-align: right;
+
+  }
+
+  &__meter-value {
+    color: #fff3c9;
+  }
+}
+
+.equipment-summary {
+  .equipment-summary__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .equipment-summary__row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 2px 8px;
+    align-items: center;
+    min-height: 38px;
+    padding: 4px 6px;
+    border: 1px solid rgba(202, 172, 104, 0.14);
+    border-radius: 4px;
+    background: rgba(2, 3, 5, 0.22);
+
+    .label,
+    .value {
+      grid-column: 2;
+      line-height: 1.1;
+    }
+
+    .label {
+      grid-row: 1;
+      font-size: 0.92em;
+    }
+
+    .value {
+      grid-row: 2;
+    }
+  }
+
+  .equipment-summary__tile {
+    display: grid;
+    grid-row: 1 / span 2;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(213, 181, 112, 0.18);
+    border-radius: 3px;
+    background: rgba(1, 2, 4, 0.5);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.62);
+
+    .dcss-tile {
+      filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8));
+    }
+  }
+
+  .is-empty {
+    .equipment-summary__tile {
+      opacity: 0.58;
+    }
+
+    .value {
+      color: rgba(235, 222, 190, 0.56);
+      font-weight: 500;
+    }
+  }
+}
+
+.dcss-scoreboard,
+.resistance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.score-pill,
+.resistance-pill {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 7px;
+  border: 1px solid rgba(202, 172, 104, 0.22);
+  border-radius: 4px;
+  background: rgba(2, 3, 5, 0.46);
+
+}
+
+.score-pill__label,
+.resistance-pill__pips {
+  overflow: hidden;
+  color: rgba(226, 218, 196, 0.78);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-pill__value,
+.resistance-pill__label {
+  color: #f6d982;
+}
+
+.score-pill--offense .score-pill__value {
+  color: #92cbdf;
+}
+
+.resistance-pill {
+  grid-template-columns: 1fr auto;
+  color: #bdd6c8;
+
+  &.is-neutral {
+    opacity: 0.68;
+  }
+}
+
+.attributes .breakdown {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: rgba(225, 219, 203, 0.68);
+  font-size: 0.86em;
+
+  .passive {
+    color: #80cbc4;
+  }
+}
+
+.skill-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+
+  .summary,
+  .available {
+    margin: 0;
   }
 
   .summary {
-    margin: 0;
-    font-size: var(--font-size-sm);
     display: flex;
-    gap: var(--space-xs);
+    gap: 5px;
     align-items: baseline;
 
     strong {
@@ -257,98 +662,46 @@ section.skill-tree {
   }
 
   .available {
-    margin: 0;
-    font-size: var(--font-size-sm);
     color: rgba(255, 255, 255, 0.75);
   }
 
   .flower-button {
-    margin-top: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.08);
+    margin-top: 2px;
+    padding: 6px 9px;
+    border: 1px solid rgba(208, 171, 90, 0.35);
+    border-radius: 4px;
+    background: rgba(30, 37, 40, 0.76);
     color: #f1f1f1;
     font-size: var(--font-size-sm);
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 
     &:hover {
-      background: rgba(255, 215, 79, 0.15);
-      border-color: rgba(255, 215, 79, 0.5);
+      border-color: rgba(255, 215, 79, 0.55);
+      background: rgba(86, 70, 35, 0.42);
     }
   }
 }
 
-div.stats_slot {
-  height: 100%;
-  font-family: "GameFont", sans-serif;
-  color: #f1f1f1;
-  text-align: left;
-  text-shadow: 1px 1px 0 black;
-  font-size: var(--font-size-sm);
+@media (width <= 520px) {
+  .dcss-scoreboard,
+  .resistance-grid,
+  .character-hero__meters {
+    grid-template-columns: 1fr 1fr;
+  }
 
-  /* GameFont renders tall glyphs in small line boxes; without an explicit
-     line-height consecutive lines overlap. */
-  line-height: 1.7;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
+  div.stats_slot li {
+    grid-template-columns: 1fr;
+  }
 
-  section {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-sm);
-    padding: var(--space-md);
+  div.stats_slot .equipment-summary__row {
+    grid-template-columns: 34px minmax(0, 1fr);
 
-    header {
-      font-size: var(--font-size-sm);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: var(--space-sm);
-      color: #f5d68a;
-    }
-
-    ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-
-      li {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: var(--space-xs) var(--space-md);
-        align-items: baseline;
-
-        .label {
-          text-transform: capitalize;
-        }
-
-        .value {
-          font-weight: bold;
-        }
-
-        .breakdown {
-          grid-column: 1 / -1;
-          display: flex;
-          gap: var(--space-md);
-          opacity: 0.75;
-          font-size: 0.85em;
-
-          span {
-            display: inline-block;
-          }
-
-          .passive {
-            color: #80cbc4;
-          }
-        }
-      }
+    .label,
+    .value {
+      grid-column: 2;
     }
   }
 }

@@ -11,6 +11,19 @@ import { packInventoryItems } from '@shared/inventory-footprints.js';
 
 const cloneItems = (items) => items.map((item) => ({ ...item, position: { ...item.position } }));
 
+export const getItemEquipSlot = item => (
+  item?.equipSlot
+  || item?.slotType
+  || item?.wearSlot
+  || item?.equipmentSlot
+  || null
+);
+
+export const canEquipInventoryItemToSlot = (item, slotId) => {
+  const equipSlot = getItemEquipSlot(item);
+  return Boolean(equipSlot && slotId && equipSlot === slotId);
+};
+
 export const useInventoryStore = defineStore('inventoryGrid', () => {
   const grid = reactive({ ...DEFAULT_GRID });
   const orientationMap = reactive(new Map());
@@ -20,6 +33,7 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     dragState: {
       activeItemId: null,
       source: null,
+      sourceSlotId: null,
       pointerOffset: { x: 0, y: 0 },
       ghostPosition: null,
       orientation: ORIENTATION_DEFAULT,
@@ -39,11 +53,32 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     }));
   };
 
-  const activeItem = computed(() => (
-    state.dragState.activeItemId
-      ? state.items.find((item) => item.uuid === state.dragState.activeItemId) || null
-      : null
-  ));
+  const normaliseEquipmentItem = (item, slotId) => {
+    if (!item || !slotId) {
+      return null;
+    }
+
+    return normaliseInventoryItem({
+      ...item,
+      equipSlot: item.equipSlot || item.slotType || slotId,
+      slotType: item.slotType || item.equipSlot || slotId,
+      slot: Number.isInteger(item.slot) ? item.slot : 0,
+    }, grid, orientationMap);
+  };
+
+  const activeItem = computed(() => {
+    if (!state.dragState.activeItemId) {
+      return null;
+    }
+
+    if (state.dragState.source === 'equipment') {
+      const slotId = state.dragState.sourceSlotId;
+      const item = slotId ? state.equipment[slotId] : null;
+      return normaliseEquipmentItem(item, slotId);
+    }
+
+    return state.items.find((item) => item.uuid === state.dragState.activeItemId) || null;
+  });
 
   const isDragging = computed(() => !!state.dragState.activeItemId);
 
@@ -55,23 +90,28 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     state.equipment = { ...wear };
   };
 
-  const beginDrag = (uuid, source, { pointerOffset = { x: 0, y: 0 } } = {}) => {
-    const item = findItemByUuid(uuid);
+  const beginDrag = (uuid, source, { pointerOffset = { x: 0, y: 0 }, sourceSlotId = null } = {}) => {
+    const item = source === 'equipment'
+      ? normaliseEquipmentItem(state.equipment[sourceSlotId], sourceSlotId)
+      : findItemByUuid(uuid);
     if (!item) {
       return;
     }
 
-    state.dragState.activeItemId = uuid;
+    state.dragState.activeItemId = item.uuid || uuid;
     state.dragState.source = source;
+    state.dragState.sourceSlotId = sourceSlotId;
     state.dragState.pointerOffset = { ...pointerOffset };
-    state.dragState.ghostPosition = { ...item.position };
+    state.dragState.ghostPosition = source === 'equipment' ? null : { ...item.position };
     state.dragState.orientation = orientationMap.get(uuid) || item.orientation || ORIENTATION_DEFAULT;
-    state.dragState.hoverTarget = {
-      type: 'inventory',
-      position: { ...item.position },
-      valid: true,
-      blockers: [],
-    };
+    state.dragState.hoverTarget = source === 'equipment'
+      ? null
+      : {
+        type: 'inventory',
+        position: { ...item.position },
+        valid: true,
+        blockers: [],
+      };
   };
 
   const updateGhostPosition = (position) => {
@@ -160,6 +200,7 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
   const cancelDrag = () => {
     state.dragState.activeItemId = null;
     state.dragState.source = null;
+    state.dragState.sourceSlotId = null;
     state.dragState.pointerOffset = { x: 0, y: 0 };
     state.dragState.ghostPosition = null;
     state.dragState.orientation = ORIENTATION_DEFAULT;
@@ -168,7 +209,7 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
 
   const commitDrop = () => {
     const item = activeItem.value;
-    const { hoverTarget, orientation } = state.dragState;
+    const { hoverTarget, orientation, source, sourceSlotId } = state.dragState;
 
     if (!item || !hoverTarget) {
       cancelDrag();
@@ -181,16 +222,30 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
         return { cancelled: true, reason: 'invalid-placement' };
       }
 
+      if (source === 'equipment') {
+        cancelDrag();
+        return {
+          cancelled: false,
+          type: 'unequip',
+          slotId: sourceSlotId,
+          target: hoverTarget,
+          item,
+        };
+      }
+
       if (hoverTarget.stackTarget) {
         const stackTarget = findItemByUuid(hoverTarget.stackTarget);
         const stacking = applyStacking(item, stackTarget);
-        if (stacking) {
-          stackTarget.qty = stacking.targetQty;
-          item.qty = stacking.sourceRemainder;
-          if (item.qty === 0) {
-            state.items = state.items.filter((entry) => entry.uuid !== item.uuid);
-            orientationMap.delete(item.uuid);
-          }
+        if (!stacking) {
+          cancelDrag();
+          return { cancelled: true, reason: 'invalid-stack' };
+        }
+
+        stackTarget.qty = stacking.targetQty;
+        item.qty = stacking.sourceRemainder;
+        if (item.qty === 0) {
+          state.items = state.items.filter((entry) => entry.uuid !== item.uuid);
+          orientationMap.delete(item.uuid);
         }
       } else {
         const nextItems = state.items.map((entry) => {
@@ -219,6 +274,11 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     }
 
     if (hoverTarget.type === 'equipment') {
+      if (hoverTarget.valid === false || !canEquipInventoryItemToSlot(item, hoverTarget.slotId)) {
+        cancelDrag();
+        return { cancelled: true, reason: 'invalid-equipment-slot' };
+      }
+
       cancelDrag();
       return {
         cancelled: false,
@@ -229,6 +289,16 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     }
 
     if (hoverTarget.type === 'world-drop') {
+      if (source === 'equipment') {
+        cancelDrag();
+        return {
+          cancelled: false,
+          type: 'unequip-world-drop',
+          slotId: sourceSlotId,
+          item,
+        };
+      }
+
       state.items = state.items.filter((entry) => entry.uuid !== item.uuid);
       orientationMap.delete(item.uuid);
       cancelDrag();
