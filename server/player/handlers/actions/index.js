@@ -27,6 +27,7 @@ import {
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
 
 const refreshInventory = (player) => {
   if (!player || !player.socket_id) {
@@ -915,6 +916,8 @@ const actionEvents = {
       player: { socket_id: world.players[playerIndex].socket_id },
       data: world.players[playerIndex].inventory.slots,
     });
+
+    notifyTutorial(world.players[playerIndex], 'loot');
   },
 
   /**

@@ -4,6 +4,7 @@ import GameMap from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -370,6 +371,7 @@ class PartyService {
     party.metadata.completedAt = null;
 
     this.teleportMembersToSpawns(party, scene);
+    this.forEachMember(party, member => notifyTutorial(member, 'delve'));
 
     this.sendPartyUpdate(party);
     this.sendSceneTransition(party, scene);

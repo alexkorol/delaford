@@ -10,6 +10,7 @@ import { directionDelta } from '#server/core/entities/player/movement-handler.js
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
 import { dropMonsterLoot } from '#server/core/combat/loot.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
 import { processResourceRegeneration, REGEN_INTERVAL_MS } from '#server/core/combat/regeneration.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
@@ -307,6 +308,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
   }
 
   ensureCombatState(player).lastCombatAt = now;
+  notifyTutorial(player, 'attack');
 
   const died = result.type === 'death' || result.type === 'permadeath';
   let experience = null;
@@ -315,6 +317,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
     experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
     dropMonsterLoot(monster);
+    notifyTutorial(player, 'slay');
   }
 
   return {

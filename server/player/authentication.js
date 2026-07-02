@@ -1,6 +1,7 @@
 import Socket from '#server/socket.js';
 import axios from 'axios';
 import world from '#server/core/world.js';
+import { maybeStartTutorial } from '#server/core/tutorial.js';
 import { publicSceneMetadata } from '#server/core/world-transitions.js';
 
 class Authentication {
@@ -126,6 +127,9 @@ class Authentication {
 
     const recipients = world.getScenePlayers(scene.id);
     Socket.broadcast('player:joined', recipients, recipients, { meta });
+
+    // Give the client a moment to mount the chat before the guide speaks
+    setTimeout(() => maybeStartTutorial(player), 2500);
   }
 }
 
