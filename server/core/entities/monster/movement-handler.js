@@ -315,10 +315,14 @@ const patrol = (monster, now = Date.now()) => {
   }
 
   const secondary = pickSecondaryDirection(direction, monster, monster.state.patrolTarget);
-  if (secondary) {
-    return step(monster, secondary, now);
+  if (secondary && step(monster, secondary, now)) {
+    return true;
   }
 
+  // Every route toward the target is blocked (walls or occupied tiles);
+  // abandon it so the monster does not shuffle into a wall forever.
+  monster.state.patrolTarget = pickPatrolTarget(monster);
+  monster.state.lastDecisionAt = now;
   return false;
 };
 

@@ -189,6 +189,7 @@ class Delaford {
     this.addPeriodicTask('party:stairs', 300, () => partyService.checkStairTransitions());
     this.addPeriodicTask('player:auto-attack', 150, () => Combat.processAutoAttacks());
     this.addPeriodicTask('player:respawn', 1000, () => Combat.processPlayerRespawns());
+    this.addPeriodicTask('player:regen', 2000, () => Combat.processResourceRegeneration());
     this.addPeriodicTask('player:auto-save', this.playerAutoSaveInterval, () => playerPersistenceService.flushAllPlayers());
   }
 

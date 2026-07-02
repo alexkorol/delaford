@@ -9,6 +9,7 @@ import { DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { directionDelta } from '#server/core/entities/player/movement-handler.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
+import { processResourceRegeneration, REGEN_INTERVAL_MS } from '#server/core/combat/regeneration.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
 const DEFAULT_PROJECTILE_RANGE = 5;
@@ -303,6 +304,8 @@ const applyHitToMonster = (player, monster, skill, now) => {
   if (!result) {
     return null;
   }
+
+  ensureCombatState(player).lastCombatAt = now;
 
   const died = result.type === 'death' || result.type === 'permadeath';
   let experience = null;
@@ -737,10 +740,13 @@ export const processPlayerRespawns = (now = Date.now()) => {
   });
 };
 
+export { processResourceRegeneration, REGEN_INTERVAL_MS };
+
 export default {
   tryUseSkill,
   processPlayerRespawns,
   processAutoAttacks,
+  processResourceRegeneration,
   isPlayerAlive,
   rollPlayerDamage,
   findMeleeTargets,

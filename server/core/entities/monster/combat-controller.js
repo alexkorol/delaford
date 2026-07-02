@@ -110,8 +110,9 @@ const tryAttack = (monster, target, now = Date.now()) => {
     return false;
   }
 
+  const range = Math.max(1, attack.range || 1);
   const distance = manhattanDistance(monster, target);
-  if (distance > 1) {
+  if (distance > range) {
     return false;
   }
 
@@ -174,14 +175,18 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     return false;
   }
 
+  const attack = monster.behaviour.attack || DEFAULT_BEHAVIOUR.attack;
+  const range = Math.max(1, attack.range || 1);
   const distance = manhattanDistance(monster, target);
-  if (distance > 1) {
+  if (distance > range) {
     return false;
   }
 
   const nowTs = now;
   const mitigation = getArmourMitigation(target, nowTs);
   const damage = Math.max(0, Math.floor(payload.damage - mitigation));
+  target.combat = target.combat || {};
+  target.combat.lastCombatAt = nowTs;
   const result = target.applyDamage(damage, { allowCheatDeath: true, now: nowTs });
 
   if (result) {
