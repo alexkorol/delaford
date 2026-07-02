@@ -9,6 +9,7 @@ import { DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { directionDelta } from '#server/core/entities/player/movement-handler.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
+import { dropMonsterLoot } from '#server/core/combat/loot.js';
 import { processResourceRegeneration, REGEN_INTERVAL_MS } from '#server/core/combat/regeneration.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
@@ -313,6 +314,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
   if (died) {
     experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
+    dropMonsterLoot(monster);
   }
 
   return {

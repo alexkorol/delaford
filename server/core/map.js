@@ -97,6 +97,52 @@ const TEMPLATE_THEMES = {
   swamp: 'marsh',
 };
 
+// Monster identities per theme so each floor reads differently.
+const THEME_MONSTERS = {
+  stone: {
+    melee: 'Dread Vanguard',
+    ranged: 'Ashen Marksman',
+    support: 'Celestial Channeler',
+    boss: 'Warden of the Deep',
+  },
+  crypt: {
+    melee: 'Risen Blademaster',
+    ranged: 'Gravebolt Archer',
+    support: 'Bone Chorister',
+    boss: 'The Pale Sovereign',
+  },
+  sand: {
+    melee: 'Dune Reaver',
+    ranged: 'Sirocco Slinger',
+    support: 'Mirage Priest',
+    boss: 'Tomb King Ahmenet',
+  },
+  volcanic: {
+    melee: 'Cinder Brute',
+    ranged: 'Magma Spitter',
+    support: 'Flamecaller',
+    boss: 'Furnace Tyrant',
+  },
+  marsh: {
+    melee: 'Bog Lurker',
+    ranged: 'Fen Dartcaster',
+    support: 'Mire Shaman',
+    boss: 'The Rotfather',
+  },
+};
+
+// Treasure-room gear pools; deeper floors roll better bases.
+const INSTANCE_LOOT_TIERS = [
+  { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
+  { minDepth: 3, gear: ['iron-sword', 'iron-battleaxe', 'iron-chainmail', 'bronze-shield', 'hard-leather-body', 'shortbow'] },
+  { minDepth: 5, gear: ['steel-sword', 'steel-battleaxe', 'steel-warhammer', 'ranger-body', 'longbow', 'gold-ring'] },
+];
+
+const gearPoolForDepth = (depth) => {
+  const eligible = INSTANCE_LOOT_TIERS.filter(tier => depth >= tier.minDepth);
+  return eligible.length ? eligible[eligible.length - 1].gear : INSTANCE_LOOT_TIERS[0].gear;
+};
+
 class Map {
   constructor(level) {
     // Getters & Setters
@@ -380,10 +426,35 @@ class Map {
 
     if (carvedRooms.length > 1) {
       const corridorWidth = Math.max(2, options.corridorWidth || DEFAULT_CORRIDOR_WIDTH);
-      const anchor = carvedRooms[0];
-      carvedRooms.slice(1).forEach((roomCenter) => {
-        Map.carveCorridor(background, foreground, anchor, roomCenter, corridorWidth, floorPicker, rng);
-      });
+
+      // Chain the rooms so the floor reads as a progression from the
+      // entry to the stairs down, rather than a hub with spokes.
+      for (let index = 1; index < carvedRooms.length; index += 1) {
+        Map.carveCorridor(
+          background,
+          foreground,
+          carvedRooms[index - 1],
+          carvedRooms[index],
+          corridorWidth,
+          floorPicker,
+          rng,
+        );
+      }
+
+      // One extra corridor loops a mid room back to the exit so parties
+      // can choose routes and avoid full backtracking.
+      if (carvedRooms.length > 3) {
+        const loopFrom = 1 + Math.floor(rng() * (carvedRooms.length - 3));
+        Map.carveCorridor(
+          background,
+          foreground,
+          carvedRooms[loopFrom],
+          carvedRooms[carvedRooms.length - 1],
+          corridorWidth,
+          floorPicker,
+          rng,
+        );
+      }
     }
 
     Map.decorateInstance({
@@ -403,11 +474,17 @@ class Map {
 
     const depthLevelBonus = (depth - 1) * 2;
     const depthRewardMultiplier = 1 + ((depth - 1) * 0.35);
+    const themeMonsters = THEME_MONSTERS[themeName] || THEME_MONSTERS.stone;
 
-    const monsterSpawns = carvedRooms.slice(1);
+    // A mid room (never the entry or the exit) holds the floor's treasure
+    const treasureRoomIndex = carvedRooms.length >= 4
+      ? 1 + Math.floor(rng() * (carvedRooms.length - 2))
+      : -1;
+
     const roleCycle = ['melee', 'ranged', 'support'];
-    const instanceMonsters = monsterSpawns.map((center, index) => {
-      const role = roleCycle[index % roleCycle.length];
+    const buildMonsterDefinition = ({
+      center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
+    }) => {
       const behaviour = {
         type: role,
         aggressionRange: role === 'support' ? 6 : 8,
@@ -429,17 +506,12 @@ class Map {
         };
       }
 
-      const archetype = role === 'ranged' ? 'mystic' : (role === 'support' ? 'mystic' : 'brute');
-      const rarity = index % 3 === 2 ? 'rare' : (index % 3 === 1 ? 'uncommon' : 'common');
+      const archetype = role === 'melee' ? 'brute' : 'mystic';
 
       return {
         id: `instance-${seed}-${index}`,
-        name: role === 'support'
-          ? 'Celestial Channeler'
-          : role === 'ranged'
-            ? 'Ashen Marksman'
-            : 'Dread Vanguard',
-        level: Math.max(4, Math.floor(5 + (index * 0.75))) + depthLevelBonus,
+        name,
+        level: Math.max(4, Math.floor(5 + (index * 0.75))) + depthLevelBonus + levelBonus,
         archetype,
         rarity,
         spawn: {
@@ -449,13 +521,72 @@ class Map {
         },
         behaviour,
         rewards: {
-          experience: Math.round((30 + (index * 18)) * depthRewardMultiplier),
-          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier),
+          experience: Math.round((30 + (index * 18)) * depthRewardMultiplier * rewardMultiplier),
+          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier),
         },
         respawn: {
           delayMs: 600000,
         },
       };
+    };
+
+    const rollRarity = () => {
+      const roll = rng();
+      if (roll < 0.12) {
+        return 'rare';
+      }
+      if (roll < 0.4) {
+        return 'uncommon';
+      }
+      return 'common';
+    };
+
+    const instanceMonsters = [];
+    let monsterIndex = 0;
+    const exitRoomIndex = carvedRooms.length - 1;
+
+    carvedRooms.forEach((center, roomIndex) => {
+      if (roomIndex === 0) {
+        return;
+      }
+
+      if (roomIndex === exitRoomIndex && carvedRooms.length > 1) {
+        // The stairs down are guarded by the floor boss
+        instanceMonsters.push(buildMonsterDefinition({
+          center,
+          index: monsterIndex,
+          role: 'melee',
+          rarity: 'elite',
+          name: themeMonsters.boss,
+          levelBonus: 3,
+          rewardMultiplier: 3,
+        }));
+        monsterIndex += 1;
+        return;
+      }
+
+      // Normal rooms hold a small pack; deeper floors pack heavier
+      let packSize = 1 + (rng() < 0.4 ? 1 : 0);
+      if (depth > 2 && rng() < 0.35) {
+        packSize += 1;
+      }
+
+      for (let member = 0; member < packSize; member += 1) {
+        const role = roleCycle[monsterIndex % roleCycle.length];
+        const isTreasureGuard = roomIndex === treasureRoomIndex && member === 0;
+        instanceMonsters.push(buildMonsterDefinition({
+          center: {
+            x: center.x + (member === 1 ? 2 : (member === 2 ? -2 : 0)),
+            y: center.y + (member === 2 ? 1 : 0),
+          },
+          index: monsterIndex,
+          role: isTreasureGuard ? 'melee' : role,
+          rarity: isTreasureGuard ? 'rare' : rollRarity(),
+          name: themeMonsters[isTreasureGuard ? 'melee' : role],
+          rewardMultiplier: isTreasureGuard ? 1.5 : 1,
+        }));
+        monsterIndex += 1;
+      }
     });
 
     // Players spawn on the walkable tiles around the entry stairs,
@@ -463,16 +594,49 @@ class Map {
     const entry = carvedRooms[0];
     const exit = carvedRooms.length > 1 ? carvedRooms[carvedRooms.length - 1] : null;
     const idx = (x, y) => (y * width) + x;
+    const tileIsOpen = (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) {
+        return false;
+      }
+      const bgWalkable = UI.tileWalkable(background[idx(x, y)] - 1);
+      const fgGid = foreground[idx(x, y)];
+      return bgWalkable && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+    };
+
+    // Scatter the treasure hoard on open tiles around the room centre
+    const treasureCentre = treasureRoomIndex >= 0 ? carvedRooms[treasureRoomIndex] : null;
+    const instanceItems = [];
+    if (treasureCentre) {
+      const treasureSpots = [
+        { x: treasureCentre.x + 1, y: treasureCentre.y + 1 },
+        { x: treasureCentre.x - 1, y: treasureCentre.y + 1 },
+        { x: treasureCentre.x + 1, y: treasureCentre.y - 1 },
+        { x: treasureCentre.x - 1, y: treasureCentre.y - 1 },
+        { x: treasureCentre.x, y: treasureCentre.y + 2 },
+      ].filter(spot => tileIsOpen(spot.x, spot.y));
+
+      if (treasureSpots.length) {
+        const coinQuantity = Math.round((80 + Math.floor(rng() * 60)) * depthRewardMultiplier);
+        const coins = ItemFactory.createById('coins', { quantity: coinQuantity });
+        if (coins) {
+          instanceItems.push(ItemFactory.toWorldInstance(coins, treasureSpots[0]));
+        }
+
+        const gearPool = gearPoolForDepth(depth);
+        const gearId = gearPool[Math.floor(rng() * gearPool.length)];
+        const gear = ItemFactory.createById(gearId, { rng });
+        if (gear && treasureSpots.length > 1) {
+          instanceItems.push(ItemFactory.toWorldInstance(gear, treasureSpots[1]));
+        }
+      }
+    }
+
     const spawnPoints = [
       { x: entry.x + 1, y: entry.y },
       { x: entry.x - 1, y: entry.y },
       { x: entry.x, y: entry.y + 1 },
       { x: entry.x, y: entry.y - 1 },
-    ].filter((tile) => {
-      const bgWalkable = UI.tileWalkable(background[idx(tile.x, tile.y)] - 1);
-      const fgGid = foreground[idx(tile.x, tile.y)];
-      return bgWalkable && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
-    });
+    ].filter(tile => tileIsOpen(tile.x, tile.y));
 
     if (!spawnPoints.length) {
       spawnPoints.push({ ...entry });
@@ -493,6 +657,7 @@ class Map {
         roomCentres: carvedRooms,
         stairsUp: { x: entry.x, y: entry.y },
         stairsDown: exit ? { x: exit.x, y: exit.y } : null,
+        treasureRoom: treasureCentre ? { x: treasureCentre.x, y: treasureCentre.y } : null,
         rewards: {
           coinsPerPlayer: Math.round((120 + (instanceMonsters.length * 20)) * depthRewardMultiplier),
           experience: {
@@ -506,7 +671,7 @@ class Map {
         monsters: [],
         resources: [],
       },
-      items: [],
+      items: instanceItems,
       npcs: [],
       monsters: instanceMonsters,
     };
