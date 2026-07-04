@@ -7,11 +7,7 @@
         <div class="point-grid" aria-label="Passive points">
           <div>
             <span>Skill Points</span>
-            <strong>{{ treeState.points.nodes }}</strong>
-          </div>
-          <div>
-            <span>Conduits</span>
-            <strong>{{ treeState.points.conduits }}</strong>
+            <strong>{{ treeState.points.skill }}</strong>
           </div>
           <div>
             <span>Nodes</span>
@@ -394,10 +390,13 @@ class SVGRenderer {
     const searchTerm = this.tree.searchTerm;
 
     this.tree.conduits.forEach((conduit) => {
+      const conduitVisible = this.tree.isConduitVisible(conduit);
       conduit.options.forEach((option) => {
         const cache = this.cache.conduits.get(`${conduit.id}|${option.id}`);
         if (!cache) return;
-        const { line } = cache;
+        const { line, hit } = cache;
+        line.style.display = conduitVisible ? '' : 'none';
+        hit.style.display = conduitVisible ? '' : 'none';
         line.setAttribute('class', 'conduit-path');
         line.style.setProperty('--path-color', option.color);
         line.style.setProperty('--path-depth', conduit.depth);
@@ -420,6 +419,7 @@ class SVGRenderer {
       if (!cache) return;
       const { group, shell, core, ring } = cache;
       group.classList.remove('active', 'available', 'pending', 'selected', 'empowered');
+      group.style.display = this.tree.isNodeVisible(node) ? '' : 'none';
       group.style.opacity = this.matchesSearch(node, searchTerm) ? '1' : SEARCH_DIM_OPACITY;
 
       const empowered = this.tree.empoweredNodes.has(node.id);
@@ -571,8 +571,7 @@ class ViewController {
 
 const initialTreeState = () => ({
   points: {
-    nodes: VERDIGRIS_SKILL_TREE_POINTS.nodes,
-    conduits: VERDIGRIS_SKILL_TREE_POINTS.conduits,
+    skill: VERDIGRIS_SKILL_TREE_POINTS.skill,
   },
   stats: {
     attrs: { STR: 0, DEX: 0, INT: 0 },

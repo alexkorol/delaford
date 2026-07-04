@@ -15,9 +15,11 @@ const readSource = relativePath => readFileSync(
 );
 
 describe('Verdigris skill tree UI copy', () => {
-  it('uses the Verdigris tree point model in shared UI summaries', () => {
-    expect(VERDIGRIS_SKILL_TREE_POINTS).toEqual({ nodes: 36, conduits: 42 });
-    expect(VERDIGRIS_SKILL_TREE_TOTALS.nodes).toBe(127);
+  it('uses the unified Verdigris point model in shared UI summaries', () => {
+    expect(VERDIGRIS_SKILL_TREE_POINTS).toEqual({ skill: 123 });
+    expect(VERDIGRIS_SKILL_TREE_TOTALS.layers).toBe(9);
+    expect(VERDIGRIS_SKILL_TREE_TOTALS.nodes).toBe(271);
+    expect(VERDIGRIS_SKILL_TREE_TOTALS.subtreeNodes).toBe(34);
   });
 
   it('does not expose how-to text in the skill tree overlay', () => {

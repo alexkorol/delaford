@@ -259,7 +259,15 @@ export default {
         return String(item.rarity).toLowerCase();
       }
 
+      if (item?.vessel?.item?.awakened) {
+        return 'rare';
+      }
+
       if (item?.affixes && (item.affixes.brand || item.affixes.bond)) {
+        return 'magic';
+      }
+
+      if (item?.vessel?.item?.brands?.length || item?.vessel?.item?.bonds?.length) {
         return 'magic';
       }
 
@@ -275,7 +283,11 @@ export default {
     const itemTooltip = (item) => {
       const { width, height } = getItemDimensions(item, item.orientation);
       const name = item.displayName || item.name || item.id || 'Item';
-      return `${name} (${width} x ${height})`;
+      const header = `${name} (${width} x ${height})`;
+      const vesselLines = Array.isArray(item.vessel?.lines)
+        ? item.vessel.lines.filter(line => line.section !== 'name').map(line => line.text)
+        : [];
+      return vesselLines.length ? [header, ...vesselLines].join('\n') : header;
     };
 
     const ghostPlacement = computed(() => {

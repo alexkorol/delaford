@@ -1,5 +1,28 @@
 # Vision
 
+## Status (updated 2026-07-04)
+
+Landed from the WIZARD prototypes (skill tree, Vesselforge inventory engine,
+Chronicles account creator):
+
+- **Skill tree** — nine-ring Verdigris geometric lattice (271 nodes + 34
+  subtree nodes behind six gateway annexes), unified 123-point economy
+  (100 from levels, 23 from quests; 1 point per node, 1 per path), ring-8
+  Signs (birthsign keystones), ring-7 class masteries
+  (Champion/Acrobat/Archmage/Spellsword). `src/core/passives/`.
+- **Itemisation** — Vesselforge engine + Verdigris content pack ported to
+  `server/core/items/vesselforge/`: vessel slots, Brands ✦ / Bonds ◈ /
+  Trophies ✧ / Scars ✕, patience crafting, material firing, attunement and
+  awakening. Dropped gear now carries a vessel block (ilvl scales with the
+  slain monster) surfaced in inventory tooltips.
+- **Character identity** — Chronicles class archetypes (plain
+  Warrior/Rogue/Mage) selectable at login; they tilt base attributes
+  (13/10/7 spread) and map to Vesselforge kinships for future bond
+  estrangement. `server/shared/archetypes.js`.
+
+Still open: server-authoritative tree allocation tied to XP/quests, vessel
+crafting UI (sear/fire/trophies), permadeath loop, houses/legacy meta.
+
 ## Pillars
 
 - **WASD-first ARPG**: keyboard movement/combat with optional mouse context menus.
@@ -16,16 +39,20 @@
 - Establish CI/testing pipelines and documentation.
 
 ### Gameplay Core
-- Implement Str/Dex/Int, health/mana, and scaling rules.
+- ~~Implement Str/Dex/Int, health/mana, and scaling rules.~~ ✅ shared stat
+  pipeline + archetype attribute spreads.
 - Create permadeath/cheat-death mechanics.
 - Add LLM-backed RP naming enforcement.
-- Design the skill tree with a Flower-of-Life-inspired layout.
+- ~~Design the skill tree with a Flower-of-Life-inspired layout.~~ ✅
+  nine-ring geometric lattice with Signs, masteries, and gateway annexes.
 
 ### Inventory & Items
 - Build 127 backpack and ragdoll equipment slots.
 - Support nested containers (bags, cube) with recursive grids.
-- Introduce brands/bonds (prefix/suffix) affix system.
-- Bind items to player identity.
+- ~~Introduce brands/bonds (prefix/suffix) affix system.~~ ✅ legacy affix
+  engine plus the full Vesselforge brand/bond/trophy model.
+- ~~Bind items to player identity.~~ ✅ bind-on-pickup plus Vesselforge bond
+  kinship (bonds estrange when worn by another archetype).
 
 ### UI/UX
 - Left stats pane, right inventory pane inspired by PoE.

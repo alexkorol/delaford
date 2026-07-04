@@ -60,7 +60,13 @@ export const dropMonsterLoot = (monster, options = {}) => {
     : GEAR_DROP_CHANCES.common;
   if (rng() < gearChance) {
     const gearId = GEAR_DROP_POOL[Math.floor(rng() * GEAR_DROP_POOL.length)];
-    const gear = ItemFactory.createById(gearId, { rng });
+    const monsterLevel = Number.isFinite(monster.level)
+      ? monster.level
+      : monster.stats && Number.isFinite(monster.stats.level) ? monster.stats.level : undefined;
+    const gear = ItemFactory.createById(gearId, {
+      rng,
+      itemLevel: monsterLevel ? Math.min(80, monsterLevel * 2) : undefined,
+    });
     if (gear) {
       drops.push(ItemFactory.toWorldInstance(gear, { x: monster.x, y: monster.y }));
     }

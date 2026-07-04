@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import Query from '#server/core/data/query.js';
 import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine.js';
+import { createVesselBlock } from './vesselforge/adapter.js';
 import { resolveItemSize } from '#shared/inventory-footprints.js';
 
 const composeAffixedName = (baseName, brand, bond) => {
@@ -74,6 +75,7 @@ const createFromBase = (baseItem, options = {}) => {
     bindTo = null,
     quantity = baseItem.stackable ? 1 : undefined,
     includeAffixes = true,
+    itemLevel,
     rng,
     uuid: providedUuid,
   } = options;
@@ -93,6 +95,13 @@ const createFromBase = (baseItem, options = {}) => {
     instance.affixes = { brand: null, bond: null };
     instance.stats = structuredCloneSafe(baseItem.stats || {});
     instance.name = baseItem.name;
+  }
+
+  if (includeAffixes) {
+    const vessel = createVesselBlock(baseItem, { rng, ilvl: itemLevel });
+    if (vessel) {
+      instance.vessel = vessel;
+    }
   }
 
   instance.displayName = instance.name;

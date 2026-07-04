@@ -12,7 +12,7 @@
         />
       </div>
       <div class="character-hero__identity">
-        <span class="eyebrow">Character</span>
+        <span class="eyebrow">{{ archetypeLabel }}</span>
         <strong>{{ characterSheet.identity.name }}</strong>
         <span class="character-hero__state">XL {{ characterSheet.identity.level }} / {{ lifecycleState }}</span>
       </div>
@@ -103,13 +103,13 @@
     <section class="skill-tree">
       <header>Skill Tree</header>
       <p class="summary">
-        <strong>{{ skillTreeSummary.nodePoints }}</strong>
+        <strong>{{ skillTreeSummary.skillPoints }}</strong>
         <span>/</span>
         <span>{{ skillTreeSummary.totalNodes }}</span>
-        nodes
+        points to spend across the lattice
       </p>
       <p class="available">
-        {{ skillTreeSummary.conduits }} conduits available
+        {{ skillTreeSummary.fromLevels }} from levels, {{ skillTreeSummary.fromQuests }} from quests
       </p>
       <button
         type="button"
@@ -170,6 +170,7 @@
 <script>
 import { mapStores } from 'pinia';
 import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats/index.js';
+import { getArchetype } from '@shared/archetypes.js';
 import {
   computeFlowerAttributeBonuses,
   FLOWER_OF_LIFE_DEFAULT_PROGRESS,
@@ -177,7 +178,11 @@ import {
 import bus from '@/core/utilities/bus';
 import { useUiStore } from '@/stores/ui.js';
 import { buildCharacterSheet } from '@/core/character-sheet.js';
-import { VERDIGRIS_SKILL_TREE_POINTS, VERDIGRIS_SKILL_TREE_TOTALS } from '@/core/passives/verdigris-skill-tree.js';
+import {
+  VERDIGRIS_SKILL_TREE_POINTS,
+  VERDIGRIS_SKILL_TREE_SOURCES,
+  VERDIGRIS_SKILL_TREE_TOTALS,
+} from '@/core/passives/verdigris-skill-tree.js';
 import dungeonAtlasUrl from '@/assets/tiles/dungeon.png';
 import objectsAtlasUrl from '@/assets/tiles/objects.png';
 
@@ -204,14 +209,19 @@ export default {
     player() {
       return this.game && this.game.player ? this.game.player : {};
     },
+    archetypeLabel() {
+      const archetype = getArchetype(this.player.archetype);
+      return archetype ? archetype.name : 'Character';
+    },
     flowerProgress() {
       return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     skillTreeSummary() {
       return {
-        nodePoints: VERDIGRIS_SKILL_TREE_POINTS.nodes,
-        conduits: VERDIGRIS_SKILL_TREE_POINTS.conduits,
-        totalNodes: VERDIGRIS_SKILL_TREE_TOTALS.nodes,
+        skillPoints: VERDIGRIS_SKILL_TREE_POINTS.skill,
+        fromLevels: VERDIGRIS_SKILL_TREE_SOURCES.levels,
+        fromQuests: VERDIGRIS_SKILL_TREE_SOURCES.quests,
+        totalNodes: VERDIGRIS_SKILL_TREE_TOTALS.nodes + VERDIGRIS_SKILL_TREE_TOTALS.subtreeNodes,
       };
     },
     stats() {
