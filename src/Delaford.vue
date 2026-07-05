@@ -21,6 +21,7 @@
       :player-progress="playerProgress"
       :quick-slots="quickSlots"
       :quickbar-active-index="quickbarActiveIndex"
+      :quickbar-cooldowns="quickbarCooldowns"
       :party="party"
       :party-invites="partyInvites"
       :party-loading="partyLoading"
@@ -198,6 +199,12 @@ export default {
     },
     showGameScreen() {
       return this.loaded && Boolean(this.game && this.game.map);
+    },
+    quickbarCooldowns() {
+      // Server-authoritative cooldown map: skillId -> ready-at timestamp
+      // (ms). The quickbar renders each slot's remaining sweep from this.
+      const combat = this.game && this.game.player && this.game.player.combat;
+      return (combat && combat.cooldowns) ? combat.cooldowns : {};
     },
     playerVitals() {
       const fallback = {

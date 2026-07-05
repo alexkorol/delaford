@@ -32,14 +32,16 @@
         >{{ entry.slot.icon || '·' }}</span>
         <span class="quickbar__label">{{ entry.slot.label || `Slot ${entry.index + 1}` }}</span>
         <span
-          v-if="entry.slot.skill && entry.slot.skill.cooldown"
+          v-if="!slotCooldown(entry.slot).active && entry.slot.skill && entry.slot.skill.cooldown"
           class="quickbar__cd"
         >{{ entry.slot.skill.cooldown }}s</span>
-        <span
-          v-if="entry.index === activeIndex && cooldownSeconds(entry.slot) > 0"
-          class="quickbar__sweep"
-          :style="{ animationDuration: `${cooldownSeconds(entry.slot)}s` }"
-        />
+        <template v-if="slotCooldown(entry.slot).active">
+          <span
+            class="quickbar__sweep"
+            :style="{ background: sweepBackground(slotCooldown(entry.slot).fraction) }"
+          />
+          <span class="quickbar__cd-timer">{{ slotCooldown(entry.slot).remaining }}</span>
+        </template>
       </button>
     </div>
   </nav>
@@ -57,17 +59,92 @@ export default {
       type: Number,
       default: -1,
     },
+    // skillId -> ready-at timestamp (ms), server-authoritative.
+    cooldowns: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   emits: ['slot-activate', 'request-remap'],
+  data() {
+    return {
+      now: Date.now(),
+      timerId: null,
+    };
+  },
   computed: {
     // PoE-style: always show the full bar of fixed slots, empty ones dimmed.
     slotEntries() {
       return this.slots.map((slot, index) => ({ slot, index }));
     },
+    anyCooldownActive() {
+      return this.slots.some((slot) => {
+        const readyAt = slot && slot.skillId ? this.cooldowns[slot.skillId] : 0;
+        return readyAt && readyAt > this.now;
+      });
+    },
+  },
+  watch: {
+    // Whenever the cooldown map changes (a skill was cast), make sure the
+    // per-frame clock is running so the sweep animates down to ready.
+    cooldowns: {
+      deep: true,
+      handler() {
+        this.ensureTicking();
+      },
+    },
+  },
+  beforeUnmount() {
+    this.stopTicking();
   },
   methods: {
     cooldownSeconds(slot) {
       return slot && slot.skill && Number.isFinite(slot.skill.cooldown) ? slot.skill.cooldown : 0;
+    },
+    // Live cooldown state for a slot: whether it is cooling down, the fraction
+    // remaining (1 -> 0), and the ceil'd seconds left for the readout.
+    slotCooldown(slot) {
+      const duration = this.cooldownSeconds(slot) * 1000;
+      const readyAt = slot && slot.skillId ? this.cooldowns[slot.skillId] : 0;
+      if (!duration || !readyAt) {
+        return { active: false, fraction: 0, remaining: 0 };
+      }
+      const remainingMs = readyAt - this.now;
+      if (remainingMs <= 0) {
+        return { active: false, fraction: 0, remaining: 0 };
+      }
+      return {
+        active: true,
+        fraction: Math.min(1, remainingMs / duration),
+        remaining: Math.ceil(remainingMs / 1000),
+      };
+    },
+    // Dark wedge covering the remaining-cooldown portion, sweeping clockwise
+    // from the top as the skill recovers (PoE-style clock hand).
+    sweepBackground(fraction) {
+      const angle = Math.max(0, Math.min(1, fraction)) * 360;
+      return `conic-gradient(rgba(0, 0, 0, 0.66) 0deg ${angle}deg, transparent ${angle}deg 360deg)`;
+    },
+    ensureTicking() {
+      // A short interval (not rAF, which is throttled in background tabs)
+      // advances the clock so the sweep and countdown update smoothly while
+      // any skill is cooling down, and stops itself once all are ready.
+      if (this.timerId != null || typeof window === 'undefined') {
+        return;
+      }
+      this.now = Date.now();
+      this.timerId = window.setInterval(() => {
+        this.now = Date.now();
+        if (!this.anyCooldownActive) {
+          this.stopTicking();
+        }
+      }, 60);
+    },
+    stopTicking() {
+      if (this.timerId != null && typeof window !== 'undefined') {
+        window.clearInterval(this.timerId);
+      }
+      this.timerId = null;
     },
     slotTitle(slot, index) {
       const label = slot.label || `Slot ${index + 1}`;
@@ -186,27 +263,29 @@ export default {
   color: var(--color-accent-strong, #e0b45c);
 }
 
-/* Radial cooldown sweep: a dark wedge that unwinds over the skill's cooldown
- * when the slot is triggered. */
+/* Radial cooldown sweep: a dark wedge covering the remaining cooldown that
+ * unwinds clockwise as the skill recovers (PoE-style clock hand). The wedge
+ * angle is set inline each frame from the live remaining fraction. */
 .quickbar__sweep {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: conic-gradient(rgba(0, 0, 0, 0.62) 0deg, rgba(0, 0, 0, 0.62) 360deg);
-  animation-name: quickbar-sweep;
-  animation-timing-function: linear;
-  animation-iteration-count: 1;
 }
 
-@keyframes quickbar-sweep {
-  from {
-    clip-path: polygon(50% 50%, 50% 0, 50% 0, 50% 0, 50% 0, 50% 0);
-  }
-
-  to {
-    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 0 100%, 0 0);
-  }
+.quickbar__cd-timer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'GameFont', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f7eeda;
+  text-shadow: 0 1px 2px #000, 0 0 4px #000;
+  pointer-events: none;
 }
 
 .quickbar__label {

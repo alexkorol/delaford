@@ -177,6 +177,7 @@
             :player-progress="playerProgress"
             :quick-slots="quickSlots"
             :quickbar-active-index="quickbarActiveIndex"
+            :quickbar-cooldowns="quickbarCooldowns"
             @quick-slot="handleQuickSlot"
             @request-remap="handleQuickbarRemap"
           />
@@ -264,6 +265,10 @@ export default {
     quickbarActiveIndex: {
       type: Number,
       default: null,
+    },
+    quickbarCooldowns: {
+      type: Object,
+      default: () => ({}),
     },
     party: {
       type: Object,

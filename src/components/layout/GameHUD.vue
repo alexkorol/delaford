@@ -12,6 +12,7 @@
         class="hud-shell__quickbar"
         :slots="quickSlots"
         :active-index="quickbarActiveIndex"
+        :cooldowns="quickbarCooldowns"
         @slot-activate="handleSlotActivate"
         @request-remap="handleRequestRemap"
       />
@@ -64,6 +65,10 @@ export default {
     quickbarActiveIndex: {
       type: Number,
       default: null,
+    },
+    quickbarCooldowns: {
+      type: Object,
+      default: () => ({}),
     },
   },
   emits: [
