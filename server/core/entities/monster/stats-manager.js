@@ -183,9 +183,15 @@ const buildStats = (monster, attributeOverrides = {}) => {
   state.resources.health.current = state.resources.health.max;
   state.resources.mana.current = state.resources.mana.max;
 
-  if (rarity && rarity.healthMultiplier && rarity.healthMultiplier !== 1) {
+  // Combine the rarity health scale with an optional per-monster one, so
+  // instance trash can be made squishy (mow-through packs) while bosses and
+  // rarer foes stay tanky.
+  const rarityHealthMultiplier = rarity && rarity.healthMultiplier ? rarity.healthMultiplier : 1;
+  const monsterHealthMultiplier = Number.isFinite(monster.healthMultiplier) ? monster.healthMultiplier : 1;
+  const healthMultiplier = rarityHealthMultiplier * monsterHealthMultiplier;
+  if (healthMultiplier !== 1) {
     const health = state.resources.health;
-    health.max = Math.max(1, Math.round(health.max * rarity.healthMultiplier));
+    health.max = Math.max(1, Math.round(health.max * healthMultiplier));
     health.current = health.max;
   }
 

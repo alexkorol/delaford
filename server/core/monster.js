@@ -29,6 +29,9 @@ class Monster {
     this.sceneId = definition.sceneId || world.defaultTownId;
     this.archetypeId = definition.archetype || 'brute';
     this.rarityId = definition.rarity || 'common';
+    // Optional per-monster stat scales (instance trash is squishy; bosses 1.0).
+    this.healthMultiplier = Number.isFinite(definition.healthMultiplier) ? definition.healthMultiplier : 1;
+    this.damageMultiplier = Number.isFinite(definition.damageMultiplier) ? definition.damageMultiplier : 1;
     this.spawn = {
       x: definition.spawn && Number.isFinite(definition.spawn.x) ? definition.spawn.x : 0,
       y: definition.spawn && Number.isFinite(definition.spawn.y) ? definition.spawn.y : 0,

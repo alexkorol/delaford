@@ -484,6 +484,7 @@ class Map {
     const roleCycle = ['melee', 'ranged', 'support'];
     const buildMonsterDefinition = ({
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
+      healthMultiplier = 0.32, damageMultiplier = 0.55,
     }) => {
       const behaviour = {
         type: role,
@@ -511,9 +512,15 @@ class Map {
       return {
         id: `instance-${seed}-${index}`,
         name,
-        level: Math.max(4, Math.floor(5 + (index * 0.75))) + depthLevelBonus + levelBonus,
+        // Floor-1 trash tracks a fresh character (level 1-3); depth and role
+        // bonuses layer on top. Bosses take an explicit levelBonus. Scaling is
+        // gentle so a floor is uniformly mow-through rather than spiking late.
+        level: Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus,
         archetype,
         rarity,
+        // Squishy trash so packs can be mown through; bosses pass 1.0.
+        healthMultiplier,
+        damageMultiplier,
         spawn: {
           x: center.x,
           y: center.y,
@@ -551,7 +558,8 @@ class Map {
       }
 
       if (roomIndex === exitRoomIndex && carvedRooms.length > 1) {
-        // The stairs down are guarded by the floor boss
+        // The stairs down are guarded by the floor boss — a real damage sponge
+        // that hits hard, unlike the trash (full health, near-full damage).
         instanceMonsters.push(buildMonsterDefinition({
           center,
           index: monsterIndex,
@@ -560,30 +568,46 @@ class Map {
           name: themeMonsters.boss,
           levelBonus: 3,
           rewardMultiplier: 3,
+          healthMultiplier: 1,
+          damageMultiplier: 0.8,
         }));
         monsterIndex += 1;
         return;
       }
 
-      // Normal rooms hold a small pack; deeper floors pack heavier
-      let packSize = 1 + (rng() < 0.4 ? 1 : 0);
-      if (depth > 2 && rng() < 0.35) {
+      // Normal rooms hold a dense pack of trash (ARPG mow-through); deeper
+      // floors and larger rooms pack heavier.
+      let packSize = 3 + Math.floor(rng() * 3); // 3-5
+      if (depth > 2) {
         packSize += 1;
       }
+      if (rng() < 0.3) {
+        packSize += 1;
+      }
+
+      // Ring the room centre so a pack reads as a cluster, not a stack.
+      const ringOffsets = [
+        { x: 0, y: 0 }, { x: 2, y: 0 }, { x: -2, y: 0 }, { x: 0, y: 2 },
+        { x: 0, y: -2 }, { x: 2, y: 2 }, { x: -2, y: -2 }, { x: 2, y: -2 },
+      ];
 
       for (let member = 0; member < packSize; member += 1) {
         const role = roleCycle[monsterIndex % roleCycle.length];
         const isTreasureGuard = roomIndex === treasureRoomIndex && member === 0;
+        const offset = ringOffsets[member % ringOffsets.length];
         instanceMonsters.push(buildMonsterDefinition({
           center: {
-            x: center.x + (member === 1 ? 2 : (member === 2 ? -2 : 0)),
-            y: center.y + (member === 2 ? 1 : 0),
+            x: center.x + offset.x,
+            y: center.y + offset.y,
           },
           index: monsterIndex,
           role: isTreasureGuard ? 'melee' : role,
           rarity: isTreasureGuard ? 'rare' : rollRarity(),
           name: themeMonsters[isTreasureGuard ? 'melee' : role],
           rewardMultiplier: isTreasureGuard ? 1.5 : 1,
+          // Treasure guards are a step tankier than plain trash.
+          healthMultiplier: isTreasureGuard ? 0.6 : 0.32,
+          damageMultiplier: isTreasureGuard ? 0.7 : 0.55,
         }));
         monsterIndex += 1;
       }
