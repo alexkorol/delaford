@@ -17,7 +17,7 @@
         :class="`slot ${getItemFromSlot(i).isLocked} ${getItemFromSlot(i).id} ${gridData(screen).classId} ${isItemSelected(i)}`"
         @click.left="selectItem($event)"
         @mouseover="showContextMenu($event, i, true)"
-        @click.right="showContextMenu($event, i)"
+        @contextmenu.prevent="showContextMenu($event, i)"
       >
         <span
           v-if="hasQuantity(i)"

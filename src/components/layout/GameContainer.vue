@@ -2,7 +2,7 @@
   <div
     class="wrapper game-container"
     :class="gameContainerClasses"
-    @click.right.prevent="handleRightClick"
+    @contextmenu.prevent="handleRightClick"
   >
     <PaneHost
       ref="paneHostRef"

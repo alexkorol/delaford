@@ -2,7 +2,7 @@
   <div
     id="context-menu"
     :style="style"
-    @click.right="contextClick"
+    @contextmenu.prevent="contextClick"
   >
     <ul
       v-if="view"
@@ -10,12 +10,15 @@
       tabindex="-1"
       @blur="closeMenu"
     >
+      <!-- Labels are server-authored and carry colour markup for item
+           rarity; text interpolation showed the raw tags to the player. -->
       <li
         v-for="(item, index) in items"
         :key="index"
         class="action"
         @click="selectAction($event, item)"
-      >{{ item.label }}</li>
+        v-html="item.label"
+      />
       <li
         class="action"
         @click="selectAction($event, { action: { name: 'cancel' } })"

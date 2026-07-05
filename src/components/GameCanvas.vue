@@ -26,7 +26,7 @@
       @mouseleave="onGame = false"
       @mousemove="mouseSelection"
       @click.left="leftClick"
-      @click.right="rightClick"
+      @contextmenu.prevent="rightClick"
     />
   </div>
 </template>
