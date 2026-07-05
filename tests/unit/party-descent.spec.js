@@ -64,6 +64,7 @@ vi.mock('#server/core/entities/player/stats-manager.js', () => ({
 }));
 
 vi.mock('#server/core/map.js', () => ({
+  LAYOUT_IDS: ['warren', 'clearings', 'gauntlet'],
   default: {
     generateInstance: vi.fn().mockImplementation(async (options = {}) => {
       const depth = options.depth || 1;

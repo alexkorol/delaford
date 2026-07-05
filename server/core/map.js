@@ -15,6 +15,77 @@ const DEFAULT_INSTANCE_ROOM_COUNT = 12;
 const DEFAULT_OUTDOOR_CLEARING_COUNT = 9;
 const DEFAULT_CORRIDOR_WIDTH = 3;
 
+// Layout recipes are the *shape* of a floor, kept independent of the theme
+// (which is only art). Any theme can pair with any recipe, PoE-style: a crypt
+// can be a tight warren OR a linear colonnade OR an open courtyard, reusing the
+// same tiles. generateInstance picks a recipe from options.layout, defaulting
+// to the theme's natural indoor/outdoor shape so existing callers are unchanged.
+//
+// The param names map 1:1 onto the placement loop: a value `foo` fed as
+// `Math.floor(rng() * fooRoll) + fooBase`. Keeping the roll/base split lets the
+// warren/clearings recipes reproduce the previous hard-coded numbers exactly.
+const LAYOUT_RECIPES = {
+  // Branching warren: many tight rooms budding off random anchors with short
+  // corridors — the classic dungeon.
+  warren: {
+    id: 'warren',
+    open: false,
+    linear: false,
+    anchor: 'random',
+    roomCount: DEFAULT_INSTANCE_ROOM_COUNT,
+    roomBase: 7,
+    roomRoll: 6, // 7-12
+    bandFrac: 0.30,
+    gapBase: 3,
+    gapRoll: 4, // 3-6: short corridor
+    corridorWidth: DEFAULT_CORRIDOR_WIDTH,
+    packBase: 3,
+    packRoll: 3, // 3-5
+    spreadFrac: 0,
+  },
+  // Open clearings: a few big overlapping chambers with wide links and lots of
+  // scattered cover — the open field / courtyard.
+  clearings: {
+    id: 'clearings',
+    open: true,
+    linear: false,
+    anchor: 'random',
+    roomCount: DEFAULT_OUTDOOR_CLEARING_COUNT,
+    roomBase: 14,
+    roomRoll: 10, // 14-23: big clearings
+    bandFrac: 0.24,
+    gapBase: -2,
+    gapRoll: 5, // -2..2: clearings overlap
+    corridorWidth: 4,
+    packBase: 6,
+    packRoll: 4, // 6-9 spread across a clearing
+    spreadFrac: 0.38,
+  },
+  // Linear gauntlet: rooms strung in a chain from entry to exit, each budding
+  // off the previous one in a biased run direction — a push-through map with no
+  // shortcut back to the stairs down.
+  gauntlet: {
+    id: 'gauntlet',
+    open: false,
+    linear: true,
+    anchor: 'previous',
+    forwardBias: true,
+    angleJitter: 1.1, // radians of wander around the run axis
+    roomCount: 8,
+    roomBase: 8,
+    roomRoll: 5, // 8-12
+    bandFrac: 0.14,
+    gapBase: 3,
+    gapRoll: 4, // 3-6 short halls between rooms
+    corridorWidth: 3,
+    packBase: 4,
+    packRoll: 3, // 4-6
+    spreadFrac: 0,
+  },
+};
+
+export const LAYOUT_IDS = Object.keys(LAYOUT_RECIPES);
+
 // Visual themes for generated instances, built on the DCSS (RLTiles) dungeon
 // tileset. Each entry lists gid pools; generation picks per-tile variants.
 const INSTANCE_THEMES = {
@@ -306,6 +377,7 @@ class Map {
     decorPool,
     treePool,
     theme,
+    denseDecor,
     roomRects,
     carvedRooms,
   }) {
@@ -374,10 +446,11 @@ class Map {
       if (!pools.length) {
         return;
       }
-      // Outdoor clearings are large and want scattered cover (a grove of
-      // trees), so seed many more pieces per clearing; indoor rooms stay
-      // sparse so the floor reads clear.
-      const pieces = theme.outdoor
+      // Open layouts are large and want scattered cover (a grove of trees), so
+      // seed many more pieces per clearing; tight rooms stay sparse so the floor
+      // reads clear. Density follows the layout recipe, not the theme, so an
+      // open crypt gets scattered cover too.
+      const pieces = denseDecor
         ? Math.floor((room.width * room.height) / 26) + 2
         : 1 + Math.floor(rng() * 2);
       // Keep a clear zone around the room centre: monsters spawn there (ring
@@ -444,6 +517,14 @@ class Map {
     const themeName = themeNames[(baseThemeIndex + (depth - 1)) % themeNames.length];
     const theme = INSTANCE_THEMES[themeName] || INSTANCE_THEMES.stone;
 
+    // Layout is a separate axis from theme (art). Pick the requested recipe, or
+    // default to the theme's natural shape — outdoor themes open into clearings,
+    // indoor themes into a warren. This keeps every existing caller unchanged.
+    const layoutId = options.layout && LAYOUT_RECIPES[options.layout]
+      ? options.layout
+      : (baseIsOutdoor ? 'clearings' : 'warren');
+    const recipe = LAYOUT_RECIPES[layoutId];
+
     // Each floor gets its own deterministic seed derived from the base
     const baseSeed = Map.normaliseSeed(options.seed);
     const seed = Map.normaliseSeed(baseSeed + ((depth - 1) * 7919));
@@ -469,31 +550,30 @@ class Map {
       return pool[Math.floor(rng() * pool.length)] || floorPool[0];
     };
 
-    const outdoor = Boolean(theme.outdoor);
-    // Outdoor realms are open groves/wilds: fewer, larger overlapping clearings
-    // that merge into one connected space, so there is almost no corridor.
-    const rooms = Math.max(1, options.rooms
-      || (outdoor ? DEFAULT_OUTDOOR_CLEARING_COUNT : DEFAULT_INSTANCE_ROOM_COUNT));
+    // The floor's shape comes entirely from the recipe now (see LAYOUT_RECIPES).
+    const rooms = Math.max(1, options.rooms || recipe.roomCount);
     const carvedRooms = [];
     const roomRects = [];
     const anchorOf = [];
 
-    // A tight central band keeps the whole floor compact — corridors are short
-    // because every room is placed within a few tiles of a room already down.
-    const bandFrac = outdoor ? 0.24 : 0.30;
+    // A central band keeps the whole floor compact — corridors are short because
+    // every room is placed within a few tiles of a room already down. A gauntlet
+    // uses a wider band so its chain of rooms can stretch across the map.
+    const bandFrac = recipe.bandFrac;
     const bandMinX = Math.floor(width * bandFrac);
     const bandMaxX = Math.floor(width * (1 - bandFrac));
     const bandMinY = Math.floor(height * bandFrac);
     const bandMaxY = Math.floor(height * (1 - bandFrac));
     const clampV = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
 
+    // Linear gauntlets bud rooms along one wandering run direction; other
+    // recipes bud in any direction. (Falsy recipe.forwardBias consumes no rng,
+    // so warren/clearings keep their exact prior tile output.)
+    const runAngle = recipe.forwardBias ? rng() * Math.PI * 2 : 0;
+
     for (let index = 0; index < rooms; index += 1) {
-      const roomWidth = outdoor
-        ? Math.floor(rng() * 10) + 14 // 14-23: big clearings
-        : Math.floor(rng() * 6) + 7; // 7-12: tight rooms
-      const roomHeight = outdoor
-        ? Math.floor(rng() * 10) + 14
-        : Math.floor(rng() * 6) + 7;
+      const roomWidth = Math.floor(rng() * recipe.roomRoll) + recipe.roomBase;
+      const roomHeight = Math.floor(rng() * recipe.roomRoll) + recipe.roomBase;
 
       let originX;
       let originY;
@@ -502,14 +582,17 @@ class Map {
         originY = Math.floor((bandMinY + bandMaxY) / 2 - (roomHeight / 2));
         anchorOf.push(-1);
       } else {
-        // Grow the floor by budding each new room off one already placed,
-        // only a short gap away (outdoor clearings overlap into open space).
-        const anchorIndex = Math.floor(rng() * carvedRooms.length);
+        // Grow the floor by budding each new room off an already-placed one,
+        // only a short gap away. A warren/clearing picks a random anchor; a
+        // gauntlet always chains off the previous room to stay a line.
+        const anchorIndex = recipe.anchor === 'previous'
+          ? index - 1
+          : Math.floor(rng() * carvedRooms.length);
         const anchor = carvedRooms[anchorIndex];
-        const angle = rng() * Math.PI * 2;
-        const gap = outdoor
-          ? Math.floor(rng() * 5) - 2 // -2..2: clearings overlap/touch
-          : Math.floor(rng() * 4) + 3; // 3-6: short corridor
+        const angle = recipe.forwardBias
+          ? runAngle + ((rng() - 0.5) * recipe.angleJitter)
+          : rng() * Math.PI * 2;
+        const gap = Math.floor(rng() * recipe.gapRoll) + recipe.gapBase;
         const dist = ((roomWidth + roomHeight) / 2) + gap;
         originX = Math.round(anchor.x + (Math.cos(angle) * dist) - (roomWidth / 2));
         originY = Math.round(anchor.y + (Math.sin(angle) * dist) - (roomHeight / 2));
@@ -532,11 +615,10 @@ class Map {
     }
 
     if (carvedRooms.length > 1) {
-      // Outdoor clearings already overlap, so a narrow link is enough; indoor
-      // rooms get a proper corridor. Either way it is short because rooms bud
+      // Corridor width comes from the recipe (wide for merging clearings,
+      // narrow for tight rooms). Either way links are short because rooms bud
       // off nearby anchors.
-      const corridorWidth = Math.max(2, options.corridorWidth
-        || (outdoor ? 4 : DEFAULT_CORRIDOR_WIDTH));
+      const corridorWidth = Math.max(2, options.corridorWidth || recipe.corridorWidth);
 
       // Connect each room to the anchor it budded from — guarantees the floor
       // is one connected piece with only short links.
@@ -553,8 +635,10 @@ class Map {
         );
       }
 
-      // One extra loop link so there is more than one route through the floor.
-      if (carvedRooms.length > 3) {
+      // One extra loop link so there is more than one route through the floor —
+      // skipped for linear gauntlets, which are meant to be a single push with
+      // no shortcut back to the stairs down.
+      if (!recipe.linear && carvedRooms.length > 3) {
         const loopFrom = 1 + Math.floor(rng() * (carvedRooms.length - 3));
         Map.carveCorridor(
           background,
@@ -579,6 +663,7 @@ class Map {
       decorPool,
       treePool,
       theme,
+      denseDecor: recipe.open,
       roomRects,
       carvedRooms,
     });
@@ -796,12 +881,10 @@ class Map {
         return;
       }
 
-      // Indoor rooms hold a dense pack; outdoor clearings are big and want
-      // more, spread across the clearing so it does not read as empty grass.
+      // Pack size comes from the recipe: tight rooms hold a small pack; open
+      // clearings are big and want more, spread out so they do not read empty.
       const roomRect = roomRects[roomIndex];
-      let packSize = outdoor
-        ? 6 + Math.floor(rng() * 4) // 6-9 spread across a clearing
-        : 3 + Math.floor(rng() * 3); // 3-5
+      let packSize = recipe.packBase + Math.floor(rng() * recipe.packRoll);
       if (depth > 2) {
         packSize += 1;
       }
@@ -809,10 +892,10 @@ class Map {
         packSize += 1;
       }
 
-      // Spread radius: tight cluster indoors, scattered across the clearing
-      // outdoors (up to ~40% of the clearing extent from the centre).
-      const spread = outdoor && roomRect
-        ? Math.max(3, Math.floor(Math.min(roomRect.width, roomRect.height) * 0.38))
+      // Spread radius: tight cluster by default, scattered across the room up to
+      // recipe.spreadFrac of its extent for open layouts.
+      const spread = recipe.spreadFrac && roomRect
+        ? Math.max(3, Math.floor(Math.min(roomRect.width, roomRect.height) * recipe.spreadFrac))
         : 2;
 
       for (let member = 0; member < packSize; member += 1) {
@@ -904,6 +987,7 @@ class Map {
         depth,
         template,
         theme: themeName,
+        layout: layoutId,
         spawnPoints,
         roomCentres: carvedRooms,
         stairsUp: { x: entry.x, y: entry.y },

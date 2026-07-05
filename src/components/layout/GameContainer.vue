@@ -392,19 +392,21 @@ export default {
     const partyOpen = ref(false);
     const adventureOpen = ref(false);
 
-    // Zone menu templates must match the server's ADVENTURE_ZONES; the server
-    // validates the template and falls back to 'dungeon' if unknown.
+    // Zone menu must match the server's ADVENTURE_ZONES; each zone pairs an art
+    // template with a layout shape (warren/clearings/gauntlet). The server
+    // validates both and falls back to sensible defaults if unknown.
     const adventureZones = [
-      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
-      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', levelHint: '1–6' },
-      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
-      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', levelHint: '6–12' },
-      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
+      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
+      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
+      { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
+      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
+      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
+      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
     ];
 
     const enterZone = (zone) => {
       adventureOpen.value = false;
-      emit('enter-zone', zone.template);
+      emit('enter-zone', { template: zone.template, layout: zone.layout });
     };
 
     const activeChatDock = () => (props.chatExpanded ? chatOverlayRef.value : chatPeekRef.value);

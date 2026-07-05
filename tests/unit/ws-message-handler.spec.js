@@ -106,6 +106,7 @@ vi.mock('#server/core/item.js', () => ({
 }));
 
 vi.mock('#server/core/map.js', () => ({
+  LAYOUT_IDS: ['warren', 'clearings', 'gauntlet'],
   default: vi.fn().mockImplementation(() => ({
     foreground: [],
     background: [],

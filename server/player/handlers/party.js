@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import world from '#server/core/world.js';
-import GameMap from '#server/core/map.js';
+import GameMap, { LAYOUT_IDS } from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
@@ -8,16 +8,20 @@ import { notifyTutorial } from '#server/core/tutorial.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
-// PoE-style zone menu: each entry maps to an instance template/theme. A lone
-// player picks one and drops into a freshly generated instance solo.
+// PoE-style zone menu: a zone pairs an art theme (template) with a layout shape
+// (warren = tight dungeon, clearings = open field, gauntlet = linear push). The
+// same art can appear under different layouts — Weir Crypt is a tight warren,
+// the Sunken Colonnade reuses the crypt tiles as a linear gauntlet.
 export const ADVENTURE_ZONES = [
-  { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
-  { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', levelHint: '1–6' },
-  { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
-  { id: 'the-wilds', name: 'The Wilds', template: 'wilds', levelHint: '6–12' },
-  { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
+  { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
+  { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
+  { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
+  { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
+  { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
+  { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
 ];
 const ZONE_TEMPLATES = new Set(ADVENTURE_ZONES.map(zone => zone.template));
+const ZONE_LAYOUTS = new Set(LAYOUT_IDS);
 
 const getPlayerBySocket = (socketId) => world.players.find(p => p.socket_id === socketId);
 const getPlayerByUuid = (playerUuid) => world.players.find(p => p.uuid === playerUuid);
@@ -350,6 +354,7 @@ class PartyService {
     const generation = await GameMap.generateInstance({
       seed: party.metadata.baseSeed,
       template: party.metadata.template,
+      layout: party.metadata.layout,
       depth,
     });
 
@@ -452,6 +457,9 @@ class PartyService {
     }
 
     party.metadata.template = ZONE_TEMPLATES.has(options.template) ? options.template : 'dungeon';
+    // Layout is independent of theme; an unknown/absent value lets the generator
+    // fall back to the theme's natural shape.
+    party.metadata.layout = ZONE_LAYOUTS.has(options.layout) ? options.layout : null;
     await this.startInstance(party, player);
   }
 
@@ -919,7 +927,8 @@ const PartyHandlers = {
     }
 
     const template = message && message.data ? message.data.template : null;
-    await partyService.startSoloInstance(player, { template });
+    const layout = message && message.data ? message.data.layout : null;
+    await partyService.startSoloInstance(player, { template, layout });
   },
 };
 

@@ -1337,8 +1337,9 @@ export default {
       Socket.emit('party:startInstance');
     },
 
-    handleEnterZone(template) {
-      Socket.emit('instance:enterSolo', { template });
+    handleEnterZone(selection) {
+      const { template, layout } = selection || {};
+      Socket.emit('instance:enterSolo', { template, layout });
     },
 
     handlePartyReturnToTown() {

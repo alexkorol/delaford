@@ -185,4 +185,64 @@ describe('generateInstance themes', () => {
       }
     }
   });
+
+  // Layout is an independent axis from theme (art). Any theme can pair with any
+  // layout recipe, PoE-style, and the recipe alone controls the floor's shape.
+  describe('layout recipes (decoupled from theme)', () => {
+    const walkableCount = (map) => {
+      let count = 0;
+      for (let i = 0; i < map.background.length; i += 1) if (walkableAt(map, i)) count += 1;
+      return count;
+    };
+    const entryExitSpan = (metadata) => {
+      const { stairsUp: a, stairsDown: b } = metadata;
+      return b ? Math.hypot(b.x - a.x, b.y - a.y) : 0;
+    };
+
+    it('defaults to warren for indoor themes and clearings for outdoor themes', async () => {
+      const dungeon = await GameMap.generateInstance({ seed: 5, template: 'dungeon' });
+      const grove = await GameMap.generateInstance({ seed: 5, template: 'grove' });
+      expect(dungeon.metadata.layout).toBe('warren');
+      expect(grove.metadata.layout).toBe('clearings');
+    });
+
+    it('lets any theme pair with any layout, recording the chosen recipe', async () => {
+      for (const template of ['dungeon', 'crypt', 'grove']) {
+        for (const layout of ['warren', 'clearings', 'gauntlet']) {
+          const { map, metadata } = await GameMap.generateInstance({
+            seed: 12, template, layout, depth: 1,
+          });
+          expect(metadata.layout, `${template}/${layout}`).toBe(layout);
+          expect(unreachableRoomCount(map, metadata), `${template}/${layout} connectivity`).toBe(0);
+        }
+      }
+    });
+
+    it('builds the gauntlet as a connected line, not a compact warren', async () => {
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const gauntlet = await GameMap.generateInstance({ seed, template: 'crypt', layout: 'gauntlet' });
+        const warren = await GameMap.generateInstance({ seed, template: 'crypt', layout: 'warren' });
+        // The gauntlet strings its rooms out, so the stairs down end up much
+        // farther from the entry than in a compact warren.
+        expect(entryExitSpan(gauntlet.metadata), `seed ${seed}`)
+          .toBeGreaterThan(entryExitSpan(warren.metadata) * 1.8);
+        expect(unreachableRoomCount(gauntlet.map, gauntlet.metadata), `seed ${seed}`).toBe(0);
+      }
+    });
+
+    it('opens a normally-tight theme when paired with the clearings layout', async () => {
+      const openCrypt = await GameMap.generateInstance({ seed: 9, template: 'crypt', layout: 'clearings' });
+      const tightCrypt = await GameMap.generateInstance({ seed: 9, template: 'crypt', layout: 'warren' });
+      // Same crypt art, far more open floor.
+      expect(walkableCount(openCrypt.map)).toBeGreaterThan(walkableCount(tightCrypt.map) * 1.5);
+      expect(unreachableRoomCount(openCrypt.map, openCrypt.metadata)).toBe(0);
+    });
+
+    it('ignores an unknown layout and falls back to the theme default', async () => {
+      const { metadata } = await GameMap.generateInstance({
+        seed: 3, template: 'dungeon', layout: 'not-a-real-layout',
+      });
+      expect(metadata.layout).toBe('warren');
+    });
+  });
 });
