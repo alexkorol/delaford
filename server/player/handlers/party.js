@@ -12,7 +12,9 @@ const INVITE_DURATION_MS = 60 * 1000;
 // player picks one and drops into a freshly generated instance solo.
 export const ADVENTURE_ZONES = [
   { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
+  { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', levelHint: '1–6' },
   { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
+  { id: 'the-wilds', name: 'The Wilds', template: 'wilds', levelHint: '6–12' },
   { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
 ];
 const ZONE_TEMPLATES = new Set(ADVENTURE_ZONES.map(zone => zone.template));

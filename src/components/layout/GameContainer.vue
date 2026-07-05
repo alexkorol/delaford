@@ -396,7 +396,9 @@ export default {
     // validates the template and falls back to 'dungeon' if unknown.
     const adventureZones = [
       { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
+      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', levelHint: '1–6' },
       { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
+      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', levelHint: '6–12' },
       { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
     ];
 

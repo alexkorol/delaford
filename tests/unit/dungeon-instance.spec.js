@@ -116,11 +116,73 @@ describe('generateInstance themes', () => {
   });
 
   it('supports every declared theme without leaking town tiles', async () => {
-    const themes = ['dungeon', 'crypt', 'sand', 'volcanic', 'marsh'];
+    const themes = ['dungeon', 'crypt', 'sand', 'volcanic', 'marsh', 'grove', 'wilds'];
     await Promise.all(themes.map(async (template) => {
       const { map, metadata } = await GameMap.generateInstance({ seed: 7, template });
       expect(metadata.theme).toBeTruthy();
       expect(map.background.every(gid => gid >= DUNGEON_FIRST_GID)).toBe(true);
     }));
+  });
+
+  // Every room centre reachable on foot from the entry stairs. Returns the
+  // count of unreachable room centres (0 == fully connected).
+  const unreachableRoomCount = (map, metadata, width = 200) => {
+    const start = (metadata.stairsUp.y * width) + metadata.stairsUp.x;
+    const seen = new Set([start]);
+    const queue = [start];
+    while (queue.length) {
+      const cur = queue.pop();
+      const x = cur % width;
+      const y = Math.floor(cur / width);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= width) return;
+        const ni = (ny * width) + nx;
+        if (!seen.has(ni) && walkableAt(map, ni)) {
+          seen.add(ni);
+          queue.push(ni);
+        }
+      });
+    }
+    return metadata.roomCentres.filter(r => !seen.has((r.y * width) + r.x)).length;
+  };
+
+  it('carves many rooms with short corridors, not a few big halls down long tunnels', async () => {
+    // The user asked for "more rooms" and "shorter corridors". A dungeon floor
+    // should read as a dense warren, not 5 rooms strung on long tunnels.
+    for (const seed of [11, 22, 33, 44, 55]) {
+      const { metadata } = await GameMap.generateInstance({ seed, template: 'dungeon', depth: 1 });
+      expect(metadata.roomCentres.length, `seed ${seed}`).toBeGreaterThanOrEqual(9);
+    }
+  });
+
+  it('generates open outdoor clearings for grove/wilds themes', async () => {
+    for (const template of ['grove', 'wilds']) {
+      const { map, metadata, monsters } = await GameMap.generateInstance({ seed: 4, template, depth: 1 });
+      const width = 200;
+      let walkable = 0;
+      for (let i = 0; i < map.background.length; i += 1) if (walkableAt(map, i)) walkable += 1;
+      // Outdoor floors are far more open than tight indoor dungeons.
+      expect(walkable, `${template} walkable`).toBeGreaterThan(1400);
+      expect(metadata.roomCentres.length, `${template} clearings`).toBeGreaterThanOrEqual(8);
+      // and denser packs of monsters roam them
+      expect(monsters.length, `${template} monsters`).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  it('guarantees full connectivity across templates, seeds and depths', async () => {
+    const templates = ['dungeon', 'crypt', 'marsh', 'grove', 'wilds'];
+    for (const template of templates) {
+      for (const seed of [101, 202, 303]) {
+        for (const depth of [1, 3]) {
+          const { map, metadata } = await GameMap.generateInstance({ seed, template, depth });
+          expect(
+            unreachableRoomCount(map, metadata),
+            `${template} seed ${seed} depth ${depth}`,
+          ).toBe(0);
+        }
+      }
+    }
   });
 });

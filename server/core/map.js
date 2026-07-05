@@ -11,7 +11,8 @@ import { Shop } from './functions/index.js';
 import world from './world.js';
 import createWorldLayout from './world-layout.js';
 
-const DEFAULT_INSTANCE_ROOM_COUNT = 8;
+const DEFAULT_INSTANCE_ROOM_COUNT = 12;
+const DEFAULT_OUTDOOR_CLEARING_COUNT = 9;
 const DEFAULT_CORRIDOR_WIDTH = 3;
 
 // Visual themes for generated instances, built on the DCSS (RLTiles) dungeon
@@ -82,6 +83,38 @@ const INSTANCE_THEMES = {
     trees: () => dungeonGroupGids('tree', 'tree'),
     water: true,
   },
+  // Outdoor themes: open clearings and tree-lines instead of tight rooms and
+  // long corridors. The generator uses an open-field layout for these.
+  grove: {
+    outdoor: true,
+    floors: () => [
+      ...dungeonGroupGids('floor', 'lair'),
+      ...dungeonGroupGids('floor', 'marsh'),
+    ],
+    floorAccents: () => dungeonGroupGids('floor', 'dirt'),
+    walls: () => dungeonGroupGids('wall', 'vines'),
+    decor: () => dungeonGroupGids('decor_walk', 'flowers'),
+    trees: () => dungeonGroupGids('tree', 'tree'),
+    water: true,
+  },
+  wilds: {
+    outdoor: true,
+    floors: () => [
+      ...dungeonGroupGids('floor', 'dirt'),
+      ...dungeonGroupGids('floor', 'lair'),
+    ],
+    floorAccents: () => dungeonGroupGids('floor', 'mud'),
+    walls: () => [
+      ...dungeonGroupGids('wall', 'vines'),
+      ...dungeonGroupGids('wall', 'brick'),
+    ],
+    decor: () => dungeonGroupGids('decor_walk', 'flowers'),
+    trees: () => [
+      ...dungeonGroupGids('tree', 'tree'),
+      ...dungeonGroupGids('tree', 'tree_dead'),
+    ],
+    water: true,
+  },
 };
 
 const TEMPLATE_THEMES = {
@@ -95,6 +128,10 @@ const TEMPLATE_THEMES = {
   hell: 'volcanic',
   marsh: 'marsh',
   swamp: 'marsh',
+  grove: 'grove',
+  forest: 'grove',
+  wilds: 'wilds',
+  wilderness: 'wilds',
 };
 
 // Monster identities per theme so each floor reads differently.
@@ -128,6 +165,18 @@ const THEME_MONSTERS = {
     ranged: 'Fen Dartcaster',
     support: 'Mire Shaman',
     boss: 'The Rotfather',
+  },
+  grove: {
+    melee: 'Thornclad Stag',
+    ranged: 'Bramble Slinger',
+    support: 'Grovekeeper',
+    boss: 'The Elder Oak',
+  },
+  wilds: {
+    melee: 'Wild Marauder',
+    ranged: 'Barrow Archer',
+    support: 'Beast Whisperer',
+    boss: 'Alpha of the Wilds',
   },
 };
 
@@ -325,7 +374,12 @@ class Map {
       if (!pools.length) {
         return;
       }
-      const pieces = 1 + Math.floor(rng() * 2);
+      // Outdoor clearings are large and want scattered cover (a grove of
+      // trees), so seed many more pieces per clearing; indoor rooms stay
+      // sparse so the floor reads clear.
+      const pieces = theme.outdoor
+        ? Math.floor((room.width * room.height) / 26) + 2
+        : 1 + Math.floor(rng() * 2);
       // Keep a clear zone around the room centre: monsters spawn there (ring
       // offsets up to 2 tiles) and the stairs sit on the centre, so blocking
       // decor there would trap spawns and break floor connectivity.
@@ -343,18 +397,29 @@ class Map {
         }
       }
 
-      // Marsh-style themes get small water pools in roomy chambers.
+      // Marsh/outdoor themes get small water pools in roomy chambers. Never
+      // over the centre clear-zone — water is non-walkable and would trap the
+      // pack spawn / stairs and break connectivity (same trap as blocking
+      // decor). Retry a few placements to find a spot clear of the centre.
       if (theme.water && room.width >= 9 && room.height >= 9 && rng() < 0.7) {
         const waterGid = dungeonGroupGids('liquid', 'water_shallow')[0];
         if (waterGid) {
-          const px = room.x + 2 + Math.floor(rng() * (room.width - 5));
-          const py = room.y + 2 + Math.floor(rng() * (room.height - 5));
-          for (let dy = 0; dy < 2; dy += 1) {
-            for (let dx = 0; dx < 2; dx += 1) {
-              if (!foreground[idx(px + dx, py + dy)]) {
-                background[idx(px + dx, py + dy)] = waterGid;
+          for (let attempt = 0; attempt < 6; attempt += 1) {
+            const px = room.x + 2 + Math.floor(rng() * (room.width - 5));
+            const py = room.y + 2 + Math.floor(rng() * (room.height - 5));
+            const poolClearOfCentre = Math.abs((px + 0.5) - centreX) > 3
+              || Math.abs((py + 0.5) - centreY) > 3;
+            if (!poolClearOfCentre) {
+              continue;
+            }
+            for (let dy = 0; dy < 2; dy += 1) {
+              for (let dx = 0; dx < 2; dx += 1) {
+                if (!foreground[idx(px + dx, py + dy)]) {
+                  background[idx(px + dx, py + dy)] = waterGid;
+                }
               }
             }
+            break;
           }
         }
       }
@@ -369,8 +434,12 @@ class Map {
       || 'stone';
 
     // Deeper floors rotate through the theme list, starting from the
-    // template's theme on floor 1.
-    const themeNames = Object.keys(INSTANCE_THEMES);
+    // template's theme on floor 1. Indoor and outdoor themes rotate within
+    // their own pools so an outdoor zone stays outdoor as you descend (and an
+    // indoor dungeon never suddenly opens into a forest floor).
+    const baseIsOutdoor = !!(INSTANCE_THEMES[baseThemeName] || {}).outdoor;
+    const themeNames = Object.keys(INSTANCE_THEMES)
+      .filter(name => !!INSTANCE_THEMES[name].outdoor === baseIsOutdoor);
     const baseThemeIndex = Math.max(0, themeNames.indexOf(baseThemeName));
     const themeName = themeNames[(baseThemeIndex + (depth - 1)) % themeNames.length];
     const theme = INSTANCE_THEMES[themeName] || INSTANCE_THEMES.stone;
@@ -400,31 +469,55 @@ class Map {
       return pool[Math.floor(rng() * pool.length)] || floorPool[0];
     };
 
-    const rooms = Math.max(1, options.rooms || DEFAULT_INSTANCE_ROOM_COUNT);
+    const outdoor = Boolean(theme.outdoor);
+    // Outdoor realms are open groves/wilds: fewer, larger overlapping clearings
+    // that merge into one connected space, so there is almost no corridor.
+    const rooms = Math.max(1, options.rooms
+      || (outdoor ? DEFAULT_OUTDOOR_CLEARING_COUNT : DEFAULT_INSTANCE_ROOM_COUNT));
     const carvedRooms = [];
     const roomRects = [];
+    const anchorOf = [];
+
+    // A tight central band keeps the whole floor compact — corridors are short
+    // because every room is placed within a few tiles of a room already down.
+    const bandFrac = outdoor ? 0.24 : 0.30;
+    const bandMinX = Math.floor(width * bandFrac);
+    const bandMaxX = Math.floor(width * (1 - bandFrac));
+    const bandMinY = Math.floor(height * bandFrac);
+    const bandMaxY = Math.floor(height * (1 - bandFrac));
+    const clampV = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
 
     for (let index = 0; index < rooms; index += 1) {
-      // Tighter rooms (less empty floor per room).
-      const roomWidth = Math.max(6, Math.floor(rng() * 6) + 7);
-      const roomHeight = Math.max(6, Math.floor(rng() * 6) + 7);
-      // Keep rooms in a central band so corridors stay short and the floor
-      // reads as a dense crawl rather than a few rooms flung across a huge,
-      // mostly-empty map.
-      const bandMinX = Math.floor(width * 0.30);
-      const bandMaxX = Math.floor(width * 0.70);
-      const bandMinY = Math.floor(height * 0.30);
-      const bandMaxY = Math.floor(height * 0.70);
-      const spanX = Math.max(1, bandMaxX - bandMinX - roomWidth);
-      const spanY = Math.max(1, bandMaxY - bandMinY - roomHeight);
-      const originX = Math.min(
-        width - roomWidth - 1,
-        bandMinX + Math.floor(rng() * spanX),
-      );
-      const originY = Math.min(
-        height - roomHeight - 1,
-        bandMinY + Math.floor(rng() * spanY),
-      );
+      const roomWidth = outdoor
+        ? Math.floor(rng() * 10) + 14 // 14-23: big clearings
+        : Math.floor(rng() * 6) + 7; // 7-12: tight rooms
+      const roomHeight = outdoor
+        ? Math.floor(rng() * 10) + 14
+        : Math.floor(rng() * 6) + 7;
+
+      let originX;
+      let originY;
+      if (index === 0) {
+        originX = Math.floor((bandMinX + bandMaxX) / 2 - (roomWidth / 2));
+        originY = Math.floor((bandMinY + bandMaxY) / 2 - (roomHeight / 2));
+        anchorOf.push(-1);
+      } else {
+        // Grow the floor by budding each new room off one already placed,
+        // only a short gap away (outdoor clearings overlap into open space).
+        const anchorIndex = Math.floor(rng() * carvedRooms.length);
+        const anchor = carvedRooms[anchorIndex];
+        const angle = rng() * Math.PI * 2;
+        const gap = outdoor
+          ? Math.floor(rng() * 5) - 2 // -2..2: clearings overlap/touch
+          : Math.floor(rng() * 4) + 3; // 3-6: short corridor
+        const dist = ((roomWidth + roomHeight) / 2) + gap;
+        originX = Math.round(anchor.x + (Math.cos(angle) * dist) - (roomWidth / 2));
+        originY = Math.round(anchor.y + (Math.sin(angle) * dist) - (roomHeight / 2));
+        anchorOf.push(anchorIndex);
+      }
+
+      originX = clampV(originX, Math.max(1, bandMinX), Math.min(width - roomWidth - 1, bandMaxX));
+      originY = clampV(originY, Math.max(1, bandMinY), Math.min(height - roomHeight - 1, bandMaxY));
 
       Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng);
 
@@ -439,15 +532,20 @@ class Map {
     }
 
     if (carvedRooms.length > 1) {
-      const corridorWidth = Math.max(2, options.corridorWidth || DEFAULT_CORRIDOR_WIDTH);
+      // Outdoor clearings already overlap, so a narrow link is enough; indoor
+      // rooms get a proper corridor. Either way it is short because rooms bud
+      // off nearby anchors.
+      const corridorWidth = Math.max(2, options.corridorWidth
+        || (outdoor ? 4 : DEFAULT_CORRIDOR_WIDTH));
 
-      // Chain the rooms so the floor reads as a progression from the
-      // entry to the stairs down, rather than a hub with spokes.
+      // Connect each room to the anchor it budded from — guarantees the floor
+      // is one connected piece with only short links.
       for (let index = 1; index < carvedRooms.length; index += 1) {
+        const anchorIndex = anchorOf[index] >= 0 ? anchorOf[index] : index - 1;
         Map.carveCorridor(
           background,
           foreground,
-          carvedRooms[index - 1],
+          carvedRooms[anchorIndex],
           carvedRooms[index],
           corridorWidth,
           floorPicker,
@@ -455,8 +553,7 @@ class Map {
         );
       }
 
-      // One extra corridor loops a mid room back to the exit so parties
-      // can choose routes and avoid full backtracking.
+      // One extra loop link so there is more than one route through the floor.
       if (carvedRooms.length > 3) {
         const loopFrom = 1 + Math.floor(rng() * (carvedRooms.length - 3));
         Map.carveCorridor(
@@ -485,6 +582,88 @@ class Map {
       roomRects,
       carvedRooms,
     });
+
+    // Guarantee connectivity: decor, water, or clamped overlaps can block a
+    // path after carving, so flood-fill from the entry and carve a clean
+    // corridor to any unreachable room centre. Without this a pack, the
+    // treasure, or the stairs down can end up sealed off.
+    if (carvedRooms.length > 1) {
+      const cIdx = (x, y) => (y * width) + x;
+      const inBounds = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
+      const walkAt = (x, y) => {
+        if (!inBounds(x, y)) {
+          return false;
+        }
+        const bgOk = UI.tileWalkable(background[cIdx(x, y)] - 1);
+        const fgGid = foreground[cIdx(x, y)];
+        return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+      };
+      const clearTile = (x, y) => {
+        if (!inBounds(x, y)) {
+          return;
+        }
+        background[cIdx(x, y)] = floorPicker();
+        const fgGid = foreground[cIdx(x, y)];
+        if (fgGid && !UI.tileWalkable(fgGid - 1, 'foreground')) {
+          foreground[cIdx(x, y)] = 0;
+        }
+      };
+      const carveClearLine = (a, b) => {
+        let x = a.x;
+        let y = a.y;
+        let guard = 0;
+        const maxSteps = width + height;
+        while ((x !== b.x || y !== b.y) && guard < maxSteps) {
+          guard += 1;
+          clearTile(x, y);
+          clearTile(x + 1, y);
+          clearTile(x, y + 1);
+          if (x < b.x) x += 1; else if (x > b.x) x -= 1;
+          if (y < b.y) y += 1; else if (y > b.y) y -= 1;
+        }
+        clearTile(b.x, b.y);
+        clearTile(b.x + 1, b.y);
+      };
+      const floodFrom = (start) => {
+        const seen = new Set([cIdx(start.x, start.y)]);
+        const queue = [start];
+        while (queue.length) {
+          const cur = queue.pop();
+          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+            const nx = cur.x + dx;
+            const ny = cur.y + dy;
+            const ni = cIdx(nx, ny);
+            if (!seen.has(ni) && walkAt(nx, ny)) {
+              seen.add(ni);
+              queue.push({ x: nx, y: ny });
+            }
+          });
+        }
+        return seen;
+      };
+      const start = carvedRooms[0];
+      for (let pass = 0; pass < carvedRooms.length; pass += 1) {
+        const seen = floodFrom(start);
+        const unreached = carvedRooms.filter(room => !seen.has(cIdx(room.x, room.y)));
+        if (!unreached.length) {
+          break;
+        }
+        const target = unreached[0];
+        let nearest = start;
+        let bestDistance = Infinity;
+        carvedRooms.forEach((room) => {
+          if (!seen.has(cIdx(room.x, room.y))) {
+            return;
+          }
+          const distance = Math.abs(room.x - target.x) + Math.abs(room.y - target.y);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            nearest = room;
+          }
+        });
+        carveClearLine(nearest, target);
+      }
+    }
 
     const depthLevelBonus = (depth - 1) * 2;
     const depthRewardMultiplier = 1 + ((depth - 1) * 0.35);
@@ -566,6 +745,34 @@ class Map {
     let monsterIndex = 0;
     const exitRoomIndex = carvedRooms.length - 1;
 
+    // A monster may only spawn on an open tile (not a wall, tree, or water),
+    // so spread packs across a clearing safely: spiral out from the desired
+    // spot to the nearest open tile, falling back to the (always-clear) centre.
+    const monIdx = (x, y) => (y * width) + x;
+    const isSpawnable = (x, y) => {
+      if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) {
+        return false;
+      }
+      const bgOk = UI.tileWalkable(background[monIdx(x, y)] - 1);
+      const fgGid = foreground[monIdx(x, y)];
+      return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+    };
+    const findSpawn = (cx, cy, wantX, wantY) => {
+      if (isSpawnable(wantX, wantY)) {
+        return { x: wantX, y: wantY };
+      }
+      for (let radius = 1; radius <= 5; radius += 1) {
+        for (let dy = -radius; dy <= radius; dy += 1) {
+          for (let dx = -radius; dx <= radius; dx += 1) {
+            if (isSpawnable(wantX + dx, wantY + dy)) {
+              return { x: wantX + dx, y: wantY + dy };
+            }
+          }
+        }
+      }
+      return { x: cx, y: cy };
+    };
+
     carvedRooms.forEach((center, roomIndex) => {
       if (roomIndex === 0) {
         return;
@@ -589,9 +796,12 @@ class Map {
         return;
       }
 
-      // Normal rooms hold a dense pack of trash (ARPG mow-through); deeper
-      // floors and larger rooms pack heavier.
-      let packSize = 3 + Math.floor(rng() * 3); // 3-5
+      // Indoor rooms hold a dense pack; outdoor clearings are big and want
+      // more, spread across the clearing so it does not read as empty grass.
+      const roomRect = roomRects[roomIndex];
+      let packSize = outdoor
+        ? 6 + Math.floor(rng() * 4) // 6-9 spread across a clearing
+        : 3 + Math.floor(rng() * 3); // 3-5
       if (depth > 2) {
         packSize += 1;
       }
@@ -599,21 +809,23 @@ class Map {
         packSize += 1;
       }
 
-      // Ring the room centre so a pack reads as a cluster, not a stack.
-      const ringOffsets = [
-        { x: 0, y: 0 }, { x: 2, y: 0 }, { x: -2, y: 0 }, { x: 0, y: 2 },
-        { x: 0, y: -2 }, { x: 2, y: 2 }, { x: -2, y: -2 }, { x: 2, y: -2 },
-      ];
+      // Spread radius: tight cluster indoors, scattered across the clearing
+      // outdoors (up to ~40% of the clearing extent from the centre).
+      const spread = outdoor && roomRect
+        ? Math.max(3, Math.floor(Math.min(roomRect.width, roomRect.height) * 0.38))
+        : 2;
 
       for (let member = 0; member < packSize; member += 1) {
         const role = roleCycle[monsterIndex % roleCycle.length];
         const isTreasureGuard = roomIndex === treasureRoomIndex && member === 0;
-        const offset = ringOffsets[member % ringOffsets.length];
+        // Distribute members around the centre, then snap to an open tile.
+        const angle = (member / packSize) * Math.PI * 2 + (rng() * 0.8);
+        const ring = member === 0 ? 0 : (0.4 + (rng() * 0.6)) * spread;
+        const wantX = Math.round(center.x + Math.cos(angle) * ring);
+        const wantY = Math.round(center.y + Math.sin(angle) * ring);
+        const spot = findSpawn(center.x, center.y, wantX, wantY);
         instanceMonsters.push(buildMonsterDefinition({
-          center: {
-            x: center.x + offset.x,
-            y: center.y + offset.y,
-          },
+          center: spot,
           index: monsterIndex,
           role: isTreasureGuard ? 'melee' : role,
           rarity: isTreasureGuard ? 'rare' : rollRarity(),
