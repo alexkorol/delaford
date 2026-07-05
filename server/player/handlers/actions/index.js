@@ -498,12 +498,16 @@ const actionEvents = {
    * A player equips an item from their inventory
    */
   'item:equip': async (data) => {
-    const playerIndex = world.players.findIndex(p => p.uuid === data.id);
-    if (playerIndex === -1) {
+    // The socket dispatch hands handlers the full message; the client payload
+    // lives at data.data (getPlayerFromPayload resolves the bound player).
+    const player = getPlayerFromPayload(data);
+    if (!player) {
       return;
     }
-    const player = world.players[playerIndex];
-    const itemPayload = data.item || {};
+    // Real dispatch wraps the client payload in data.data; tolerate a flat
+    // payload too (some callers/tests pass it unwrapped).
+    const payload = data.data || data;
+    const itemPayload = payload.item || {};
     const miscData = itemPayload.miscData || {};
     const getItem = wearableItems.find(i => i.id === itemPayload.id);
     if (!getItem) {
@@ -533,6 +537,8 @@ const actionEvents = {
       : Number.isInteger(itemPayload.slot)
         ? itemPayload.slot
         : inventoryItem?.slot;
+    // Normalise to the flat shape equippedAnItem/unequipItem expect.
+    const equipData = { id: player.uuid, item: itemPayload };
     const alreadyWearing = player.wear[getItem.slot];
     if (alreadyWearing) {
       const status = await pipe.player.unequipItem({
@@ -547,16 +553,16 @@ const actionEvents = {
           slot: sourceSlot,
         },
         replacing: true,
-        id: data.id,
+        id: player.uuid,
       });
 
       if (status !== 200) {
         return;
       }
 
-      pipe.player.equippedAnItem(data);
+      pipe.player.equippedAnItem(equipData);
     } else {
-      pipe.player.equippedAnItem(data);
+      pipe.player.equippedAnItem(equipData);
     }
   },
 
@@ -565,7 +571,8 @@ const actionEvents = {
    */
   'item:unequip': (data) => {
     const player = getPlayerFromPayload(data);
-    const itemPayload = data.item || {};
+    const payload = data.data || data;
+    const itemPayload = payload.item || {};
     const miscData = itemPayload.miscData || {};
     const slotId = miscData.slot || itemPayload.slot || null;
     if (!player || !slotId || !player.wear) {
@@ -582,10 +589,10 @@ const actionEvents = {
       return;
     }
 
-    const newData = Object.assign(data, {
+    const newData = {
       id: player.uuid,
       player: {
-        ...(data.player || {}),
+        ...(payload.player || {}),
         socket_id: player.socket_id,
       },
       item: {
@@ -598,7 +605,7 @@ const actionEvents = {
           targetInventorySlot: miscData.targetInventorySlot,
         },
       },
-    });
+    };
     pipe.player.unequipItem(newData);
   },
 

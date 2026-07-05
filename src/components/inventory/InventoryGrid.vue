@@ -20,6 +20,7 @@
         :style="itemStyle(item)"
         :title="itemTooltip(item)"
         @pointerdown.prevent="beginPointerDrag($event, item)"
+        @dblclick.prevent="handleDoubleClick(item)"
       >
         <div
           class="inventory-item__sprite"
@@ -196,6 +197,26 @@ export default {
       window.addEventListener('pointerup', handlePointerUp);
     };
 
+    // Deterministic equip: double-clicking an equippable item sends it to its
+    // ragdoll slot without relying on drag hit-testing. Reuses the same
+    // 'equip' commit the drag path emits.
+    const handleDoubleClick = (item) => {
+      if (!item || item.stackable) {
+        return;
+      }
+      const slotId = item.equipSlot || item.slotType;
+      if (!slotId) {
+        return;
+      }
+      inventoryStore.cancelDrag();
+      emit('commit', {
+        cancelled: false,
+        type: 'equip',
+        slotId,
+        item,
+      });
+    };
+
     const handleKeyUp = (event) => {
       if (!isDragging.value) {
         return;
@@ -340,6 +361,7 @@ export default {
       handlePointerMove,
       handlePointerLeave,
       beginPointerDrag,
+      handleDoubleClick,
       itemStyle,
       itemSpriteStyle,
       itemClasses,
