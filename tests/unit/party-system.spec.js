@@ -256,4 +256,18 @@ describe('PartyService', () => {
 
     expect(party.state).not.toBe('instance');
   });
+
+  it('startSoloInstance re-enters when a stale solo party is stuck inside an instance', async () => {
+    await service.startSoloInstance(leader, { template: 'dungeon' });
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(party.state).toBe('instance');
+
+    // Simulate a reconnect leaving the party flagged inside; picking a new
+    // zone must self-heal rather than error out.
+    await service.startSoloInstance(leader, { template: 'marsh' });
+
+    expect(party.metadata.template).toBe('marsh');
+    expect(party.state).toBe('instance');
+    expect(party.sceneId).toContain('instance-');
+  });
 });

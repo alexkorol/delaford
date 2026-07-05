@@ -439,6 +439,16 @@ class PartyService {
       return;
     }
 
+    // A solo party can get stuck flagged as 'instance' (e.g. after a reconnect
+    // when the client lost the instance view). Re-picking a zone should always
+    // work, so reset a stale solo instance instead of erroring. enterFloor
+    // tears down the old instance scene when it regenerates.
+    if (party.state === 'instance') {
+      party.state = 'lobby';
+      party.metadata.depth = 0;
+      party.metadata.transitioning = false;
+    }
+
     party.metadata.template = ZONE_TEMPLATES.has(options.template) ? options.template : 'dungeon';
     await this.startInstance(party, player);
   }
