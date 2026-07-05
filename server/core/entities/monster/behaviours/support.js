@@ -31,6 +31,13 @@ const findWeakenedAlly = (monster) => {
   return candidates.length ? candidates[0].ally : null;
 };
 
+// Healing is a paced ability, not a free action: without the interval gate a
+// support healed every AI tick (600ms) for more than most trash mobs' entire
+// health pool — players watched their target refill mid-swing and nothing
+// near a healer could ever die.
+const DEFAULT_HEAL_INTERVAL_MS = 4000;
+const HEAL_FRACTION_CAP = 0.3; // a single heal restores at most 30% of the ally
+
 const applyHeal = (monster, ally, behaviour, now) => {
   if (!ally) {
     return false;
@@ -39,13 +46,27 @@ const applyHeal = (monster, ally, behaviour, now) => {
   const supportConfig = behaviour.support || DEFAULT_BEHAVIOUR.support || {};
   const healRange = supportConfig.healRange || 5;
   const healAmount = supportConfig.healAmount || Math.round(monster.level * 3.5);
+  const healIntervalMs = supportConfig.healIntervalMs || DEFAULT_HEAL_INTERVAL_MS;
+
+  if (now - (monster.state.lastHealAt || 0) < healIntervalMs) {
+    return 'cooldown';
+  }
 
   if (manhattanDistance(monster, ally) > healRange) {
     return 'move';
   }
 
-  const result = ally.heal(healAmount, { now });
+  const allyMaxHealth = (ally.stats && ally.stats.resources && ally.stats.resources.health)
+    ? ally.stats.resources.health.max
+    : 0;
+  const cappedHeal = Math.max(1, Math.min(
+    Math.floor(healAmount),
+    Math.round(allyMaxHealth * HEAL_FRACTION_CAP) || 1,
+  ));
+
+  const result = ally.heal(cappedHeal, { now });
   if (result) {
+    monster.state.lastHealAt = now;
     monster.setAnimationState('attack', { direction: monster.facing, duration: behaviour.attack?.windupMs || 400, startedAt: now });
     return 'healed';
   }
@@ -94,11 +115,15 @@ const createSupportBehaviourSystem = (entity, monster) => (world, _delta, contex
     const action = applyHeal(monster, ally, behaviour, now);
     if (action === 'move') {
       dirty = monster.pursue(ally, now) || dirty;
-    } else if (action === 'healed') {
-      dirty = true;
+      markDirty(entity, dirty);
+      return;
     }
-    markDirty(entity, dirty);
-    return;
+    if (action === 'healed') {
+      markDirty(entity, true);
+      return;
+    }
+    // Heal on cooldown: fall through and fight like everyone else instead of
+    // hovering uselessly next to the wounded ally.
   }
 
   const target = monster.resolveTarget(now);

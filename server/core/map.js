@@ -779,9 +779,13 @@ class Map {
       };
 
       if (role === 'support') {
+        // Modest paced heal (support.js also enforces an interval and a
+        // 30%-of-ally cap). The old 20 + index*5 escalated past entire trash
+        // health pools — packs near a healer were unkillable.
         behaviour.support = {
-          healAmount: 20 + (index * 5),
+          healAmount: 8 + depth,
           healRange: 6,
+          healIntervalMs: 4000,
         };
       }
 
