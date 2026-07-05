@@ -119,4 +119,19 @@ describe('resource regeneration', () => {
     expect(player.hp).toBe(player.stats.resources.health);
     expect(player.mana).toBe(player.stats.resources.mana);
   });
+
+  it('restores a cheat-death player to alive once regeneration heals them', () => {
+    // A player saved by cheat death sits at a low health floor with a
+    // 'cheat-death' lifecycle state. Natural regen mutates health directly, so
+    // without this recovery the state would be stuck at 'cheat-death' forever.
+    const player = makePlayer();
+    player.stats.resources.health.current = 22; // cheat-death floor
+    player.stats.lifecycle.state = 'cheat-death';
+    world.players = [player];
+
+    processResourceRegeneration(50_000);
+
+    expect(player.stats.resources.health.current).toBeGreaterThan(22);
+    expect(player.stats.lifecycle.state).toBe('alive');
+  });
 });

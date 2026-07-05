@@ -55,6 +55,15 @@ export const processResourceRegeneration = (now = Date.now()) => {
       changed = true;
     }
 
+    // A player rescued by cheat death recovers to 'alive' once regeneration
+    // brings them back above zero — mirror applyHealing so the lifecycle state
+    // does not stay stuck at 'cheat-death' forever.
+    const lifecycle = player.stats.lifecycle;
+    if (lifecycle && lifecycle.state === 'cheat-death' && health.current > 0) {
+      lifecycle.state = 'alive';
+      changed = true;
+    }
+
     if (changed) {
       player.hp = health;
       player.mana = mana;

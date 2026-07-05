@@ -13,7 +13,15 @@ export const constructWear = (data) => {
 
     if (wearData[property] !== null) {
       const id = wearData[property];
-      const { name, graphics } = wearableItems.find(db => db.id === id);
+      const definition = wearableItems.find(db => db.id === id);
+      // A saved character can reference an item id that no longer exists in the
+      // database (e.g. after an item-pack rename). Clear the slot instead of
+      // crashing the whole player load.
+      if (!definition) {
+        wearData[property] = null;
+        return;
+      }
+      const { name, graphics } = definition;
       wearData[property] = {
         uuid: uuid(),
         graphics,
