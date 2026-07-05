@@ -27,8 +27,6 @@
       @mousemove="mouseSelection"
       @click.left="leftClick"
       @click.right="rightClick"
-      @keydown.prevent="handleKeyDown"
-      @keyup.prevent="handleKeyUp"
     />
   </div>
 </template>
@@ -142,8 +140,16 @@ export default {
   },
   mounted() {
     this.initialiseInputController();
+    // Movement/skill input listens on window, not the canvas element: the
+    // old canvas-focus binding meant WASD went completely dead after
+    // clicking any UI (chat, panes, menu buttons) until the player clicked
+    // the game world again.
+    window.addEventListener('keydown', this.handleGlobalKeyDown);
+    window.addEventListener('keyup', this.handleGlobalKeyUp);
   },
   beforeUnmount() {
+    window.removeEventListener('keydown', this.handleGlobalKeyDown);
+    window.removeEventListener('keyup', this.handleGlobalKeyUp);
     if (this.inputController) {
       this.inputController.destroy();
       this.inputController = null;
@@ -456,6 +462,27 @@ export default {
         event.preventDefault();
       }
     },
+    // True while the player is typing somewhere game input must not steal.
+    isTypingTarget(event) {
+      const target = event && event.target;
+      if (!target || typeof target.tagName !== 'string') {
+        return false;
+      }
+      const tag = target.tagName.toUpperCase();
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable === true;
+    },
+    handleGlobalKeyDown(event) {
+      if (this.isTypingTarget(event)) {
+        return;
+      }
+      this.handleKeyDown(event);
+    },
+    handleGlobalKeyUp(event) {
+      if (this.isTypingTarget(event)) {
+        return;
+      }
+      this.handleKeyUp(event);
+    },
     dispatchMovement(direction) {
       if (!this.game || !this.game.player || !direction) {
         return;
@@ -463,7 +490,15 @@ export default {
 
       if (Array.isArray(this.game.player.optimisticQueue)
         && this.game.player.optimisticQueue.length >= 6) {
-        return;
+        // Six unacknowledged predictions means reconciliation lost the
+        // thread (teleport, rejection, desync) — a healthy loop never holds
+        // more than a couple. Resync and keep moving rather than silently
+        // eating the player's input.
+        if (typeof this.game.resetOptimisticMovement === 'function') {
+          this.game.resetOptimisticMovement();
+        } else {
+          return;
+        }
       }
 
       this.game.move(direction);

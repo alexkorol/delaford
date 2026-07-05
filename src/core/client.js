@@ -211,6 +211,11 @@ class Client {
       this.player.movement.hardSync(this.player.x, this.player.y);
     }
 
+    // Scene changed: any client-side movement predictions belong to the old
+    // map. A stale queue here jammed at the 6-entry cap and ate all WASD
+    // input after entering or leaving an instance.
+    this.resetOptimisticMovement();
+
     this.players = [];
 
     const images = await this.ensureAssets();

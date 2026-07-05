@@ -1131,7 +1131,11 @@ export default {
 
             if (matchIndex !== -1) {
               player.optimisticQueue.splice(0, matchIndex + 1);
-            } else if (step && step.blocked) {
+            } else {
+              // Blocked step OR a position we never predicted (teleport,
+              // server-side rejection, any desync): the server is
+              // authoritative. Drop the stale predictions — a jammed queue
+              // used to hit the 6-entry cap and silently eat all WASD input.
               player.optimisticQueue = [];
               if (typeof this.game.resetOptimisticMovement === 'function') {
                 this.game.resetOptimisticMovement();
