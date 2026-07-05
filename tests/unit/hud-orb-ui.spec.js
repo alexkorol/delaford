@@ -98,12 +98,14 @@ describe('WIZARD HUD orbs', () => {
     expect(hud).toContain('flex: 0 1 auto;');
     expect(container).toContain('grid-template-rows: minmax(0, 1fr);');
     expect(container).toContain('.game-container__hud {\n  position: absolute;');
-    expect(quickbar).toContain('visibleSlotEntries()');
-    expect(quickbar).toContain('const assigned = entries.filter(entry => entry.slot && entry.slot.skillId);');
+    // PoE-style rebuild: full fixed bar, corner hotkey, cooldown sweep, and
+    // right-click remap (no occluding remap button).
+    expect(quickbar).toContain('slotEntries()');
     expect(quickbar).toContain('@media (width <= 1100px)');
     expect(quickbar).toContain('height: 40px;');
     expect(quickbar).toContain('quickbar__slot--empty');
-    expect(quickbar).toContain('flex: 0 0 40px;');
+    expect(quickbar).toContain('quickbar__sweep');
+    expect(quickbar).toContain('@contextmenu.prevent="$emit(\'request-remap\'');
     expect(quickbar).toContain('flex-basis: 36px;');
     expect(quickbar).toContain('clip: rect(0 0 0 0);');
   });
