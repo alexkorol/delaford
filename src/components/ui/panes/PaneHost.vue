@@ -19,6 +19,8 @@
           :title="leftPaneTitle"
           :aria-label="`${leftPaneTitle} panel`"
           :compressed="layoutMode !== 'desktop'"
+          :dismissible="true"
+          @dismiss="$emit('overlay-close', leftPane)"
         >
           <component
             :is="leftPaneComponent"
@@ -46,6 +48,8 @@
           :title="rightPaneTitle"
           :aria-label="`${rightPaneTitle} panel`"
           :compressed="layoutMode !== 'desktop'"
+          :dismissible="true"
+          @dismiss="$emit('overlay-close', rightPane)"
         >
           <component
             :is="rightPaneComponent"

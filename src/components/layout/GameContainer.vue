@@ -13,7 +13,7 @@
       :left-pane="defaultLeftPane"
       :right-pane="defaultRightPane"
       :overlay-pane="activeOverlayDescriptor"
-      @overlay-close="$emit('overlay-close')"
+      @overlay-close="$emit('overlay-close', $event)"
     >
       <div class="game-container__center">
         <div
