@@ -1,6 +1,7 @@
 import actionEvents from './handlers/actions/index.js';
 import socketEvents from './handlers/socket-events/index.js';
 import partyEvents from './handlers/party.js';
+import devEvents from './handlers/dev.js';
 
 /**
  * A global event handler (RPC)
@@ -16,6 +17,8 @@ const Handler = {
   ...actionEvents,
   // Party lifecycle and instancing events
   ...partyEvents,
+  // Wiz/dev playtest commands (no-ops in production)
+  ...devEvents,
 };
 
 export default Handler;

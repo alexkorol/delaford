@@ -1,0 +1,311 @@
+/**
+ * Headless player harness — plays Verdigris over the real WebSocket protocol,
+ * exactly like the browser client, so playtests exercise the full live server
+ * (dispatch, handlers, world state, the 10Hz game loop) without a browser.
+ *
+ * Designed for LLM coding agents: high-level verbs, one authoritative
+ * state() snapshot, and waitFor() for anything asynchronous.
+ *
+ *   const p = await HeadlessPlayer.connect();
+ *   await p.enterZone('crypt', 'gauntlet');
+ *   const s = await p.state();               // position, hp, monsters, items…
+ *   await p.attack(s.monsters[0]);
+ *   await p.waitFor(async () => (await p.state()).monsters.length < s.monsters.length);
+ *   p.close();
+ *
+ * NOTE the boundary: this drives the SERVER truth through the real protocol.
+ * Client-side rendering/binding bugs (Vue templates, canvas, focus) still
+ * need a browser pass — see playtest/README.md.
+ */
+
+import WebSocket from 'ws';
+
+const DEFAULT_URL = process.env.PLAYTEST_WS_URL || 'ws://localhost:6500';
+const DEFAULT_TIMEOUT_MS = 8000;
+
+const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
+
+export class HeadlessPlayer {
+  constructor(ws) {
+    this.ws = ws;
+    this.player = null; // login block player
+    this.scene = null; // latest scene payload (login or transition)
+    this.messages = []; // game:send:message texts
+    this.hits = []; // combat:hit payloads
+    this.inventory = [];
+    this.stats = null; // latest player:stats:update for us
+    this.lastMovement = null;
+    this.events = []; // raw event log (ring buffer)
+    this.pendingState = new Map(); // requestId -> resolver
+    this.stateCounter = 0;
+
+    ws.on('message', (raw) => this.handleMessage(raw));
+  }
+
+  static async connect({ url = DEFAULT_URL, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const ws = new WebSocket(url);
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`WS connect timeout: ${url}`)), timeoutMs);
+      ws.once('open', () => { clearTimeout(timer); resolve(); });
+      ws.once('error', (error) => { clearTimeout(timer); reject(error); });
+    });
+
+    const player = new HeadlessPlayer(ws);
+    player.emit('player:login', { useGuestAccount: true });
+    await player.waitFor(() => player.player !== null, { label: 'login', timeoutMs });
+    return player;
+  }
+
+  handleMessage(raw) {
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch (error) {
+      return;
+    }
+
+    const { event, data } = message;
+    this.events.push({ event, at: Date.now() });
+    if (this.events.length > 500) {
+      this.events.splice(0, this.events.length - 500);
+    }
+
+    switch (event) {
+      case 'player:login':
+        this.player = data.player;
+        this.scene = data.scene || null;
+        this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
+        break;
+      case 'world:scene:transition':
+      case 'party:scene:transition':
+        this.sceneTransitions = (this.sceneTransitions || 0) + 1;
+        this.scene = data.scene || this.scene;
+        if (data.playerState && this.player) {
+          this.player.x = data.playerState.x;
+          this.player.y = data.playerState.y;
+          this.player.sceneId = data.playerState.sceneId;
+        }
+        break;
+      case 'player:movement':
+        if (this.player && data && data.uuid === this.player.uuid) {
+          this.player.x = data.x;
+          this.player.y = data.y;
+          this.lastMovement = message.meta ? message.meta.movementStep : data.movementStep;
+        }
+        break;
+      case 'player:stats:update':
+        if (this.player && data && data.playerId === this.player.uuid) {
+          this.stats = data;
+        }
+        break;
+      case 'game:send:message':
+        this.messages.push(typeof data === 'string' ? data : (data.text || ''));
+        break;
+      case 'combat:hit':
+        this.hits.push(data);
+        break;
+      case 'core:refresh:inventory':
+        this.inventory = data.data || data || [];
+        break;
+      case 'dev:state': {
+        const resolver = this.pendingState.get(data.requestId);
+        if (resolver) {
+          this.pendingState.delete(data.requestId);
+          resolver(data.state);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  emit(event, data) {
+    this.ws.send(JSON.stringify({ event, data }));
+  }
+
+  /** Authoritative server-side snapshot: position, hp, monsters, items, tree… */
+  state({ timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    this.stateCounter += 1;
+    const requestId = `state-${this.stateCounter}`;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingState.delete(requestId);
+        reject(new Error('dev:state timed out — is the server running with NODE_ENV!==production?'));
+      }, timeoutMs);
+      this.pendingState.set(requestId, (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      });
+      this.emit('dev:state', { requestId });
+    });
+  }
+
+  /** Wait until predicate() (sync or async) is truthy. */
+  async waitFor(predicate, { timeoutMs = DEFAULT_TIMEOUT_MS, intervalMs = 150, label = 'condition' } = {}) {
+    const deadline = Date.now() + timeoutMs;
+     
+    while (Date.now() < deadline) {
+      const result = await predicate();
+      if (result) {
+        return result;
+      }
+      await sleep(intervalMs);
+    }
+     
+    throw new Error(`Timed out waiting for ${label} (${timeoutMs}ms)`);
+  }
+
+  // ── Player verbs ──────────────────────────────────────────────────────
+
+  /** Take one movement step ('up'/'down'/'left'/'right'/diagonals). */
+  step(direction) {
+    this.emit('player:move', { id: this.player.uuid, direction });
+  }
+
+  /** Walk N steps in a direction, pacing like a held key. */
+  async move(direction, steps = 1, { stepMs = 180 } = {}) {
+     
+    for (let i = 0; i < steps; i += 1) {
+      this.step(direction);
+      await sleep(stepMs);
+    }
+     
+  }
+
+  /** Fire a skill ('primary-attack', 'dash', 'ability-1'…). */
+  useSkill(skillId, direction = 'down') {
+    this.emit('player:skill:trigger', {
+      id: this.player.uuid,
+      skillId,
+      direction,
+      issuedAt: Date.now(),
+      modifiers: {},
+      phase: 'start',
+    });
+  }
+
+  /** Attack toward a target's tile (steps into melee arc direction). */
+  async attack(target) {
+    const s = await this.state();
+    const dx = Math.sign((target.x || 0) - s.x);
+    const dy = Math.sign((target.y || 0) - s.y);
+    const direction = dy < 0 ? (dx < 0 ? 'up-left' : dx > 0 ? 'up-right' : 'up')
+      : dy > 0 ? (dx < 0 ? 'down-left' : dx > 0 ? 'down-right' : 'down')
+        : (dx < 0 ? 'left' : 'right');
+    this.useSkill('primary-attack', direction);
+    return direction;
+  }
+
+  /** Enter a solo Adventure zone (template + optional layout). */
+  async enterZone(template, layout = null, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    // Instance -> instance keeps the same scene id (same party), so wait on
+    // the transition event, not on the id changing.
+    const transitionsBefore = this.sceneTransitions || 0;
+    this.emit('instance:enterSolo', { template, layout });
+    await this.waitFor(() => (this.sceneTransitions || 0) > transitionsBefore, {
+      timeoutMs,
+      label: `zone transition to ${template}`,
+    });
+    return this.scene;
+  }
+
+  /**
+   * Right-click a world tile: asks the server to build the real context menu
+   * and resolves with its entries (label + everything needed to choose one).
+   */
+  async rightClick(worldX, worldY, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const menuPromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('context menu build timed out')), timeoutMs);
+      const onMessage = (raw) => {
+        try {
+          const message = JSON.parse(raw.toString());
+          if (message.event === 'game:context-menu:items') {
+            clearTimeout(timer);
+            this.ws.off('message', onMessage);
+            resolve(message.data.data || []);
+          }
+        } catch (error) { /* ignore */ }
+      };
+      this.ws.on('message', onMessage);
+    });
+
+    // Server derives world coordinates from tile.world when provided.
+    this.emit('player:context-menu:build', {
+      miscData: { clickedOn: { 0: 'main-canvas', 1: 'gameMap' } },
+      tile: {
+        x: 0, y: 0, world: { x: worldX, y: worldY },
+      },
+      player: { socket_id: this.player.socket_id },
+    });
+
+    return menuPromise;
+  }
+
+  /** Choose a context-menu entry (as returned by rightClick). */
+  choose(menuItem, tile = {}) {
+    this.emit('player:context-menu:action', {
+      data: {
+        item: menuItem,
+        tile,
+      },
+      queueItem: {
+        item: { uuid: menuItem.uuid, id: menuItem.id },
+        tile,
+        action: menuItem.action,
+        at: menuItem.at || false,
+        coordinates: menuItem.coordinates || false,
+        queueable: menuItem.action && menuItem.action.queueable,
+        world: tile.world,
+      },
+      player: { socket_id: this.player.socket_id },
+    });
+  }
+
+  /** Right-click a ground item and Take it, waiting until it leaves the floor. */
+  async takeItem(groundItem, { timeoutMs = 15000 } = {}) {
+    const menu = await this.rightClick(groundItem.x, groundItem.y);
+    const plain = entry => String(entry.label || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
+    const take = menu.find(entry => plain(entry).startsWith('take')
+      || (entry.action && String(entry.action.name || '').toLowerCase() === 'take'));
+    if (!take) {
+      throw new Error(`No Take entry at ${groundItem.x},${groundItem.y}: ${menu.map(m => m.label).join(' | ')}`);
+    }
+    this.choose(take, { x: 0, y: 0, world: { x: groundItem.x, y: groundItem.y } });
+    await this.waitFor(async () => {
+      const s = await this.state();
+      return !s.groundItems.some(item => item.uuid === groundItem.uuid);
+    }, { timeoutMs, label: `pickup of ${groundItem.id}` });
+  }
+
+  /** Persist a skill-tree snapshot (as the pane does). */
+  saveSkillTree(snapshot) {
+    this.emit('player:skilltree:save', { snapshot });
+  }
+
+  // ── Wiz/dev commands ─────────────────────────────────────────────────
+
+  devTeleport(x, y) {
+    this.emit('dev:teleport', { x, y });
+  }
+
+  devGive(itemId, qty = 1) {
+    this.emit('dev:give', { itemId, qty });
+  }
+
+  devSetLevel(level) {
+    this.emit('dev:setlevel', { level });
+  }
+
+  devHeal() {
+    this.emit('dev:heal', {});
+  }
+
+  close() {
+    try {
+      this.ws.close();
+    } catch (error) { /* ignore */ }
+  }
+}
+
+export default HeadlessPlayer;
