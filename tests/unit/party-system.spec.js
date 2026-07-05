@@ -101,6 +101,7 @@ vi.mock('#shared/stats/index.js', () => ({
 const { PartyService } = await import('#server/player/handlers/party.js').then(mod => ({
   PartyService: mod.partyService.constructor,
 }));
+const { default: world } = await import('#server/core/world.js');
 
 const makePlayer = (overrides = {}) => ({
   uuid: `player-${Math.random().toString(36).slice(2, 8)}`,
@@ -122,6 +123,11 @@ describe('PartyService', () => {
     service = new PartyService();
     leader = makePlayer({ username: 'Leader' });
     member = makePlayer({ username: 'Member' });
+    // forEachMember resolves members through world.players, so the test
+    // players must actually live in the world for member-level effects
+    // (teleports, path cancellation) to be observable.
+    world.players.length = 0;
+    world.players.push(leader, member);
   });
 
   it('creates a party with leader as first member', () => {
@@ -247,6 +253,81 @@ describe('PartyService', () => {
     await service.startSoloInstance(leader, { template: 'not-a-zone' });
     const party = service.getPartyForPlayer(leader.uuid);
     expect(party.metadata.template).toBe('dungeon');
+  });
+
+  it('startSoloInstance threads the zone layout through to the generator', async () => {
+    const { default: GameMap } = await import('#server/core/map.js');
+    await service.startSoloInstance(leader, { template: 'crypt', layout: 'gauntlet' });
+
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(party.metadata.layout).toBe('gauntlet');
+    expect(GameMap.generateInstance).toHaveBeenLastCalledWith(
+      expect.objectContaining({ template: 'crypt', layout: 'gauntlet', depth: 1 }),
+    );
+  });
+
+  it('startSoloInstance nulls an unknown layout so the generator picks the theme default', async () => {
+    const { default: GameMap } = await import('#server/core/map.js');
+    await service.startSoloInstance(leader, { template: 'crypt', layout: 'spiral-of-doom' });
+
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(party.metadata.layout).toBeNull();
+    expect(GameMap.generateInstance).toHaveBeenLastCalledWith(
+      expect.objectContaining({ template: 'crypt', layout: null }),
+    );
+  });
+
+  // Found in live play: entering an instance while click-walking left the
+  // stale surface path running; one leftover step carried the player from the
+  // spawn tile onto the adjacent entry stairs and instantly bounced the party
+  // back to town ("The party returns to the surface." right after entering).
+  it('cancels any in-flight walk when teleporting members into an instance', async () => {
+    leader.x = 40;
+    leader.y = 90;
+    leader.cancelPathfinding = vi.fn();
+
+    await service.startSoloInstance(leader, { template: 'crypt' });
+
+    expect(leader.cancelPathfinding).toHaveBeenCalled();
+    expect(leader.x).toBe(5); // mock generator's spawn point
+    expect(leader.y).toBe(5);
+  });
+
+  // Found in live play: returnToTown kept the dungeon coordinates, so leaving
+  // an instance materialised the player at those raw x/y on the surface map —
+  // in the middle of Fenmire Causeway, next to its boss.
+  it('returns members to where they entered the instance from', async () => {
+    leader.x = 40;
+    leader.y = 90;
+    leader.cancelPathfinding = vi.fn();
+
+    await service.startSoloInstance(leader, { template: 'crypt' });
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90 });
+
+    // Descending to another floor must not overwrite the surface entry point.
+    await service.enterFloor(party, 2);
+    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90 });
+
+    service.returnToTown(party);
+
+    expect(leader.sceneId).toBe('town-1');
+    expect(leader.x).toBe(40);
+    expect(leader.y).toBe(90);
+    expect(leader.preInstancePosition).toBeNull();
+    expect(leader.cancelPathfinding).toHaveBeenCalled();
+  });
+
+  it('falls back to the town spawn when no entry position was recorded', async () => {
+    await service.startSoloInstance(leader, { template: 'dungeon' });
+    const party = service.getPartyForPlayer(leader.uuid);
+    leader.preInstancePosition = null; // e.g. joined the party mid-instance
+
+    service.returnToTown(party);
+
+    expect(leader.sceneId).toBe('town-1');
+    expect(leader.x).toBe(38);
+    expect(leader.y).toBe(115);
   });
 
   it('startSoloInstance refuses when the player is in a multi-member party', async () => {

@@ -8,6 +8,10 @@ import { notifyTutorial } from '#server/core/tutorial.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
+// Where a player lands when leaving an instance with no recorded entry point
+// (e.g. they joined the party mid-instance). Matches the town login spawn.
+const TOWN_FALLBACK_SPAWN = { x: 38, y: 115 };
+
 // PoE-style zone menu: a zone pairs an art theme (template) with a layout shape
 // (warren = tight dungeon, clearings = open field, gauntlet = linear push). The
 // same art can appear under different layouts — Weir Crypt is a tight warren,
@@ -252,6 +256,9 @@ class PartyService {
     return {
       id: scene.id,
       type: scene.type,
+      // Display name for the client HUD (minimap label). Without it the
+      // client keeps the previous surface label while inside an instance.
+      name: scene.name || '',
       map: scene.map,
       npcs: scene.npcs,
       monsters: Array.isArray(scene.monsters)
@@ -334,11 +341,26 @@ class PartyService {
         : { x: player.x, y: player.y };
       spawnIndex += 1;
 
+      // Remember where the player entered from (first entry only, not floor
+      // descents) so returning to town can put them back there instead of
+      // stranding them at raw dungeon coordinates on the surface map.
+      const fromScene = world.getScene(player.sceneId);
+      if (!fromScene || fromScene.type !== 'instance') {
+        player.preInstancePosition = { x: player.x, y: player.y };
+      }
+
       if (spawn && typeof spawn.x === 'number' && typeof spawn.y === 'number') {
         player.x = spawn.x;
         player.y = spawn.y;
       }
       world.assignPlayerToScene(player, scene.id);
+      // Kill any in-flight click-to-walk path: spawn tiles sit right next to
+      // the entry stairs, so one leftover step from the surface walk would
+      // carry the player onto them and instantly bounce the party back to
+      // town (observed in live play).
+      if (typeof player.cancelPathfinding === 'function') {
+        player.cancelPathfinding();
+      }
       if (player.path) {
         player.path.grid = null;
       }
@@ -358,8 +380,19 @@ class PartyService {
       depth,
     });
 
+    // Name the instance after its Adventure-menu zone (template+layout pair)
+    // so the HUD shows "Sunken Colonnade · Floor 2" instead of a stale
+    // surface location.
+    const zone = ADVENTURE_ZONES.find(entry => entry.template === party.metadata.template
+        && (entry.layout || null) === (party.metadata.layout || null))
+      || ADVENTURE_ZONES.find(entry => entry.template === party.metadata.template);
+    const zoneName = (zone && zone.name)
+      || `${String(party.metadata.template || 'dungeon').charAt(0).toUpperCase()}${String(party.metadata.template || 'dungeon').slice(1)}`;
+    const displayName = depth > 1 ? `${zoneName} · Floor ${depth}` : zoneName;
+
     world.destroyInstance(party.id);
     const scene = world.createInstance(party.id, {
+      name: displayName,
       map: generation.map,
       npcs: generation.npcs,
       monsters: generation.monsters,
@@ -557,7 +590,23 @@ class PartyService {
     this.clearReadyState(party);
 
     this.forEachMember(party, (player) => {
+      // Put the player back where they entered the instance from; dungeon
+      // coordinates mean nothing on the surface map (they landed players in
+      // the middle of Fenmire Causeway, next to its boss).
+      const back = player.preInstancePosition;
+      if (back && Number.isFinite(back.x) && Number.isFinite(back.y)) {
+        player.x = back.x;
+        player.y = back.y;
+      } else {
+        player.x = TOWN_FALLBACK_SPAWN.x;
+        player.y = TOWN_FALLBACK_SPAWN.y;
+      }
+      player.preInstancePosition = null;
+
       world.assignPlayerToScene(player, town.id);
+      if (typeof player.cancelPathfinding === 'function') {
+        player.cancelPathfinding();
+      }
       if (player.path) {
         player.path.grid = null;
       }
