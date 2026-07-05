@@ -377,9 +377,13 @@ export default {
 .inventory-grid__cell {
   width: var(--cell-size);
   height: var(--cell-size);
+
+  /* Navy slot-well texture (WIZARD PoE-style chrome) under a darkening wash. */
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
-    rgba(4, 5, 7, 0.72);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(10, 16, 30, 0.62), rgba(6, 9, 18, 0.72)),
+    url('@/assets/inventory/slot_texture.png');
+  background-size: cover, cover, var(--cell-size) var(--cell-size);
   border: 1px solid rgba(117, 101, 78, 0.22);
   box-sizing: border-box;
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.72);
