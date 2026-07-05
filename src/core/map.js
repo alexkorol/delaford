@@ -875,8 +875,7 @@ class Map {
 
     const animator = this.ensureAnimation(this.player);
     const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
-    const sourceX = frame.column * tileSize;
-    const sourceY = frame.row * tileSize;
+    const { sourceX, sourceY } = this.clampSpriteSource(this.images.playerImage, frame, tileSize);
 
     ctx.drawImage(
       this.images.playerImage,
@@ -920,8 +919,7 @@ class Map {
 
       const animator = this.ensureAnimation(player);
       const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
-      const sourceX = frame.column * tileSize;
-      const sourceY = frame.row * tileSize;
+      const { sourceX, sourceY } = this.clampSpriteSource(this.images.playerImage, frame, tileSize);
 
       ctx.drawImage(
         this.images.playerImage,
@@ -1033,6 +1031,30 @@ class Map {
    * @param {number} lastHitAt Timestamp of the last hit (ms)
    * @param {number} timestamp Current frame timestamp (ms)
    */
+  /**
+   * Resolve a sprite frame's source rect, clamped to the sheet's bounds. A
+   * frame column/row that falls outside the image (e.g. an animation state
+   * referencing a frame the sheet does not have) would otherwise sample empty
+   * pixels and make the sprite vanish — clamp to the nearest valid frame so it
+   * always draws something visible.
+   *
+   * @param {HTMLImageElement} image The sprite sheet
+   * @param {object} frame { column, row }
+   * @param {number} tileSize Frame size in px
+   * @returns {{ sourceX: number, sourceY: number }}
+   */
+  clampSpriteSource(image, frame, tileSize) {
+    let column = Number.isFinite(frame && frame.column) ? frame.column : 0;
+    let row = Number.isFinite(frame && frame.row) ? frame.row : 0;
+    const width = image && image.width ? image.width : tileSize;
+    const height = image && image.height ? image.height : tileSize;
+    const maxColumn = Math.max(0, Math.floor(width / tileSize) - 1);
+    const maxRow = Math.max(0, Math.floor(height / tileSize) - 1);
+    column = Math.min(Math.max(0, column), maxColumn);
+    row = Math.min(Math.max(0, row), maxRow);
+    return { sourceX: column * tileSize, sourceY: row * tileSize };
+  }
+
   drawHitTint(ctx, x, y, tileSize, lastHitAt, timestamp) {
     const HIT_TINT_DURATION = 180;
     if (!lastHitAt) {

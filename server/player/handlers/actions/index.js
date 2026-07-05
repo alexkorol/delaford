@@ -269,6 +269,13 @@ const actionEvents = {
 
     const player = world.players[playerIndexMoveTo];
 
+    // A dead player must not queue click-to-move; otherwise the path set while
+    // awaiting respawn walks the character across the map once they revive.
+    const health = player.stats && player.stats.resources && player.stats.resources.health;
+    if (!health || health.current <= 0) {
+      return;
+    }
+
     const providedViewport = movingData.viewport || data.viewport;
     const providedCenter = movingData.center || data.center;
     const providedWorld = movingData.world || data.world;

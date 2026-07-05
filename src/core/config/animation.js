@@ -4,9 +4,13 @@ import {
   DEFAULT_ANIMATION_HOLDS,
 } from '@shared/combat.js';
 
-// The current human sprite sheet only exposes a single 32x32 frame, so every
-// facing direction must point to the same row (0). Once multi-directional
-// sprites land we can restore distinct row indexes.
+// The current human sprite sheet (human.png) is a single 32x32 frame: one
+// column, one row. Every state must therefore point at column 0 and row 0 —
+// referencing columns 1/2 (as the old run/attack/dash/hurt frames did) samples
+// outside the image and draws nothing, which made the character flicker and
+// vanish while acting. States keep their durations/holds so the combat state
+// machine still works; only the (nonexistent) frame motion is removed. When a
+// multi-frame sprite lands, restore per-state frame arrays and rows here.
 const baseRows = {
   down: 0,
   left: 0,
@@ -14,7 +18,7 @@ const baseRows = {
   up: 0,
 };
 
-const baseFrames = [0, 1, 2, 1];
+const singleFrame = [0];
 
 export const PLAYER_SPRITE_CONFIG = {
   tileSize: 32,
@@ -22,21 +26,21 @@ export const PLAYER_SPRITE_CONFIG = {
   defaultDirection: DEFAULT_FACING_DIRECTION,
   states: {
     idle: {
-      frames: [0],
+      frames: singleFrame,
       frameDuration: 480,
       rows: baseRows,
       loop: true,
       holdState: null,
     },
     run: {
-      frames: baseFrames,
+      frames: singleFrame,
       frameDuration: 110,
       rows: baseRows,
       loop: true,
       holdState: null,
     },
     attack: {
-      frames: [2, 1, 0, 1],
+      frames: singleFrame,
       frameDuration: 90,
       rows: baseRows,
       loop: false,
@@ -44,7 +48,7 @@ export const PLAYER_SPRITE_CONFIG = {
       duration: DEFAULT_ANIMATION_DURATIONS.attack,
     },
     dash: {
-      frames: [0, 2, 1, 2],
+      frames: singleFrame,
       frameDuration: 70,
       rows: baseRows,
       loop: false,
@@ -52,7 +56,7 @@ export const PLAYER_SPRITE_CONFIG = {
       duration: DEFAULT_ANIMATION_DURATIONS.dash,
     },
     hurt: {
-      frames: [2, 2, 1, 1],
+      frames: singleFrame,
       frameDuration: 120,
       rows: baseRows,
       loop: false,

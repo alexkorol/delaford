@@ -234,6 +234,24 @@ const tryRespawn = (player, options = {}) => {
 
   const result = tryStatRespawn(player.stats, options);
   syncShortcuts(player.stats, player);
+
+  // On a real respawn, drop any walking path/queue carried over from before
+  // death so the reborn character stays at its respawn point instead of
+  // striding a stale route across the map.
+  if (result && result.success) {
+    if (player.path && player.path.current) {
+      player.path.current.walking = [];
+      player.path.current.set = [];
+      player.path.current.step = 0;
+      player.path.current.length = 0;
+      player.path.current.walkable = false;
+      player.path.current.interrupted = true;
+    }
+    if (Array.isArray(player.queue)) {
+      player.queue = [];
+    }
+  }
+
   return result;
 };
 
