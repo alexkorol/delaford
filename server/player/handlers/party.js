@@ -8,6 +8,15 @@ import { notifyTutorial } from '#server/core/tutorial.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
+// PoE-style zone menu: each entry maps to an instance template/theme. A lone
+// player picks one and drops into a freshly generated instance solo.
+export const ADVENTURE_ZONES = [
+  { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
+  { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
+  { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
+];
+const ZONE_TEMPLATES = new Set(ADVENTURE_ZONES.map(zone => zone.template));
+
 const getPlayerBySocket = (socketId) => world.players.find(p => p.socket_id === socketId);
 const getPlayerByUuid = (playerUuid) => world.players.find(p => p.uuid === playerUuid);
 const getPlayerByUsername = (username) => {
@@ -400,6 +409,38 @@ class PartyService {
       this.sendError(initiator, 'Failed to prepare the instance. Please try again.');
       this.sendLoadingState(party, 'idle');
     }
+  }
+
+  /**
+   * Solo adventuring: a lone player picks a zone and drops into a freshly
+   * generated instance. Reuses all the party/instance plumbing by wrapping
+   * the player in an implicit one-member party.
+   *
+   * @param {object} player The adventuring player
+   * @param {object} options { template } chosen zone template
+   */
+  async startSoloInstance(player, options = {}) {
+    if (!player) {
+      return;
+    }
+
+    let party = this.getPartyForPlayer(player.uuid);
+    if (party && party.members.size > 1) {
+      this.sendError(player, 'Leave your party before adventuring solo.');
+      return;
+    }
+
+    if (!party) {
+      party = this.createParty(player);
+    }
+
+    if (!party) {
+      this.sendError(player, 'Could not prepare the adventure.');
+      return;
+    }
+
+    party.metadata.template = ZONE_TEMPLATES.has(options.template) ? options.template : 'dungeon';
+    await this.startInstance(party, player);
   }
 
   /**
@@ -858,6 +899,15 @@ const PartyHandlers = {
     }
 
     partyService.returnToTown(party);
+  },
+  'instance:enterSolo': async (message, ws) => {
+    const player = getPlayerBySocket(ws.id);
+    if (!player) {
+      return;
+    }
+
+    const template = message && message.data ? message.data.template : null;
+    await partyService.startSoloInstance(player, { template });
   },
 };
 

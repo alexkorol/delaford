@@ -230,4 +230,30 @@ describe('PartyService', () => {
     expect(snapshot.members[0].uuid).toBe(leader.uuid);
     expect(snapshot.state).toBe('lobby');
   });
+
+  it('startSoloInstance wraps a lone player in a party and enters an instance', async () => {
+    await service.startSoloInstance(leader, { template: 'crypt' });
+
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(party).not.toBeNull();
+    expect(party.members.size).toBe(1);
+    expect(party.metadata.template).toBe('crypt');
+    expect(party.state).toBe('instance');
+    expect(party.sceneId).toContain('instance-');
+  });
+
+  it('startSoloInstance falls back to the dungeon template for unknown zones', async () => {
+    await service.startSoloInstance(leader, { template: 'not-a-zone' });
+    const party = service.getPartyForPlayer(leader.uuid);
+    expect(party.metadata.template).toBe('dungeon');
+  });
+
+  it('startSoloInstance refuses when the player is in a multi-member party', async () => {
+    const party = service.createParty(leader);
+    service.addMember(party, member);
+
+    await service.startSoloInstance(leader, { template: 'crypt' });
+
+    expect(party.state).not.toBe('instance');
+  });
 });

@@ -45,6 +45,7 @@
       @party-invite="handlePartyInviteRequest"
       @party-accept-invite="handlePartyAcceptInvite"
       @party-decline-invite="handlePartyDeclineInvite"
+      @enter-zone="handleEnterZone"
       @toggle-chat="toggleChat"
       @toggle-chat-pin="toggleChatPin"
       @chat-hover="handleChatHover"
@@ -1327,6 +1328,10 @@ export default {
 
     handlePartyStartInstance() {
       Socket.emit('party:startInstance');
+    },
+
+    handleEnterZone(template) {
+      Socket.emit('instance:enterSolo', { template });
     },
 
     handlePartyReturnToTown() {

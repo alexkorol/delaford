@@ -61,6 +61,30 @@
                 @accept-invite="$emit('party-accept-invite', $event)"
                 @decline-invite="$emit('party-decline-invite', $event)"
               />
+              <button
+                type="button"
+                class="game-container__party-toggle"
+                @click="adventureOpen = !adventureOpen"
+              >
+                Adventure
+              </button>
+              <div
+                v-if="adventureOpen"
+                class="game-container__zone-menu"
+                aria-label="Choose a zone"
+              >
+                <p class="game-container__zone-title">Descend into…</p>
+                <button
+                  v-for="zone in adventureZones"
+                  :key="zone.id"
+                  type="button"
+                  class="game-container__zone"
+                  @click="enterZone(zone)"
+                >
+                  <span class="game-container__zone-name">{{ zone.name }}</span>
+                  <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                </button>
+              </div>
             </div>
             <div
               v-if="!uiHidden && !chatExpanded"
@@ -303,6 +327,7 @@ export default {
     'party-invite',
     'party-accept-invite',
     'party-decline-invite',
+    'enter-zone',
     'toggle-chat',
     'toggle-chat-pin',
     'chat-hover',
@@ -360,6 +385,20 @@ export default {
 
     const uiHidden = ref(false);
     const partyOpen = ref(false);
+    const adventureOpen = ref(false);
+
+    // Zone menu templates must match the server's ADVENTURE_ZONES; the server
+    // validates the template and falls back to 'dungeon' if unknown.
+    const adventureZones = [
+      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', levelHint: '1–5' },
+      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', levelHint: '4–9' },
+      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', levelHint: '8–14' },
+    ];
+
+    const enterZone = (zone) => {
+      adventureOpen.value = false;
+      emit('enter-zone', zone.template);
+    };
 
     const activeChatDock = () => (props.chatExpanded ? chatOverlayRef.value : chatPeekRef.value);
 
@@ -619,6 +658,9 @@ export default {
       triggerSkill,
       uiHidden,
       partyOpen,
+      adventureOpen,
+      adventureZones,
+      enterZone,
       beginChatDrag,
       resetChatDock,
       cycleChatDock,
@@ -793,6 +835,54 @@ export default {
 
 .game-container__party-overlay :deep(.party-panel) {
   width: 100%;
+}
+
+.game-container__zone-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(180, 145, 86, 0.4);
+  background: rgba(10, 12, 20, 0.94);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+}
+
+.game-container__zone-title {
+  margin: 0 0 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(231, 218, 190, 0.7);
+}
+
+.game-container__zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(180, 145, 86, 0.28);
+  background: linear-gradient(180deg, rgba(58, 30, 26, 0.85), rgba(24, 14, 12, 0.9));
+  color: #f2d391;
+  font-family: 'GameFont', sans-serif;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-accent-strong, #e0b45c);
+    background: linear-gradient(180deg, rgba(78, 40, 34, 0.9), rgba(34, 20, 16, 0.95));
+  }
+}
+
+.game-container__zone-name {
+  font-size: 0.82rem;
+}
+
+.game-container__zone-level {
+  font-size: 0.66rem;
+  color: rgba(148, 180, 214, 0.86);
 }
 
 .game-container__chat-peek {
