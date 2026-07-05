@@ -52,27 +52,6 @@
       </div>
     </div>
 
-    <div
-      class="class_picker"
-      role="radiogroup"
-      aria-label="Class archetype"
-    >
-      <button
-        v-for="archetype in archetypes"
-        :key="archetype.id"
-        v-tippy
-        :title="archetype.description"
-        type="button"
-        class="class_option"
-        :class="{ selected: selectedArchetype === archetype.id }"
-        role="radio"
-        :aria-checked="selectedArchetype === archetype.id"
-        @click="selectedArchetype = archetype.id"
-      >
-        {{ archetype.name }}
-      </button>
-    </div>
-
     <div class="action_buttons">
       <button
         class="button login"
@@ -116,7 +95,6 @@ import {
   watch,
 } from 'vue';
 
-import { CHARACTER_ARCHETYPES, DEFAULT_ARCHETYPE_ID } from '@shared/archetypes.js';
 import { useUiStore } from '@/stores/ui.js';
 
 import bus from '../../core/utilities/bus.js';
@@ -124,8 +102,6 @@ import Socket from '../../core/utilities/socket.js';
 
 const uiStore = useUiStore();
 
-const archetypes = CHARACTER_ARCHETYPES;
-const selectedArchetype = ref(DEFAULT_ARCHETYPE_ID);
 const invalid = ref(false);
 const username = ref('');
 const password = ref('');
@@ -191,7 +167,6 @@ const login = () => {
     username: username.value,
     password: password.value,
     useGuestAccount: guestAccount.value,
-    archetype: selectedArchetype.value,
   };
 
   uiStore.rememberDevAccount({
@@ -369,41 +344,6 @@ div.form {
 
   .guest_account {
     margin-top: 1em;
-  }
-
-  .class_picker {
-    display: flex;
-    gap: var(--space-sm);
-    margin-top: 1em;
-
-    .class_option {
-      flex: 1;
-      font-family: "ChatFont", sans-serif;
-      font-size: 1rem;
-      color: #e6d8ba;
-      text-shadow: 1px 1px 0 #000;
-      background: rgba(30, 25, 19, 0.9);
-      border: 1px solid rgba(190, 160, 110, 0.5);
-      padding: 0.35em 0.5em;
-      cursor: pointer;
-
-      &:hover {
-        border-color: var(--color-accent-strong);
-        background: rgba(212, 173, 90, 0.12);
-      }
-
-      &.selected {
-        color: #f2d88f;
-        border-color: var(--color-accent-strong);
-        background: rgba(212, 173, 90, 0.18);
-        box-shadow: inset 0 0 8px rgba(212, 173, 90, 0.25);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--color-accent-strong);
-        outline-offset: 2px;
-      }
-    }
   }
 
   .sr-only {

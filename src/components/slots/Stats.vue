@@ -12,7 +12,7 @@
         />
       </div>
       <div class="character-hero__identity">
-        <span class="eyebrow">{{ archetypeLabel }}</span>
+        <span class="eyebrow">Character</span>
         <strong>{{ characterSheet.identity.name }}</strong>
         <span class="character-hero__state">XL {{ characterSheet.identity.level }} / {{ lifecycleState }}</span>
       </div>
@@ -170,7 +170,6 @@
 <script>
 import { mapStores } from 'pinia';
 import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats/index.js';
-import { getArchetype } from '@shared/archetypes.js';
 import {
   computeFlowerAttributeBonuses,
   FLOWER_OF_LIFE_DEFAULT_PROGRESS,
@@ -208,10 +207,6 @@ export default {
     ...mapStores(useUiStore),
     player() {
       return this.game && this.game.player ? this.game.player : {};
-    },
-    archetypeLabel() {
-      const archetype = getArchetype(this.player.archetype);
-      return archetype ? archetype.name : 'Character';
     },
     flowerProgress() {
       return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;

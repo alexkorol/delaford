@@ -7,7 +7,6 @@ import Combat from '#server/core/combat/index.js';
 import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import config from '#server/config.js';
-import { isValidArchetypeId } from '#shared/archetypes.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import world from '#server/core/world.js';
@@ -60,14 +59,13 @@ export default {
    */
   'player:login': async (data, ws) => {
     const payload = data.data || {};
-    const archetype = isValidArchetypeId(payload.archetype) ? payload.archetype : undefined;
 
     try {
       if (!payload.useGuestAccount) {
         const { player, token } = await Authentication.login({ ...data, data: payload });
-        Authentication.addPlayer(new Player({ archetype, ...player }, token, ws.id));
+        Authentication.addPlayer(new Player(player, token, ws.id));
       } else {
-        Authentication.addPlayer(new Player({ ...playerGuest, archetype }, 'none', ws.id));
+        Authentication.addPlayer(new Player(playerGuest, 'none', ws.id));
       }
       ws.authenticated = true;
     } catch (error) {

@@ -1,6 +1,5 @@
 import PF from 'pathfinding';
 import UI from '#shared/ui.js';
-import { getArchetype } from '#shared/archetypes.js';
 import config from '#server/config.js';
 import * as emoji from 'node-emoji';
 import playerPersistenceService from '#server/core/services/player-persistence.js';
@@ -31,15 +30,7 @@ class Player {
     this.level = data.level;
     this.skills = data.skills;
 
-    // Chronicles class archetype. Seeds base attributes only for fresh
-    // characters that chose a class and have no stored attribute block.
-    const archetype = getArchetype(data.archetype);
-    this.archetype = archetype ? archetype.id : null;
-    const statsData = archetype && !data.baseAttributes && !(data.attributes && data.attributes.base)
-      ? { ...data, baseAttributes: { ...archetype.attributes } }
-      : data;
-
-    this.buildInitialStats(statsData);
+    this.buildInitialStats(data);
 
     // A player's bank
     this.bank = data.bank;

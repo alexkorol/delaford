@@ -15,13 +15,15 @@ Chronicles account creator):
   Trophies ✧ / Scars ✕, patience crafting, material firing, attunement and
   awakening. Dropped gear now carries a vessel block (ilvl scales with the
   slain monster) surfaced in inventory tooltips.
-- **Character identity** — Chronicles class archetypes (plain
-  Warrior/Rogue/Mage) selectable at login; they tilt base attributes
-  (13/10/7 spread) and map to Vesselforge kinships for future bond
-  estrangement. `server/shared/archetypes.js`.
+- **Character identity** — no classes. Every character is a blank with
+  10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
+  picker was reverted; the intended identity layer is Chronicles
+  **Houses & Scions** (account = House meta, characters = permadeath scions),
+  tracked in `docs/fix-plan-2026-07-04.md` Phase 6.
 
-Still open: server-authoritative tree allocation tied to XP/quests, vessel
-crafting UI (sear/fire/trophies), permadeath loop, houses/legacy meta.
+Still open (see `docs/fix-plan-2026-07-04.md`): combat feel, PoE-style
+quickbar, inventory UI port (drag-to-equip, textured grid), skill-tree point
+scaling by level, Houses/Scions creation flow, discoverable zones/instances.
 
 ## Pillars
 
