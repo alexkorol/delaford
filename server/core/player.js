@@ -67,6 +67,10 @@ class Player {
     this.friend_list = data.friend_list;
     this.wear = Player.constructWear(data.wear);
 
+    // Skill-tree allocations (restored to the client when the pane opens;
+    // persisted via player:skilltree:save).
+    this.passiveTree = data.passiveTree || null;
+
     this.refreshDerivedStats();
 
     // Pathfinding

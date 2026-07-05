@@ -226,6 +226,7 @@ import {
   VERDIGRIS_SKILL_TREE_SOURCES,
   VERDIGRIS_SKILL_TREE_TOTALS,
 } from '@/core/passives/verdigris-skill-tree.js';
+import Socket from '@/core/utilities/socket.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SEARCH_DIM_OPACITY = '0.18';
@@ -233,7 +234,11 @@ const SEARCH_DIM_OPACITY = '0.18';
 // 1 point per level after the first, capped at the lifetime maximum. Quest
 // points (currently 0) will add on top of this later.
 const earnedPointsForLevel = (level) => {
-  const fromLevels = Math.max(0, Math.floor((Number(level) || 1) - 1));
+  // An allocation costs 2 points (node + its path), so grant at least 2 — a
+  // fresh character must be able to make their first pick immediately, not
+  // stare at a dead pane. From level 2 on it's one point per level, meeting
+  // the 100-point level budget exactly at the cap.
+  const fromLevels = Math.max(2, Math.floor(Number(level) || 1));
   return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, Math.min(fromLevels, VERDIGRIS_SKILL_TREE_SOURCES.levels));
 };
 
@@ -644,6 +649,30 @@ export default {
     this.skillTree = new VerdigrisGeometricTree({
       availablePoints: earnedPointsForLevel(this.game?.player?.level),
     });
+
+    // Restore saved allocations — a fresh tree on every open threw away the
+    // player's build the moment the pane closed.
+    const saved = this.game?.player?.passiveTree;
+    const savedConduits = saved && Array.isArray(saved.conduits) ? saved.conduits : [];
+    const hasRealAllocations = saved
+      && Array.isArray(saved.nodes)
+      && (saved.nodes.some(id => id !== '0,0') || savedConduits.length > 0);
+    if (hasRealAllocations) {
+      this.skillTree.restore({
+        nodes: saved.nodes,
+        conduits: savedConduits,
+        points: saved.points && typeof saved.points === 'object' ? saved.points : { skill: 0 },
+        log: Array.isArray(saved.log) ? saved.log : [],
+        selectedNodeId: saved.selectedNodeId,
+      });
+      // Reconcile points earned since the save: spent stays spent, newly
+      // earned points become available. earned may legitimately be 0.
+      if (Number.isFinite(saved.earned)) {
+        this.skillTree.initialPoints = Math.max(0, saved.earned);
+      }
+      this.skillTree.setAvailablePoints(earnedPointsForLevel(this.game?.player?.level));
+    }
+
     this.treeState = this.skillTree.toState();
 
     this.renderer = new SVGRenderer(this.skillTree, {
@@ -664,6 +693,7 @@ export default {
     });
   },
   beforeUnmount() {
+    this.persistTree();
     if (this.viewController) this.viewController.destroy();
   },
   watch: {
@@ -678,6 +708,21 @@ export default {
       if (!this.skillTree) return;
       this.treeState = this.skillTree.toState();
       if (this.renderer) this.renderer.update();
+      this.persistTree();
+    },
+    persistTree() {
+      if (!this.skillTree) return;
+      const snapshot = this.skillTree.snapshot();
+      delete snapshot.log; // build log is cosmetic; don't persist it
+      snapshot.earned = this.skillTree.initialPoints;
+      // Mirror onto the shared player object so an immediate close/reopen
+      // restores even before the server acknowledges. `game` is the live
+      // client-state singleton, not parent-owned display data.
+      if (this.game && this.game.player) {
+        // eslint-disable-next-line vue/no-mutating-props
+        this.game.player.passiveTree = snapshot;
+      }
+      Socket.emit('player:skilltree:save', { snapshot });
     },
     onSearchInput() {
       if (!this.skillTree) return;

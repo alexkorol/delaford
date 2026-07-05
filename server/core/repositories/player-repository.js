@@ -75,6 +75,7 @@ export class PlayerRepository {
       wearData: this.buildWearSnapshot(player),
       skillsData: cloneValue(player.skills || {}),
       bankData: cloneValue(player.bank || []),
+      passiveTreeData: cloneValue(player.passiveTree || null),
     };
   }
 

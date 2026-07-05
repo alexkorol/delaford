@@ -9,7 +9,40 @@ import Socket from '#server/socket.js';
 import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
+import playerPersistence from '#server/core/services/player-persistence.js';
 import world from '#server/core/world.js';
+
+// Guest accounts have no backing API, so their skill-tree allocations live in
+// process memory keyed by uuid — surviving relogs within a server run.
+const guestPassiveTrees = new Map();
+
+// Whitelist and bound the client-sent skill tree snapshot; never trust shapes
+// straight off the wire.
+const sanitisePassiveTree = (snapshot) => {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return null;
+  }
+  if (!Array.isArray(snapshot.nodes) || !Array.isArray(snapshot.conduits)) {
+    return null;
+  }
+  if (snapshot.nodes.length > 512 || snapshot.conduits.length > 1024) {
+    return null;
+  }
+
+  return {
+    nodes: snapshot.nodes.filter(id => typeof id === 'string').slice(0, 512),
+    conduits: snapshot.conduits
+      .filter(entry => entry && typeof entry.id === 'string')
+      .map(entry => ({
+        id: entry.id,
+        variant: typeof entry.variant === 'string' ? entry.variant : null,
+      }))
+      .slice(0, 1024),
+    points: { skill: Math.max(0, Math.floor(Number(snapshot.points && snapshot.points.skill) || 0)) },
+    earned: Math.max(0, Math.floor(Number(snapshot.earned) || 0)),
+    selectedNodeId: typeof snapshot.selectedNodeId === 'string' ? snapshot.selectedNodeId : '0,0',
+  };
+};
 
 const getPlayerBySocket = (ws) => {
   if (!ws || !ws.id) {
@@ -65,7 +98,13 @@ export default {
         const { player, token } = await Authentication.login({ ...data, data: payload });
         Authentication.addPlayer(new Player(player, token, ws.id));
       } else {
-        Authentication.addPlayer(new Player(playerGuest, 'none', ws.id));
+        const guest = new Player(playerGuest, 'none', ws.id);
+        // Rehydrate the guest's skill tree from the in-process store so
+        // allocations survive a relog during a dev session.
+        if (guestPassiveTrees.has(guest.uuid)) {
+          guest.passiveTree = guestPassiveTrees.get(guest.uuid);
+        }
+        Authentication.addPlayer(guest);
       }
       ws.authenticated = true;
     } catch (error) {
@@ -85,6 +124,33 @@ export default {
    */
   'player:logout': async (data, ws, context) => {
     context.constructor.close(ws, true);
+  },
+
+  /**
+   * A player saves their skill-tree allocations. Stored on the live Player
+   * (so reopening the pane restores it), cached for guest relogs, and pushed
+   * to the account API for real accounts.
+   */
+  'player:skilltree:save': ({ data }, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!player) {
+      return;
+    }
+
+    const sanitised = sanitisePassiveTree(data && data.snapshot);
+    if (!sanitised) {
+      return;
+    }
+
+    player.passiveTree = sanitised;
+    guestPassiveTrees.set(player.uuid, sanitised);
+    playerPersistence.markDirty(player);
+
+    // Guests have no backing API — skip the network save (it would only log
+    // errors); the in-memory copies above already cover them.
+    if (player.token && player.token !== 'none') {
+      playerPersistence.savePlayer(player).catch(() => {});
+    }
   },
 
   /**
