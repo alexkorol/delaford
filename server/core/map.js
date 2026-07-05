@@ -11,7 +11,7 @@ import { Shop } from './functions/index.js';
 import world from './world.js';
 import createWorldLayout from './world-layout.js';
 
-const DEFAULT_INSTANCE_ROOM_COUNT = 6;
+const DEFAULT_INSTANCE_ROOM_COUNT = 8;
 const DEFAULT_CORRIDOR_WIDTH = 3;
 
 // Visual themes for generated instances, built on the DCSS (RLTiles) dungeon
@@ -326,13 +326,19 @@ class Map {
         return;
       }
       const pieces = 1 + Math.floor(rng() * 2);
+      // Keep a clear zone around the room centre: monsters spawn there (ring
+      // offsets up to 2 tiles) and the stairs sit on the centre, so blocking
+      // decor there would trap spawns and break floor connectivity.
+      const centreX = Math.floor(room.x + (room.width / 2));
+      const centreY = Math.floor(room.y + (room.height / 2));
       for (let i = 0; i < pieces; i += 1) {
         const pool = pools[Math.floor(rng() * pools.length)];
         const x = room.x + 1 + Math.floor(rng() * Math.max(1, room.width - 2));
         const y = room.y + 1 + Math.floor(rng() * Math.max(1, room.height - 2));
         const onSpawn = roomIndex === 0
           && Math.abs(x - entry.x) <= 2 && Math.abs(y - entry.y) <= 2;
-        if (isFloor(x, y) && !foreground[idx(x, y)] && !onSpawn) {
+        const onCentre = Math.abs(x - centreX) <= 2 && Math.abs(y - centreY) <= 2;
+        if (isFloor(x, y) && !foreground[idx(x, y)] && !onSpawn && !onCentre) {
           foreground[idx(x, y)] = pool[Math.floor(rng() * pool.length)];
         }
       }
@@ -399,17 +405,25 @@ class Map {
     const roomRects = [];
 
     for (let index = 0; index < rooms; index += 1) {
-      const roomWidth = Math.max(6, Math.floor(rng() * 12) + 6);
-      const roomHeight = Math.max(6, Math.floor(rng() * 12) + 6);
-      const marginX = Math.max(2, Math.floor(width * 0.05));
-      const marginY = Math.max(2, Math.floor(height * 0.05));
+      // Tighter rooms (less empty floor per room).
+      const roomWidth = Math.max(6, Math.floor(rng() * 6) + 7);
+      const roomHeight = Math.max(6, Math.floor(rng() * 6) + 7);
+      // Keep rooms in a central band so corridors stay short and the floor
+      // reads as a dense crawl rather than a few rooms flung across a huge,
+      // mostly-empty map.
+      const bandMinX = Math.floor(width * 0.30);
+      const bandMaxX = Math.floor(width * 0.70);
+      const bandMinY = Math.floor(height * 0.30);
+      const bandMaxY = Math.floor(height * 0.70);
+      const spanX = Math.max(1, bandMaxX - bandMinX - roomWidth);
+      const spanY = Math.max(1, bandMaxY - bandMinY - roomHeight);
       const originX = Math.min(
         width - roomWidth - 1,
-        Math.max(marginX, Math.floor(rng() * (width - roomWidth - marginX))),
+        bandMinX + Math.floor(rng() * spanX),
       );
       const originY = Math.min(
         height - roomHeight - 1,
-        Math.max(marginY, Math.floor(rng() * (height - roomHeight - marginY))),
+        bandMinY + Math.floor(rng() * spanY),
       );
 
       Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng);
@@ -484,7 +498,7 @@ class Map {
     const roleCycle = ['melee', 'ranged', 'support'];
     const buildMonsterDefinition = ({
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
-      healthMultiplier = 0.32, damageMultiplier = 0.55,
+      healthMultiplier = 0.13, damageMultiplier = 0.35,
     }) => {
       const behaviour = {
         type: role,
@@ -568,8 +582,8 @@ class Map {
           name: themeMonsters.boss,
           levelBonus: 3,
           rewardMultiplier: 3,
-          healthMultiplier: 1,
-          damageMultiplier: 0.8,
+          healthMultiplier: 0.5,
+          damageMultiplier: 0.6,
         }));
         monsterIndex += 1;
         return;
@@ -605,9 +619,10 @@ class Map {
           rarity: isTreasureGuard ? 'rare' : rollRarity(),
           name: themeMonsters[isTreasureGuard ? 'melee' : role],
           rewardMultiplier: isTreasureGuard ? 1.5 : 1,
-          // Treasure guards are a step tankier than plain trash.
-          healthMultiplier: isTreasureGuard ? 0.6 : 0.32,
-          damageMultiplier: isTreasureGuard ? 0.7 : 0.55,
+          // Trash is squishy so a pack can be mown through before it focus-
+          // fires the player down; treasure guards are a step tankier.
+          healthMultiplier: isTreasureGuard ? 0.3 : 0.13,
+          damageMultiplier: isTreasureGuard ? 0.45 : 0.35,
         }));
         monsterIndex += 1;
       }
