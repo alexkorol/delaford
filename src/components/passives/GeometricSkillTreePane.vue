@@ -223,11 +223,19 @@ import {
 } from '@/core/passives/verdigris-geometric-tree.js';
 import {
   VERDIGRIS_SKILL_TREE_POINTS,
+  VERDIGRIS_SKILL_TREE_SOURCES,
   VERDIGRIS_SKILL_TREE_TOTALS,
 } from '@/core/passives/verdigris-skill-tree.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SEARCH_DIM_OPACITY = '0.18';
+
+// 1 point per level after the first, capped at the lifetime maximum. Quest
+// points (currently 0) will add on top of this later.
+const earnedPointsForLevel = (level) => {
+  const fromLevels = Math.max(0, Math.floor((Number(level) || 1) - 1));
+  return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, Math.min(fromLevels, VERDIGRIS_SKILL_TREE_SOURCES.levels));
+};
 
 const makeSvgEl = (tag, attrs = {}) => {
   const el = document.createElementNS(SVG_NS, tag);
@@ -571,7 +579,7 @@ class ViewController {
 
 const initialTreeState = () => ({
   points: {
-    skill: VERDIGRIS_SKILL_TREE_POINTS.skill,
+    skill: 0,
   },
   stats: {
     attrs: { STR: 0, DEX: 0, INT: 0 },
@@ -579,7 +587,7 @@ const initialTreeState = () => ({
   },
   selectedNode: {
     id: '0,0',
-    name: 'Prime Seed Nexus',
+    name: 'Origin',
     type: 'origin',
     axis: 'HYBRID',
     axisLabel: 'Hybrid',
@@ -633,7 +641,9 @@ export default {
     },
   },
   mounted() {
-    this.skillTree = new VerdigrisGeometricTree();
+    this.skillTree = new VerdigrisGeometricTree({
+      availablePoints: earnedPointsForLevel(this.game?.player?.level),
+    });
     this.treeState = this.skillTree.toState();
 
     this.renderer = new SVGRenderer(this.skillTree, {
@@ -655,6 +665,13 @@ export default {
   },
   beforeUnmount() {
     if (this.viewController) this.viewController.destroy();
+  },
+  watch: {
+    'game.player.level': function watchLevel(level) {
+      if (!this.skillTree) return;
+      this.skillTree.setAvailablePoints(earnedPointsForLevel(level));
+      this.syncTreeState();
+    },
   },
   methods: {
     syncTreeState() {

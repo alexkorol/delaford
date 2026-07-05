@@ -1,5 +1,4 @@
 import {
-  VERDIGRIS_SKILL_TREE_POINTS,
   VERDIGRIS_SKILL_TREE_TOTALS,
 } from '@/core/passives/verdigris-skill-tree.js';
 
@@ -433,16 +432,18 @@ const pathAttributesFromWeights = (weights, ring) => {
   return attrs;
 };
 
-const biasArcAttributes = (attrs, axis, side) => {
+// Nudge one point from the dominant axis into the axis the conduit is
+// *second* closest to at its sampled control point. Each option samples a
+// different perpendicular-offset position, so the inner and outer arcs lean
+// toward whichever neighbouring axis they actually curve toward — a conduit
+// hugging the STR axis carries STR + its nearer neighbour, never the far one.
+const biasArcAttributes = (attrs, weights) => {
   const copy = { ...attrs };
-  const primary = Object.entries(copy).sort((a, b) => b[1] - a[1])[0]?.[0] || 'STR';
-  const secondaryByAxis = {
-    INT: side < 0 ? 'DEX' : 'STR',
-    DEX: side < 0 ? 'STR' : 'INT',
-    STR: side < 0 ? 'INT' : 'DEX',
-    HYBRID: side < 0 ? 'DEX' : 'STR',
-  };
-  const secondary = secondaryByAxis[axis] || secondaryByAxis[primary] || 'INT';
+  const ordered = Object.entries(weights)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key]) => key);
+  const primary = ordered[0] || 'STR';
+  const secondary = ordered[1] || 'INT';
   if (copy[primary] > 1 && copy[secondary] === 0) {
     copy[primary] -= 1;
     copy[secondary] += 1;
@@ -544,7 +545,7 @@ const createMainNode = (hex) => {
       type,
       axis,
       weights,
-      name: 'Prime Seed Nexus',
+      name: 'Origin',
       effects: ['Starting point. No passive bonus.'],
       tags: ['HYB', 'origin'],
     });
@@ -628,7 +629,7 @@ class Conduit {
     };
     const weights = axisWeightsFromPosition(sample);
     const axis = dominantAxis(weights);
-    const attrs = biasArcAttributes(pathAttributesFromWeights(weights, Math.max(nodeA.ring, nodeB.ring)), axis, side);
+    const attrs = biasArcAttributes(pathAttributesFromWeights(weights, Math.max(nodeA.ring, nodeB.ring)), weights);
     const secondary = Object.entries(attrs)
       .filter(([, value]) => value > 0)
       .sort((a, b) => b[1] - a[1])
@@ -650,10 +651,14 @@ class Conduit {
 }
 
 export class VerdigrisGeometricTree {
-  constructor() {
+  // availablePoints is the current earned pool (1 per level after 1, plus
+  // quest points). A fresh level-1 character starts with 0; the 123 constant
+  // in VERDIGRIS_SKILL_TREE_POINTS is only the lifetime cap shown in the UI.
+  constructor({ availablePoints = 0 } = {}) {
+    this.initialPoints = Math.max(0, Math.floor(availablePoints));
     this.nodes = new Map();
     this.conduits = new Map();
-    this.points = { skill: VERDIGRIS_SKILL_TREE_POINTS.skill };
+    this.points = { skill: this.initialPoints };
     this.pending = null;
     this.selectedNodeId = '0,0';
     this.history = [];
@@ -824,10 +829,20 @@ export class VerdigrisGeometricTree {
     this.saveHistory();
     this.nodes.forEach((node) => { node.active = node.id === '0,0'; });
     this.conduits.forEach((conduit) => { conduit.allocatedVariant = null; });
-    this.points = { skill: VERDIGRIS_SKILL_TREE_POINTS.skill };
+    this.points = { skill: this.initialPoints };
     this.pending = null;
     this.selectedNodeId = '0,0';
     this.log = ['Build reset to origin.'];
+    this.recalculate();
+  }
+
+  // Reconcile the earned pool when the character levels up or gains quest
+  // points: add the delta to whatever is currently unspent.
+  setAvailablePoints(total) {
+    const next = Math.max(0, Math.floor(total));
+    const spent = this.initialPoints - this.points.skill;
+    this.initialPoints = next;
+    this.points = { skill: Math.max(0, next - Math.max(0, spent)) };
     this.recalculate();
   }
 
@@ -1199,7 +1214,7 @@ export class VerdigrisGeometricTree {
       `${boost.percentIncrease}% increased center-node effect.`,
     ];
     if (node.stat && boost.directBonus) lines.push(`+${formatNumber(boost.directBonus)}${statSuffix(node.stat)} ${formatDerivedLabel(node.stat)}.`);
-    lines.push(`${formatAttrs(boost.attrBonus)} from geometric resonance.`);
+    lines.push(`${formatAttrs(boost.attrBonus)} from the closed loop.`);
     return lines;
   }
 

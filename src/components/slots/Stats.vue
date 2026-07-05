@@ -103,13 +103,13 @@
     <section class="skill-tree">
       <header>Skill Tree</header>
       <p class="summary">
-        <strong>{{ skillTreeSummary.skillPoints }}</strong>
+        <strong>{{ skillTreeSummary.earned }}</strong>
         <span>/</span>
-        <span>{{ skillTreeSummary.totalNodes }}</span>
-        points to spend across the lattice
+        <span>{{ skillTreeSummary.cap }}</span>
+        skill points
       </p>
       <p class="available">
-        {{ skillTreeSummary.fromLevels }} from levels, {{ skillTreeSummary.fromQuests }} from quests
+        1 per level · {{ skillTreeSummary.cap }} at the cap
       </p>
       <button
         type="button"
@@ -180,7 +180,6 @@ import { buildCharacterSheet } from '@/core/character-sheet.js';
 import {
   VERDIGRIS_SKILL_TREE_POINTS,
   VERDIGRIS_SKILL_TREE_SOURCES,
-  VERDIGRIS_SKILL_TREE_TOTALS,
 } from '@/core/passives/verdigris-skill-tree.js';
 import dungeonAtlasUrl from '@/assets/tiles/dungeon.png';
 import objectsAtlasUrl from '@/assets/tiles/objects.png';
@@ -212,11 +211,14 @@ export default {
       return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     skillTreeSummary() {
+      const level = Number(this.player && this.player.level) || 1;
+      const earned = Math.min(
+        VERDIGRIS_SKILL_TREE_POINTS.skill,
+        Math.min(Math.max(0, level - 1), VERDIGRIS_SKILL_TREE_SOURCES.levels),
+      );
       return {
-        skillPoints: VERDIGRIS_SKILL_TREE_POINTS.skill,
-        fromLevels: VERDIGRIS_SKILL_TREE_SOURCES.levels,
-        fromQuests: VERDIGRIS_SKILL_TREE_SOURCES.quests,
-        totalNodes: VERDIGRIS_SKILL_TREE_TOTALS.nodes + VERDIGRIS_SKILL_TREE_TOTALS.subtreeNodes,
+        earned,
+        cap: VERDIGRIS_SKILL_TREE_POINTS.skill,
       };
     },
     stats() {
