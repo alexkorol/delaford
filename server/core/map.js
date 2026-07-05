@@ -879,7 +879,9 @@ class Map {
           levelBonus: 3,
           rewardMultiplier: 3,
           healthMultiplier: 0.5,
-          damageMultiplier: 0.6,
+          // ~33% of a level-1 player's HP per swing (was ~40%): hits like a
+          // boss without three-tapping fresh characters.
+          damageMultiplier: 0.5,
         }));
         monsterIndex += 1;
         return;

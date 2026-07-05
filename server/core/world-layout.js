@@ -448,6 +448,8 @@ const createOldWoodScene = () => {
       },
       {
         id: 'mossbound-brute',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.7,
         name: 'Mossbound Brute',
         level: 5,
         archetype: 'brute',
@@ -507,6 +509,8 @@ const createMireScene = () => {
     monsterDefinitions: [
       {
         id: 'reed-witch',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.45,
         name: 'Reed Witch',
         level: 5,
         archetype: 'mystic',
@@ -519,6 +523,8 @@ const createMireScene = () => {
       },
       {
         id: 'bog-revenant',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.55,
         name: 'Bog Revenant',
         level: 6,
         archetype: 'brute',
@@ -581,6 +587,8 @@ const createGraveyardScene = () => {
     monsterDefinitions: [
       {
         id: 'hollow-warden',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.85,
         name: 'Hollow Warden',
         level: 4,
         archetype: 'brute',
@@ -593,6 +601,8 @@ const createGraveyardScene = () => {
       },
       {
         id: 'barrow-sister',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.5,
         name: 'Barrow Sister',
         level: 6,
         archetype: 'mystic',
@@ -656,6 +666,8 @@ const createBarrowScene = () => {
     monsterDefinitions: [
       {
         id: 'crypt-guard',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.7,
         name: 'Crypt Guard',
         level: 7,
         archetype: 'brute',
@@ -668,6 +680,8 @@ const createBarrowScene = () => {
       },
       {
         id: 'bone-oracle',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.4,
         name: 'Bone Oracle',
         level: 8,
         archetype: 'mystic',
@@ -680,6 +694,8 @@ const createBarrowScene = () => {
       },
       {
         id: 'barrow-knight',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.6,
         name: 'Barrow Knight',
         level: 9,
         archetype: 'brute',
@@ -750,6 +766,8 @@ const createEmberScene = () => {
     monsterDefinitions: [
       {
         id: 'ember-guard',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.6,
         name: 'Ember Guard',
         level: 10,
         archetype: 'brute',
@@ -762,6 +780,8 @@ const createEmberScene = () => {
       },
       {
         id: 'ash-seer',
+        // Measured: keeps an at-level player above 6 hits-to-die.
+        damageMultiplier: 0.4,
         name: 'Ash Seer',
         level: 11,
         archetype: 'mystic',
