@@ -21,9 +21,16 @@ Chronicles account creator):
   **Houses & Scions** (account = House meta, characters = permadeath scions),
   tracked in `docs/fix-plan-2026-07-04.md` Phase 6.
 
-Still open (see `docs/fix-plan-2026-07-04.md`): combat feel, PoE-style
-quickbar, inventory UI port (drag-to-equip, textured grid), skill-tree point
-scaling by level, Houses/Scions creation flow, discoverable zones/instances.
+Sprint of 2026-07-04 (`docs/fix-plan-2026-07-04.md`) delivered: combat feel
+(hit tint, unarmed retaliation, bottom xp bar, crisp orbs), pane close
+buttons, skill-tree corrections (plain names, correct conduit bias, level-
+scaled points), PoE-style quickbar, inventory slot texture + varied drops,
+solo zone/instance entry (Adventure menu), and the Chronicles Houses & Scions
+persistence model (`src/core/chronicles/houses.js`).
+
+Still open: the Chronicles creation *screen* (found House → create scion →
+set out) and the permadeath-to-crypt hook — the data model and tests are in
+place, the UI wiring into the login/auth flow is the remaining piece.
 
 ## Pillars
 
