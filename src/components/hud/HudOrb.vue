@@ -99,7 +99,10 @@ export default {
   justify-content: center;
   width: var(--orb-size);
   height: var(--orb-size);
-  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.55));
+
+  /* Soft, centred contact shadow — the previous heavy offset shadow read as
+   * an unsightly dark edge hugging the orb. */
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
 }
 
 .hud-orb.mp {

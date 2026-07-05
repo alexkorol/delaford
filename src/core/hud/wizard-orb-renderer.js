@@ -168,7 +168,9 @@ class WizardOrbRenderer {
 
     this.gl = canvas.getContext('webgl2', {
       alpha: true,
-      antialias: false,
+      // MSAA smooths the circular orb edge so it does not jag when the
+      // canvas is displayed smaller than its backing store.
+      antialias: true,
       premultipliedAlpha: false,
       powerPreference: 'high-performance',
     });
@@ -254,7 +256,9 @@ class WizardOrbRenderer {
     const gl = this.gl;
     if (!gl) return;
     const rect = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Render up to 3x the CSS size so high-DPI screens get a crisp edge
+    // instead of upscaled jaggies.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const width = Math.max(2, Math.round((rect.width || this.canvas.width || 128) * dpr));
     const height = Math.max(2, Math.round((rect.height || this.canvas.height || 128) * dpr));
     if (this.canvas.width !== width || this.canvas.height !== height) {

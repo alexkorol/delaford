@@ -461,6 +461,17 @@ class Map {
         monster.lastHitAt = at;
         this.monsters.splice(index, 1, monster);
       }
+    } else if (payload.targetType === 'player') {
+      // Tint the struck player (self or others) rather than hiding the sprite.
+      if (this.player && this.player.uuid === payload.targetId) {
+        this.player.lastHitAt = at;
+      }
+      const index = (this.players || []).findIndex((player) => player.uuid === payload.targetId);
+      if (index !== -1) {
+        const player = this.players[index];
+        player.lastHitAt = at;
+        this.players.splice(index, 1, player);
+      }
     }
 
     this.combatFeedback.push({
@@ -878,6 +889,8 @@ class Map {
       tileSize,
       tileSize,
     );
+
+    this.drawHitTint(ctx, drawX, drawY, tileSize, this.player && this.player.lastHitAt, now());
   }
 
   /**
@@ -921,6 +934,8 @@ class Map {
         tileSize,
         tileSize,
       );
+
+      this.drawHitTint(ctx, screenPosition.x, screenPosition.y, tileSize, player.lastHitAt, now());
     });
   }
 
@@ -982,13 +997,8 @@ class Map {
         tileSize,
       );
 
-      // Brief red flash when recently hit
-      if (monster.lastHitAt && timestamp - monster.lastHitAt < 200) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255, 64, 64, 0.4)';
-        ctx.fillRect(screenPosition.x, screenPosition.y, tileSize, tileSize);
-        ctx.restore();
-      }
+      // Soft, sprite-inset tint when recently hit (never hides the sprite)
+      this.drawHitTint(ctx, screenPosition.x, screenPosition.y, tileSize, monster.lastHitAt, timestamp);
 
       // Health bar once the monster has taken damage
       if (health && Number.isFinite(health.max) && health.max > 0 && health.current < health.max) {
@@ -1011,6 +1021,39 @@ class Map {
   /**
    * Draw floating damage numbers for recent combat hits
    */
+  /**
+   * A brief, subtle red tint over a sprite that was recently hit. Kept inset
+   * from the tile edges and eased to zero so it reads as a body flash rather
+   * than a jarring full-tile square, and it never hides the sprite.
+   *
+   * @param {CanvasRenderingContext2D} ctx Target context
+   * @param {number} x Sprite top-left screen x
+   * @param {number} y Sprite top-left screen y
+   * @param {number} tileSize Tile size in px
+   * @param {number} lastHitAt Timestamp of the last hit (ms)
+   * @param {number} timestamp Current frame timestamp (ms)
+   */
+  drawHitTint(ctx, x, y, tileSize, lastHitAt, timestamp) {
+    const HIT_TINT_DURATION = 180;
+    if (!lastHitAt) {
+      return;
+    }
+    const elapsed = timestamp - lastHitAt;
+    if (elapsed < 0 || elapsed >= HIT_TINT_DURATION) {
+      return;
+    }
+
+    const progress = elapsed / HIT_TINT_DURATION;
+    const alpha = 0.42 * (1 - progress);
+    const inset = Math.max(2, Math.round(tileSize * 0.12));
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgb(255, 72, 72)';
+    ctx.fillRect(x + inset, y + inset, tileSize - inset * 2, tileSize - inset * 2);
+    ctx.restore();
+  }
+
   drawCombatFeedback() {
     const ctx = this.bufferContext || this.context;
     if (!ctx || !Array.isArray(this.combatFeedback) || !this.combatFeedback.length || !this.player) {

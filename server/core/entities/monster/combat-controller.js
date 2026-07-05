@@ -1,5 +1,5 @@
 import world from '#server/core/world.js';
-import { DEFAULT_FACING_DIRECTION } from '#shared/combat.js';
+import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.js';
 import { manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
 import UI from '#shared/ui.js';
@@ -192,6 +192,23 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   if (result) {
     target.setAnimationState('hurt', { direction: target.facing, startedAt: nowTs });
     // Stats broadcast handled by player logic
+
+    // Auto-retaliate: a struck, unengaged player fights back at their
+    // attacker (even unarmed) instead of standing there taking hits. The
+    // auto-attack tick (processAutoAttacks) does range/alive gating.
+    const struckAlive = result.type !== 'death' && result.type !== 'permadeath';
+    if (struckAlive && target.combat && !target.combat.autoAttack) {
+      target.combat.autoAttack = {
+        targetId: monster.uuid,
+        targetName: monster.name || 'Monster',
+        sceneId: target.sceneId,
+        skillId: DEFAULT_SKILL_IDS.primary,
+        startedAt: nowTs,
+        lastTriggeredAt: 0,
+      };
+      target.combat.autoAttackStoppedReason = null;
+    }
+
     if (result.type === 'death' || result.type === 'permadeath') {
       monster.state.mode = 'idle';
       monster.state.targetId = null;
