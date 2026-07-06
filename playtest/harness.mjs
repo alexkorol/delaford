@@ -283,10 +283,15 @@ export class HeadlessPlayer {
     this.emit('player:skilltree:save', { snapshot });
   }
 
+  /** Grab the item under/beside your feet (the 'z'/'g' key). */
+  pickupUnderfoot() {
+    this.emit('player:take:underfoot', {});
+  }
+
   // ── Wiz/dev commands ─────────────────────────────────────────────────
 
-  devTeleport(x, y) {
-    this.emit('dev:teleport', { x, y });
+  devTeleport(x, y, sceneId = undefined) {
+    this.emit('dev:teleport', { x, y, sceneId });
   }
 
   devGive(itemId, qty = 1) {

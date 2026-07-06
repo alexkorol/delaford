@@ -424,6 +424,8 @@ const createOldWoodScene = () => {
     monsterDefinitions: [
       {
         id: 'oldwood-wolf',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.4,
         name: 'Old Wood Wolf',
         level: 2,
         archetype: 'skirmisher',
@@ -436,6 +438,8 @@ const createOldWoodScene = () => {
       },
       {
         id: 'thorn-stalker',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.45,
         name: 'Thorn Stalker',
         level: 4,
         archetype: 'skirmisher',
@@ -448,6 +452,8 @@ const createOldWoodScene = () => {
       },
       {
         id: 'mossbound-brute',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.55,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.7,
         name: 'Mossbound Brute',
@@ -493,6 +499,28 @@ const createOldWoodScene = () => {
     message: 'The forest thins into wet sedge and black water.',
   });
 
+  // Instance gates: the procedural zones live IN the world, not just in a menu.
+  addPortal(scene, map, {
+    id: 'gate-verdant-grove',
+    name: 'Mossy Archway',
+    x: 96,
+    y: 139,
+    tileId: tile.exitPortal,
+    floor: tile.lairFloor,
+    destination: { instance: { template: 'grove', layout: 'clearings' } },
+    message: 'You slip through the mossy archway into the Verdant Grove.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-old-barrow',
+    name: 'Sunken Steps',
+    x: 112,
+    y: 142,
+    tileId: tile.exitPortal,
+    floor: tile.dirtFloor,
+    destination: { instance: { template: 'dungeon', layout: 'warren' } },
+    message: 'Old steps descend beneath the roots into The Old Barrow.',
+  });
+
   clearSceneSpawnPads(scene, map);
 
   return scene;
@@ -509,6 +537,8 @@ const createMireScene = () => {
     monsterDefinitions: [
       {
         id: 'reed-witch',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.5,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.45,
         name: 'Reed Witch',
@@ -523,6 +553,8 @@ const createMireScene = () => {
       },
       {
         id: 'bog-revenant',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.5,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.55,
         name: 'Bog Revenant',
@@ -571,6 +603,27 @@ const createMireScene = () => {
     message: 'You take the sedge trail back into the Old Wood.',
   });
 
+  addPortal(scene, map, {
+    id: 'gate-marsh-of-reeds',
+    name: 'Reed-Choked Jetty',
+    x: 60,
+    y: 116,
+    tileId: tile.exitPortal,
+    floor: tile.dirtFloor,
+    destination: { instance: { template: 'marsh', layout: 'clearings' } },
+    message: 'You pole off the jetty into the Marsh of Reeds.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-the-wilds',
+    name: 'Broken Palisade',
+    x: 42,
+    y: 90,
+    tileId: tile.exitPortal,
+    floor: tile.dirtFloor,
+    destination: { instance: { template: 'wilds', layout: 'clearings' } },
+    message: 'Beyond the broken palisade, The Wilds open before you.',
+  });
+
   clearSceneSpawnPads(scene, map);
 
   return scene;
@@ -587,6 +640,8 @@ const createGraveyardScene = () => {
     monsterDefinitions: [
       {
         id: 'hollow-warden',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.55,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.85,
         name: 'Hollow Warden',
@@ -601,6 +656,8 @@ const createGraveyardScene = () => {
       },
       {
         id: 'barrow-sister',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.6,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.5,
         name: 'Barrow Sister',
@@ -650,6 +707,27 @@ const createGraveyardScene = () => {
     message: 'You descend the old barrow steps.',
   });
 
+  addPortal(scene, map, {
+    id: 'gate-weir-crypt',
+    name: 'Weir Crypt Door',
+    x: 88,
+    y: 44,
+    tileId: tile.exitPortal,
+    floor: tile.cryptFloor,
+    destination: { instance: { template: 'crypt', layout: 'warren' } },
+    message: 'The crypt door grinds open onto the Weir Crypt.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-sunken-colonnade',
+    name: 'Flooded Stair',
+    x: 112,
+    y: 44,
+    tileId: tile.exitPortal,
+    floor: tile.cryptFloor,
+    destination: { instance: { template: 'crypt', layout: 'gauntlet' } },
+    message: 'A flooded stair leads down into the Sunken Colonnade.',
+  });
+
   clearSceneSpawnPads(scene, map);
 
   return scene;
@@ -666,6 +744,8 @@ const createBarrowScene = () => {
     monsterDefinitions: [
       {
         id: 'crypt-guard',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.5,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.7,
         name: 'Crypt Guard',
@@ -680,6 +760,8 @@ const createBarrowScene = () => {
       },
       {
         id: 'bone-oracle',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.55,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.4,
         name: 'Bone Oracle',
@@ -694,6 +776,8 @@ const createBarrowScene = () => {
       },
       {
         id: 'barrow-knight',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.5,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.6,
         name: 'Barrow Knight',
@@ -766,6 +850,8 @@ const createEmberScene = () => {
     monsterDefinitions: [
       {
         id: 'ember-guard',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.45,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.6,
         name: 'Ember Guard',
@@ -780,6 +866,8 @@ const createEmberScene = () => {
       },
       {
         id: 'ash-seer',
+        // Measured: dies in ARPG time, not sponge time (TTK targets in spec).
+        healthMultiplier: 0.55,
         // Measured: keeps an at-level player above 6 hits-to-die.
         damageMultiplier: 0.4,
         name: 'Ash Seer',

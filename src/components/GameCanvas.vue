@@ -475,6 +475,13 @@ export default {
       if (this.isTypingTarget(event)) {
         return;
       }
+      // Grab key: pick up the item under (or beside) your feet.
+      const key = String(event.key || '').toLowerCase();
+      if ((key === 'z' || key === 'g') && !event.repeat) {
+        Socket.emit('player:take:underfoot', {});
+        event.preventDefault();
+        return;
+      }
       this.handleKeyDown(event);
     },
     handleGlobalKeyUp(event) {

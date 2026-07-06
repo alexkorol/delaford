@@ -113,6 +113,12 @@ const devEvents = {
     if (typeof player.cancelPathfinding === 'function') {
       player.cancelPathfinding();
     }
+
+    // Optional cross-scene teleport (playtest scenarios walk the world).
+    if (typeof payload.sceneId === 'string' && world.scenes.has(payload.sceneId)) {
+      world.assignPlayerToScene(player, payload.sceneId);
+    }
+
     player.x = Math.floor(payload.x);
     player.y = Math.floor(payload.y);
     if (player.path) {

@@ -342,11 +342,15 @@ class PartyService {
       spawnIndex += 1;
 
       // Remember where the player entered from (first entry only, not floor
-      // descents) so returning to town can put them back there instead of
-      // stranding them at raw dungeon coordinates on the surface map.
+      // descents) so leaving the instance puts them back there — same tile,
+      // same SCENE (instance gates live in wilderness zones, not just town).
       const fromScene = world.getScene(player.sceneId);
       if (!fromScene || fromScene.type !== 'instance') {
-        player.preInstancePosition = { x: player.x, y: player.y };
+        player.preInstancePosition = {
+          x: player.x,
+          y: player.y,
+          sceneId: fromScene ? fromScene.id : null,
+        };
       }
 
       if (spawn && typeof spawn.x === 'number' && typeof spawn.y === 'number') {
@@ -590,10 +594,12 @@ class PartyService {
     this.clearReadyState(party);
 
     this.forEachMember(party, (player) => {
-      // Put the player back where they entered the instance from; dungeon
-      // coordinates mean nothing on the surface map (they landed players in
-      // the middle of Fenmire Causeway, next to its boss).
+      // Put the player back where they entered the instance from — the same
+      // tile in the same scene (gates live in wilderness zones too). Raw
+      // dungeon coordinates mean nothing on any surface map.
       const back = player.preInstancePosition;
+      const backScene = back && back.sceneId ? world.getScene(back.sceneId) : null;
+      const returnScene = backScene && backScene.type !== 'instance' ? backScene : town;
       if (back && Number.isFinite(back.x) && Number.isFinite(back.y)) {
         player.x = back.x;
         player.y = back.y;
@@ -603,17 +609,33 @@ class PartyService {
       }
       player.preInstancePosition = null;
 
-      world.assignPlayerToScene(player, town.id);
+      world.assignPlayerToScene(player, returnScene.id);
       if (typeof player.cancelPathfinding === 'function') {
         player.cancelPathfinding();
       }
       if (player.path) {
         player.path.grid = null;
       }
+      player.lastReturnScene = returnScene;
     });
 
     this.sendPartyUpdate(party);
-    this.sendSceneTransition(party, town);
+    // Send each member the scene they actually returned to.
+    this.forEachMember(party, (player) => {
+      const scene = player.lastReturnScene || town;
+      delete player.lastReturnScene;
+      Socket.emit('party:scene:transition', {
+        player: { socket_id: player.socket_id },
+        scene: this.buildScenePayload(scene),
+        party: this.getPartySnapshot(party),
+        playerState: {
+          uuid: player.uuid,
+          x: player.x,
+          y: player.y,
+          sceneId: player.sceneId,
+        },
+      });
+    });
     this.sendLoadingState(party, 'idle');
     world.destroyInstance(party.id);
   }

@@ -56,6 +56,31 @@ export default async function loot({ connect, assert }) {
       .filter(item => item.id === 'coins')
       .reduce((sum, item) => sum + (item.qty || 0), 0);
     assert(coinsAfter > coinsBefore, `coins entered the inventory (${coinsBefore} -> ${coinsAfter})`);
+
+    // Underfoot grab key: kill another mob, stand ON its drop, press grab.
+    const drop2 = await p.waitFor(async () => {
+      const s = await p.state();
+      if (s.lifecycle !== 'alive') p.devHeal();
+      const coins = s.groundItems.find(item => item.id === 'coins');
+      if (coins) return coins;
+      const nearest = s.monsters
+        .filter(m => m.rarity !== 'elite')
+        .sort((a, b) => (Math.abs(a.x - s.x) + Math.abs(a.y - s.y))
+          - (Math.abs(b.x - s.x) + Math.abs(b.y - s.y)))[0];
+      if (nearest && Math.abs(nearest.x - s.x) <= 1.6 && Math.abs(nearest.y - s.y) <= 1.6) {
+        await p.attack(nearest);
+      } else if (nearest) {
+        p.devTeleport(Math.round(nearest.x) + 1, Math.round(nearest.y));
+      }
+      return false;
+    }, { timeoutMs: 30000, intervalMs: 400, label: 'a second coin drop' });
+
+    p.devTeleport(drop2.x, drop2.y); // stand ON it
+    p.pickupUnderfoot();
+    await p.waitFor(async () => {
+      const s = await p.state();
+      return !s.groundItems.some(item => item.uuid === drop2.uuid);
+    }, { timeoutMs: 6000, label: 'underfoot pickup' });
   } finally {
     p.close();
   }

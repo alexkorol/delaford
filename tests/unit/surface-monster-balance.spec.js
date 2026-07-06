@@ -48,6 +48,28 @@ describe('surface monster balance (measured, at-level)', () => {
     });
   });
 
+  it('overworld monsters die in ARPG time, not sponge time', () => {
+    // Playtest feedback: "the first monster out of town is a Tank". Player
+    // unarmed DPS is level-independent (~18.6); measure kill time per mob.
+    const TTK_LIMITS = { common: 7, uncommon: 9, rare: 13 };
+    withMonsters.forEach((scene) => {
+      scene.metadata.monsterDefinitions.forEach((definition) => {
+        const monster = new Monster({ ...definition, sceneId: scene.id });
+        const hp = monster.stats.resources.health.max;
+        const ttk = hp / 18.6;
+        const limit = TTK_LIMITS[definition.rarity] || TTK_LIMITS.uncommon;
+        expect(ttk, `${definition.name} (${hp} HP = ${ttk.toFixed(1)}s)`)
+          .toBeLessThanOrEqual(limit);
+      });
+    });
+
+    // The very first monster a new player meets must feel mowable.
+    const oldWood = withMonsters.find(scene => scene.id === 'zone:old-wood');
+    const wolf = oldWood.metadata.monsterDefinitions.find(def => def.id === 'oldwood-wolf');
+    const wolfMonster = new Monster({ ...wolf, sceneId: oldWood.id });
+    expect(wolfMonster.stats.resources.health.max / 18.6).toBeLessThanOrEqual(3.5);
+  });
+
   it('instance boss needs at least 3 swings to drop a fresh level-1 player', async () => {
     const generation = await GameMap.generateInstance({ seed: 77, template: 'dungeon', depth: 1 });
     const bossDef = generation.monsters.find(def => def.rarity === 'elite');

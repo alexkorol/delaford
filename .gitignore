@@ -33,3 +33,6 @@ server/data/
 
 # pm2 runtime logs
 /logs
+
+# Local guest/dev character saves (per-machine state)
+server/data/guest-saves/

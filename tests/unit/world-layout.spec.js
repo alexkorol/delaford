@@ -109,12 +109,20 @@ describe('DCSS world layout', () => {
       expect(scene.metadata.portals.length).toBeGreaterThan(0);
       scene.metadata.portals.forEach((portal) => {
         expect(scene.map.foreground[(portal.y * 200) + portal.x]).toBeGreaterThanOrEqual(DUNGEON_FIRST_GID);
+        expect(isWalkable(scene, portal.x, portal.y)).toBe(true);
+
+        // Instance gates lead into generated zones, not static scenes.
+        if (portal.destination.instance) {
+          expect(typeof portal.destination.instance.template).toBe('string');
+          expect(typeof portal.destination.instance.layout).toBe('string');
+          return;
+        }
+
         expect(sceneIds.has(portal.destination.sceneId)).toBe(true);
         expect(portal.destination.x).toBeGreaterThanOrEqual(0);
         expect(portal.destination.x).toBeLessThan(200);
         expect(portal.destination.y).toBeGreaterThanOrEqual(0);
         expect(portal.destination.y).toBeLessThan(200);
-        expect(isWalkable(scene, portal.x, portal.y)).toBe(true);
         expect(isWalkable(scenesById.get(portal.destination.sceneId), portal.destination.x, portal.destination.y)).toBe(true);
       });
     });

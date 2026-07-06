@@ -1,4 +1,5 @@
 import playerRepository from '#server/core/repositories/player-repository.js';
+import { saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_COOLDOWN_MS = Number(process.env.PLAYER_SAVE_COOLDOWN_MS) || 60000;
@@ -31,14 +32,18 @@ export class PlayerPersistenceService {
       return null;
     }
 
-    // Guest accounts have no backing account API — attempting the network
-    // save just dumps a huge axios error into the server log every flush.
-    if (!player.token || player.token === 'none') {
+    if (this.shouldThrottleSave(player, options)) {
       return null;
     }
 
-    if (this.shouldThrottleSave(player, options)) {
-      return null;
+    // Guest accounts have no backing account API; they persist to a local
+    // file instead so loot/levels/tree survive relogins during dev.
+    if (!player.token || player.token === 'none') {
+      const snapshot = saveGuest(player);
+      if (snapshot) {
+        this.lastSuccessfulSave.set(player.uuid, Date.now());
+      }
+      return snapshot;
     }
 
     try {

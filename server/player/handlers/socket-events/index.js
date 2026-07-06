@@ -10,6 +10,7 @@ import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
+import { loadGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
 
 // Guest accounts have no backing API, so their skill-tree allocations live in
@@ -98,10 +99,15 @@ export default {
         const { player, token } = await Authentication.login({ ...data, data: payload });
         Authentication.addPlayer(new Player(player, token, ws.id));
       } else {
-        const guest = new Player(playerGuest, 'none', ws.id);
-        // Rehydrate the guest's skill tree from the in-process store so
-        // allocations survive a relog during a dev session.
-        if (guestPassiveTrees.has(guest.uuid)) {
+        // Guests persist to a local file (same shape as the template), so
+        // loot, levels, bank, and the skill tree survive relogins — merge the
+        // saved snapshot over the template before constructing the player.
+        const saved = loadGuest(playerGuest.uuid);
+        const guestData = saved ? { ...playerGuest, ...saved } : playerGuest;
+        const guest = new Player(guestData, 'none', ws.id);
+        // In-process fallback for the skill tree (covers saves made moments
+        // before a crash, ahead of the next file flush).
+        if (!guest.passiveTree && guestPassiveTrees.has(guest.uuid)) {
           guest.passiveTree = guestPassiveTrees.get(guest.uuid);
         }
         Authentication.addPlayer(guest);

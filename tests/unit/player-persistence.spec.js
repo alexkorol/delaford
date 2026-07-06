@@ -45,14 +45,12 @@ describe('PlayerPersistenceService', () => {
       expect(repository.save).not.toHaveBeenCalled();
     });
 
-    it('skips guest players (no account API behind them)', async () => {
-      const guest = { ...createMockPlayer('guest-1', 'dev'), token: 'none' };
+    it('routes guest players to the local file store, never the network', async () => {
+      const guest = { ...createMockPlayer('guest-test-1', 'dev'), token: 'none' };
       const result = await service.savePlayer(guest);
-      expect(result).toBeNull();
-      expect(repository.save).not.toHaveBeenCalled();
-
-      const tokenless = { ...createMockPlayer('guest-2'), token: undefined };
-      expect(await service.savePlayer(tokenless)).toBeNull();
+      // A snapshot comes back from the file store; the account API is untouched.
+      expect(result).toBeTruthy();
+      expect(result.level).toBe(guest.level);
       expect(repository.save).not.toHaveBeenCalled();
     });
 

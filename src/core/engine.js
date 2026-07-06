@@ -111,6 +111,11 @@ class Engine {
     // Draw the player
     this.game.map.drawPlayer();
 
+    // Draw in-flight projectiles above actors
+    if (typeof this.game.map.drawProjectiles === 'function') {
+      this.game.map.drawProjectiles();
+    }
+
     // Draw floating combat feedback above actors
     if (typeof this.game.map.drawCombatFeedback === 'function') {
       this.game.map.drawCombatFeedback();

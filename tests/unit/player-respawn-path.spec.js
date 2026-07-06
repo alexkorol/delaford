@@ -3,10 +3,13 @@
 import { describe, expect, it } from 'vitest';
 
 import createPlayerStatsManager from '#server/core/entities/player/stats-manager.js';
+import createPlayerMovementHandler from '#server/core/entities/player/movement-handler.js';
 
-// Regression: clicking around while dead used to queue a walking path that
-// executed on respawn, striding the reborn character across the map. A real
-// respawn must drop any stale path/queue.
+// Regression (twice over): clicking around while dead used to queue a walking
+// path that executed on respawn. The first "fix" cleared path.current.walking
+// — but the walk loop reads path.current.path.walking and is keyed on walkId,
+// so the stale route STILL resumed (observed live). Respawn now goes through
+// the real cancelPathfinding: walkId bump + nested arrays + queue.
 
 const makeDeadPlayerWithPath = () => {
   const player = {
@@ -29,23 +32,32 @@ const makeDeadPlayerWithPath = () => {
         },
       },
     },
+    // The REAL path shape from the Player constructor.
     path: {
+      grid: {},
       current: {
-        walking: [{ x: 40, y: 40 }, { x: 41, y: 40 }, { x: 42, y: 40 }],
-        set: [{ x: 42, y: 40 }],
-        step: 1,
+        name: '',
         length: 3,
+        path: {
+          walking: [{ x: 40, y: 40 }, { x: 41, y: 40 }, { x: 42, y: 40 }],
+          set: [{ x: 42, y: 40 }],
+        },
+        step: 1,
         walkable: true,
         interrupted: false,
+        walkId: 7,
       },
     },
     queue: [{ action: 'walk' }],
+    moving: true,
   };
+  const movement = createPlayerMovementHandler(player);
+  player.cancelPathfinding = () => movement.cancelPathfinding();
   return player;
 };
 
 describe('respawn clears a stale walking path', () => {
-  it('drops the walking path and queue on a successful respawn', () => {
+  it('drops the walking path, bumps walkId, and empties the queue on respawn', () => {
     const player = makeDeadPlayerWithPath();
     const stats = createPlayerStatsManager(player);
 
@@ -53,10 +65,11 @@ describe('respawn clears a stale walking path', () => {
 
     expect(result.success).toBe(true);
     expect(player.stats.lifecycle.state).toBe('alive');
-    expect(player.path.current.walking).toEqual([]);
-    expect(player.path.current.set).toEqual([]);
-    expect(player.path.current.walkable).toBe(false);
+    expect(player.path.current.path.walking).toEqual([]);
+    expect(player.path.current.path.set).toEqual([]);
+    expect(player.path.current.walkId).toBe(8); // invalidates the walk loop
     expect(player.queue).toEqual([]);
+    expect(player.moving).toBe(false);
   });
 
   it('leaves the path untouched when respawn is not ready', () => {
@@ -67,6 +80,7 @@ describe('respawn clears a stale walking path', () => {
     const result = stats.tryRespawn({ now: Date.now() });
 
     expect(result.success).toBe(false);
-    expect(player.path.current.walking).toHaveLength(3);
+    expect(player.path.current.path.walking).toHaveLength(3);
+    expect(player.path.current.walkId).toBe(7);
   });
 });

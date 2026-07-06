@@ -935,6 +935,78 @@ const actionEvents = {
   },
 
   /**
+   * Grab the item under your feet (or on an adjacent tile) with one key.
+   * Playtest feedback: standing ON an item made pickup harder than the
+   * click-to-walk flow, because the context menu is fiddly at your own tile.
+   */
+  'player:take:underfoot': (data, ws) => {
+    const player = world.players.find(p => ws && p.socket_id === ws.id);
+    if (!player) {
+      return;
+    }
+
+    const scene = getPlayerScene(player);
+    const sceneItems = getSceneItems(scene);
+
+    // Own tile first, then the four cardinal neighbours.
+    const spots = [
+      { x: player.x, y: player.y },
+      { x: player.x + 1, y: player.y },
+      { x: player.x - 1, y: player.y },
+      { x: player.x, y: player.y + 1 },
+      { x: player.x, y: player.y - 1 },
+    ];
+    let itemIndex = -1;
+    for (const spot of spots) {
+      itemIndex = sceneItems.findIndex(entry => entry
+        && entry.x === spot.x && entry.y === spot.y
+        && (!entry.boundTo || entry.boundTo === player.uuid));
+      if (itemIndex !== -1) break;
+    }
+
+    if (itemIndex === -1) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: 'There is nothing here to pick up.',
+      });
+      return;
+    }
+
+    const worldItem = sceneItems[itemIndex];
+    const baseData = Query.getItemData(worldItem.id) || {};
+    const candidate = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
+      || { ...baseData, ...worldItem };
+    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidate);
+    if (openSlot === false && openSlot !== 0) {
+      sendInventoryError(player, 'There is no room in your backpack.');
+      return;
+    }
+
+    const quantity = worldItem.qty || 1;
+    sceneItems.splice(itemIndex, 1);
+    broadcastSceneItems(scene, 'item:change');
+
+    player.inventory.add(baseData.id || worldItem.id, quantity, {
+      uuid: worldItem.uuid,
+      existingItem: worldItem,
+    });
+
+    const sceneRespawns = getSceneRespawns(scene);
+    const respawnIndex = sceneRespawns.items.findIndex(
+      entry => entry.respawn && entry.x === worldItem.x && entry.y === worldItem.y,
+    );
+    if (respawnIndex !== -1) {
+      sceneRespawns.items[respawnIndex].pickedUp = true;
+      sceneRespawns.items[respawnIndex].willRespawnIn = Item.calculateRespawnTime(
+        sceneRespawns.items[respawnIndex].respawnIn,
+      );
+    }
+
+    refreshInventory(player);
+    notifyTutorial(player, 'loot');
+  },
+
+  /**
    * A player wants opening a trade shop
    */
   'player:screen:npc:trade': (data) => {

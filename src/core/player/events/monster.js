@@ -15,4 +15,10 @@ export default {
 
     context.combatHit(message && message.data ? message.data : {});
   },
+  'world:projectile': (message, context) => {
+    const map = context && context.game && context.game.map;
+    if (map && typeof map.addProjectile === 'function') {
+      map.addProjectile(message && message.data ? message.data : {});
+    }
+  },
 };

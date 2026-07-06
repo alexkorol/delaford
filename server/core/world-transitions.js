@@ -127,6 +127,18 @@ export const transitionPlayerIfOnPortal = (player) => {
     return false;
   }
 
+  // Instance gates: physical entrances in the world that drop the player
+  // into a generated zone — continuity instead of a dropdown menu. Dynamic
+  // import keeps the handler layer out of this module's dependency graph.
+  if (portal.destination && portal.destination.instance) {
+    const { template, layout } = portal.destination.instance;
+    sendMessage(player, portal.message || 'The gate takes hold of you...');
+    import('#server/player/handlers/party.js')
+      .then(({ partyService }) => partyService.startSoloInstance(player, { template, layout }))
+      .catch((error) => console.error('[world] Instance gate failed:', error));
+    return true;
+  }
+
   return transitionPlayerToPortalDestination(player, portal);
 };
 

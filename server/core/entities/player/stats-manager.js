@@ -214,6 +214,14 @@ const applyDamage = (player, amount, options = {}) => {
 
   const result = applyStatDamage(player.stats, amount, options);
   syncShortcuts(player.stats, player);
+
+  // Death cancels any in-flight walk immediately — the corpse must not keep
+  // striding its old path, and nothing may resume it after respawn.
+  if (result && (result.type === 'death' || result.type === 'permadeath')
+    && typeof player.cancelPathfinding === 'function') {
+    player.cancelPathfinding();
+  }
+
   return result;
 };
 
@@ -236,20 +244,13 @@ const tryRespawn = (player, options = {}) => {
   syncShortcuts(player.stats, player);
 
   // On a real respawn, drop any walking path/queue carried over from before
-  // death so the reborn character stays at its respawn point instead of
-  // striding a stale route across the map.
-  if (result && result.success) {
-    if (player.path && player.path.current) {
-      player.path.current.walking = [];
-      player.path.current.set = [];
-      player.path.current.step = 0;
-      player.path.current.length = 0;
-      player.path.current.walkable = false;
-      player.path.current.interrupted = true;
-    }
-    if (Array.isArray(player.queue)) {
-      player.queue = [];
-    }
+  // death. The previous manual cleanup wrote to path.current.walking — but
+  // the real arrays live at path.current.path.walking and the walk loop is
+  // keyed on walkId, so it never actually stopped anything (the reborn
+  // character strode off on its stale route). cancelPathfinding does all of
+  // it correctly: bumps walkId, clears the step arrays, empties the queue.
+  if (result && result.success && typeof player.cancelPathfinding === 'function') {
+    player.cancelPathfinding();
   }
 
   return result;

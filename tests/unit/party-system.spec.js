@@ -303,11 +303,11 @@ describe('PartyService', () => {
 
     await service.startSoloInstance(leader, { template: 'crypt' });
     const party = service.getPartyForPlayer(leader.uuid);
-    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90 });
+    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90, sceneId: 'town-1' });
 
     // Descending to another floor must not overwrite the surface entry point.
     await service.enterFloor(party, 2);
-    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90 });
+    expect(leader.preInstancePosition).toEqual({ x: 40, y: 90, sceneId: 'town-1' });
 
     service.returnToTown(party);
 

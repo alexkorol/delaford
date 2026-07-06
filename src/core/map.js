@@ -938,6 +938,82 @@ class Map {
   }
 
   /**
+   * Register a projectile broadcast for rendering (ranged attacks used to
+   * land invisibly). Entries expire after their travel time.
+   */
+  addProjectile(data = {}) {
+    if (!Number.isFinite(data.fromX) || !Number.isFinite(data.toX)) {
+      return;
+    }
+    this.projectiles = this.projectiles || [];
+    this.projectiles.push({
+      fromX: data.fromX,
+      fromY: data.fromY,
+      toX: data.toX,
+      toY: data.toY,
+      travelMs: Math.max(80, data.travelMs || 280),
+      kind: data.kind || 'monster',
+      startedAt: now(),
+    });
+    if (this.projectiles.length > 48) {
+      this.projectiles.splice(0, this.projectiles.length - 48);
+    }
+  }
+
+  /**
+   * Draw in-flight projectiles as a glowing bolt with a short trail.
+   */
+  drawProjectiles() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !Array.isArray(this.projectiles) || !this.projectiles.length) {
+      return;
+    }
+
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+    const colours = {
+      player: '#ffd27a',
+      monster: '#ff6a4d',
+      support: '#7dedae',
+    };
+
+    this.projectiles = this.projectiles.filter((p) => {
+      const t = (timestamp - p.startedAt) / p.travelMs;
+      if (t >= 1) {
+        return false;
+      }
+
+      const from = centerOfTile(p.fromX, p.fromY, tileSize);
+      const to = centerOfTile(p.toX, p.toY, tileSize);
+      const x = from.x + ((to.x - from.x) * t);
+      const y = from.y + ((to.y - from.y) * t);
+      const tail = Math.max(0, t - 0.18);
+      const tx = from.x + ((to.x - from.x) * tail);
+      const ty = from.y + ((to.y - from.y) * tail);
+
+      const head = this.worldToScreen({ x, y }, metrics);
+      const back = this.worldToScreen({ x: tx, y: ty }, metrics);
+      const colour = colours[p.kind] || colours.monster;
+
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(back.x, back.y);
+      ctx.lineTo(head.x, head.y);
+      ctx.stroke();
+      ctx.fillStyle = colour;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return true;
+    });
+  }
+
+  /**
    * Draw the monsters on the game viewport canvas
    */
   drawMonsters() {

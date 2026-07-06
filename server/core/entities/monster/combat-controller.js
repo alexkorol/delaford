@@ -1,3 +1,4 @@
+import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.js';
@@ -143,6 +144,20 @@ const tryAttack = (monster, target, now = Date.now()) => {
   };
 
   monster.state.lastAttackAt = now;
+
+  // Ranged attacks fly as a visible projectile during the windup — the hit
+  // used to land "from nowhere" (playtest: "invisible projectiles").
+  if (range > 1) {
+    Socket.broadcast('world:projectile', {
+      fromX: monster.x,
+      fromY: monster.y,
+      toX: target.x,
+      toY: target.y,
+      travelMs: Math.max(120, attack.windupMs || 300),
+      kind: monster.behaviour.type === 'support' ? 'support' : 'monster',
+    }, world.getScenePlayers(monster.sceneId));
+  }
+
   return true;
 };
 

@@ -36,11 +36,14 @@ describe('WIZARD HUD orbs', () => {
     expect(renderer).toContain('alpha: true');
     expect(renderer).toContain('premultipliedAlpha: false');
     expect(renderer).toContain('outColor = vec4(0.0);');
-    expect(shader).toContain('float matteValue = max(art.r, max(art.g, art.b));');
-    expect(shader).toContain('float matteLift = max(luma(art), satur(art) * 0.32);');
-    expect(shader).toContain('smoothstep(0.09, 0.24, matteValue)');
-    expect(shader).toContain('float alpha = clamp(max(orbAlpha, artAlpha), 0.0, 1.0);');
+    // art.png carries a REAL alpha matte now (generated offline); no more
+    // runtime luma keying — transparency comes straight from the texture.
+    expect(renderer).toContain("from '@/assets/orbs/wizard/art.png'");
+    expect(renderer).toContain("from '@/assets/orbs/wizard/mask_fullres.png'");
+    expect(shader).toContain('vec4 artTex = texture(uArt, uv);');
+    expect(shader).toContain('float alpha = clamp(max(orbAlpha, artTex.a), 0.0, 1.0);');
     expect(shader).toContain('outColor = vec4(col, alpha);');
+    expect(shader).not.toContain('matteValue');
   });
 
   it('keeps chat affordances above the taller orb HUD', () => {

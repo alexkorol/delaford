@@ -595,6 +595,22 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
       projectile.range || DEFAULT_PROJECTILE_RANGE,
     );
     targets = target ? [target] : [];
+
+    // Player projectiles are visible too — fly to the victim, or the full
+    // range on a miss.
+    const delta = directionDelta(direction) || { x: 0, y: 1 };
+    const range = projectile.range || DEFAULT_PROJECTILE_RANGE;
+    const impact = target
+      ? { x: monsterTileX(target), y: monsterTileY(target) }
+      : { x: player.x + (delta.x * range), y: player.y + (delta.y * range) };
+    Socket.broadcast('world:projectile', {
+      fromX: player.x,
+      fromY: player.y,
+      toX: impact.x,
+      toY: impact.y,
+      travelMs: Math.max(120, projectile.travelTimeMs || 280),
+      kind: 'player',
+    }, world.getScenePlayers(player.sceneId));
   } else {
     targets = findMeleeTargets(player, direction);
   }
