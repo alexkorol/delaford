@@ -374,6 +374,16 @@ class WizardOrbRenderer {
       cancelAnimationFrame(this.raf);
       this.raf = null;
     }
+    // Release the GPU context: repeated remounts (reconnect re-logins)
+    // otherwise accumulate WebGL contexts until the browser starts killing
+    // the oldest ones (~16 cap) and orbs go blank.
+    if (this.gl) {
+      const lose = this.gl.getExtension('WEBGL_lose_context');
+      if (lose) {
+        lose.loseContext();
+      }
+      this.gl = null;
+    }
   }
 }
 
