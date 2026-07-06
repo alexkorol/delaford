@@ -4,9 +4,12 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { PlayerPersistenceService } from '#server/core/services/player-persistence.js';
 
+// A real account player carries a JWT; guests carry token 'none' and are
+// skipped by the network save entirely.
 const createMockPlayer = (uuid = 'player-1', username = 'TestUser') => ({
   uuid,
   username,
+  token: 'jwt-test-token',
   update: vi.fn(),
 });
 
@@ -39,6 +42,17 @@ describe('PlayerPersistenceService', () => {
     it('returns null for null player', async () => {
       const result = await service.savePlayer(null);
       expect(result).toBeNull();
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('skips guest players (no account API behind them)', async () => {
+      const guest = { ...createMockPlayer('guest-1', 'dev'), token: 'none' };
+      const result = await service.savePlayer(guest);
+      expect(result).toBeNull();
+      expect(repository.save).not.toHaveBeenCalled();
+
+      const tokenless = { ...createMockPlayer('guest-2'), token: undefined };
+      expect(await service.savePlayer(tokenless)).toBeNull();
       expect(repository.save).not.toHaveBeenCalled();
     });
 

@@ -31,6 +31,12 @@ export class PlayerPersistenceService {
       return null;
     }
 
+    // Guest accounts have no backing account API — attempting the network
+    // save just dumps a huge axios error into the server log every flush.
+    if (!player.token || player.token === 'none') {
+      return null;
+    }
+
     if (this.shouldThrottleSave(player, options)) {
       return null;
     }
