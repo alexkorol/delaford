@@ -36,8 +36,6 @@ const vec3 ORBL = vec3(541.0, 484.5, 252.0);  // cx, cy(y-up), r in art px
 const vec3 ORBR = vec3(1128.0, 483.0, 252.0);
 const float INNER = 0.94;                      // inner glass radius
 
-float maxChan(vec3 c){ return max(c.r, max(c.g, c.b)); }
-
 float hash12(vec2 p){
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -457,7 +455,8 @@ vec3 orbContent(vec2 p, bool life, vec3 empty, float thick, vec3 stoneTex){
 
 void main(){
   vec2 uv = gl_FragCoord.xy / uRes;
-  vec3 art = texture(uArt, uv).rgb;
+  vec4 artTex = texture(uArt, uv);
+  vec3 art = artTex.rgb;
   float m  = texture(uMask, uv).r;
   vec3 empty = texture(uEmpty, uv).rgb;
   vec2 pack = texture(uPack, uv).rg;
@@ -541,24 +540,10 @@ void main(){
 
   float orbAlpha = max(aL, aR);
 
-  // The statue plate is a JPEG photographed over black: its silhouette
-  // pixels are statue-times-alpha (a black matte), and JPEG noise pits the
-  // key. Close pinholes with a tiny neighborhood max, key on a tight
-  // near-black band so internal shadows stay opaque, then UN-MATTE — divide
-  // the black-multiplied colour back out at partial alpha. Without that
-  // division, semi-transparent edges composite as a dark fringe on any
-  // light background.
-  vec2 texel = 1.0 / vec2(textureSize(uArt, 0));
-  float mv = maxChan(art);
-  mv = max(mv, maxChan(texture(uArt, uv + vec2(texel.x, 0.0)).rgb));
-  mv = max(mv, maxChan(texture(uArt, uv - vec2(texel.x, 0.0)).rgb));
-  mv = max(mv, maxChan(texture(uArt, uv + vec2(0.0, texel.y)).rgb));
-  mv = max(mv, maxChan(texture(uArt, uv - vec2(0.0, texel.y)).rgb));
-  float artAlpha = smoothstep(0.06, 0.18, mv);
-  float alpha = clamp(max(orbAlpha, artAlpha), 0.0, 1.0);
-
-  float edge = (1.0 - orbAlpha) * smoothstep(0.995, 0.35, alpha);
-  col = mix(col, col / max(alpha, 0.28), edge * step(0.02, alpha));
+  // art.png carries a real statue matte (keyed offline with morphological
+  // cleanup, colour recovered from the black matte), so transparency comes
+  // straight from the texture — no runtime keying, no fringe on light UIs.
+  float alpha = clamp(max(orbAlpha, artTex.a), 0.0, 1.0);
 
   outColor = vec4(col, alpha);
 }

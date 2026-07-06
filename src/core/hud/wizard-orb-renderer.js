@@ -1,9 +1,13 @@
 // eslint-disable-next-line import/no-unresolved -- Vite raw shader imports use query suffixes.
 import fragmentSource from '@/assets/shaders/wizard-orb.frag?raw';
 
-import artUrl from '@/assets/orbs/wizard/art.jpg';
+// art.png carries a REAL alpha channel (statue matte generated offline from
+// the black-background plate — see the commit that added it); mask_fullres is
+// an analytic full-resolution orb-disc mask. Together they replace the old
+// runtime luma-keying that fringed dark on light backgrounds.
+import artUrl from '@/assets/orbs/wizard/art.png';
 import emptyUrl from '@/assets/orbs/wizard/empty_aligned.jpg';
-import maskUrl from '@/assets/orbs/wizard/mask.png';
+import maskUrl from '@/assets/orbs/wizard/mask_fullres.png';
 import normalUrl from '@/assets/orbs/wizard/normal_aligned.jpg';
 import packUrl from '@/assets/orbs/wizard/pack_aligned.jpg';
 import stoneUrl from '@/assets/orbs/wizard/stone_aligned.jpg';
