@@ -10,8 +10,39 @@ import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
-import { loadGuest } from '#server/core/repositories/guest-save-store.js';
+import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
+
+// One character, one session. When the same account logs in again (second
+// tab, another machine, an automated playtest), the OLD session used to be
+// silently replaced mid-play — its client got "foreign player reference"
+// rejections and its unsaved loot was lost. Now: flush the old session's
+// state to disk FIRST (so the new login loads it), tell the old client it
+// was replaced (so it doesn't auto-reconnect into a steal war), and close it.
+const replaceExistingSession = (uuid, newSocketId) => {
+  const existing = world.players.find(p => p.uuid === uuid && p.socket_id !== newSocketId);
+  if (!existing) {
+    return;
+  }
+
+  if (!existing.token || existing.token === 'none') {
+    saveGuest(existing);
+  }
+
+  Socket.emit('player:session-replaced', {
+    player: { socket_id: existing.socket_id },
+  });
+
+  const oldWs = world.clients.find(client => client.id === existing.socket_id);
+  world.removePlayer(existing);
+  if (oldWs) {
+    setTimeout(() => {
+      try {
+        oldWs.close();
+      } catch (error) { /* already gone */ }
+    }, 150);
+  }
+};
 
 // Guest accounts have no backing API, so their skill-tree allocations live in
 // process memory keyed by uuid — surviving relogs within a server run.
@@ -97,8 +128,13 @@ export default {
     try {
       if (!payload.useGuestAccount) {
         const { player, token } = await Authentication.login({ ...data, data: payload });
+        replaceExistingSession(player.uuid, ws.id);
         Authentication.addPlayer(new Player(player, token, ws.id));
       } else {
+        // Flush + kick any existing session for this guest FIRST, so the
+        // snapshot loaded below carries its up-to-the-second loot.
+        replaceExistingSession(playerGuest.uuid, ws.id);
+
         // Guests persist to a local file (same shape as the template), so
         // loot, levels, bank, and the skill tree survive relogins — merge the
         // saved snapshot over the template before constructing the player.

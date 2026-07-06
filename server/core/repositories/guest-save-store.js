@@ -12,7 +12,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SAVE_DIR = path.resolve(here, '..', '..', 'data', 'guest-saves');
+// GUEST_SAVE_DIR override keeps automated playtests hermetic — they must
+// never inherit (or clobber) the developer's own character save.
+const SAVE_DIR = process.env.GUEST_SAVE_DIR
+  ? path.resolve(process.env.GUEST_SAVE_DIR)
+  : path.resolve(here, '..', '..', 'data', 'guest-saves');
 
 const savePath = uuid => path.join(SAVE_DIR, `${String(uuid).replace(/[^a-zA-Z0-9-]/g, '')}.json`);
 

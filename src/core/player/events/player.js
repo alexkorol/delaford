@@ -81,6 +81,16 @@ export default {
   },
 
   /**
+   * This session was replaced by a login elsewhere (second tab, another
+   * machine). Stand down — do NOT reconnect into a session-steal war.
+   */
+  'player:session-replaced': (data, context) => {
+    if (context && typeof context.sessionReplaced === 'function') {
+      context.sessionReplaced();
+    }
+  },
+
+  /**
    * When a player moves.
    */
   'player:movement': (message, context) => {

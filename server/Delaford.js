@@ -286,21 +286,25 @@ class Delaford {
     ws.id = uuid();
     ws.authenticated = false;
 
-    // Per-connection rate limiter (token bucket)
-    const RATE_TOKENS_MAX = 30;
-    const RATE_REFILL_PER_SEC = 10;
-    ws._rateTokens = RATE_TOKENS_MAX;
-    ws._rateLastRefill = Date.now();
+    // Per-connection rate limiting: latency-critical gameplay input gets its
+    // own bucket so held-key movement (~9 msg/s) plus skills can NEVER be
+    // starved by chatty UI traffic (hover context-menu builds were draining
+    // the shared bucket and eating player:move — felt like random input loss).
+    const CRITICAL_EVENTS = new Set(['player:move', 'player:skill:trigger', 'player:take:underfoot']);
+    const buckets = {
+      critical: { tokens: 40, max: 40, refill: 25, last: Date.now() },
+      general: { tokens: 30, max: 30, refill: 10, last: Date.now() },
+    };
 
-    const consumeRateToken = () => {
+    const consumeRateToken = (eventName) => {
+      const bucket = CRITICAL_EVENTS.has(eventName) ? buckets.critical : buckets.general;
       const now = Date.now();
-      const elapsed = (now - ws._rateLastRefill) / 1000;
-      ws._rateTokens = Math.min(RATE_TOKENS_MAX, ws._rateTokens + elapsed * RATE_REFILL_PER_SEC);
-      ws._rateLastRefill = now;
-      if (ws._rateTokens < 1) {
+      bucket.tokens = Math.min(bucket.max, bucket.tokens + (((now - bucket.last) / 1000) * bucket.refill));
+      bucket.last = now;
+      if (bucket.tokens < 1) {
         return false;
       }
-      ws._rateTokens -= 1;
+      bucket.tokens -= 1;
       return true;
     };
 
@@ -353,7 +357,7 @@ class Delaford {
       }
 
       // Rate limit: drop messages when the bucket is empty
-      if (!consumeRateToken()) {
+      if (!consumeRateToken(data.event)) {
         console.warn(`[socket] Rate limited ${ws.id.substring(0, 5)}... event="${data.event}"`);
         return;
       }

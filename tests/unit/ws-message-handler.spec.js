@@ -316,17 +316,26 @@ describe('Delaford.connection – rate limiting', () => {
   });
 
   it('rejects messages when the rate limit bucket is exhausted', async () => {
-    const msg = JSON.stringify({ event: 'player:move', data: {} });
-
-    // The rate limiter starts with 30 tokens. Exhaust them all.
-    for (let i = 0; i < 30; i += 1) {
-      await ws._triggerMessage(msg);
+    // Movement rides the CRITICAL bucket (40 tokens) so held-key input is
+    // never starved by chatty UI events; both buckets still cap out.
+    const move = JSON.stringify({ event: 'player:move', data: {} });
+    for (let i = 0; i < 40; i += 1) {
+      await ws._triggerMessage(move);
     }
+    vi.clearAllMocks();
+    await ws._triggerMessage(move);
+    expect(Handler['player:move']).not.toHaveBeenCalled();
+  });
 
+  it('keeps movement flowing while chatty UI events exhaust the general bucket', async () => {
+    const uiSpam = JSON.stringify({ event: 'player:context-menu:build', data: {} });
+    for (let i = 0; i < 35; i += 1) {
+      await ws._triggerMessage(uiSpam); // drains the general bucket
+    }
     vi.clearAllMocks();
 
-    // The 31st message should be rate-limited
-    await ws._triggerMessage(msg);
-    expect(Handler['player:move']).not.toHaveBeenCalled();
+    const move = JSON.stringify({ event: 'player:move', data: {} });
+    await ws._triggerMessage(move);
+    expect(Handler['player:move']).toHaveBeenCalled();
   });
 });

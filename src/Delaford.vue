@@ -7,6 +7,13 @@
       Connection lost — reconnecting…
     </div>
 
+    <div
+      v-if="sessionNotice"
+      class="connection-banner"
+    >
+      {{ sessionNotice }}
+    </div>
+
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
@@ -165,6 +172,8 @@ export default {
       connectionLost: false,
       reconnectAttempts: 0,
       intentionalDisconnect: false,
+      sessionNotice: '',
+      skipAutoRelogin: false,
       layout: {
         activePane: null,
         leftPane: defaultPaneAssignments.left,
@@ -517,9 +526,10 @@ export default {
           this.connectionLost = false;
           Socket.ensureListeners();
           Socket.flushQueue();
-          if (Socket.lastLoginPayload && this.screen === 'game') {
+          if (Socket.lastLoginPayload && this.screen === 'game' && !this.skipAutoRelogin) {
             Socket.emit('player:login', Socket.lastLoginPayload);
           }
+          this.skipAutoRelogin = false;
         };
       }, delay);
     };
@@ -629,6 +639,20 @@ export default {
     /**
      * Logout player
      */
+    /**
+     * The server replaced this session (login elsewhere). Return to the
+     * login screen without fighting to reconnect; the next socket open
+     * skips auto-relogin so the user decides.
+     */
+    sessionReplaced() {
+      this.skipAutoRelogin = true;
+      this.sessionNotice = 'Logged in from another window — this session was signed out.';
+      setTimeout(() => { this.sessionNotice = ''; }, 12000);
+      this.logout();
+      // Let the socket itself reconnect (the login screen needs a live
+      // socket to submit through); skipAutoRelogin stops the steal war.
+      this.intentionalDisconnect = false;
+    },
     logout() {
       // A user-chosen logout must not trigger the auto-reconnect loop.
       this.intentionalDisconnect = true;

@@ -10,6 +10,7 @@
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -38,6 +39,8 @@ const startServer = () => new Promise((resolve, reject) => {
       NODE_ENV: 'development',
       PORT: String(PORT),
       PLAYER_SAVE_COOLDOWN_MS: '999999999',
+      // Hermetic saves: never inherit or clobber the developer's character.
+      GUEST_SAVE_DIR: path.join(os.tmpdir(), `verdigris-playtest-${Date.now()}`),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

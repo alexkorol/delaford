@@ -40,6 +40,7 @@ export class HeadlessPlayer {
     this.stateCounter = 0;
 
     ws.on('message', (raw) => this.handleMessage(raw));
+    ws.on('close', () => { this.closed = true; });
   }
 
   static async connect({ url = DEFAULT_URL, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
@@ -106,6 +107,9 @@ export class HeadlessPlayer {
         break;
       case 'core:refresh:inventory':
         this.inventory = data.data || data || [];
+        break;
+      case 'player:session-replaced':
+        this.sessionReplaced = true;
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
