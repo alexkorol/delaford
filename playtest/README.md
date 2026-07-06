@@ -76,7 +76,8 @@ export `async ({ connect, assert }) => {…}`. Throw (or fail an assert) to fail
 
 The harness drives **server truth over the real protocol**. It cannot see
 client-side rendering or input binding bugs (dead Vue event bindings, canvas
-focus traps, stale HUD labels). After UI changes, do a short browser pass:
-move with WASD **after clicking a UI element**, right-click the canvas and an
-inventory item, open/close the skill tree. `preview_start` config
-`delaford-dev`, login button is prefilled.
+focus traps, stale HUD labels). After UI changes, do a short browser pass
+(`npm run dev`, http://localhost:5173 — the Login button is prefilled;
+Claude Code should use its preview tools with the `delaford-dev` config
+instead of a raw shell): move with WASD **after clicking a UI element**,
+right-click the canvas and an inventory item, open/close the skill tree.
