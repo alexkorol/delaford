@@ -57,8 +57,26 @@ class Engine {
 
     this.sampleFps(deltaMs);
 
-    // Paint the map
-    this.paintCanvas(deltaSeconds);
+    // Paint the map. A single throwing draw call must not kill the rAF loop
+    // — that used to freeze the canvas permanently, indistinguishable from a
+    // crash. Log the first failure loudly, keep rendering, and only give up
+    // (with a visible notice) if painting fails continuously.
+    try {
+      this.paintCanvas(deltaSeconds);
+      this._paintFailures = 0;
+    } catch (error) {
+      this._paintFailures = (this._paintFailures || 0) + 1;
+      if (this._paintFailures === 1) {
+        console.error('[engine] paint failed (continuing):', error);
+        bus.$emit('client:error', `Render error: ${error.message}`);
+      }
+      if (this._paintFailures > 120) {
+        console.error('[engine] paint failing continuously — stopping loop.', error);
+        bus.$emit('client:error', 'Rendering stopped after repeated errors — please reload.');
+        this.stop();
+        return;
+      }
+    }
 
     // and back to the top...
     this._rafId = requestAnimationFrame(this.loop);

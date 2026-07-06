@@ -14,6 +14,13 @@
       {{ sessionNotice }}
     </div>
 
+    <div
+      v-if="clientErrorNotice"
+      class="connection-banner connection-banner--error"
+    >
+      {{ clientErrorNotice }}
+    </div>
+
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
@@ -173,6 +180,7 @@ export default {
       reconnectAttempts: 0,
       intentionalDisconnect: false,
       sessionNotice: '',
+      clientErrorNotice: '',
       skipAutoRelogin: false,
       layout: {
         activePane: null,
@@ -557,6 +565,23 @@ export default {
     this.handleFlowerPaneOpen = () => {
       this.openPane('flowerOfLife');
     };
+
+    // Client-side crash visibility: render errors and uncaught exceptions
+    // surface as a banner instead of a silent freeze that looks like a
+    // server crash.
+    this.handleClientError = (text) => {
+      this.clientErrorNotice = String(text || 'Client error');
+      clearTimeout(this.clientErrorTimeout);
+      this.clientErrorTimeout = setTimeout(() => { this.clientErrorNotice = ''; }, 10000);
+    };
+    bus.$on('client:error', this.handleClientError);
+    window.addEventListener('error', (event) => {
+      console.error('[client] uncaught error:', event.error || event.message);
+      this.handleClientError(`Client error: ${event.message}`);
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('[client] unhandled rejection:', event.reason);
+    });
 
     bus.$on('show-sidebar', this.showSidebar);
     bus.$on('skill-tree:open', this.handleFlowerPaneOpen);
@@ -1690,6 +1715,10 @@ export default {
     width: 100%;
     box-sizing: border-box;
   }
+}
+
+.connection-banner--error {
+  background: rgba(150, 90, 20, 0.92) !important;
 }
 
 .connection-banner {

@@ -15,6 +15,34 @@ const serverDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = path.resolve(serverDir, '..');
 const distDir = path.join(projectRoot, 'dist');
 
+// Crash forensics: every uncaught exception/rejection is appended to a file
+// with a timestamp BEFORE the process dies, so "the game crashed" is always
+// diagnosable even after nodemon restarts and the console buffer rolls.
+const crashLogPath = path.join(serverDir, 'logs', 'crash.log');
+const recordCrash = (kind, error) => {
+  try {
+    fs.mkdirSync(path.dirname(crashLogPath), { recursive: true });
+    const entry = [
+      `\n[${new Date().toISOString()}] ${kind}`,
+      error && error.stack ? error.stack : String(error),
+      '',
+    ].join('\n');
+    fs.appendFileSync(crashLogPath, entry);
+  } catch (logError) {
+    // Last resort: at least the console below.
+  }
+  console.error(`[crash] ${kind}:`, error);
+};
+
+process.on('uncaughtException', (error) => {
+  recordCrash('uncaughtException', error);
+  process.exit(1); // let nodemon restart with a clean slate
+});
+process.on('unhandledRejection', (reason) => {
+  // Log but do not exit: a stray rejection must not take the world down.
+  recordCrash('unhandledRejection', reason);
+});
+
 const port = process.env.PORT || 6500;
 const env = process.env.NODE_ENV || 'development';
 const app = express();

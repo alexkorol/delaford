@@ -30,11 +30,22 @@ export default async function movement({ connect, assert }) {
     assert(inZone.sceneType === 'instance', `still in the instance after 2s (scene: ${inZone.sceneName})`);
     assert(!p.messages.some(m => m.includes('returns to the surface')), 'no bounce back to town');
 
-    // Movement still works inside the instance.
+    // Movement still works inside the instance. The spawn tile hugs the
+    // entry stairs, so some directions may be walls — any one moving is
+    // proof of life.
     const before = await p.state();
-    await p.move('down', 2);
-    const after = await p.state();
-    assert(before.x !== after.x || before.y !== after.y, 'moved inside the instance');
+    let movedInside = false;
+     
+    for (const direction of ['down', 'right', 'up', 'left']) {
+      await p.move(direction, 2);
+      const after = await p.state();
+      if (before.x !== after.x || before.y !== after.y) {
+        movedInside = true;
+        break;
+      }
+    }
+     
+    assert(movedInside, 'moved inside the instance');
   } finally {
     p.close();
   }
