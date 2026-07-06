@@ -467,7 +467,13 @@ class Client {
     const targetY = (typeof basePosition.y === 'number' ? basePosition.y : actor.y) + delta.y;
 
     return this.monsters.find((monster) => {
-      if (!monster || monster.x !== targetX || monster.y !== targetY) {
+      // Monsters glide at float positions; they occupy the tile they round
+      // to. Exact equality here made the client predict a step ONTO an
+      // occupied tile, and the server's rejection snapped the player back —
+      // the jarring "bump" on monster contact.
+      if (!monster
+        || Math.round(monster.x) !== targetX
+        || Math.round(monster.y) !== targetY) {
         return false;
       }
 

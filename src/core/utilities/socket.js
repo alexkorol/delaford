@@ -66,7 +66,16 @@ class Socket {
    * @param {string} event The event to send out
    * @param {object} data The data regarding the event
    */
+  static lastLoginPayload = null;
+
   static emit(event, data) {
+    // Remember the credentials so a reconnect can log straight back in
+    // after a server restart instead of dumping the player at the login
+    // screen.
+    if (event === 'player:login') {
+      Socket.lastLoginPayload = data;
+    }
+
     const payload = JSON.stringify({
       event,
       data,

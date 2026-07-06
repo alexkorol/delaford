@@ -199,7 +199,9 @@ class ContextMenu {
 
     const npcs = this.npcs
       .filter(
-        npc => npc.x === this.coordinates.map.x && npc.y === this.coordinates.map.y,
+        // NPCs amble at float positions; they occupy the tile they round to.
+        npc => Math.round(npc.x) === this.coordinates.map.x
+          && Math.round(npc.y) === this.coordinates.map.y,
       )
       .map((npc) => {
         npc.context = 'npc';

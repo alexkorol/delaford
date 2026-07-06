@@ -1,5 +1,12 @@
 <template>
   <div id="app">
+    <div
+      v-if="connectionLost"
+      class="connection-banner"
+    >
+      Connection lost — reconnecting…
+    </div>
+
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
@@ -155,6 +162,9 @@ export default {
       loaded: false,
       game: { exit: true },
       screen: 'login',
+      connectionLost: false,
+      reconnectAttempts: 0,
+      intentionalDisconnect: false,
       layout: {
         activePane: null,
         leftPane: defaultPaneAssignments.left,
@@ -464,10 +474,7 @@ export default {
   created() {
     const context = this;
 
-    // Reload window upon Socket close
-    window.ws.onclose = () => setTimeout(() => window.location.reload(), 1000);
-
-    window.ws.onmessage = (evt) => {
+    const handleMessage = (evt) => {
       const data = JSON.parse(evt.data);
       const eventName = data.event;
 
@@ -489,11 +496,53 @@ export default {
       }
     };
 
-    // On server connection error,
-    // show the appropriate screen
-    window.ws.onerror = () => {
-      this.screen = 'server-down';
+    // The old behaviour force-reloaded the page 1s after any socket close —
+    // every dev-server restart logged the player out. Reconnect with backoff
+    // instead, and log straight back in with the remembered credentials.
+    const wsUrl = window.ws ? window.ws.url : null;
+
+    const attemptReconnect = () => {
+      const delay = Math.min(8000, 750 * (2 ** Math.min(this.reconnectAttempts, 4)));
+      this.reconnectAttempts += 1;
+      setTimeout(() => {
+        if (this.intentionalDisconnect) {
+          return;
+        }
+        const ws = new WebSocket(wsUrl);
+        window.ws = ws;
+         
+        wireSocket(ws);
+        ws.onopen = () => {
+          this.reconnectAttempts = 0;
+          this.connectionLost = false;
+          Socket.ensureListeners();
+          Socket.flushQueue();
+          if (Socket.lastLoginPayload && this.screen === 'game') {
+            Socket.emit('player:login', Socket.lastLoginPayload);
+          }
+        };
+      }, delay);
     };
+
+    const wireSocket = (ws) => {
+      ws.onmessage = handleMessage;
+      ws.onclose = () => {
+        if (this.intentionalDisconnect) {
+          return;
+        }
+        this.connectionLost = true;
+        attemptReconnect();
+      };
+      ws.onerror = () => {
+        // Before the first successful login a dead server means the classic
+        // screen; mid-game errors flow through onclose → reconnect.
+        if (this.screen !== 'game') {
+          this.screen = 'server-down';
+        }
+      };
+    };
+
+    wireSocket(window.ws);
 
     this.handleFlowerPaneOpen = () => {
       this.openPane('flowerOfLife');
@@ -581,6 +630,10 @@ export default {
      * Logout player
      */
     logout() {
+      // A user-chosen logout must not trigger the auto-reconnect loop.
+      this.intentionalDisconnect = true;
+      setTimeout(() => { this.intentionalDisconnect = false; }, 3000);
+
       if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
         this.game.map.destroy();
       }
@@ -1475,6 +1528,17 @@ export default {
       // Stop the main menu music
       bus.$emit('music:stop');
 
+      // Re-entry safe (auto re-login after a reconnect): stop the previous
+      // engine and map before building fresh ones, or two rAF loops fight
+      // over the canvas.
+      if (this.engine) {
+        this.engine.stop();
+        this.engine = null;
+      }
+      if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
+        this.game.map.destroy();
+      }
+
       // Initialise client state immediately
       this.game = new Client(data);
 
@@ -1602,5 +1666,21 @@ export default {
     width: 100%;
     box-sizing: border-box;
   }
+}
+
+.connection-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: rgba(120, 30, 30, 0.92);
+  color: #ffe9e0;
+  font-family: 'GameFont', sans-serif;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 </style>
