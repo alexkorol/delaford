@@ -36,6 +36,8 @@ const vec3 ORBL = vec3(541.0, 484.5, 252.0);  // cx, cy(y-up), r in art px
 const vec3 ORBR = vec3(1128.0, 483.0, 252.0);
 const float INNER = 0.94;                      // inner glass radius
 
+float maxChan(vec3 c){ return max(c.r, max(c.g, c.b)); }
+
 float hash12(vec2 p){
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -538,13 +540,25 @@ void main(){
   col += (hash12(gl_FragCoord.xy + fract(uTime)) - 0.5) * 0.012;
 
   float orbAlpha = max(aL, aR);
-  float matteValue = max(art.r, max(art.g, art.b));
-  float matteLift = max(luma(art), satur(art) * 0.32);
-  float artAlpha = max(
-    smoothstep(0.09, 0.24, matteValue),
-    smoothstep(0.07, 0.22, matteLift)
-  );
+
+  // The statue plate is a JPEG photographed over black: its silhouette
+  // pixels are statue-times-alpha (a black matte), and JPEG noise pits the
+  // key. Close pinholes with a tiny neighborhood max, key on a tight
+  // near-black band so internal shadows stay opaque, then UN-MATTE — divide
+  // the black-multiplied colour back out at partial alpha. Without that
+  // division, semi-transparent edges composite as a dark fringe on any
+  // light background.
+  vec2 texel = 1.0 / vec2(textureSize(uArt, 0));
+  float mv = maxChan(art);
+  mv = max(mv, maxChan(texture(uArt, uv + vec2(texel.x, 0.0)).rgb));
+  mv = max(mv, maxChan(texture(uArt, uv - vec2(texel.x, 0.0)).rgb));
+  mv = max(mv, maxChan(texture(uArt, uv + vec2(0.0, texel.y)).rgb));
+  mv = max(mv, maxChan(texture(uArt, uv - vec2(0.0, texel.y)).rgb));
+  float artAlpha = smoothstep(0.06, 0.18, mv);
   float alpha = clamp(max(orbAlpha, artAlpha), 0.0, 1.0);
+
+  float edge = (1.0 - orbAlpha) * smoothstep(0.995, 0.35, alpha);
+  col = mix(col, col / max(alpha, 0.28), edge * step(0.02, alpha));
 
   outColor = vec4(col, alpha);
 }
