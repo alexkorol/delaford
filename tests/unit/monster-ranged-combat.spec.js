@@ -178,11 +178,18 @@ describe('patrol deadlock recovery', () => {
     monster.state.lastStepAt = 0;
     monster.state.lastDecisionAt = 0;
 
-    const moved = monster.patrol(5_000);
+    // Continuous movement: glide until the wall blocks the path; the target
+    // must then be abandoned (cleared, with a dwell before the next wander)
+    // — never an endless shuffle into the wall.
+    monster.patrol(5_000); // primes the glide clock
+    let abandoned = false;
+    for (let now = 5_300; now <= 20_000 && !abandoned; now += 300) {
+      monster.patrol(now);
+      const target = monster.state.patrolTarget;
+      abandoned = !target || target.x !== unreachable.x || target.y !== unreachable.y;
+    }
 
-    expect(moved).toBe(false);
-    // Deadlock fix: the blocked target has been replaced and the retry timer reset
-    expect(monster.state.patrolTarget).not.toEqual(unreachable);
-    expect(monster.state.lastDecisionAt).toBe(5_000);
+    expect(abandoned).toBe(true);
+    expect(monster.state.wanderDwellUntil || 0).toBeGreaterThan(0);
   });
 });

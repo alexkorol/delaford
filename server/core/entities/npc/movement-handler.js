@@ -105,92 +105,122 @@ const updateMovementStep = (npc, step) => {
   return npc.movementStep;
 };
 
-const canMove = (npc, direction, worldRef) => {
+// ── Continuous ambling ─────────────────────────────────────────────────
+//
+// The old behaviour hopped exactly one random cell every ~2.5s — smooth
+// tween, robotic decision. NPCs now amble to a point inside their range at
+// walking pace, pause like a person would, and amble on. Positions are
+// floats; the client interpolates position→position over the duration.
+
+const NPC_AMBLE_SPEED = 1.1; // tiles/sec — an unhurried villager
+const NPC_SAMPLE_TILES = 0.3;
+const NPC_MAX_DT_MS = 2000;
+
+const tileOpenForNpc = (npc, worldRef, x, y) => {
   const map = worldRef.map;
   if (!map || !Array.isArray(map.background) || !Array.isArray(map.foreground)) {
     return false;
   }
 
-  const background = UI.getFutureTileID(map.background, npc.x, npc.y, direction);
-  const foreground = UI.getFutureTileID(map.foreground, npc.x, npc.y, direction);
-  const walkable = UI.tileWalkable(background)
-    && UI.tileWalkable(foreground, 'foreground');
-
-  if (!walkable) {
+  const tileX = Math.round(x);
+  const tileY = Math.round(y);
+  if (tileX < (npc.spawn.x - npc.range) || tileX > (npc.spawn.x + npc.range)
+    || tileY < (npc.spawn.y - npc.range) || tileY > (npc.spawn.y + npc.range)) {
     return false;
   }
 
-  const vector = directionVectors[direction];
-  if (!vector) {
-    return false;
+  const width = Math.sqrt(map.background.length) | 0;
+  const index = (tileY * width) + tileX;
+  return UI.tileWalkable(map.background[index] - 1)
+    && UI.tileWalkable(map.foreground[index] - 1, 'foreground');
+};
+
+const pickAmbleTarget = (npc, worldRef) => {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const angle = (UI.getRandomInt(0, 359) * Math.PI) / 180;
+    const distance = UI.getRandomInt(10, Math.max(10, npc.range * 10)) / 10;
+    const x = npc.spawn.x + (Math.cos(angle) * distance);
+    const y = npc.spawn.y + (Math.sin(angle) * distance);
+    if (tileOpenForNpc(npc, worldRef, x, y)) {
+      return { x, y };
+    }
   }
-
-  const targetX = npc.x + vector.x;
-  const targetY = npc.y + vector.y;
-
-  if (targetX < (npc.spawn.x - npc.range) || targetX > (npc.spawn.x + npc.range)) {
-    return false;
-  }
-
-  if (targetY < (npc.spawn.y - npc.range) || targetY > (npc.spawn.y + npc.range)) {
-    return false;
-  }
-
-  return true;
+  return null;
 };
 
 const performRandomMovement = (npc, worldRef) => {
-  const nextActionAllowed = npc.lastAction + 2500;
   const now = Date.now();
+  const dtRaw = now - (npc.lastGlideAt || now);
+  npc.lastGlideAt = now;
+  const dt = Math.max(0, Math.min(dtRaw, NPC_MAX_DT_MS));
 
-  if (npc.lastAction !== 0 && nextActionAllowed >= now) {
+  // Pausing between strolls.
+  if ((npc.ambleDwellUntil || 0) > now) {
     return false;
   }
 
-  const action = UI.getRandomInt(1, 2) === 1 ? 'move' : 'nothing';
-  let moved = false;
-  let directionTaken = null;
-  let blockedAttempt = false;
-
-  if (action === 'move') {
-    const directions = ['up', 'down', 'left', 'right'];
-    const candidate = directions[UI.getRandomInt(0, 3)];
-    directionTaken = candidate;
-
-    if (canMove(npc, candidate, worldRef)) {
-      const vector = directionVectors[candidate];
-      npc.x += vector.x;
-      npc.y += vector.y;
-      moved = true;
-    } else {
-      blockedAttempt = true;
+  if (!npc.ambleTarget) {
+    npc.ambleTarget = pickAmbleTarget(npc, worldRef);
+    if (!npc.ambleTarget) {
+      npc.ambleDwellUntil = now + 2000;
+      return false;
     }
   }
 
-  const duration = moved && directionTaken ? computeStepDuration(directionTaken) : 0;
+  const dx = npc.ambleTarget.x - npc.x;
+  const dy = npc.ambleTarget.y - npc.y;
+  const remaining = Math.sqrt((dx * dx) + (dy * dy));
+
+  if (remaining <= 0.25 || dt === 0) {
+    if (remaining <= 0.25) {
+      npc.ambleTarget = null;
+      npc.ambleDwellUntil = now + 1500 + UI.getRandomInt(0, 4500);
+      setAnimationState(npc, 'idle', { direction: npc.facing, startedAt: now });
+      updateMovementStep(npc, {
+        startedAt: now, duration: 0, direction: null, blocked: false,
+      });
+    }
+    return false;
+  }
+
+  const travel = Math.min((NPC_AMBLE_SPEED * dt) / 1000, remaining);
+  const ux = dx / remaining;
+  const uy = dy / remaining;
+
+  // Collision-sample the path; stop at the last open spot.
+  const samples = Math.max(1, Math.ceil(travel / NPC_SAMPLE_TILES));
+  let reached = 0;
+  for (let i = 1; i <= samples; i += 1) {
+    const at = (travel * i) / samples;
+    if (!tileOpenForNpc(npc, worldRef, npc.x + (ux * at), npc.y + (uy * at))) {
+      break;
+    }
+    reached = at;
+  }
+
+  if (reached <= 0.01) {
+    npc.ambleTarget = null;
+    npc.ambleDwellUntil = now + 1200;
+    updateMovementStep(npc, {
+      startedAt: now, duration: 0, direction: null, blocked: true,
+    });
+    setAnimationState(npc, 'idle', { direction: npc.facing, startedAt: now });
+    return false;
+  }
+
+  npc.x += ux * reached;
+  npc.y += uy * reached;
+
+  const direction = Math.abs(ux) > Math.abs(uy)
+    ? (ux > 0 ? 'right' : 'left')
+    : (uy > 0 ? 'down' : 'up');
+  const duration = Math.max(90, Math.round(dt));
+
   updateMovementStep(npc, {
-    startedAt: now,
-    duration,
-    direction: moved ? directionTaken : null,
-    blocked: action === 'move' && blockedAttempt && !moved,
+    startedAt: now, duration, direction, blocked: false,
   });
-
-  if (directionTaken) {
-    setFacing(npc, directionTaken);
-  }
-
-  if (moved && directionTaken) {
-    setAnimationState(npc, 'run', {
-      direction: directionTaken,
-      duration,
-      startedAt: now,
-    });
-  } else {
-    setAnimationState(npc, 'idle', {
-      direction: directionTaken || npc.facing,
-      startedAt: now,
-    });
-  }
+  setFacing(npc, direction);
+  setAnimationState(npc, 'run', { direction, duration, startedAt: now });
 
   npc.lastAction = now;
   return true;

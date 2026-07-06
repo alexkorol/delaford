@@ -200,6 +200,10 @@ class Monster {
     return this.movement.pursue(target, now);
   }
 
+  retreatFrom(target, now = Date.now()) {
+    return this.movement.retreatFrom(target, now);
+  }
+
   returnToSpawn(now = Date.now()) {
     return this.movement.returnToSpawn(now);
   }

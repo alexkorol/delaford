@@ -143,11 +143,21 @@ const createSupportBehaviourSystem = (entity, monster) => (world, _delta, contex
     return;
   }
 
-  if (distance <= minimumDistance) {
-    dirty = monster.pursue(target, now) || dirty;
-    if (!dirty) {
+  if (distance <= minimumDistance - 0.5) {
+    // A caster that is crowded backs away; the hysteresis margin stops the
+    // approach/retreat flip-flop dance at the boundary.
+    const retreated = monster.retreatFrom(target, now);
+    dirty = retreated || dirty;
+    if (!retreated) {
       dirty = monster.tryAttack(target, now) || dirty;
     }
+    markDirty(entity, dirty);
+    return;
+  }
+
+  if (distance <= minimumDistance) {
+    // Inside the comfort band but not crowded: hold ground and cast.
+    dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);
     return;
   }

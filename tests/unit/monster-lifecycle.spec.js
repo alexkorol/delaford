@@ -347,11 +347,15 @@ describe('monster lifecycle', () => {
       metadata: { spawnPoints: [{ x: 10, y: 10 }] },
     });
 
-    expect(monster.pursue({ x: 12, y: 10 }, 1_200)).toBe(false);
+    // Continuous movement: slows scale glide speed. stepIntervalMs 1000 at a
+    // 0.5 slow = 0.5 tiles/sec, so one second of pursuit covers ~0.5 tiles
+    // instead of the unslowed ~1.0.
+    monster.pursue({ x: 12, y: 10 }, 1_200); // primes the glide clock
     expect(monster.x).toBe(10);
 
-    expect(monster.pursue({ x: 12, y: 10 }, 2_000)).toBe(true);
-    expect(monster.x).toBe(11);
+    expect(monster.pursue({ x: 12, y: 10 }, 2_200)).toBe(true);
+    expect(monster.x).toBeGreaterThan(10.3);
+    expect(monster.x).toBeLessThan(10.75); // unslowed pace would reach ~11
     expect(monster.movementStep.duration).toBeGreaterThan(150);
   });
 
@@ -385,10 +389,15 @@ describe('monster lifecycle', () => {
     });
     scene.players = [player];
 
-    expect(monster.pursue({ x: 12, y: 10 }, 1_000)).toBe(false);
-    expect(monster.x).toBe(10);
-    expect(monster.y).toBe(10);
-    expect(monster.movementStep.blocked).toBe(true);
+    // Continuous movement: the monster closes in but may never enter the
+    // tile a living player is standing on.
+    monster.pursue({ x: 12, y: 10 }, 1_000); // primes the glide clock
+    for (let now = 1_200; now <= 3_000; now += 200) {
+      monster.pursue({ x: 12, y: 10 }, now);
+    }
+    expect(Math.round(monster.x)).toBe(10);
+    expect(Math.round(monster.y)).toBe(10);
+    expect(monster.x).toBeLessThan(10.5);
   });
 
   it('does not step onto living monsters while pursuing', () => {
@@ -413,9 +422,13 @@ describe('monster lifecycle', () => {
       metadata: { spawnPoints: [{ x: 10, y: 10 }] },
     });
 
-    expect(monster.pursue({ x: 12, y: 10 }, 1_000)).toBe(false);
-    expect(monster.x).toBe(10);
-    expect(monster.y).toBe(10);
-    expect(monster.movementStep.blocked).toBe(true);
+    // Continuous movement: the blocker's tile stays exclusive.
+    monster.pursue({ x: 12, y: 10 }, 1_000); // primes the glide clock
+    for (let now = 1_200; now <= 3_000; now += 200) {
+      monster.pursue({ x: 12, y: 10 }, now);
+    }
+    expect(Math.round(monster.x)).toBe(10);
+    expect(Math.round(monster.y)).toBe(10);
+    expect(monster.x).toBeLessThan(10.5);
   });
 });

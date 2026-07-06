@@ -11,32 +11,13 @@ const markDirty = (entity, dirty) => {
   return true;
 };
 
+// Kite away smoothly (continuous positions) instead of hopping one cell.
 const attemptRetreat = (monster, target, now) => {
   if (!target) {
     return false;
   }
 
-  const dx = monster.x - target.x;
-  const dy = monster.y - target.y;
-
-  const primaryDirection = Math.abs(dx) > Math.abs(dy)
-    ? (dx >= 0 ? 'right' : 'left')
-    : (dy >= 0 ? 'down' : 'up');
-
-  const fallback = primaryDirection === 'left' || primaryDirection === 'right'
-    ? ['up', 'down']
-    : ['left', 'right'];
-
-  const candidates = [primaryDirection, ...fallback];
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    const direction = candidates[index];
-    if (direction && monster.step(direction, now)) {
-      return true;
-    }
-  }
-
-  return false;
+  return monster.retreatFrom(target, now);
 };
 
 const ensureDeathHandled = (monster, entity, now) => {
@@ -91,12 +72,20 @@ const createRangedBehaviourSystem = (entity, monster) => (world, _delta, context
     return;
   }
 
-  if (distance <= minimumDistance) {
+  if (distance <= minimumDistance - 0.5) {
+    // Hysteresis: only kite away once genuinely crowded, so the archer does
+    // not metronome across the minimum-range boundary every tick.
     const retreated = attemptRetreat(monster, target, now);
     dirty = retreated || dirty;
     if (!retreated) {
       dirty = monster.tryAttack(target, now) || dirty;
     }
+    markDirty(entity, dirty);
+    return;
+  }
+
+  if (distance <= minimumDistance) {
+    dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);
     return;
   }

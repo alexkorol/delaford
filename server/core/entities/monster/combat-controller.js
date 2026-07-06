@@ -1,8 +1,12 @@
 import world from '#server/core/world.js';
 import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.js';
-import { manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
+import { euclideanDistance, manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
 import UI from '#shared/ui.js';
+
+// Continuous positions: melee pursuit stands off ~1 tile from the target
+// (never on its tile), so reach checks are radii with diagonal headroom.
+const REACH_TOLERANCE = 0.6;
 
 const rollDamage = (monster) => {
   const archetype = monster.archetype || {};
@@ -113,8 +117,8 @@ const tryAttack = (monster, target, now = Date.now()) => {
   }
 
   const range = Math.max(1, attack.range || 1);
-  const distance = manhattanDistance(monster, target);
-  if (distance > range) {
+  const distance = euclideanDistance(monster, target);
+  if (distance > range + REACH_TOLERANCE) {
     return false;
   }
 
@@ -179,8 +183,8 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
 
   const attack = monster.behaviour.attack || DEFAULT_BEHAVIOUR.attack;
   const range = Math.max(1, attack.range || 1);
-  const distance = manhattanDistance(monster, target);
-  if (distance > range) {
+  const distance = euclideanDistance(monster, target);
+  if (distance > range + REACH_TOLERANCE) {
     return false;
   }
 

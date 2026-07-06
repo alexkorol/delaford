@@ -64,6 +64,11 @@ export const dropMonsterLoot = (monster, options = {}) => {
     return [];
   }
 
+  // Monsters roam at continuous positions; loot must land on the tile grid
+  // so pickup (exact tile match) and rendering line up.
+  const dropX = Math.round(monster.x);
+  const dropY = Math.round(monster.y);
+
   const rng = typeof options.rng === 'function' ? options.rng : Math.random;
   const drops = [];
 
@@ -73,7 +78,7 @@ export const dropMonsterLoot = (monster, options = {}) => {
   if (coins > 0) {
     const coinItem = ItemFactory.createById('coins', { quantity: coins });
     if (coinItem) {
-      drops.push(ItemFactory.toWorldInstance(coinItem, { x: monster.x, y: monster.y }));
+      drops.push(ItemFactory.toWorldInstance(coinItem, { x: dropX, y: dropY }));
     }
   }
 
@@ -91,7 +96,7 @@ export const dropMonsterLoot = (monster, options = {}) => {
       itemLevel: monsterLevel ? Math.min(80, monsterLevel * 2) : undefined,
     });
     if (gear) {
-      drops.push(ItemFactory.toWorldInstance(gear, { x: monster.x, y: monster.y }));
+      drops.push(ItemFactory.toWorldInstance(gear, { x: dropX, y: dropY }));
     }
   }
 

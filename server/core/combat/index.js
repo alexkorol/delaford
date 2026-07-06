@@ -16,8 +16,15 @@ import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
 const DEFAULT_PROJECTILE_RANGE = 5;
 const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
-const AUTO_ATTACK_RANGE = 1;
+// Monsters hold continuous positions and stand off ~1 tile when engaging, so
+// the auto-attack leash needs diagonal headroom beyond strict adjacency.
+const AUTO_ATTACK_RANGE = 1.9;
 const DEFAULT_DASH_DISTANCE = 3;
+
+// Continuous monster positions still fight over the tile grid: melee arcs and
+// tile lookups act on the tile a monster is standing on.
+const monsterTileX = monster => Math.round(monster.x);
+const monsterTileY = monster => Math.round(monster.y);
 
 const ensureCombatState = (player) => {
   if (!player.combat) {
@@ -135,7 +142,7 @@ const getSceneMap = (player) => {
 
 const isMonsterOnTile = (player, x, y) => (
   getAliveSceneMonsters(player.sceneId)
-    .some(monster => monster.x === x && monster.y === y)
+    .some(monster => monsterTileX(monster) === x && monsterTileY(monster) === y)
 );
 
 const canMoveToTile = (player, x, y) => {
@@ -216,7 +223,7 @@ export const findStepTarget = (player, direction) => {
   const targetX = player.x + delta.x;
   const targetY = player.y + delta.y;
   return getAliveSceneMonsters(player.sceneId)
-    .find(monster => monster.x === targetX && monster.y === targetY) || null;
+    .find(monster => monsterTileX(monster) === targetX && monsterTileY(monster) === targetY) || null;
 };
 
 /**
@@ -230,7 +237,7 @@ export const findMeleeTargets = (player, direction) => {
 
   const keys = new Set(tiles.map(tile => `${tile.x}:${tile.y}`));
   return getAliveSceneMonsters(player.sceneId)
-    .filter(monster => keys.has(`${monster.x}:${monster.y}`));
+    .filter(monster => keys.has(`${monsterTileX(monster)}:${monsterTileY(monster)}`));
 };
 
 /**
@@ -251,7 +258,7 @@ export const findProjectileTarget = (player, direction, range = DEFAULT_PROJECTI
     const x = player.x + (delta.x * step);
     const y = player.y + (delta.y * step);
 
-    const hit = monsters.find(monster => monster.x === x && monster.y === y);
+    const hit = monsters.find(monster => monsterTileX(monster) === x && monsterTileY(monster) === y);
     if (hit) {
       return hit;
     }

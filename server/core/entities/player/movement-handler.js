@@ -218,9 +218,10 @@ const hasLivingMonsterAt = (player, tileX, tileY) => {
   const scene = world.getSceneForPlayer(player);
   const monsters = scene && Array.isArray(scene.monsters) ? scene.monsters : [];
 
+  // Monsters hold continuous positions; they block the tile they stand on.
   return monsters.some(monster => monster
-    && monster.x === tileX
-    && monster.y === tileY
+    && Math.round(monster.x) === tileX
+    && Math.round(monster.y) === tileY
     && monster.isAlive !== false
     && hasBlockingHealth(monster));
 };

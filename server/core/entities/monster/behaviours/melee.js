@@ -1,4 +1,4 @@
-import { euclideanDistance, manhattanDistance } from '../movement-handler.js';
+import { euclideanDistance } from '../movement-handler.js';
 
 const markDirty = (entity, dirty) => {
   if (!dirty) {
@@ -53,8 +53,10 @@ const createMeleeBehaviourSystem = (entity, monster) => (world, _delta, context 
   const target = monster.resolveTarget(now);
   if (target) {
     monster.state.mode = 'engaged';
-    const distance = manhattanDistance(monster, target);
-    if (distance <= 1) {
+    // Continuous positions: melee reach is a radius, not tile adjacency.
+    // Pursuit stops ~1 tile out, so 1.6 covers the diagonal standoff.
+    const distance = euclideanDistance(monster, target);
+    if (distance <= 1.6) {
       dirty = monster.tryAttack(target, now) || dirty;
     } else {
       dirty = monster.pursue(target, now) || dirty;
@@ -63,8 +65,12 @@ const createMeleeBehaviourSystem = (entity, monster) => (world, _delta, context 
     return;
   }
 
+  // Only trek home when genuinely far afield (chased a player off the
+  // patrol ground). The old >0.5 gate yanked monsters back after every
+  // wander step — the "slide one cell and snap back" tic.
+  const patrolRadius = (monster.behaviour && monster.behaviour.patrolRadius) || 0;
   const distanceFromSpawn = euclideanDistance(monster, monster.spawn);
-  if (distanceFromSpawn > 0.5) {
+  if (distanceFromSpawn > patrolRadius + 1.5) {
     monster.state.mode = 'returning';
     dirty = monster.returnToSpawn(now) || dirty;
     markDirty(entity, dirty);
