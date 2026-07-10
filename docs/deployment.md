@@ -58,6 +58,29 @@ After deployment, verify `https://play.example.com/?play`. That URL provisions
 a browser-stable guest House/scion and enters a populated instance; the goal
 harness asserts combat begins in under ten seconds.
 
+Run the production-only probes before sharing the URL:
+
+```sh
+npm run smoke:production-local
+npm run smoke:public -- https://play.example.com
+```
+
+Both probes avoid `dev:*` events and use isolated guest identities. The public
+probe verifies the built page, secure WebSocket upgrade, quick House/scion
+creation, and a populated instance inside one ten-second budget.
+
+For a deployment preflight on a machine with `cloudflared` installed, this
+command creates a temporary TLS tunnel, runs the same HTTP/WSS probe, and then
+shuts the tunnel down automatically:
+
+```sh
+npm run smoke:public-tunnel
+```
+
+That temporary `trycloudflare.com` address is verification only. A shareable
+24/7 URL still needs the named DNS/Caddy setup above (or a persistent named
+Cloudflare Tunnel tied to a domain).
+
 ## Other ways to connect
 
 The client connects its WebSocket to **the same host and port the page was

@@ -15,6 +15,8 @@ import createPlayerMovementHandler, {
 import createPlayerStatsManager, {
   broadcastStats as broadcastPlayerStats,
 } from '#server/core/entities/player/stats-manager.js';
+import Wear from '#server/core/utilities/wear.js';
+import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
 class Player {
   constructor(data, token, socketId) {
@@ -66,12 +68,21 @@ class Player {
     // Tabs
     this.friend_list = data.friend_list;
     this.wear = Player.constructWear(data.wear);
+    const restoredCombat = Wear.updateCombat(this);
+    this.combat.attack = restoredCombat.attack;
+    this.combat.defense = restoredCombat.defense;
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).
-    this.passiveTree = data.passiveTree || null;
+    const restoredTree = data.passiveTree
+      ? resolveVerdigrisTree(data.passiveTree, this.level)
+      : null;
+    this.passiveTree = restoredTree?.ok ? restoredTree.snapshot : null;
+    this.passiveTreeStats = restoredTree?.ok ? restoredTree.stats : null;
 
-    this.refreshDerivedStats();
+    this.refreshDerivedStats(restoredTree?.ok
+      ? { passiveAttributes: restoredTree.attributes }
+      : {});
 
     // Pathfinding
     this.path = {

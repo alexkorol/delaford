@@ -12,7 +12,8 @@ export const constructWear = (data) => {
     }
 
     if (wearData[property] !== null) {
-      const id = wearData[property];
+      const persisted = wearData[property];
+      const id = typeof persisted === 'string' ? persisted : persisted?.id;
       const definition = wearableItems.find(db => db.id === id);
       // A saved character can reference an item id that no longer exists in the
       // database (e.g. after an item-pack rename). Clear the slot instead of
@@ -23,9 +24,11 @@ export const constructWear = (data) => {
       }
       const { name, graphics } = definition;
       wearData[property] = {
-        uuid: uuid(),
-        graphics,
-        name,
+        ...definition,
+        ...(persisted && typeof persisted === 'object' ? persisted : {}),
+        uuid: persisted?.uuid || uuid(),
+        graphics: persisted?.graphics || graphics,
+        name: persisted?.name || name,
         id,
       };
     }

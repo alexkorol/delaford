@@ -15,6 +15,7 @@ import world from '#server/core/world.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 import { dropMonsterLoot } from '#server/core/combat/loot.js';
+import ItemFactory from '#server/core/items/factory.js';
 
 const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
 
@@ -48,6 +49,17 @@ const buildStateSnapshot = (player) => {
     mana: player.stats && player.stats.resources ? { ...player.stats.resources.mana } : null,
     lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle.state : null,
     bestDepth: player.bestDepth || 0,
+    combat: player.combat ? {
+      attack: { ...(player.combat.attack || {}) },
+      defense: { ...(player.combat.defense || {}) },
+    } : null,
+    attributes: player.stats?.attributes?.total
+      ? { ...player.stats.attributes.total }
+      : null,
+    experience: {
+      attack: player.skills?.attack?.exp || 0,
+      defence: player.skills?.defence?.exp || 0,
+    },
     inventory: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(item => ({
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
@@ -157,6 +169,20 @@ const devEvents = {
       data: player.inventory.slots,
     });
     sendDevMessage(player, `Granted ${quantity}x ${payload.itemId}.`);
+  },
+
+  /** Place deterministic gear on the active floor; pickup/equip stay real. */
+  'dev:drop': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    if (!DEV_MODE || !player || typeof payload.itemId !== 'string') return;
+    const item = ItemFactory.createById(payload.itemId);
+    const scene = world.getSceneForPlayer(player);
+    if (!item || !scene) return;
+    const dropped = ItemFactory.toWorldInstance(item, { x: player.x, y: player.y });
+    world.addItem(dropped, scene.id);
+    Socket.broadcast('world:itemDropped', scene.items, world.getScenePlayers(scene.id));
+    sendDevMessage(player, `Dropped ${payload.itemId} on the active floor.`);
   },
 
   /**

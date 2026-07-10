@@ -16,6 +16,7 @@ import {
   sendChronicleState,
 } from '#server/core/services/chronicles.js';
 import world from '#server/core/world.js';
+import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
 // Fast in-process mirror; authoritative scion snapshots also persist this in
 // SQLite through PlayerPersistenceService.
@@ -163,12 +164,20 @@ export default {
     }
 
     const sanitised = sanitisePassiveTree(data && data.snapshot);
-    if (!sanitised) {
+    const resolved = sanitised && resolveVerdigrisTree(sanitised, player.level);
+    if (!resolved?.ok) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: resolved?.reason || 'That passive tree is invalid.',
+      });
       return;
     }
 
-    player.passiveTree = sanitised;
-    guestPassiveTrees.set(player.uuid, sanitised);
+    player.passiveTree = resolved.snapshot;
+    player.passiveTreeStats = resolved.stats;
+    player.refreshDerivedStats({ passiveAttributes: resolved.attributes });
+    Player.broadcastStats(player);
+    guestPassiveTrees.set(player.uuid, resolved.snapshot);
     playerPersistence.markDirty(player);
 
     // Chronicle scions save to SQLite even for guests; only legacy guests

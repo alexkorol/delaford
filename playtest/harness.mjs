@@ -331,6 +331,18 @@ export class HeadlessPlayer {
     this.emit('player:skilltree:save', { snapshot });
   }
 
+  /** Equip an inventory item through the production socket handler. */
+  equipItem(item) {
+    this.emit('item:equip', {
+      item: {
+        id: item.id,
+        uuid: item.uuid,
+        slot: item.slot,
+        miscData: { slot: item.slot },
+      },
+    });
+  }
+
   /** Grab the item under/beside your feet (the 'z'/'g' key). */
   pickupUnderfoot() {
     this.emit('player:take:underfoot', {});
@@ -364,6 +376,10 @@ export class HeadlessPlayer {
 
   devGive(itemId, qty = 1) {
     this.emit('dev:give', { itemId, qty });
+  }
+
+  devDrop(itemId) {
+    this.emit('dev:drop', { itemId });
   }
 
   devSetLevel(level) {

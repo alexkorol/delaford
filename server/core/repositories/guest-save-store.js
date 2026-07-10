@@ -20,10 +20,12 @@ const SAVE_DIR = process.env.GUEST_SAVE_DIR
 
 const savePath = uuid => path.join(SAVE_DIR, `${String(uuid).replace(/[^a-zA-Z0-9-]/g, '')}.json`);
 
-const wearIds = (wear = {}) => Object.fromEntries(
+const serialiseWear = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
     .filter(([slot]) => slot !== 'arrows')
-    .map(([slot, item]) => [slot, item && typeof item === 'object' ? item.id : item]),
+    .map(([slot, item]) => [slot, item && typeof item === 'object'
+      ? JSON.parse(JSON.stringify(item))
+      : item]),
 );
 
 const slimInventory = (slots = []) => slots
@@ -54,7 +56,7 @@ export const buildGuestSnapshot = (player) => ({
   ...surfacePosition(player),
   level: player.level,
   skills: player.skills || {},
-  wear: wearIds(player.wear),
+  wear: serialiseWear(player.wear),
   inventory: slimInventory(player.inventory && player.inventory.slots),
   bank: Array.isArray(player.bank) ? player.bank : [],
   passiveTree: player.passiveTree || null,

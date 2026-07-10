@@ -1,6 +1,6 @@
 import {
   VERDIGRIS_SKILL_TREE_TOTALS,
-} from '@/core/passives/verdigris-skill-tree.js';
+} from './verdigris-skill-tree.js';
 
 export const VERDIGRIS_AXIS_META = Object.freeze({
   STR: { label: 'Strength', short: 'STR', color: '#f06a54', path: 'Iron Route' },

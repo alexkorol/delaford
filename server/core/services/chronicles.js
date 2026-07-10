@@ -7,10 +7,10 @@ import world from '#server/core/world.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
-const wearIds = (wear = {}) => Object.fromEntries(
+const serialiseWear = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
     .filter(([slot]) => slot !== 'arrows')
-    .map(([slot, item]) => [slot, item && typeof item === 'object' ? item.id : item]),
+    .map(([slot, item]) => [slot, item && typeof item === 'object' ? clone(item) : item]),
 );
 
 const cleanInventory = (slots = []) => slots
@@ -43,7 +43,7 @@ export const buildScionSnapshot = player => ({
   ...surfacePosition(player),
   level: player.level,
   skills: clone(player.skills || {}),
-  wear: wearIds(player.wear),
+  wear: serialiseWear(player.wear),
   inventory: cleanInventory(player.inventory?.slots || []),
   bank: clone(Array.isArray(player.bank) ? player.bank : []),
   passiveTree: clone(player.passiveTree || null),

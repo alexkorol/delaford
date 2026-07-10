@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { constructWear } from '#server/core/entities/player/inventory-manager.js';
+import Wear from '#server/core/utilities/wear.js';
 
 // Regression: constructWear runs inside the Player constructor on every login.
 // A saved character can carry a worn item id that no longer exists in the item
@@ -42,5 +43,40 @@ describe('constructWear', () => {
     const wear = constructWear({ arrows: 'bronze-arrow', head: null });
     expect(wear).not.toHaveProperty('arrows');
     expect(wear.head).toBeNull();
+  });
+
+  it('rebuilds combat bonuses from persisted worn gear before world insertion', () => {
+    const player = {
+      wear: constructWear({ right_hand: 'steel-sword', armor: null }),
+    };
+
+    expect(Wear.updateCombat(player)).toMatchObject({
+      attack: { stab: 11, slash: 8, crush: 2, range: 0 },
+      defense: { stab: 0, slash: 4, crush: 3, range: 0 },
+    });
+  });
+
+  it('preserves the identity and rolled stats of a full persisted item', () => {
+    const wear = constructWear({
+      right_hand: {
+        id: 'steel-battleaxe',
+        uuid: 'rolled-axe-1',
+        displayName: 'The Long Road',
+        stats: {
+          attack: { stab: -2, slash: 23, crush: 15, range: 0 },
+          defense: { stab: 0, slash: 1, crush: 2, range: 2 },
+        },
+        affixes: { brand: { id: 'heavy' } },
+      },
+    });
+
+    expect(wear.right_hand).toMatchObject({
+      id: 'steel-battleaxe',
+      uuid: 'rolled-axe-1',
+      displayName: 'The Long Road',
+      stats: { attack: { slash: 23 } },
+      affixes: { brand: { id: 'heavy' } },
+    });
+    expect(Wear.updateCombat({ wear }).attack.slash).toBe(23);
   });
 });

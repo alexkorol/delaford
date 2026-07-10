@@ -26,7 +26,10 @@
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
     "format": "eslint . --fix",
-    "playtest": "node playtest/run.mjs"
+    "playtest": "node playtest/run.mjs",
+    "smoke:public": "node playtest/public-smoke.mjs",
+    "smoke:production-local": "node playtest/local-production-smoke.mjs",
+    "smoke:public-tunnel": "node playtest/public-tunnel-smoke.mjs"
   },
   "dependencies": {
     "axios": "^1.7.7",
