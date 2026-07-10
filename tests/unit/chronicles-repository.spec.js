@@ -95,4 +95,31 @@ describe('server-side Chronicles repository', () => {
     expect(chronicle.leaderboard[0]).toMatchObject({ houseName: 'Ashford', bestDepth: 4 });
     expect(repository.recordDepth('account:intruder', houseId, scionId, 99)).toBeNull();
   });
+
+  it('lets a death witness find the friend House relic after three of their runs', () => {
+    const { houseId, scionId } = createLineage();
+    repository.beginRun(accountId, houseId);
+    repository.entombScion({
+      accountId,
+      houseId,
+      scionId,
+      level: 5,
+      relicItems: [{ id: 'gold-ring', uuid: 'friend-ring', name: 'Bryn\'s Ring' }],
+    });
+
+    const friendAccount = 'account:friend';
+    const friendHouse = repository.foundHouse(friendAccount, 'Wayfarers');
+    const friendScion = repository.createScion(friendAccount, friendHouse.houseId, 'Mara');
+    repository.beginRun(friendAccount, friendHouse.houseId);
+    expect(repository.grantHouseRelicAccess(friendAccount, houseId, 3)).toBe(4);
+    repository.beginRun(friendAccount, friendHouse.houseId);
+    repository.beginRun(friendAccount, friendHouse.houseId);
+    expect(repository.drawEligibleRelic([friendAccount])).toBeNull();
+    repository.beginRun(friendAccount, friendHouse.houseId);
+    expect(repository.drawEligibleRelic([friendAccount])).toMatchObject({
+      originScionName: 'Bryn',
+      item: { uuid: 'friend-ring' },
+    });
+    expect(friendScion.ok).toBe(true);
+  });
 });

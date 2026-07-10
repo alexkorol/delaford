@@ -108,7 +108,11 @@ export default {
         isGuest = true;
       }
 
-      const accountId = `${isGuest ? 'guest:' : 'account:'}${profile.uuid}`;
+      const guestId = typeof payload.guestId === 'string'
+        && /^[a-zA-Z0-9-]{8,64}$/.test(payload.guestId)
+        ? payload.guestId
+        : profile.uuid;
+      const accountId = `${isGuest ? 'guest:' : 'account:'}${isGuest ? guestId : profile.uuid}`;
       ws.chronicleAuth = { accountId, profile, token, isGuest };
       ws.authenticated = true;
       if (typeof payload.resumeScionId === 'string' && payload.resumeScionId) {

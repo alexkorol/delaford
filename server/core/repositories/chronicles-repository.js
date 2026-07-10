@@ -121,6 +121,14 @@ export class ChroniclesRepository {
       );
       CREATE INDEX IF NOT EXISTS chronicle_relic_circulation
         ON chronicle_relics(status, eligible_run, created_at);
+      CREATE TABLE IF NOT EXISTS chronicle_house_links (
+        account_id TEXT NOT NULL,
+        house_id TEXT NOT NULL,
+        eligible_run INTEGER NOT NULL,
+        PRIMARY KEY(account_id, house_id),
+        FOREIGN KEY(account_id) REFERENCES chronicle_accounts(account_id) ON DELETE CASCADE,
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
     `);
   }
 
@@ -345,12 +353,21 @@ export class ChroniclesRepository {
       FROM chronicle_relics r
       JOIN chronicle_houses h ON h.id = r.house_id
       JOIN chronicle_accounts a ON a.account_id = h.account_id
-      WHERE h.account_id IN (${placeholders})
-        AND r.status = 'circulating'
-        AND r.eligible_run <= a.run_count
+      WHERE r.status = 'circulating'
+        AND (
+          (h.account_id IN (${placeholders}) AND r.eligible_run <= a.run_count)
+          OR EXISTS (
+            SELECT 1
+            FROM chronicle_house_links l
+            JOIN chronicle_accounts viewer ON viewer.account_id = l.account_id
+            WHERE l.house_id = h.id
+              AND l.account_id IN (${placeholders})
+              AND l.eligible_run <= viewer.run_count
+          )
+        )
       ORDER BY r.created_at ASC
       LIMIT 1
-    `).get(...ids);
+    `).get(...ids, ...ids);
     if (!row) return null;
     this.db.prepare(`
       UPDATE chronicle_relics SET status = 'dropped', dropped_at = ? WHERE id = ? AND status = 'circulating'
@@ -361,6 +378,21 @@ export class ChroniclesRepository {
       sourceScionId: row.source_scion_id,
       item: parseJson(row.item_json, null),
     };
+  }
+
+  grantHouseRelicAccess(accountId, houseId, delayRuns = 3) {
+    const account = this.db.prepare('SELECT run_count FROM chronicle_accounts WHERE account_id = ?')
+      .get(accountId);
+    const house = this.db.prepare('SELECT id FROM chronicle_houses WHERE id = ?').get(houseId);
+    if (!account || !house) return null;
+    const eligibleRun = account.run_count + Math.max(0, Math.floor(delayRuns));
+    this.db.prepare(`
+      INSERT INTO chronicle_house_links (account_id, house_id, eligible_run)
+      VALUES (?, ?, ?)
+      ON CONFLICT(account_id, house_id) DO UPDATE SET
+        eligible_run = MIN(eligible_run, excluded.eligible_run)
+    `).run(accountId, houseId, eligibleRun);
+    return eligibleRun;
   }
 
   claimRelic(relicId, player) {

@@ -111,6 +111,16 @@ const isLoginInProgress = ref(false);
 const usernameField = ref(null);
 
 const inDevelopment = computed(() => !import.meta.env.PROD);
+const GUEST_ID_KEY = 'verdigris_guest_id';
+
+const getGuestId = () => {
+  const existing = window.localStorage.getItem(GUEST_ID_KEY);
+  if (existing) return existing;
+  const generated = globalThis.crypto?.randomUUID?.()
+    || `guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(GUEST_ID_KEY, generated);
+  return generated;
+};
 
 const setLoginProgress = (value) => {
   isLoginInProgress.value = value;
@@ -167,6 +177,7 @@ const login = () => {
     username: username.value,
     password: password.value,
     useGuestAccount: guestAccount.value,
+    ...(guestAccount.value ? { guestId: getGuestId() } : {}),
   };
 
   uiStore.rememberDevAccount({

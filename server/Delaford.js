@@ -160,25 +160,24 @@ class Delaford {
       // Logout the player out and save the profile
       try {
         await player.update();
-        await Authentication.logout(player.token);
-
-        console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
-
-        // If the user did not logout,
-        // then we remove them from list
-        if (!logout) {
-          world.clients = world.clients.filter(c => c.id !== ws.id);
+        if (player.token && player.token !== 'none') {
+          await Authentication.logout(player.token);
         }
-
-        // Remove from any parties the player was in
-        partyService.removePlayer(player.uuid);
-
-        // Tell the clients someone left
-        const scenePlayers = world.getScenePlayers(player.sceneId);
-        Socket.broadcast('player:left', ws.id, scenePlayers);
       } catch (err) {
         console.log(err);
       }
+
+      console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
+
+      // Cleanup must happen even when persistence/the account API fails;
+      // otherwise a disconnected member strands the party forever.
+      if (!logout) {
+        world.clients = world.clients.filter(c => c.id !== ws.id);
+      }
+      partyService.removePlayer(player.uuid);
+
+      const scenePlayers = world.getScenePlayers(player.sceneId);
+      Socket.broadcast('player:left', ws.id, scenePlayers);
     }
   }
 

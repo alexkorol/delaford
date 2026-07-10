@@ -26,7 +26,7 @@ const DEFAULT_TIMEOUT_MS = 8000;
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 export class HeadlessPlayer {
-  constructor(ws) {
+  constructor(ws, options = {}) {
     this.ws = ws;
     this.player = null; // login block player
     this.scene = null; // latest scene payload (login or transition)
@@ -37,15 +37,25 @@ export class HeadlessPlayer {
     this.lastMovement = null;
     this.events = []; // raw event log (ring buffer)
     this.scionFalls = [];
+    this.party = null;
+    this.partyInvites = [];
     this.pendingState = new Map(); // requestId -> resolver
     this.stateCounter = 0;
     this.chronicle = null;
+    this.houseName = options.houseName || 'Playtest House';
+    this.scionName = options.scionName || 'Harness';
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
   }
 
-  static async connect({ url = DEFAULT_URL, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  static async connect({
+    url = DEFAULT_URL,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    guestId = 'playtest-primary',
+    houseName,
+    scionName,
+  } = {}) {
     const ws = new WebSocket(url);
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`WS connect timeout: ${url}`)), timeoutMs);
@@ -53,8 +63,8 @@ export class HeadlessPlayer {
       ws.once('error', (error) => { clearTimeout(timer); reject(error); });
     });
 
-    const player = new HeadlessPlayer(ws);
-    player.emit('player:login', { useGuestAccount: true });
+    const player = new HeadlessPlayer(ws, { houseName, scionName });
+    player.emit('player:login', { useGuestAccount: true, guestId });
     await player.waitFor(() => player.player !== null, { label: 'login', timeoutMs });
     return player;
   }
@@ -84,9 +94,9 @@ export class HeadlessPlayer {
         const houses = this.chronicle.houses || [];
         const house = houses.find(entry => entry.id === this.chronicle.activeHouseId) || houses[0];
         if (!house) {
-          this.emit('chronicles:house:found', { name: 'Playtest House' });
+          this.emit('chronicles:house:found', { name: this.houseName });
         } else if (!(house.scions || []).length) {
-          this.emit('chronicles:scion:create', { houseId: house.id, name: 'Harness' });
+          this.emit('chronicles:scion:create', { houseId: house.id, name: this.scionName });
         } else {
           this.emit('chronicles:scion:set-out', {
             scionId: data.createdScionId || house.scions[0].id,
@@ -131,6 +141,15 @@ export class HeadlessPlayer {
       case 'chronicles:scion-fallen':
         this.scionFalls.push(data);
         this.chronicle = data.chronicle || this.chronicle;
+        break;
+      case 'chronicles:scion-witnessed':
+        this.scionFalls.push(data);
+        break;
+      case 'party:update':
+        this.party = data.party || null;
+        break;
+      case 'party:invited':
+        if (data.invite) this.partyInvites.push(data.invite);
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
@@ -311,6 +330,26 @@ export class HeadlessPlayer {
   /** Grab the item under/beside your feet (the 'z'/'g' key). */
   pickupUnderfoot() {
     this.emit('player:take:underfoot', {});
+  }
+
+  createParty() {
+    this.emit('party:create', {});
+  }
+
+  invitePlayer(username) {
+    this.emit('party:invite', { username });
+  }
+
+  acceptPartyInvite(partyId) {
+    this.emit('party:invite:accept', { partyId });
+  }
+
+  togglePartyReady() {
+    this.emit('party:ready', {});
+  }
+
+  startPartyInstance() {
+    this.emit('party:startInstance', {});
   }
 
   // ── Wiz/dev commands ─────────────────────────────────────────────────

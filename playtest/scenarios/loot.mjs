@@ -79,7 +79,12 @@ export default async function loot({ connect, assert }) {
     p.pickupUnderfoot();
     await p.waitFor(async () => {
       const s = await p.state();
-      return !s.groundItems.some(item => item.uuid === drop2.uuid);
+      if (!s.groundItems.some(item => item.uuid === drop2.uuid)) return true;
+      // Multiple drops can share/neighbor a death tile. The grab key takes
+      // one reachable item per press, so keep pressing until the asserted
+      // coin itself is collected rather than flaking on a preceding item.
+      p.pickupUnderfoot();
+      return false;
     }, { timeoutMs: 6000, label: 'underfoot pickup' });
   } finally {
     p.close();

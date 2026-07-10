@@ -193,6 +193,11 @@ export const entombFallenScion = (player, { cause = 'Fell in battle' } = {}) => 
   });
   const witnesses = world.getScenePlayers(player.sceneId)
     .filter(witness => witness.socket_id !== player.socket_id);
+  witnesses.forEach((witness) => {
+    if (witness.accountId) {
+      chroniclesRepository.grantHouseRelicAccess(witness.accountId, player.houseId, 3);
+    }
+  });
   if (witnesses.length) {
     Socket.broadcast('chronicles:scion-witnessed', {
       fallen: result.fallen,
