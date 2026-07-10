@@ -40,25 +40,35 @@ npm run build
 pm2 restart delaford
 ```
 
-## Letting players connect
+## Public TLS deployment (recommended)
+
+Point an A/AAAA record for your domain at the server, install
+[Caddy](https://caddyserver.com/docs/install), then use the supplied proxy:
+
+```sh
+cp Caddyfile.example Caddyfile
+VERDIGRIS_DOMAIN=play.example.com caddy run --config Caddyfile
+```
+
+Caddy obtains and renews TLS certificates and proxies HTTP and WebSocket
+traffic to `127.0.0.1:6500`. Expose only ports 80/443, not 6500. WebSockets are same-origin, so no
+`VITE_WS_URL` override is required.
+
+After deployment, verify `https://play.example.com/?play`. That URL provisions
+a browser-stable guest House/scion and enters a populated instance; the goal
+harness asserts combat begins in under ten seconds.
+
+## Other ways to connect
 
 The client connects its WebSocket to **the same host and port the page was
 loaded from**, so no client configuration is needed for any of these:
 
 - **Same machine:** http://localhost:6500
 - **LAN:** http://&lt;machine-ip&gt;:6500 (open TCP 6500 in the OS firewall)
-- **Remote play without port forwarding (recommended):** install
+- **Private remote play without port forwarding:** install
   [Tailscale](https://tailscale.com) on the server and each player's machine,
   then play via http://&lt;tailscale-name-or-100.x-ip&gt;:6500. Traffic is
   end-to-end encrypted by the tailnet; nothing is exposed to the internet.
-
-### Public internet (later)
-
-Only if/when you outgrow Tailscale: put a TLS proxy (Caddy is the least
-fuss) in front of port 6500, set `FORCE_HTTPS=true` in the pm2 env so the
-server enforces HTTPS behind the proxy, and rebuild the client with
-`VITE_WS_URL=wss://your-domain` if the proxy terminates WebSockets on a
-different host than the page.
 
 ## Environment variables
 
@@ -69,9 +79,13 @@ different host than the page.
 | `FORCE_HTTPS` | unset | `true` redirects HTTP→HTTPS (only behind a TLS proxy) |
 | `VITE_WS_URL` | same-origin | Build-time client override for the WebSocket URL |
 | `SITE_URL` | unset | Auth/persistence API for non-guest accounts (not yet self-hostable) |
+| `CHRONICLES_DB_FILE` | `server/data/verdigris.sqlite` | SQLite House/scion/relic database |
+| `IDENTITY_DB_FILE` | Chronicle DB path | Optional separate SQLite identity database |
 
-## Known limitation
+## Persistence and backups
 
-Player progress is only persisted for accounts backed by the `SITE_URL`
-auth API. Guest sessions reset on logout/restart — local persistence is the
-next planned piece of work.
+Guest/account Chronicles and the identity registry live in
+`server/data/verdigris.sqlite` by default. Back up that file and its `-wal`
+sidecar while running, or stop PM2 briefly and copy the main database. Legacy
+`identity-store.json` records are imported automatically; new writes use only
+SQLite.

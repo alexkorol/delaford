@@ -1691,6 +1691,9 @@ export default {
       bus.$emit('login:done');
       this.screen = 'game';
       this.resetChatState();
+      if (data.quickStart === true) {
+        Socket.emit('instance:enterSolo', { template: 'dungeon', layout: 'warren' });
+      }
     },
     /**
      * A click-handler event that does nothing, really.

@@ -93,6 +93,26 @@ export const sendChronicleState = (ws, extra = {}) => {
   return chronicle;
 };
 
+export const ensureQuickGuestScion = (accountId) => {
+  let chronicle = chroniclesRepository.getChronicle(accountId);
+  let house = chronicle.houses.find(entry => entry.id === chronicle.activeHouseId) || chronicle.houses[0];
+  const suffix = String(accountId).replace(/[^a-zA-Z0-9]/g, '').slice(-6) || 'guest';
+  if (!house) {
+    const founded = chroniclesRepository.foundHouse(accountId, `Wayfarers ${suffix}`);
+    if (!founded.ok) return null;
+    chronicle = founded.chronicle;
+    house = chronicle.houses.find(entry => entry.id === chronicle.activeHouseId) || chronicle.houses[0];
+  }
+  let scion = house.scions[0];
+  if (!scion) {
+    const created = chroniclesRepository.createScion(accountId, house.id, `Wanderer ${suffix}`);
+    if (!created.ok) return null;
+    scion = created.chronicle.houses.find(entry => entry.id === house.id)?.scions
+      .find(entry => entry.id === created.scionId);
+  }
+  return scion || null;
+};
+
 const replaceScionSession = async (scionId, socketId) => {
   const existing = world.players.find(player => player.scionId === scionId && player.socket_id !== socketId);
   if (!existing) return;
@@ -111,7 +131,7 @@ const replaceScionSession = async (scionId, socketId) => {
   }
 };
 
-export const beginScionSession = async (ws, scionId, { resume = false } = {}) => {
+export const beginScionSession = async (ws, scionId, { resume = false, quickStart = false } = {}) => {
   const auth = ws?.chronicleAuth;
   if (!auth?.accountId) return { ok: false, reason: 'Authenticate before setting out.' };
   const ownedScion = chroniclesRepository.getLivingScion(auth.accountId, scionId);
@@ -151,6 +171,7 @@ export const beginScionSession = async (ws, scionId, { resume = false } = {}) =>
   player.houseName = scion.houseName;
   player.scionId = scion.id;
   player.isGuest = auth.isGuest;
+  player.quickStart = quickStart;
   player.chronicleRun = resume
     ? chroniclesRepository.getChronicle(auth.accountId).runCount
     : chroniclesRepository.beginRun(auth.accountId, scion.houseId);
@@ -236,6 +257,7 @@ export default {
   collectNotableGear,
   drawCirculatingRelic,
   entombFallenScion,
+  ensureQuickGuestScion,
   saveLivingScion,
   sendChronicleState,
 };

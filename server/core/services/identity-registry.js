@@ -1,92 +1,85 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
 
 const serviceDir = fileURLToPath(new URL('.', import.meta.url));
-const DEFAULT_STORE_FILE = path.join(serviceDir, '../../data/identity-store.json');
+const DEFAULT_DB_FILE = path.join(serviceDir, '../../data/verdigris.sqlite');
+const LEGACY_STORE_FILE = path.join(serviceDir, '../../data/identity-store.json');
+const clone = value => JSON.parse(JSON.stringify(value));
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
-
-class IdentityRegistry {
-  constructor() {
-    this.storeFile = process.env.IDENTITY_STORE_FILE || DEFAULT_STORE_FILE;
-    this.state = { accounts: {} };
-    this.writeInFlight = null;
-    this.writeQueued = false;
-    this.load();
+export class IdentityRegistry {
+  constructor({
+    dbFile = process.env.VITEST
+      ? ':memory:'
+      : (process.env.IDENTITY_DB_FILE || process.env.CHRONICLES_DB_FILE || DEFAULT_DB_FILE),
+    legacyStoreFile = process.env.IDENTITY_STORE_FILE || LEGACY_STORE_FILE,
+  } = {}) {
+    this.dbFile = dbFile;
+    this.legacyStoreFile = legacyStoreFile;
+    if (dbFile !== ':memory:') fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+    this.db = new Database(dbFile);
+    this.db.pragma('foreign_keys = ON');
+    if (dbFile !== ':memory:') {
+      try { this.db.pragma('journal_mode = WAL'); } catch { /* default journal remains safe */ }
+    }
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS identity_accounts (
+        account_id TEXT PRIMARY KEY,
+        state_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    this.migrateLegacyJson();
   }
 
-  load() {
+  close() {
+    this.db.close();
+  }
+
+  migrateLegacyJson() {
+    if (!this.legacyStoreFile || !fs.existsSync(this.legacyStoreFile)) return;
     try {
-      if (fs.existsSync(this.storeFile)) {
-        const raw = fs.readFileSync(this.storeFile, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && parsed.accounts) {
-          this.state = { accounts: parsed.accounts };
-        }
-      } else {
-        this.persist().catch((error) => {
-          process.stderr.write(`[identity-registry] Failed to persist initial state. ${error}\n`);
+      const parsed = JSON.parse(fs.readFileSync(this.legacyStoreFile, 'utf8'));
+      const accounts = parsed?.accounts && typeof parsed.accounts === 'object' ? parsed.accounts : {};
+      const insert = this.db.prepare(`
+        INSERT INTO identity_accounts (account_id, state_json, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(account_id) DO NOTHING
+      `);
+      const migrate = this.db.transaction(() => {
+        Object.entries(accounts).forEach(([id, account]) => {
+          insert.run(id, JSON.stringify(account), new Date().toISOString());
         });
-      }
+      });
+      migrate();
     } catch (error) {
-      process.stderr.write(`[identity-registry] Failed to load state, starting empty. ${error}\n`);
-      this.state = { accounts: {} };
+      process.stderr.write(`[identity-registry] Legacy migration skipped: ${error.message}\n`);
     }
   }
 
   ensureAccount(accountId) {
-    if (!accountId) {
-      return null;
-    }
-
+    if (!accountId) return null;
     const id = String(accountId);
-    if (!this.state.accounts[id]) {
-      this.state.accounts[id] = {
-        accountId: id,
-        history: [],
-        boundIdentity: null,
-      };
-    }
-
-    return this.state.accounts[id];
+    const existing = this.getAccount(id);
+    if (existing) return existing;
+    const account = { accountId: id, history: [], boundIdentity: null };
+    this.writeAccount(account);
+    return account;
   }
 
-  async persist() {
-    const dir = path.dirname(this.storeFile);
-    await fs.promises.mkdir(dir, { recursive: true });
-
-    const payload = JSON.stringify({ accounts: this.state.accounts }, null, 2);
-
-    if (this.writeInFlight) {
-      this.writeQueued = true;
-      await this.writeInFlight;
-      this.writeQueued = false;
-    }
-
-    this.writeInFlight = fs.promises.writeFile(this.storeFile, payload, 'utf8');
-
-    try {
-      await this.writeInFlight;
-    } finally {
-      this.writeInFlight = null;
-      if (this.writeQueued) {
-        this.writeQueued = false;
-        await this.persist();
-      }
-    }
+  writeAccount(account) {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO identity_accounts (account_id, state_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(account_id) DO UPDATE SET state_json = excluded.state_json, updated_at = excluded.updated_at
+    `).run(account.accountId, JSON.stringify(account), now);
   }
 
   async recordValidation(accountId, payload) {
-    if (!accountId) {
-      return null;
-    }
-
+    if (!accountId) return null;
     const account = this.ensureAccount(accountId);
-    if (!account) {
-      return null;
-    }
-
     const entry = {
       jobId: payload.jobId || null,
       requestedAt: payload.requestedAt || new Date().toISOString(),
@@ -99,9 +92,7 @@ class IdentityRegistry {
       provider: payload.provider || 'local',
       metadata: payload.metadata || null,
     };
-
     account.history.push(entry);
-
     if (entry.valid) {
       account.boundIdentity = {
         name: entry.normalizedName,
@@ -111,23 +102,21 @@ class IdentityRegistry {
         provider: entry.provider,
       };
     }
-
-    await this.persist();
+    this.writeAccount(account);
     return clone(account);
   }
 
   getAccount(accountId) {
-    if (!accountId) {
+    if (!accountId) return null;
+    const row = this.db.prepare('SELECT state_json FROM identity_accounts WHERE account_id = ?')
+      .get(String(accountId));
+    if (!row) return null;
+    try {
+      const parsed = JSON.parse(row.state_json);
+      return parsed && typeof parsed === 'object' ? clone(parsed) : null;
+    } catch {
       return null;
     }
-
-    const id = String(accountId);
-    const account = this.state.accounts[id];
-    if (!account) {
-      return null;
-    }
-
-    return clone(account);
   }
 }
 

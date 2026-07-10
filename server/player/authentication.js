@@ -112,6 +112,7 @@ class Authentication {
         seed: scene.metadata && scene.metadata.seed,
         metadata: publicSceneMetadata(scene.metadata || {}),
       },
+      quickStart: player.quickStart === true,
     };
 
     // Tell the client they are logging in

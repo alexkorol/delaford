@@ -55,6 +55,7 @@ export class HeadlessPlayer {
     guestId = 'playtest-primary',
     houseName,
     scionName,
+    quickGuest = false,
   } = {}) {
     const ws = new WebSocket(url);
     await new Promise((resolve, reject) => {
@@ -64,7 +65,7 @@ export class HeadlessPlayer {
     });
 
     const player = new HeadlessPlayer(ws, { houseName, scionName });
-    player.emit('player:login', { useGuestAccount: true, guestId });
+    player.emit('player:login', { useGuestAccount: true, guestId, quickGuest });
     await player.waitFor(() => player.player !== null, { label: 'login', timeoutMs });
     return player;
   }
@@ -88,6 +89,9 @@ export class HeadlessPlayer {
         this.player = data.player;
         this.scene = data.scene || null;
         this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
+        if (data.quickStart === true) {
+          this.emit('instance:enterSolo', { template: 'dungeon', layout: 'warren' });
+        }
         break;
       case 'chronicles:state': {
         this.chronicle = data.chronicle || { houses: [] };

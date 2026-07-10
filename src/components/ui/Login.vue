@@ -2,7 +2,7 @@
   <div class="form">
     <div
       v-tippy
-      title="Load pre-made guest account. No progress will be saved on this account."
+      title="Play with a persistent guest House on this browser."
       class="checkbox guest_account"
     >
       <label for="guest_account">
@@ -53,6 +53,13 @@
     </div>
 
     <div class="action_buttons">
+      <button
+        class="button quick-play"
+        type="button"
+        @click="quickPlay"
+      >
+        Play Now
+      </button>
       <button
         class="button login"
         @click="login"
@@ -169,7 +176,8 @@ const incorrectLogin = () => {
   invalid.value = true;
 };
 
-const login = () => {
+const login = (quickGuest = false) => {
+  const useQuickGuest = quickGuest === true;
   if (isLoginInProgress.value) return;
   setLoginProgress(true);
   invalid.value = false;
@@ -178,6 +186,7 @@ const login = () => {
     password: password.value,
     useGuestAccount: guestAccount.value,
     ...(guestAccount.value ? { guestId: getGuestId() } : {}),
+    ...(useQuickGuest ? { quickGuest: true } : {}),
   };
 
   uiStore.rememberDevAccount({
@@ -185,6 +194,13 @@ const login = () => {
     password: password.value,
   });
   Socket.emit('player:login', data);
+};
+
+const quickPlay = () => {
+  guestAccount.value = true;
+  uiStore.setGuestAccount(true);
+  applyGuestCredentials(true);
+  login(true);
 };
 
 const handleLoginError = () => incorrectLogin();
@@ -203,6 +219,11 @@ onMounted(() => {
 
   if (guestAccount.value && import.meta.env.DEV) {
     applyGuestCredentials(true);
+  }
+
+  if (new URLSearchParams(window.location.search).has('play')) {
+    setTimeout(quickPlay, 50);
+    return;
   }
 
   const storedAccount = uiStore.account;

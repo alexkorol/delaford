@@ -36,7 +36,7 @@ The validation provider is selected with environment variables:
 
 ## Moderation overrides
 
-- All validation attempts (successes and failures) are stored in `server/core/data/identity-store.json`. The latest successful
+- All validation attempts (successes and failures) are stored in SQLite (`server/data/verdigris.sqlite` by default). The latest successful
   decision is treated as the bound identity.
 - To override a decision, edit the JSON entry for the account, adjust `boundIdentity`, and remove or annotate the previous
   history entry. Restarting the server will reload the modified state.

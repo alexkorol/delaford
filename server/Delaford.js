@@ -352,6 +352,11 @@ class Delaford {
     });
 
     ws.on('message', async (msg) => {
+      const messageBytes = Buffer.byteLength(msg);
+      if (messageBytes > 32 * 1024) {
+        console.warn(`[socket] Oversized message from ${ws.id.substring(0, 5)}... (${messageBytes} bytes)`);
+        return;
+      }
       let data;
       try {
         data = JSON.parse(msg);
@@ -362,6 +367,12 @@ class Delaford {
 
       if (!data || typeof data.event !== 'string') {
         console.warn(`[socket] Missing event field from ${ws.id.substring(0, 5)}...`);
+        return;
+      }
+
+      if (data.data !== undefined
+        && (data.data === null || typeof data.data !== 'object' || Array.isArray(data.data))) {
+        console.warn(`[socket] Invalid payload shape from ${ws.id.substring(0, 5)}...`);
         return;
       }
 

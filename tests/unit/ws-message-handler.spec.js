@@ -203,6 +203,17 @@ describe('Delaford.connection – message handler validation', () => {
     expect(Handler['player:login']).not.toHaveBeenCalled();
   });
 
+  it('rejects oversized websocket frames before parsing or dispatch', async () => {
+    const oversized = JSON.stringify({ event: 'player:say', data: { said: 'x'.repeat(33 * 1024) } });
+    await ws._triggerMessage(oversized);
+    expect(Handler['player:say']).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-object payload shapes', async () => {
+    await ws._triggerMessage(JSON.stringify({ event: 'player:say', data: 'hello' }));
+    expect(Handler['player:say']).not.toHaveBeenCalled();
+  });
+
   it('rejects unknown event names', async () => {
     await ws._triggerMessage(JSON.stringify({ event: 'player:exploit' }));
     expect(Handler['player:login']).not.toHaveBeenCalled();

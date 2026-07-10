@@ -10,7 +10,11 @@ import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
-import { beginScionSession, sendChronicleState } from '#server/core/services/chronicles.js';
+import {
+  beginScionSession,
+  ensureQuickGuestScion,
+  sendChronicleState,
+} from '#server/core/services/chronicles.js';
 import world from '#server/core/world.js';
 
 // Fast in-process mirror; authoritative scion snapshots also persist this in
@@ -115,6 +119,13 @@ export default {
       const accountId = `${isGuest ? 'guest:' : 'account:'}${isGuest ? guestId : profile.uuid}`;
       ws.chronicleAuth = { accountId, profile, token, isGuest };
       ws.authenticated = true;
+      if (isGuest && payload.quickGuest === true) {
+        const scion = ensureQuickGuestScion(accountId);
+        if (!scion) throw new Error('Could not prepare a guest scion.');
+        const started = await beginScionSession(ws, scion.id, { quickStart: true });
+        if (!started.ok) throw new Error(started.reason);
+        return;
+      }
       if (typeof payload.resumeScionId === 'string' && payload.resumeScionId) {
         const resumed = await beginScionSession(ws, payload.resumeScionId, { resume: true });
         if (resumed.ok) return;
