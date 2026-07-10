@@ -251,6 +251,20 @@ const THEME_MONSTERS = {
   },
 };
 
+// The existing monster atlas contains eighteen readable silhouettes. Generated
+// floors used to omit graphic metadata, making every role render as column 0.
+// Give melee, ranged, support, and elite enemies a stable visual language while
+// rotating the exact bodies between themes.
+const THEME_MONSTER_COLUMNS = {
+  stone: [4, 9, 16],
+  crypt: [1, 11, 13],
+  sand: [3, 8, 17],
+  volcanic: [6, 14, 16],
+  marsh: [0, 8, 13],
+  grove: [1, 6, 9],
+  wilds: [3, 11, 17],
+};
+
 // Treasure-room gear pools; deeper floors roll better bases.
 const INSTANCE_LOOT_TIERS = [
   { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
@@ -753,6 +767,7 @@ class Map {
     const depthLevelBonus = (depth - 1) * 2;
     const depthRewardMultiplier = 1 + ((depth - 1) * 0.35);
     const themeMonsters = THEME_MONSTERS[themeName] || THEME_MONSTERS.stone;
+    const themeMonsterColumns = THEME_MONSTER_COLUMNS[themeName] || THEME_MONSTER_COLUMNS.stone;
 
     // A mid room (never the entry or the exit) holds the floor's treasure
     const treasureRoomIndex = carvedRooms.length >= 4
@@ -790,6 +805,10 @@ class Map {
       }
 
       const archetype = role === 'melee' ? 'brute' : 'mystic';
+      const roleIndex = Math.max(0, roleCycle.indexOf(role));
+      const graphicColumn = rarity === 'elite'
+        ? (themeMonsterColumns[roleIndex] + 7) % 18
+        : themeMonsterColumns[roleIndex];
 
       return {
         id: `instance-${seed}-${index}`,
@@ -800,6 +819,7 @@ class Map {
         level: Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus,
         archetype,
         rarity,
+        graphic: { column: graphicColumn, row: 0 },
         // Squishy trash so packs can be mown through; bosses pass 1.0.
         healthMultiplier,
         damageMultiplier,

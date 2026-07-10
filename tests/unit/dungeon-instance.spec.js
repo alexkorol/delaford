@@ -124,6 +124,16 @@ describe('generateInstance themes', () => {
     }));
   });
 
+  it('gives generated monster roles distinct silhouettes', async () => {
+    const themes = ['dungeon', 'crypt', 'sand', 'volcanic', 'marsh', 'grove', 'wilds'];
+    await Promise.all(themes.map(async (template) => {
+      const { monsters } = await GameMap.generateInstance({ seed: 7, template });
+      const columns = new Set(monsters.map(monster => monster.graphic?.column));
+      expect(columns.size, `${template} silhouette count`).toBeGreaterThanOrEqual(3);
+      expect([...columns].every(column => Number.isInteger(column) && column >= 0 && column < 18)).toBe(true);
+    }));
+  });
+
   // Every room centre reachable on foot from the entry stairs. Returns the
   // count of unreachable room centres (0 == fully connected).
   const unreachableRoomCount = (map, metadata, width = 200) => {

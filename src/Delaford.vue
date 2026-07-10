@@ -21,6 +21,18 @@
       {{ clientErrorNotice }}
     </div>
 
+    <Transition name="final-fall">
+      <div
+        v-if="finalFall"
+        class="final-fall"
+        role="alert"
+      >
+        <span>The line is broken</span>
+        <strong>{{ finalFall.fallen?.name || 'A scion' }}</strong>
+        <small>passes into the crypt</small>
+      </div>
+    </Transition>
+
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
@@ -100,6 +112,7 @@ import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/in
 // Core assets
 import Client from './core/client.js';
 import Engine from './core/engine.js';
+import SoundSystem from './core/audio/sound-system.js';
 import { buildCombatLogEntry } from './core/combat-log.js';
 import bus from './core/utilities/bus.js';
 import Event from './core/player/events.js';
@@ -196,6 +209,7 @@ export default {
       chronicle: { houses: [], activeHouseId: null },
       chronicleError: '',
       chronicleFall: null,
+      finalFall: null,
       layout: {
         activePane: null,
         leftPane: defaultPaneAssignments.left,
@@ -621,11 +635,16 @@ export default {
     bus.$on('go:main', this.cancelLogin);
   },
   mounted() {
+    this.soundSystem = new SoundSystem();
+    this.soundSystem.start();
+    this.unlockSounds = () => this.soundSystem?.unlock();
+
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.onViewportResize, { passive: true });
       window.addEventListener('keydown', this.handleGlobalKeydown, { capture: true });
+      window.addEventListener('pointerdown', this.unlockSounds, { once: true, passive: true });
+      window.addEventListener('keydown', this.unlockSounds, { once: true });
     }
-
   },
   beforeUnmount() {
     if (this.engine) {
@@ -643,6 +662,8 @@ export default {
       }
       window.removeEventListener('resize', this.onViewportResize);
       window.removeEventListener('keydown', this.handleGlobalKeydown, { capture: true });
+      window.removeEventListener('pointerdown', this.unlockSounds);
+      window.removeEventListener('keydown', this.unlockSounds);
       window.removeEventListener('error', this.handleWindowError);
       window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
       if (this.viewportResizeRaf) {
@@ -675,6 +696,15 @@ export default {
       clearTimeout(this.sessionNoticeTimeout);
       this.sessionNoticeTimeout = null;
     }
+    if (this.finalFallTimeout) {
+      clearTimeout(this.finalFallTimeout);
+      this.finalFallTimeout = null;
+    }
+
+    if (this.soundSystem) {
+      this.soundSystem.destroy();
+      this.soundSystem = null;
+    }
 
     bus.$off('skill-tree:open', this.handleFlowerPaneOpen);
     bus.$off('game:map:dimensions', this.handleMapDimensions);
@@ -706,12 +736,19 @@ export default {
         this.engine.stop();
         this.engine = null;
       }
-      if (this.game?.map?.destroy) this.game.map.destroy();
+      bus.$emit('sound:final-death');
       Socket.setResumeScion(null);
       this.chronicle = payload.chronicle || this.chronicle;
       this.chronicleFall = payload;
-      this.game = { exit: true };
-      this.screen = 'chronicles';
+      this.finalFall = payload;
+      clearTimeout(this.finalFallTimeout);
+      this.finalFallTimeout = setTimeout(() => {
+        if (this.game?.map?.destroy) this.game.map.destroy();
+        this.game = { exit: true };
+        this.screen = 'chronicles';
+        this.finalFall = null;
+        this.finalFallTimeout = null;
+      }, 1800);
     },
     handleAuthNavigate(target) {
       this.screen = target;
@@ -1404,6 +1441,9 @@ export default {
 
       this.game.map.registerCombatHit(payload);
       this.emitCombatLog(payload);
+      bus.$emit(payload.died && payload.targetType === 'monster'
+        ? 'sound:monster-kill'
+        : 'sound:combat-hit');
     },
 
     resolveCombatActorName(actorId, actorType = null, fallbackName = null) {
@@ -1461,6 +1501,7 @@ export default {
 
       await this.game.loadScene(scene, playerState);
       this.applyWorldViewportToMap();
+      bus.$emit('sound:zone');
 
       if (portal && portal.message) {
         bus.$emit('item:examine', {
@@ -1589,6 +1630,7 @@ export default {
 
       await this.game.loadScene(scene, playerState);
       this.applyWorldViewportToMap();
+      bus.$emit('sound:zone');
 
       if (partySnapshot) {
         this.party = partySnapshot;
@@ -1813,5 +1855,48 @@ export default {
   font-size: 13px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+}
+
+.final-fall {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #e8d7be;
+  text-align: center;
+  text-shadow: 0 3px 12px #000;
+  background:
+    radial-gradient(circle, rgba(58, 11, 11, 0.28), rgba(7, 5, 6, 0.96) 68%),
+    rgba(7, 5, 6, 0.9);
+  pointer-events: none;
+
+  span,
+  small {
+    color: #a98d78;
+    font-size: 14px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    color: #f0dfc5;
+    font-size: clamp(34px, 6vw, 72px);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+  }
+}
+
+.final-fall-enter-active,
+.final-fall-leave-active {
+  transition: opacity 500ms ease;
+}
+
+.final-fall-enter-from,
+.final-fall-leave-to {
+  opacity: 0;
 }
 </style>
