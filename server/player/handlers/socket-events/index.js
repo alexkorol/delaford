@@ -10,42 +10,11 @@ import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
-import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
+import { beginScionSession, sendChronicleState } from '#server/core/services/chronicles.js';
 import world from '#server/core/world.js';
 
-// One character, one session. When the same account logs in again (second
-// tab, another machine, an automated playtest), the OLD session used to be
-// silently replaced mid-play — its client got "foreign player reference"
-// rejections and its unsaved loot was lost. Now: flush the old session's
-// state to disk FIRST (so the new login loads it), tell the old client it
-// was replaced (so it doesn't auto-reconnect into a steal war), and close it.
-const replaceExistingSession = (uuid, newSocketId) => {
-  const existing = world.players.find(p => p.uuid === uuid && p.socket_id !== newSocketId);
-  if (!existing) {
-    return;
-  }
-
-  if (!existing.token || existing.token === 'none') {
-    saveGuest(existing);
-  }
-
-  Socket.emit('player:session-replaced', {
-    player: { socket_id: existing.socket_id },
-  });
-
-  const oldWs = world.clients.find(client => client.id === existing.socket_id);
-  world.removePlayer(existing);
-  if (oldWs) {
-    setTimeout(() => {
-      try {
-        oldWs.close();
-      } catch (error) { /* already gone */ }
-    }, 150);
-  }
-};
-
-// Guest accounts have no backing API, so their skill-tree allocations live in
-// process memory keyed by uuid — surviving relogs within a server run.
+// Fast in-process mirror; authoritative scion snapshots also persist this in
+// SQLite through PlayerPersistenceService.
 const guestPassiveTrees = new Map();
 
 // Whitelist and bound the client-sent skill tree snapshot; never trust shapes
@@ -126,29 +95,27 @@ export default {
     const payload = data.data || {};
 
     try {
+      let profile;
+      let token;
+      let isGuest = false;
       if (!payload.useGuestAccount) {
-        const { player, token } = await Authentication.login({ ...data, data: payload });
-        replaceExistingSession(player.uuid, ws.id);
-        Authentication.addPlayer(new Player(player, token, ws.id));
+        const authenticated = await Authentication.login({ ...data, data: payload });
+        profile = authenticated.player;
+        token = authenticated.token;
       } else {
-        // Flush + kick any existing session for this guest FIRST, so the
-        // snapshot loaded below carries its up-to-the-second loot.
-        replaceExistingSession(playerGuest.uuid, ws.id);
-
-        // Guests persist to a local file (same shape as the template), so
-        // loot, levels, bank, and the skill tree survive relogins — merge the
-        // saved snapshot over the template before constructing the player.
-        const saved = loadGuest(playerGuest.uuid);
-        const guestData = saved ? { ...playerGuest, ...saved } : playerGuest;
-        const guest = new Player(guestData, 'none', ws.id);
-        // In-process fallback for the skill tree (covers saves made moments
-        // before a crash, ahead of the next file flush).
-        if (!guest.passiveTree && guestPassiveTrees.has(guest.uuid)) {
-          guest.passiveTree = guestPassiveTrees.get(guest.uuid);
-        }
-        Authentication.addPlayer(guest);
+        profile = playerGuest;
+        token = 'none';
+        isGuest = true;
       }
+
+      const accountId = `${isGuest ? 'guest:' : 'account:'}${profile.uuid}`;
+      ws.chronicleAuth = { accountId, profile, token, isGuest };
       ws.authenticated = true;
+      if (typeof payload.resumeScionId === 'string' && payload.resumeScionId) {
+        const resumed = await beginScionSession(ws, payload.resumeScionId, { resume: true });
+        if (resumed.ok) return;
+      }
+      sendChronicleState(ws);
     } catch (error) {
       console.log(error);
       const username = typeof payload.username === 'string' ? payload.username : 'unknown user';
@@ -189,9 +156,9 @@ export default {
     guestPassiveTrees.set(player.uuid, sanitised);
     playerPersistence.markDirty(player);
 
-    // Guests have no backing API — skip the network save (it would only log
-    // errors); the in-memory copies above already cover them.
-    if (player.token && player.token !== 'none') {
+    // Chronicle scions save to SQLite even for guests; only legacy guests
+    // without a scion skip the remote account API.
+    if (player.scionId || (player.token && player.token !== 'none')) {
       playerPersistence.savePlayer(player).catch(() => {});
     }
   },

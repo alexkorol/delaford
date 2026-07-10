@@ -94,6 +94,14 @@ class Socket {
     return queued;
   }
 
+  static setResumeScion(scionId) {
+    if (!Socket.lastLoginPayload) return;
+    Socket.lastLoginPayload = {
+      ...Socket.lastLoginPayload,
+      resumeScionId: scionId || null,
+    };
+  }
+
   static reset() {
     Socket.queue = [];
     Socket.waitForOpen = false;

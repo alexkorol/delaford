@@ -57,6 +57,13 @@
           <Login />
         </div>
 
+        <ChroniclesScreen
+          v-else-if="screen === 'chronicles'"
+          :chronicle="chronicle"
+          :error="chronicleError"
+          :fall="chronicleFall"
+        />
+
         <div v-else>
           <div class="auth-container__wordmark">
             <h1 class="auth-container__title">Verdigris</h1>
@@ -90,6 +97,7 @@ import AudioMainMenu from '../sub/AudioMainMenu.vue';
 import LoginBackdrop from '../sub/LoginBackdrop.vue';
 import Login from '../ui/Login.vue';
 import CharacterCreate from '../ui/auth/CharacterCreate.vue';
+import ChroniclesScreen from '../ui/auth/ChroniclesScreen.vue';
 
 export default {
   name: 'AuthContainer',
@@ -98,12 +106,16 @@ export default {
     LoginBackdrop,
     Login,
     CharacterCreate,
+    ChroniclesScreen,
   },
   props: {
     screen: {
       type: String,
       default: 'login',
     },
+    chronicle: { type: Object, default: () => ({ houses: [], activeHouseId: null }) },
+    chronicleError: { type: String, default: '' },
+    chronicleFall: { type: Object, default: null },
   },
   emits: ['navigate'],
   methods: {

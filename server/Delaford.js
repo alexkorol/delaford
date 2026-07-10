@@ -87,8 +87,15 @@ class Delaford {
     return false;
   }
 
-  static authorizeSocketMessage(data, ws, publicEvents) {
+  static authorizeSocketMessage(data, ws, publicEvents, unboundAuthEvents = new Set()) {
     if (publicEvents.has(data.event)) {
+      return true;
+    }
+
+    // Chronicle selection happens after account authentication but before a
+    // scion exists in the world, so these few events bind to the server-held
+    // account context rather than a client-supplied player id.
+    if (unboundAuthEvents.has(data.event) && ws.chronicleAuth?.accountId) {
       return true;
     }
 
@@ -311,6 +318,11 @@ class Delaford {
 
     // Events that don't require authentication
     const PUBLIC_EVENTS = new Set(['player:login']);
+    const UNBOUND_AUTH_EVENTS = new Set([
+      'chronicles:house:found',
+      'chronicles:scion:create',
+      'chronicles:scion:set-out',
+    ]);
 
     // Add player to server's player list
     console.log(`${emoji.get('computer')}  A client (${ws.id.substring(0, 5)}...) connected.`);
@@ -378,7 +390,7 @@ class Delaford {
         return;
       }
 
-      if (!this.constructor.authorizeSocketMessage(data, ws, PUBLIC_EVENTS)) {
+      if (!this.constructor.authorizeSocketMessage(data, ws, PUBLIC_EVENTS, UNBOUND_AUTH_EVENTS)) {
         return;
       }
 

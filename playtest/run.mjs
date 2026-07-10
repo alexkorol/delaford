@@ -41,6 +41,7 @@ const startServer = () => new Promise((resolve, reject) => {
       PLAYER_SAVE_COOLDOWN_MS: '999999999',
       // Hermetic saves: never inherit or clobber the developer's character.
       GUEST_SAVE_DIR: path.join(os.tmpdir(), `verdigris-playtest-${Date.now()}`),
+      CHRONICLES_DB_FILE: path.join(os.tmpdir(), `verdigris-playtest-${Date.now()}.sqlite`),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

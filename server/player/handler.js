@@ -2,6 +2,7 @@ import actionEvents from './handlers/actions/index.js';
 import socketEvents from './handlers/socket-events/index.js';
 import partyEvents from './handlers/party.js';
 import devEvents from './handlers/dev.js';
+import chronicleEvents from './handlers/chronicles.js';
 
 /**
  * A global event handler (RPC)
@@ -19,6 +20,8 @@ const Handler = {
   ...partyEvents,
   // Wiz/dev playtest commands (no-ops in production)
   ...devEvents,
+  // Authenticated account-level House and scion lifecycle events.
+  ...chronicleEvents,
 };
 
 export default Handler;

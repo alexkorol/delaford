@@ -28,6 +28,7 @@ import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
+import { claimCirculatingRelic } from '#server/core/services/chronicles.js';
 
 const refreshInventory = (player) => {
   if (!player || !player.socket_id) {
@@ -148,6 +149,13 @@ const commitGroundItemPickup = (player, scene, itemIndex) => {
 
   broadcastSceneItems(scene, 'item:change');
   refreshInventory(player);
+  if (remainder === 0 && claimCirculatingRelic(worldItem, player)) {
+    const origin = worldItem.legacy?.sourceScionName || 'a fallen scion';
+    Socket.emit('game:send:message', {
+      player: { socket_id: player.socket_id },
+      text: `You found ${worldItem.displayName || worldItem.name} — once carried by ${origin}.`,
+    });
+  }
   return { ok: remainder === 0, added, remainder };
 };
 

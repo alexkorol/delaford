@@ -1,0 +1,85 @@
+/** @vitest-environment node */
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ChroniclesRepository } from '#server/core/repositories/chronicles-repository.js';
+
+describe('server-side Chronicles repository', () => {
+  let repository;
+  const accountId = 'account:test';
+
+  beforeEach(() => {
+    repository = new ChroniclesRepository({ dbFile: ':memory:' });
+  });
+
+  afterEach(() => repository.close());
+
+  const createLineage = () => {
+    const founded = repository.foundHouse(accountId, 'Ashford');
+    expect(founded.ok).toBe(true);
+    const houseId = founded.houseId;
+    const created = repository.createScion(accountId, houseId, 'Bryn');
+    expect(created.ok).toBe(true);
+    return { houseId, scionId: created.scionId };
+  };
+
+  it('persists a House and living scion behind an account identity', () => {
+    const { houseId, scionId } = createLineage();
+    const chronicle = repository.getChronicle(accountId);
+
+    expect(chronicle.activeHouseId).toBe(houseId);
+    expect(chronicle.houses[0].name).toBe('Ashford');
+    expect(chronicle.houses[0].scions[0]).toMatchObject({ id: scionId, name: 'Bryn', level: 1 });
+    expect(repository.getChronicle('account:someone-else').houses).toEqual([]);
+  });
+
+  it('round-trips a scion snapshot and degrades safely on corrupt JSON', () => {
+    const { scionId } = createLineage();
+    repository.saveScionSnapshot(accountId, scionId, {
+      level: 7,
+      inventory: [{ id: 'gold-ring', uuid: 'ring-1' }],
+    });
+    expect(repository.getLivingScion(accountId, scionId).snapshot.inventory[0].id).toBe('gold-ring');
+
+    repository.db.prepare('UPDATE chronicle_scions SET snapshot_json = ? WHERE id = ?')
+      .run('{stale', scionId);
+    expect(repository.getLivingScion(accountId, scionId).snapshot).toBeNull();
+  });
+
+  it('entombs final death and circulates notable gear after three later runs', () => {
+    const { houseId, scionId } = createLineage();
+    repository.beginRun(accountId, houseId);
+    const burial = repository.entombScion({
+      accountId,
+      houseId,
+      scionId,
+      level: 9,
+      cause: 'Slain by the Pale Sovereign',
+      relicItems: [{ id: 'gold-ring', uuid: 'ring-1', name: 'Sun-Bound Ring' }],
+    });
+
+    expect(burial.relicCount).toBe(1);
+    expect(repository.getLivingScion(accountId, scionId)).toBeNull();
+    expect(repository.getChronicle(accountId).houses[0].crypt[0]).toMatchObject({
+      name: 'Bryn', level: 9, relics: ['Sun-Bound Ring'],
+    });
+    expect(repository.drawEligibleRelic([accountId])).toBeNull();
+
+    repository.beginRun(accountId, houseId);
+    repository.beginRun(accountId, houseId);
+    expect(repository.drawEligibleRelic([accountId])).toBeNull();
+    repository.beginRun(accountId, houseId);
+
+    const relic = repository.drawEligibleRelic([accountId]);
+    expect(relic.item).toMatchObject({ id: 'gold-ring', uuid: 'ring-1' });
+    expect(relic.originScionName).toBe('Bryn');
+    expect(repository.claimRelic(relic.id, { scionId: 'later-scion' })).toBe(true);
+    expect(repository.drawEligibleRelic([accountId])).toBeNull();
+  });
+
+  it('rejects invalid names and cross-account scion access', () => {
+    expect(repository.foundHouse(accountId, 'x').ok).toBe(false);
+    const { houseId, scionId } = createLineage();
+    expect(repository.createScion('account:intruder', houseId, 'Vesper').ok).toBe(false);
+    expect(repository.getLivingScion('account:intruder', scionId)).toBeNull();
+  });
+});

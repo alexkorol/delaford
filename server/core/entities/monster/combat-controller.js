@@ -4,6 +4,7 @@ import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.js';
 import { euclideanDistance, manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
 import UI from '#shared/ui.js';
+import { entombFallenScion } from '#server/core/services/chronicles.js';
 
 // Continuous positions: melee pursuit stands off ~1 tile from the target
 // (never on its tile), so reach checks are radii with diagonal headroom.
@@ -233,6 +234,10 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     if (result.type === 'death' || result.type === 'permadeath') {
       monster.state.mode = 'idle';
       monster.state.targetId = null;
+
+      if (result.permadeath || target.stats?.lifecycle?.state === 'permadead') {
+        entombFallenScion(target, { cause: `Slain by ${monster.name || 'a monster'}` });
+      }
     }
   }
 

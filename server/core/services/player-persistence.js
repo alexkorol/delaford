@@ -36,6 +36,17 @@ export class PlayerPersistenceService {
       return null;
     }
 
+    // Chronicle scions are authoritative server-side characters. Keep their
+    // complete snapshot with the House instead of the legacy guest file or
+    // one-character account API. Dynamic import avoids a Player/service
+    // initialization cycle.
+    if (player.scionId && player.accountId) {
+      const { saveLivingScion } = await import('#server/core/services/chronicles.js');
+      const snapshot = saveLivingScion(player);
+      if (snapshot) this.lastSuccessfulSave.set(player.uuid, Date.now());
+      return snapshot;
+    }
+
     // Guest accounts have no backing account API; they persist to a local
     // file instead so loot/levels/tree survive relogins during dev.
     if (!player.token || player.token === 'none') {

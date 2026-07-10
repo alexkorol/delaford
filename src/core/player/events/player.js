@@ -73,6 +73,22 @@ export default {
     context.startGame(data.data);
   },
 
+  'chronicles:state': (data, context) => {
+    context.showChronicles(data.data);
+  },
+
+  'chronicles:error': (data, context) => {
+    context.showChronicleError(data.data);
+  },
+
+  'chronicles:scion-fallen': (data, context) => {
+    context.handleScionFall(data.data);
+  },
+
+  'chronicles:scion-witnessed': (data, context) => {
+    context.handleScionFall(data.data);
+  },
+
   /**
    * A player logins into the game
    */

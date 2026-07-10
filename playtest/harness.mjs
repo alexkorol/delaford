@@ -36,8 +36,10 @@ export class HeadlessPlayer {
     this.stats = null; // latest player:stats:update for us
     this.lastMovement = null;
     this.events = []; // raw event log (ring buffer)
+    this.scionFalls = [];
     this.pendingState = new Map(); // requestId -> resolver
     this.stateCounter = 0;
+    this.chronicle = null;
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
@@ -77,6 +79,21 @@ export class HeadlessPlayer {
         this.scene = data.scene || null;
         this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
         break;
+      case 'chronicles:state': {
+        this.chronicle = data.chronicle || { houses: [] };
+        const houses = this.chronicle.houses || [];
+        const house = houses.find(entry => entry.id === this.chronicle.activeHouseId) || houses[0];
+        if (!house) {
+          this.emit('chronicles:house:found', { name: 'Playtest House' });
+        } else if (!(house.scions || []).length) {
+          this.emit('chronicles:scion:create', { houseId: house.id, name: 'Harness' });
+        } else {
+          this.emit('chronicles:scion:set-out', {
+            scionId: data.createdScionId || house.scions[0].id,
+          });
+        }
+        break;
+      }
       case 'world:scene:transition':
       case 'party:scene:transition':
         this.sceneTransitions = (this.sceneTransitions || 0) + 1;
@@ -110,6 +127,10 @@ export class HeadlessPlayer {
         break;
       case 'player:session-replaced':
         this.sessionReplaced = true;
+        break;
+      case 'chronicles:scion-fallen':
+        this.scionFalls.push(data);
+        this.chronicle = data.chronicle || this.chronicle;
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
@@ -308,6 +329,14 @@ export class HeadlessPlayer {
 
   devHeal() {
     this.emit('dev:heal', {});
+  }
+
+  devPrepareFinalDeath() {
+    this.emit('dev:prepare-final-death', {});
+  }
+
+  devReleaseRelic() {
+    this.emit('dev:release-relic', {});
   }
 
   close() {

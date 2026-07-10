@@ -24,6 +24,9 @@
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
+      :chronicle="chronicle"
+      :chronicle-error="chronicleError"
+      :chronicle-fall="chronicleFall"
       @navigate="handleAuthNavigate"
     />
 
@@ -190,6 +193,9 @@ export default {
       sessionNotice: '',
       clientErrorNotice: '',
       skipAutoRelogin: false,
+      chronicle: { houses: [], activeHouseId: null },
+      chronicleError: '',
+      chronicleFall: null,
       layout: {
         activePane: null,
         leftPane: defaultPaneAssignments.left,
@@ -527,7 +533,7 @@ export default {
         ClientDiagnostics.record('socket:message', { event: eventName });
       }
 
-      if (eventName === 'player:login' && this.connectionManager) {
+      if (['player:login', 'chronicles:state'].includes(eventName) && this.connectionManager) {
         this.connectionManager.markAuthenticated();
       }
 
@@ -568,7 +574,7 @@ export default {
         }
       },
       shouldAutoLogin: () => {
-        const shouldLogin = this.screen === 'game' && !this.skipAutoRelogin;
+        const shouldLogin = ['game', 'chronicles'].includes(this.screen) && !this.skipAutoRelogin;
         this.skipAutoRelogin = false;
         return shouldLogin;
       },
@@ -682,6 +688,31 @@ export default {
     }
   },
   methods: {
+    showChronicles(payload = {}) {
+      this.chronicle = payload.chronicle || { houses: [], activeHouseId: null };
+      this.chronicleError = '';
+      this.screen = 'chronicles';
+    },
+    showChronicleError(payload = {}) {
+      this.chronicleError = payload.reason || 'The Chronicle could not be changed.';
+    },
+    handleScionFall(payload = {}) {
+      const isCurrentScion = payload.fallen?.id && payload.fallen.id === this.game?.player?.scionId;
+      if (!isCurrentScion) {
+        if (payload.fallen?.name) this.setPartyStatusMessage(`${payload.fallen.name} has fallen permanently.`, 8000);
+        return;
+      }
+      if (this.engine) {
+        this.engine.stop();
+        this.engine = null;
+      }
+      if (this.game?.map?.destroy) this.game.map.destroy();
+      Socket.setResumeScion(null);
+      this.chronicle = payload.chronicle || this.chronicle;
+      this.chronicleFall = payload;
+      this.game = { exit: true };
+      this.screen = 'chronicles';
+    },
     handleAuthNavigate(target) {
       this.screen = target;
     },

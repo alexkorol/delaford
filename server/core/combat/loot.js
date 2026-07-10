@@ -3,6 +3,7 @@ import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import config from '#server/config.js';
 import UI from '#shared/ui.js';
+import { drawCirculatingRelic } from '#server/core/services/chronicles.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
 export const GEAR_DROP_CHANCES = {
@@ -11,6 +12,8 @@ export const GEAR_DROP_CHANCES = {
   rare: 0.2,
   elite: 0.5,
 };
+
+export const RELIC_DROP_CHANCE = 0.12;
 
 // A spread across weapon types, every armour slot, and jewelry so drops feel
 // varied rather than the same handful of swords.
@@ -193,6 +196,19 @@ export const dropMonsterLoot = (monster, options = {}) => {
     }
   }
 
+  const relicChance = Number.isFinite(options.relicChance)
+    ? Math.max(0, Math.min(1, options.relicChance))
+    : RELIC_DROP_CHANCE;
+  if (rng() < relicChance) {
+    const eligiblePlayers = [options.killer, ...world.getScenePlayers(scene.id)].filter(Boolean);
+    const relic = typeof options.relicProvider === 'function'
+      ? options.relicProvider(eligiblePlayers)
+      : drawCirculatingRelic(eligiblePlayers);
+    if (relic) {
+      drops.push(ItemFactory.toWorldInstance(relic, { x: dropX, y: dropY }));
+    }
+  }
+
   if (drops.length) {
     if (!Array.isArray(scene.items)) {
       scene.items = [];
@@ -208,4 +224,5 @@ export default {
   dropMonsterLoot,
   GEAR_DROP_CHANCES,
   GEAR_DROP_POOL,
+  RELIC_DROP_CHANCE,
 };

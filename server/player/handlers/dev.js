@@ -14,6 +14,7 @@ import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import { dropMonsterLoot } from '#server/core/combat/loot.js';
 
 const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
 
@@ -69,7 +70,14 @@ const buildStateSnapshot = (player) => {
       : [],
     groundItems: scene && Array.isArray(scene.items)
       ? scene.items.map(item => ({
-        id: item.id, uuid: item.uuid, x: item.x, y: item.y, qty: item.qty || 1,
+        id: item.id,
+        uuid: item.uuid,
+        name: item.displayName || item.name,
+        x: item.x,
+        y: item.y,
+        qty: item.qty || 1,
+        legacyRelicId: item.legacyRelicId || null,
+        legacy: item.legacy || null,
       }))
       : [],
     sceneMetadata: scene && scene.metadata ? {
@@ -190,6 +198,38 @@ const devEvents = {
     }
     broadcastStats(player);
     sendDevMessage(player, 'Fully healed.');
+  },
+
+  /** Put the scion one real monster hit away from its final death. */
+  'dev:prepare-final-death': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!DEV_MODE || !player?.stats?.lifecycle || !player.stats.resources?.health) return;
+    player.stats.lifecycle.mode = 'hard';
+    player.stats.lifecycle.state = 'alive';
+    player.stats.lifecycle.cheatDeath = player.stats.lifecycle.cheatDeath || {};
+    player.stats.lifecycle.cheatDeath.charges = 0;
+    player.stats.resources.health.current = 1;
+    broadcastStats(player);
+    sendDevMessage(player, 'Final death armed; the next damaging monster hit is fatal.');
+  },
+
+  /** Exercise the live relic drop pipeline deterministically for playtests. */
+  'dev:release-relic': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!DEV_MODE || !player) return;
+    const rngValues = [0.99, 0];
+    dropMonsterLoot({
+      x: player.x,
+      y: player.y,
+      sceneId: player.sceneId,
+      rarityId: 'common',
+      rewards: { coins: 0 },
+    }, {
+      killer: player,
+      relicChance: 1,
+      rng: () => rngValues.shift() ?? 0.99,
+    });
+    sendDevMessage(player, 'Released the next eligible Chronicle relic into the live loot stream.');
   },
 };
 

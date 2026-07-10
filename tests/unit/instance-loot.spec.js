@@ -131,6 +131,33 @@ describe('monster loot drops', () => {
     expect(drops[1].uuid).toBeTruthy();
   });
 
+  it('returns an eligible dead scion relic to the live loot stream', () => {
+    const sceneId = 'scene-loot-relic';
+    const killer = { accountId: 'account:heir', scionId: 'scion-heir' };
+    const scene = { id: sceneId, items: [], players: [killer] };
+    world.scenes.set(sceneId, scene);
+
+    const drops = dropMonsterLoot(makeSlainMonster(sceneId), {
+      killer,
+      rng: makeRngQueue([0.99, 0]),
+      relicProvider: () => ({
+        id: 'gold-ring',
+        uuid: 'ancestral-ring',
+        name: 'Bryn\'s Oath — Relic of Bryn',
+        displayName: 'Bryn\'s Oath — Relic of Bryn',
+        legacyRelicId: 'relic-1',
+        legacy: { sourceScionName: 'Bryn' },
+      }),
+    });
+
+    expect(drops).toHaveLength(2);
+    expect(drops[1]).toMatchObject({
+      id: 'gold-ring',
+      legacyRelicId: 'relic-1',
+      legacy: { sourceScionName: 'Bryn' },
+    });
+  });
+
   it('moves drops off stairs onto a reachable non-transition tile', async () => {
     const sceneId = 'scene-loot-stairs';
     const floor = await GameMap.generateInstance({ seed: 9090, template: 'dungeon' });
