@@ -12,7 +12,7 @@ export default [
     actionId: 'player:take',
     context: ['gameMap'],
     allow: ['item'],
-    nearby: 'exact',
+    nearby: 'edge',
     weight: 1,
     queueable: true,
   },

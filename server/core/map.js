@@ -1035,8 +1035,10 @@ class Map {
    * @param {integer} x The x-axis coord on where user clicked on game-gap
    * @param {integer} y The y-axis coord on where user clicked on game-gap
    */
-  static findQuickestPath(x, y, playerIndex) {
-    const player = world.players[playerIndex];
+  static findQuickestPath(x, y, playerReference) {
+    const player = playerReference && typeof playerReference === 'object'
+      ? playerReference
+      : world.players[playerReference];
     return new Promise((resolve) => {
       if (!player || !player.path || !player.path.grid) {
         resolve([]);
@@ -1070,10 +1072,9 @@ class Map {
    * @param {integer} y The y-axis coord on where user clicked on game-gap
    */
   static async findPath(uuidPath, x, y, location) {
-    const playerIndex = world.players.findIndex(p => p.uuid === uuidPath);
-    if (playerIndex === -1) return;
-
-    const pathingPlayer = world.players[playerIndex];
+    const pathingPlayer = world.players.find(p => p.uuid === uuidPath);
+    if (!pathingPlayer) return;
+    const sessionSocketId = pathingPlayer.socket_id;
     if (pathingPlayer.stats
       && pathingPlayer.stats.resources
       && pathingPlayer.stats.resources.health
@@ -1082,13 +1083,22 @@ class Map {
       return;
     }
 
-    if (world.players[playerIndex].moving) {
-      world.players[playerIndex].path.current.interrupted = true;
+    if (pathingPlayer.moving) {
+      pathingPlayer.path.current.interrupted = true;
     }
 
     // The player's x-y on map (always 7,5)
     // to where they clicked on the map
-    const path = await Map.findQuickestPath(x, y, playerIndex);
+    const path = await Map.findQuickestPath(x, y, pathingPlayer);
+
+    // Pathfinding is async. If this character reconnected while it was
+    // running, the old session must not mutate or drive the replacement.
+    const livePlayer = world.players.find(player => (
+      player.uuid === uuidPath && player.socket_id === sessionSocketId
+    ));
+    if (livePlayer !== pathingPlayer) {
+      return;
+    }
 
     // Since we are performing an action on a resource or tile,
     // let's end the path one step so we don't step on it.
@@ -1099,13 +1109,13 @@ class Map {
 
     // If the tile we clicked on
     // can be walked on, continue ->
-    if (world.players[playerIndex].path.current.walkable && path.length && path.length >= 1) {
-      world.players[playerIndex].path.current.path.walking = path;
-      world.players[playerIndex].path.current.step = 0;
-      world.players[playerIndex].path.current.interrupted = false;
+    if (pathingPlayer.path.current.walkable && path.length && path.length >= 1) {
+      pathingPlayer.path.current.path.walking = path;
+      pathingPlayer.path.current.step = 0;
+      pathingPlayer.path.current.interrupted = false;
 
       // We start moving the player along their path
-      world.players[playerIndex].walkPath(playerIndex);
+      pathingPlayer.walkPath();
     }
   }
 

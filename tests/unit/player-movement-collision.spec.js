@@ -151,4 +151,32 @@ describe('player movement collision', () => {
     expect(player.x).toBe(10);
     expect(player.y).toBe(10);
   });
+
+  it('abandons delayed path work when the session has been replaced', async () => {
+    vi.useFakeTimers();
+    const player = makePlayer();
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [],
+      metadata: { portals: [], spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    world.players.push(player);
+
+    player.walkPath();
+    const replacement = {
+      ...player,
+      socket_id: 'replacement-socket',
+      x: 50,
+      y: 50,
+    };
+    world._players = [replacement];
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(player.x).toBe(10);
+    expect(player.y).toBe(10);
+    expect(replacement.x).toBe(50);
+    expect(replacement.y).toBe(50);
+  });
 });

@@ -14,6 +14,7 @@ import { performance } from 'node:perf_hooks';
 import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
+import { recordRuntimeEvent } from '#server/core/services/runtime-diagnostics.js';
 
 class Delaford {
   constructor(server) {
@@ -313,6 +314,7 @@ class Delaford {
 
     // Add player to server's player list
     console.log(`${emoji.get('computer')}  A client (${ws.id.substring(0, 5)}...) connected.`);
+    recordRuntimeEvent('socket:connected', { socketId: ws.id });
     world.clients.push(ws);
 
     // Only return needed values for client
@@ -351,6 +353,13 @@ class Delaford {
         return;
       }
 
+      recordRuntimeEvent('socket:message', {
+        socketId: ws.id,
+        playerId: Delaford.getSocketPlayer(ws)?.uuid || null,
+        event: data.event,
+        bytes: Buffer.byteLength(msg),
+      });
+
       if (typeof Handler[data.event] !== 'function') {
         console.warn(`[socket] Unknown event "${data.event}" from ${ws.id.substring(0, 5)}...`);
         return;
@@ -375,12 +384,32 @@ class Delaford {
       try {
         await Handler[data.event](data, ws, this);
       } catch (err) {
+        recordRuntimeEvent('socket:handler-error', {
+          socketId: ws.id,
+          event: data.event,
+          message: err.message,
+          stack: err.stack,
+        });
         console.error(`[socket] Handler error for "${data.event}":`, err);
       }
     });
 
-    ws.on('error', e => console.log(e, `${ws.id} has left`));
-    ws.on('close', () => this.constructor.close(ws));
+    ws.on('error', (error) => {
+      recordRuntimeEvent('socket:error', {
+        socketId: ws.id,
+        message: error.message,
+      });
+      console.error(error, `${ws.id} has left`);
+    });
+    ws.on('close', (code, reason) => {
+      recordRuntimeEvent('socket:closed', {
+        socketId: ws.id,
+        playerId: Delaford.getSocketPlayer(ws)?.uuid || null,
+        code,
+        reason: reason ? reason.toString() : '',
+      });
+      this.constructor.close(ws);
+    });
   }
 
   shutdown() {

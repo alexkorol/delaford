@@ -23,8 +23,8 @@ export default {
   },
   methods: {
     logout() {
-      bus.$emit('player:logout');
       Socket.emit('player:logout', { id: this.game.player.socket_id });
+      bus.$emit('player:logout');
     },
   },
 };

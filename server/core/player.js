@@ -245,8 +245,8 @@ class Player {
    * @param {object} path The information to be used of the pathfind
    * @param {object} map The map object associated with player
    */
-  walkPath(playerIndex) {
-    return this.movement.walkPath(playerIndex);
+  walkPath() {
+    return this.movement.walkPath();
   }
 
   /**

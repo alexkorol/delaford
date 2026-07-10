@@ -1,6 +1,8 @@
 import ItemFactory from '#server/core/items/factory.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
+import config from '#server/config.js';
+import UI from '#shared/ui.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
 export const GEAR_DROP_CHANCES = {
@@ -45,6 +47,85 @@ export const GEAR_DROP_POOL = [
   'garnet-amulet',
 ];
 
+const sameTile = (left, right) => (
+  left
+  && right
+  && left.x === right.x
+  && left.y === right.y
+);
+
+const transitionTiles = (scene) => {
+  const metadata = scene && scene.metadata ? scene.metadata : {};
+  return [
+    metadata.stairsUp,
+    metadata.stairsDown,
+    ...(Array.isArray(metadata.portals) ? metadata.portals : []),
+  ].filter(Boolean);
+};
+
+const isSafeLootTile = (scene, x, y) => {
+  const map = scene && scene.map;
+  const width = config.map.size.x;
+  const height = config.map.size.y;
+  if (!map || !Array.isArray(map.background) || !Array.isArray(map.foreground)) {
+    return true;
+  }
+  if (x < 0 || y < 0 || x >= width || y >= height) {
+    return false;
+  }
+  if (transitionTiles(scene).some(tile => sameTile(tile, { x, y }))) {
+    return false;
+  }
+
+  const index = (y * width) + x;
+  const background = map.background[index];
+  const foreground = map.foreground[index];
+  const backgroundWalkable = Number.isFinite(background)
+    && UI.tileWalkable(background - 1, 'background');
+  const foregroundWalkable = !foreground || UI.tileWalkable(foreground - 1, 'foreground');
+  return backgroundWalkable && foregroundWalkable;
+};
+
+export const resolveLootLocation = (scene, x, y) => {
+  const origin = { x: Math.round(x), y: Math.round(y) };
+  if (isSafeLootTile(scene, origin.x, origin.y)) {
+    return origin;
+  }
+
+  for (let radius = 1; radius <= 6; radius += 1) {
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const candidates = [
+        { x: origin.x + offset, y: origin.y - radius },
+        { x: origin.x + radius, y: origin.y + offset },
+        { x: origin.x - offset, y: origin.y + radius },
+        { x: origin.x - radius, y: origin.y - offset },
+      ];
+      const safe = candidates.find(candidate => isSafeLootTile(scene, candidate.x, candidate.y));
+      if (safe) {
+        return safe;
+      }
+    }
+  }
+
+  const spawnFallback = scene?.metadata?.spawnPoints?.find(point => (
+    isSafeLootTile(scene, point.x, point.y)
+  ));
+  if (spawnFallback) {
+    return { x: spawnFallback.x, y: spawnFallback.y };
+  }
+
+  const width = config.map.size.x;
+  const height = config.map.size.y;
+  for (let index = 0; index < width * height; index += 1) {
+    const candidate = { x: index % width, y: Math.floor(index / width) };
+    if (isSafeLootTile(scene, candidate.x, candidate.y)) {
+      return candidate;
+    }
+  }
+
+  return origin;
+};
+
 /**
  * Drop a slain monster's rewards onto its tile: its coin bounty always,
  * plus a rarity-gated chance of a piece of gear. Drops land in the
@@ -64,10 +145,12 @@ export const dropMonsterLoot = (monster, options = {}) => {
     return [];
   }
 
-  // Monsters roam at continuous positions; loot must land on the tile grid
-  // so pickup (exact tile match) and rendering line up.
-  const dropX = Math.round(monster.x);
-  const dropY = Math.round(monster.y);
+  // Monsters roam at continuous positions and can die beside a wall or on a
+  // staircase. Snap rewards to a nearby walkable, non-transition tile so a
+  // Take action can never strand loot or zone the player instead.
+  const dropLocation = resolveLootLocation(scene, monster.x, monster.y);
+  const dropX = dropLocation.x;
+  const dropY = dropLocation.y;
 
   const rng = typeof options.rng === 'function' ? options.rng : Math.random;
   const drops = [];

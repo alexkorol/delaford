@@ -26,7 +26,7 @@ const nodeResolver = importPlugin.createNodeResolver({
 
 export default [
   {
-    ignores: ['dist/**', 'build/**'],
+    ignores: ['dist/**', 'build/**', 'test-results/**', 'playwright-report/**'],
   },
   {
     files: ['**/*.js', '**/*.vue'],

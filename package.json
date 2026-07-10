@@ -24,7 +24,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:e2e": "start-server-and-test preview http://127.0.0.1:4173 \"playwright test\"",
+    "test:e2e": "playwright test",
     "format": "eslint . --fix",
     "playtest": "node playtest/run.mjs"
   },

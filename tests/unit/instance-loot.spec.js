@@ -27,7 +27,10 @@ vi.mock('#server/socket.js', () => ({
 }));
 
 const { default: GameMap } = await import('#server/core/map.js');
-const { dropMonsterLoot, GEAR_DROP_POOL } = await import('#server/core/combat/loot.js');
+const {
+  dropMonsterLoot,
+  GEAR_DROP_POOL,
+} = await import('#server/core/combat/loot.js');
 const { default: world } = await import('#server/core/world.js');
 const { default: Socket } = await import('#server/socket.js');
 const { default: UI } = await import('#shared/ui.js');
@@ -126,6 +129,32 @@ describe('monster loot drops', () => {
     expect(drops).toHaveLength(2);
     expect(GEAR_DROP_POOL).toContain(drops[1].id);
     expect(drops[1].uuid).toBeTruthy();
+  });
+
+  it('moves drops off stairs onto a reachable non-transition tile', async () => {
+    const sceneId = 'scene-loot-stairs';
+    const floor = await GameMap.generateInstance({ seed: 9090, template: 'dungeon' });
+    const scene = {
+      id: sceneId,
+      items: [],
+      players: [],
+      map: floor.map,
+      metadata: floor.metadata,
+    };
+    world.scenes.set(sceneId, scene);
+
+    const stairs = floor.metadata.stairsDown;
+    const drops = dropMonsterLoot(makeSlainMonster(sceneId, {
+      x: stairs.x,
+      y: stairs.y,
+    }), { rng: makeRngQueue([0.99]) });
+
+    expect(drops).toHaveLength(1);
+    expect({ x: drops[0].x, y: drops[0].y }).not.toEqual(stairs);
+    const index = (drops[0].y * 200) + drops[0].x;
+    expect(UI.tileWalkable(floor.map.background[index] - 1)).toBe(true);
+    expect(!floor.map.foreground[index]
+      || UI.tileWalkable(floor.map.foreground[index] - 1, 'foreground')).toBe(true);
   });
 
   it('drops nothing without a scene or rewards', () => {

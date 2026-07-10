@@ -2,7 +2,7 @@ import Query from '#server/core/data/query.js';
 import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import ItemFactory from '#server/core/items/factory.js';
-import { packInventoryItems } from '#shared/inventory-footprints.js';
+import { packInventoryItems, positionFromSlot } from '#shared/inventory-footprints.js';
 
 const hydrateInventoryItem = (item = {}) => {
   if (!item || !item.id) {
@@ -31,10 +31,17 @@ const hydrateInventoryItem = (item = {}) => {
 };
 
 export default class Inventory {
-  constructor(slots, socketId) {
+  constructor(slots, socketId, playerUuid = null) {
     this.slots = packInventoryItems((slots || []).map(hydrateInventoryItem));
     this.socketId = socketId;
-    this.playerIndex = world.players.findIndex(p => p.socket_id === this.socketId);
+    this.playerUuid = playerUuid;
+  }
+
+  getPlayer() {
+    return world.players.find(player => (
+      (this.playerUuid && player.uuid === this.playerUuid)
+      || (this.socketId && player.socket_id === this.socketId)
+    )) || null;
   }
 
   /**
@@ -44,54 +51,83 @@ export default class Inventory {
    * @param {integer} qty - The number of quantity for that item
    */
   add(itemId, qty = 1, options = {}) {
-    // TODO
-    // Drop items on floor if no space (functionality in shop)
-    return new Promise((resolve) => {
-      const baseItem = Query.getItemData(itemId) || { id: itemId };
-      const stackable = !!baseItem.stackable;
-      const rounds = stackable ? 1 : qty; // How many times to iterate on inventory?
-      const { existingItem = null, uuid: incomingUuid = null } = options;
-      const player = world.players[this.playerIndex];
-      const playerUuid = player ? player.uuid : null;
+    const requested = Number.isFinite(qty) ? Math.max(0, Math.floor(qty)) : 0;
+    if (!itemId || requested === 0) {
+      return { ok: false, added: 0, remainder: requested };
+    }
 
-      for (let index = 0; index < rounds; index += 1) {
-        const openSlot = UI.getOpenSlot(this.slots, 'inventory', baseItem);
-        if (openSlot === false && openSlot !== 0) {
-          continue;
-        }
+    const baseItem = Query.getItemData(itemId) || { id: itemId };
+    const stackable = !!baseItem.stackable;
+    const { existingItem = null, uuid: incomingUuid = null } = options;
+    const player = this.getPlayer();
+    const playerUuid = player ? player.uuid : this.playerUuid;
+    let remainder = requested;
 
-        let instance = null;
+    if (stackable) {
+      this.slots
+        .filter(item => item && item.id === itemId && item.stackable)
+        .forEach((item) => {
+          if (remainder <= 0) {
+            return;
+          }
 
-        if (existingItem) {
-          instance = ItemFactory.adoptExisting(existingItem, {
-            uuid: incomingUuid,
-            quantity: stackable ? qty : existingItem.qty || 1,
-            bindTo: playerUuid,
-            baseItem,
-          });
-        } else {
-          instance = ItemFactory.createById(itemId, {
-            uuid: incomingUuid,
-            quantity: stackable ? qty : 1,
-            bindTo: playerUuid,
-          });
-        }
+          const currentQty = Number.isFinite(item.qty) ? item.qty : 1;
+          const maxStack = Number.isFinite(item.maxStack)
+            ? item.maxStack
+            : Number.isFinite(baseItem.maxStack) ? baseItem.maxStack : Infinity;
+          const capacity = Math.max(0, maxStack - currentQty);
+          const transfer = Math.min(capacity, remainder);
+          item.qty = currentQty + transfer;
+          remainder -= transfer;
+        });
+    }
 
-        if (!instance) {
-          continue;
-        }
-
-        instance.slot = openSlot;
-        instance.context = 'item';
-
-        if (stackable) {
-          instance.qty = qty;
-        }
-
-        this.slots.push(instance);
+    while (remainder > 0) {
+      const openSlot = UI.getOpenSlot(this.slots, 'inventory', baseItem);
+      if (openSlot === false && openSlot !== 0) {
+        break;
       }
 
-      resolve(200);
-    });
+      const configuredMaxStack = Number.isFinite(baseItem.maxStack)
+        ? baseItem.maxStack
+        : Number.isFinite(existingItem?.maxStack) ? existingItem.maxStack : Infinity;
+      const maxStack = stackable ? configuredMaxStack : Infinity;
+      const quantity = stackable ? Math.min(remainder, maxStack) : 1;
+      let instance = null;
+
+      if (existingItem && remainder === requested && quantity === remainder) {
+        instance = ItemFactory.adoptExisting(existingItem, {
+          uuid: incomingUuid,
+          quantity,
+          bindTo: playerUuid,
+          baseItem,
+        });
+      } else {
+        instance = ItemFactory.createById(itemId, {
+          uuid: remainder === requested ? incomingUuid : null,
+          quantity,
+          bindTo: playerUuid,
+        });
+      }
+
+      if (!instance) {
+        break;
+      }
+
+      instance.slot = openSlot;
+      instance.position = positionFromSlot(openSlot);
+      instance.context = 'item';
+      if (stackable) {
+        instance.qty = quantity;
+      }
+      this.slots.push(instance);
+      remainder -= quantity;
+    }
+
+    return {
+      ok: remainder === 0,
+      added: requested - remainder,
+      remainder,
+    };
   }
 }

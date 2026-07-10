@@ -165,7 +165,8 @@ export default {
    * A player logs out of the game
    */
   'player:logout': async (data, ws, context) => {
-    context.constructor.close(ws, true);
+    await context.constructor.close(ws, true);
+    ws.authenticated = false;
   },
 
   /**
@@ -291,7 +292,11 @@ export default {
       return;
     }
 
-    data.player = { ...(data.player || {}), socket_id: player.socket_id };
+    data.player = {
+      ...(data.player || {}),
+      uuid: player.uuid,
+      socket_id: player.socket_id,
+    };
     if (player.queue.length >= 20) {
       return;
     }

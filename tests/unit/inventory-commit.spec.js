@@ -227,7 +227,7 @@ describe('inventory commit identity validation', () => {
       respawnIn: '5s',
     }];
     player.inventory.slots = [];
-    player.inventory.add = vi.fn();
+    player.inventory.add = vi.fn(() => ({ ok: true, added: 7, remainder: 0 }));
     world.assignPlayerToScene(player, scene.id);
 
     actionEvents['player:take']({
@@ -276,7 +276,7 @@ describe('inventory commit identity validation', () => {
       respawnIn: '5s',
     }];
     player.inventory.slots = Array.from({ length: 84 }, (_, slot) => makeFiller(slot));
-    player.inventory.add = vi.fn();
+    player.inventory.add = vi.fn(() => ({ ok: false, added: 0, remainder: 1 }));
     world.assignPlayerToScene(player, scene.id);
 
     actionEvents['player:take']({
@@ -294,7 +294,10 @@ describe('inventory commit identity validation', () => {
     });
 
     expect(scene.items).toEqual([sceneItem]);
-    expect(player.inventory.add).not.toHaveBeenCalled();
+    expect(player.inventory.add).toHaveBeenCalledWith('bronze-sword', 1, {
+      uuid: 'full-pickup-sword',
+      existingItem: sceneItem,
+    });
     expect(scene.respawns.items[0].pickedUp).toBeUndefined();
     expect(scene.respawns.items[0].willRespawnIn).toBeUndefined();
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({

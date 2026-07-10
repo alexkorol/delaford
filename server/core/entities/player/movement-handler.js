@@ -289,8 +289,20 @@ const stopMovement = (player, data) => {
   broadcastAnimation(player);
 };
 
-export const queueEmpty = (playerIndex) => {
-  const playerAtIndex = world.players[playerIndex];
+const resolvePlayerReference = (reference) => {
+  if (reference && typeof reference === 'object') {
+    return reference;
+  }
+  if (typeof reference === 'string') {
+    return world.players.find(player => (
+      player.uuid === reference || player.socket_id === reference
+    )) || null;
+  }
+  return Number.isInteger(reference) ? world.players[reference] || null : null;
+};
+
+export const queueEmpty = (playerReference) => {
+  const playerAtIndex = resolvePlayerReference(playerReference);
 
   if (!playerAtIndex || !Array.isArray(playerAtIndex.queue)) {
     return true;
@@ -362,25 +374,42 @@ const move = (player, direction, options = {}) => {
   return true;
 };
 
-const walkPath = (player, playerIndex) => {
+const walkPath = (player) => {
   const { path } = player;
   const baseSpeed = BASE_MOVE_DURATION;
+
+  const isCurrentSession = () => world.players.some(candidate => (
+    candidate === player
+    && candidate.uuid === player.uuid
+    && candidate.socket_id === player.socket_id
+  ));
+
+  const executeQueuedAction = () => {
+    if (queueEmpty(player)) {
+      return;
+    }
+
+    const todo = player.queue[0];
+    const handler = todo && todo.action ? playerEvent[todo.action.actionId] : null;
+    if (typeof handler === 'function') {
+      const result = handler({
+        todo,
+        playerUuid: player.uuid,
+        socketId: player.socket_id,
+      });
+      if (result && typeof result.catch === 'function') {
+        result.catch(error => console.error('[movement] Queued action failed:', error));
+      }
+    }
+    player.queue.shift();
+  };
 
   if (!path || !path.current || !Array.isArray(path.current.path.walking)) {
     return;
   }
 
   if (path.current.path.walking.length <= 1) {
-    if (!queueEmpty(playerIndex)) {
-      const todo = world.players[playerIndex].queue[0];
-
-      playerEvent[todo.action.actionId]({
-        todo,
-        playerIndex,
-      });
-
-      player.queue.shift();
-    }
+    executeQueuedAction();
 
     stopMovement(player, { player: { socket_id: player.socket_id } });
     return;
@@ -391,23 +420,18 @@ const walkPath = (player, playerIndex) => {
   path.current.interrupted = false;
 
   const scheduleNextStep = () => {
+    if (!isCurrentSession()) {
+      return;
+    }
+
     if (path.current.walkId !== activeWalkId) {
       return;
     }
 
     if (path.current.step + 1 >= path.current.path.walking.length) {
-      if (!queueEmpty(playerIndex)) {
-        const todo = world.players[playerIndex].queue[0];
+      executeQueuedAction();
 
-        playerEvent[todo.action.actionId]({
-          todo,
-          playerIndex,
-        });
-
-        player.queue.shift();
-      }
-
-      stopMovement(player, { player: { socket_id: world.players[playerIndex].socket_id } });
+      stopMovement(player, { player: { socket_id: player.socket_id } });
       return;
     }
 
@@ -432,6 +456,10 @@ const walkPath = (player, playerIndex) => {
     const totalSteps = Math.max(0, path.current.path.walking.length - 1);
 
     setTimeout(() => {
+      if (!isCurrentSession()) {
+        return;
+      }
+
       if (path.current.walkId !== activeWalkId) {
         return;
       }
@@ -447,10 +475,7 @@ const walkPath = (player, playerIndex) => {
         direction: movement,
       });
 
-      const playerChanging = world.players[playerIndex];
-      if (playerChanging) {
-        broadcastMovement(playerChanging);
-      }
+      broadcastMovement(player);
 
       if (player.movementStep && player.movementStep.blocked) {
         path.current.interrupted = true;
@@ -486,7 +511,7 @@ const createPlayerMovementHandler = (player) => ({
   foregroundBlocked: () => foregroundBlocked(player),
   stopMovement: data => stopMovement(player, data),
   move: (direction, options) => move(player, direction, options),
-  walkPath: playerIndex => walkPath(player, playerIndex),
+  walkPath: () => walkPath(player),
 });
 
 export default createPlayerMovementHandler;

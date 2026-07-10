@@ -10,6 +10,7 @@ import secure from 'ssl-express-www';
 import Delaford from './Delaford.js';
 import world from './core/world.js';
 import nameValidationService from './core/services/name-validation.js';
+import { recentRuntimeEvents } from './core/services/runtime-diagnostics.js';
 
 const serverDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = path.resolve(serverDir, '..');
@@ -22,9 +23,18 @@ const crashLogPath = path.join(serverDir, 'logs', 'crash.log');
 const recordCrash = (kind, error) => {
   try {
     fs.mkdirSync(path.dirname(crashLogPath), { recursive: true });
+    if (fs.existsSync(crashLogPath) && fs.statSync(crashLogPath).size > 2 * 1024 * 1024) {
+      const rotatedCrashLogPath = `${crashLogPath}.1`;
+      if (fs.existsSync(rotatedCrashLogPath)) {
+        fs.unlinkSync(rotatedCrashLogPath);
+      }
+      fs.renameSync(crashLogPath, rotatedCrashLogPath);
+    }
     const entry = [
       `\n[${new Date().toISOString()}] ${kind}`,
       error && error.stack ? error.stack : String(error),
+      'Recent runtime events:',
+      JSON.stringify(recentRuntimeEvents(), null, 2),
       '',
     ].join('\n');
     fs.appendFileSync(crashLogPath, entry);

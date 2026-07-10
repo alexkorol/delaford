@@ -103,6 +103,8 @@ import Event from './core/player/events.js';
 import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
+import ConnectionManager from './core/utilities/connection-manager.js';
+import ClientDiagnostics from './core/utilities/client-diagnostics.js';
 import { shouldRootHandleQuickbarHotkey } from './core/hotkeys.js';
 
 const createDefaultQuickSlots = () => createQuickbarSlots();
@@ -126,6 +128,13 @@ const defaultPaneAssignments = {
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Verdigris.';
 const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
 const DESKTOP_PANE_GUTTER = 8;
+const HIGH_FREQUENCY_SOCKET_EVENTS = new Set([
+  'npc:movement',
+  'player:movement',
+  'player:animation',
+  'player:combat:update',
+  'player:stats:update',
+]);
 const MOBILE_PANE_GUTTER = 6;
 
 const floorOdd = (value, minimum = 1) => {
@@ -178,7 +187,6 @@ export default {
       screen: 'login',
       connectionLost: false,
       reconnectAttempts: 0,
-      intentionalDisconnect: false,
       sessionNotice: '',
       clientErrorNotice: '',
       skipAutoRelogin: false,
@@ -491,76 +499,82 @@ export default {
   created() {
     const context = this;
 
-    const handleMessage = (evt) => {
-      const data = JSON.parse(evt.data);
-      const eventName = data.event;
+    this.handleClientError = (text) => {
+      this.clientErrorNotice = String(text || 'Client error');
+      clearTimeout(this.clientErrorTimeout);
+      this.clientErrorTimeout = setTimeout(() => { this.clientErrorNotice = ''; }, 10000);
+    };
 
-      const canRefresh = ['world', 'player', 'item'].some((e) => eventName.split(':').includes(e));
-      // Did the game canvas change that we need
-      // to refresh the first context action?
-      if (data && eventName && canRefresh) {
-        bus.$emit('canvas:reset-context-menu');
+    const handleMessage = (evt) => {
+      let data;
+      try {
+        data = JSON.parse(evt.data);
+      } catch (error) {
+        ClientDiagnostics.record('socket:malformed-message', {
+          error,
+          preview: String(evt.data).slice(0, 200),
+        });
+        this.handleClientError('Received an invalid message from the game server.');
+        return;
       }
 
-      if (eventName !== undefined) {
+      const eventName = data.event;
+      if (typeof eventName !== 'string') {
+        ClientDiagnostics.record('socket:missing-event', data);
+        return;
+      }
+      if (!HIGH_FREQUENCY_SOCKET_EVENTS.has(eventName)) {
+        ClientDiagnostics.record('socket:message', { event: eventName });
+      }
+
+      if (eventName === 'player:login' && this.connectionManager) {
+        this.connectionManager.markAuthenticated();
+      }
+
+      const canRefresh = ['world', 'player', 'item'].some((e) => eventName.split(':').includes(e));
+      if (canRefresh) {
+        try {
+          bus.$emit('canvas:reset-context-menu');
+        } catch (error) {
+          ClientDiagnostics.record('client:context-refresh-error', { eventName, error });
+          console.error('[client] Context refresh failed:', error);
+        }
+      }
+
+      try {
         if (!Event[eventName]) {
           bus.$emit(eventName, data);
         } else {
           Event[eventName](data, context);
         }
-      } else {
-        console.log(data);
+      } catch (error) {
+        ClientDiagnostics.record('client:event-handler-error', { eventName, error });
+        console.error(`[client] Handler failed for ${eventName}:`, error);
+        this.handleClientError(`Client event failed: ${eventName}`);
       }
     };
 
-    // The old behaviour force-reloaded the page 1s after any socket close —
-    // every dev-server restart logged the player out. Reconnect with backoff
-    // instead, and log straight back in with the remembered credentials.
     const wsUrl = window.ws ? window.ws.url : null;
-
-    const attemptReconnect = () => {
-      const delay = Math.min(8000, 750 * (2 ** Math.min(this.reconnectAttempts, 4)));
-      this.reconnectAttempts += 1;
-      setTimeout(() => {
-        if (this.intentionalDisconnect) {
-          return;
-        }
-        const ws = new WebSocket(wsUrl);
-        window.ws = ws;
-         
-        wireSocket(ws);
-        ws.onopen = () => {
-          this.reconnectAttempts = 0;
-          this.connectionLost = false;
-          Socket.ensureListeners();
-          Socket.flushQueue();
-          if (Socket.lastLoginPayload && this.screen === 'game' && !this.skipAutoRelogin) {
-            Socket.emit('player:login', Socket.lastLoginPayload);
-          }
-          this.skipAutoRelogin = false;
-        };
-      }, delay);
-    };
-
-    const wireSocket = (ws) => {
-      ws.onmessage = handleMessage;
-      ws.onclose = () => {
-        if (this.intentionalDisconnect) {
-          return;
-        }
-        this.connectionLost = true;
-        attemptReconnect();
-      };
-      ws.onerror = () => {
-        // Before the first successful login a dead server means the classic
-        // screen; mid-game errors flow through onclose → reconnect.
+    this.connectionManager = new ConnectionManager({
+      url: wsUrl,
+      onMessage: handleMessage,
+      onStatus: ({ state, attempts }) => {
+        this.reconnectAttempts = attempts || 0;
+        this.connectionLost = state === 'reconnecting';
+      },
+      onError: () => {
         if (this.screen !== 'game') {
           this.screen = 'server-down';
         }
-      };
-    };
-
-    wireSocket(window.ws);
+      },
+      shouldAutoLogin: () => {
+        const shouldLogin = this.screen === 'game' && !this.skipAutoRelogin;
+        this.skipAutoRelogin = false;
+        return shouldLogin;
+      },
+    });
+    this.connectionManager.start(window.ws);
+    window.__verdigrisConnection = this.connectionManager;
 
     this.handleFlowerPaneOpen = () => {
       this.openPane('flowerOfLife');
@@ -569,19 +583,28 @@ export default {
     // Client-side crash visibility: render errors and uncaught exceptions
     // surface as a banner instead of a silent freeze that looks like a
     // server crash.
-    this.handleClientError = (text) => {
-      this.clientErrorNotice = String(text || 'Client error');
-      clearTimeout(this.clientErrorTimeout);
-      this.clientErrorTimeout = setTimeout(() => { this.clientErrorNotice = ''; }, 10000);
-    };
     bus.$on('client:error', this.handleClientError);
-    window.addEventListener('error', (event) => {
+    ClientDiagnostics.setContextProvider(() => ({
+      screen: this.screen,
+      sceneId: this.game?.player?.sceneId || null,
+      playerId: this.game?.player?.uuid || null,
+      connectionLost: this.connectionLost,
+    }));
+    this.handleWindowError = (event) => {
       console.error('[client] uncaught error:', event.error || event.message);
+      ClientDiagnostics.record('client:uncaught-error', event.error || event.message);
       this.handleClientError(`Client error: ${event.message}`);
-    });
-    window.addEventListener('unhandledrejection', (event) => {
+    };
+    this.handleUnhandledRejection = (event) => {
       console.error('[client] unhandled rejection:', event.reason);
-    });
+      ClientDiagnostics.record('client:unhandled-rejection', event.reason);
+      const message = event.reason && event.reason.message
+        ? event.reason.message
+        : String(event.reason || 'Unknown rejection');
+      this.handleClientError(`Client error: ${message}`);
+    };
+    window.addEventListener('error', this.handleWindowError);
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
 
     bus.$on('show-sidebar', this.showSidebar);
     bus.$on('skill-tree:open', this.handleFlowerPaneOpen);
@@ -605,8 +628,17 @@ export default {
     }
 
     if (typeof window !== 'undefined') {
+      if (this.connectionManager) {
+        this.connectionManager.stop();
+        this.connectionManager = null;
+      }
+      if (window.__verdigrisConnection) {
+        delete window.__verdigrisConnection;
+      }
       window.removeEventListener('resize', this.onViewportResize);
       window.removeEventListener('keydown', this.handleGlobalKeydown, { capture: true });
+      window.removeEventListener('error', this.handleWindowError);
+      window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
       if (this.viewportResizeRaf) {
         window.cancelAnimationFrame(this.viewportResizeRaf);
         this.viewportResizeRaf = null;
@@ -629,10 +661,19 @@ export default {
       clearTimeout(this.partyStatusTimeout);
       this.partyStatusTimeout = null;
     }
+    if (this.clientErrorTimeout) {
+      clearTimeout(this.clientErrorTimeout);
+      this.clientErrorTimeout = null;
+    }
+    if (this.sessionNoticeTimeout) {
+      clearTimeout(this.sessionNoticeTimeout);
+      this.sessionNoticeTimeout = null;
+    }
 
     bus.$off('skill-tree:open', this.handleFlowerPaneOpen);
     bus.$off('game:map:dimensions', this.handleMapDimensions);
     bus.$off('show-sidebar', this.showSidebar);
+    bus.$off('client:error', this.handleClientError);
     bus.$off('player:logout', this.logout);
     bus.$off('go:main', this.cancelLogin);
 
@@ -672,16 +713,14 @@ export default {
     sessionReplaced() {
       this.skipAutoRelogin = true;
       this.sessionNotice = 'Logged in from another window — this session was signed out.';
-      setTimeout(() => { this.sessionNotice = ''; }, 12000);
+      clearTimeout(this.sessionNoticeTimeout);
+      this.sessionNoticeTimeout = setTimeout(() => { this.sessionNotice = ''; }, 12000);
       this.logout();
-      // Let the socket itself reconnect (the login screen needs a live
-      // socket to submit through); skipAutoRelogin stops the steal war.
-      this.intentionalDisconnect = false;
     },
     logout() {
-      // A user-chosen logout must not trigger the auto-reconnect loop.
-      this.intentionalDisconnect = true;
-      setTimeout(() => { this.intentionalDisconnect = false; }, 3000);
+      if (this.connectionManager) {
+        this.connectionManager.markLoggedOut();
+      }
 
       if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
         this.game.map.destroy();
@@ -1576,6 +1615,11 @@ export default {
     async startGame(data) {
       // Stop the main menu music
       bus.$emit('music:stop');
+
+      ClientDiagnostics.record('game:start', {
+        reentry: Boolean(this.engine),
+        playerId: data && data.player ? data.player.uuid : null,
+      });
 
       // Re-entry safe (auto re-login after a reconnect): stop the previous
       // engine and map before building fresh ones, or two rAF loops fight

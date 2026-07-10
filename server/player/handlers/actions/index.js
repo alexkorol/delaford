@@ -54,13 +54,29 @@ const sendInventoryError = (player, text) => {
 
 const getPlayerFromPayload = (incoming) => {
   const payload = incoming.data || {};
-  const socketId = payload.player?.socket_id || incoming.player?.socket_id;
-  const playerId = payload.id || incoming.id || payload.player?.uuid || incoming.player?.uuid;
+  const socketId = payload.player?.socket_id
+    || incoming.player?.socket_id
+    || incoming.socketId
+    || incoming.todo?.player?.socket_id;
+  const playerId = payload.id
+    || incoming.id
+    || payload.player?.uuid
+    || incoming.player?.uuid
+    || incoming.playerUuid
+    || incoming.todo?.player?.uuid;
 
-  return world.players.find((player) => (
+  const stablePlayer = world.players.find((player) => (
     (playerId && player.uuid === playerId)
     || (socketId && player.socket_id === socketId)
   ));
+
+  if (stablePlayer) {
+    return stablePlayer;
+  }
+
+  return Number.isInteger(incoming.playerIndex)
+    ? world.players[incoming.playerIndex] || null
+    : null;
 };
 
 const getPlayerScene = player => (
@@ -102,6 +118,37 @@ const getSceneRecipients = scene => (
 const broadcastSceneItems = (scene, eventName) => {
   const items = getSceneItems(scene);
   Socket.broadcast(eventName, items, getSceneRecipients(scene));
+};
+
+const commitGroundItemPickup = (player, scene, itemIndex) => {
+  const sceneItems = getSceneItems(scene);
+  const worldItem = sceneItems[itemIndex];
+  if (!player || !worldItem || !player.inventory || typeof player.inventory.add !== 'function') {
+    return { ok: false, added: 0, remainder: worldItem?.qty || 1 };
+  }
+
+  const baseData = Query.getItemData(worldItem.id) || {};
+  const quantity = Number.isFinite(worldItem.qty) ? Math.max(1, Math.floor(worldItem.qty)) : 1;
+  const result = player.inventory.add(baseData.id || worldItem.id, quantity, {
+    uuid: worldItem.uuid,
+    existingItem: worldItem,
+  });
+  const added = result && Number.isFinite(result.added) ? result.added : 0;
+  const remainder = result && Number.isFinite(result.remainder) ? result.remainder : quantity;
+
+  if (added <= 0) {
+    return { ok: false, added: 0, remainder: quantity };
+  }
+
+  if (remainder > 0) {
+    worldItem.qty = remainder;
+  } else {
+    sceneItems.splice(itemIndex, 1);
+  }
+
+  broadcastSceneItems(scene, 'item:change');
+  refreshInventory(player);
+  return { ok: remainder === 0, added, remainder };
 };
 
 const getInventoryItemIndex = (slots = [], reference = {}) => {
@@ -839,9 +886,8 @@ const actionEvents = {
   },
 
   'player:take': (data = {}) => {
-    const { playerIndex } = data;
     const todo = data.todo || null;
-    const player = world.players[playerIndex];
+    const player = getPlayerFromPayload(data);
 
     if (!player) {
       return;
@@ -863,9 +909,6 @@ const actionEvents = {
       return;
     }
 
-    const baseData = Query.getItemData(todo.item.id) || {};
-    const itemId = baseData.id || todo.item.id;
-
     const scene = getPlayerScene(player);
     const sceneItems = getSceneItems(scene);
     const itemToTake = sceneItems.findIndex(
@@ -883,34 +926,27 @@ const actionEvents = {
     }
 
     if (worldItem.boundTo && worldItem.boundTo !== player.uuid) {
-      Socket.sendMessageToPlayer(
-        playerIndex,
-        'That item is bound to another adventurer.',
-      );
+      sendInventoryError(player, 'That item is bound to another adventurer.');
       return;
     }
 
-    const candidateInventoryItem = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
-      || { ...baseData, ...worldItem };
-    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidateInventoryItem);
-    if (openSlot === false && openSlot !== 0) {
-      sendInventoryError(player, 'There is no room in your backpack.');
+    const withinReach = Math.max(
+      Math.abs(player.x - worldItem.x),
+      Math.abs(player.y - worldItem.y),
+    ) <= 1;
+    if (!withinReach) {
+      sendInventoryError(player, 'That item is too far away.');
       return;
     }
-
-    // If qty not specified, we are picking up 1 item.
-    const quantity = worldItem.qty || 1;
-    sceneItems.splice(itemToTake, 1);
-
-    broadcastSceneItems(scene, 'item:change');
 
     const itemUuidLabel = todo.item.uuid ? `${todo.item.uuid.substr(0, 5)}...` : 'no-uuid';
     console.log(`Picking up: ${todo.item.id} (${itemUuidLabel})`);
 
-    world.players[playerIndex].inventory.add(itemId, quantity, {
-      uuid: todo.item.uuid,
-      existingItem: worldItem,
-    });
+    const pickup = commitGroundItemPickup(player, scene, itemToTake);
+    if (pickup.added <= 0) {
+      sendInventoryError(player, 'There is no room in your backpack.');
+      return;
+    }
 
     // Add respawn timer on item (if is a respawn)
     const sceneRespawns = getSceneRespawns(scene);
@@ -918,20 +954,14 @@ const actionEvents = {
       i => i.respawn && i.x === todo.at.x && i.y === todo.at.y,
     );
 
-    if (resetItemIndex !== -1) {
+    if (pickup.ok && resetItemIndex !== -1) {
       sceneRespawns.items[resetItemIndex].pickedUp = true;
       sceneRespawns.items[resetItemIndex].willRespawnIn = Item.calculateRespawnTime(
         sceneRespawns.items[resetItemIndex].respawnIn,
       );
     }
 
-    // Tell client to update their inventory
-    Socket.emit('core:refresh:inventory', {
-      player: { socket_id: world.players[playerIndex].socket_id },
-      data: world.players[playerIndex].inventory.slots,
-    });
-
-    notifyTutorial(world.players[playerIndex], 'loot');
+    notifyTutorial(player, 'loot');
   },
 
   /**
@@ -973,36 +1003,23 @@ const actionEvents = {
     }
 
     const worldItem = sceneItems[itemIndex];
-    const baseData = Query.getItemData(worldItem.id) || {};
-    const candidate = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
-      || { ...baseData, ...worldItem };
-    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidate);
-    if (openSlot === false && openSlot !== 0) {
+    const pickup = commitGroundItemPickup(player, scene, itemIndex);
+    if (pickup.added <= 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
       return;
     }
-
-    const quantity = worldItem.qty || 1;
-    sceneItems.splice(itemIndex, 1);
-    broadcastSceneItems(scene, 'item:change');
-
-    player.inventory.add(baseData.id || worldItem.id, quantity, {
-      uuid: worldItem.uuid,
-      existingItem: worldItem,
-    });
 
     const sceneRespawns = getSceneRespawns(scene);
     const respawnIndex = sceneRespawns.items.findIndex(
       entry => entry.respawn && entry.x === worldItem.x && entry.y === worldItem.y,
     );
-    if (respawnIndex !== -1) {
+    if (pickup.ok && respawnIndex !== -1) {
       sceneRespawns.items[respawnIndex].pickedUp = true;
       sceneRespawns.items[respawnIndex].willRespawnIn = Item.calculateRespawnTime(
         sceneRespawns.items[respawnIndex].respawnIn,
       );
     }
 
-    refreshInventory(player);
     notifyTutorial(player, 'loot');
   },
 

@@ -362,6 +362,7 @@ export default {
 
       if (!this.onGame) return;
       const mouseEvent = this.event || this.mouse;
+      if (!mouseEvent || !mouseEvent.target) return;
       // Save latest mouse data
       this.mouse = mouseEvent;
 

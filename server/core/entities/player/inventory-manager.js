@@ -35,7 +35,7 @@ export const constructWear = (data) => {
 };
 
 const createPlayerInventoryManager = (player) => ({
-  initializeInventory: (inventoryData, socketId) => new Inventory(inventoryData, socketId),
+  initializeInventory: (inventoryData, socketId) => new Inventory(inventoryData, socketId, player.uuid),
 });
 
 export default createPlayerInventoryManager;

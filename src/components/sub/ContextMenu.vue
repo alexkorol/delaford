@@ -179,6 +179,10 @@ export default {
      * @param {object} data The coordinates of the player and MouseEvent
      */
     buildMenu(data) {
+      if (!data || !data.coordinates || !data.event || !data.event.target) {
+        return;
+      }
+
       // Tile coordinates and mouse event
       this.mouseEvent = data.event;
       this.tile.x = data.coordinates.x;
@@ -213,7 +217,7 @@ export default {
 
       // Remove misc info
       const miscData = omit(
-        { ...data, clickedOn: data.event.target.classList },
+        { ...data, clickedOn: data.event.target.classList || [] },
         ['coordinates', 'event', 'target', 'world', 'viewport', 'center'],
       );
 
