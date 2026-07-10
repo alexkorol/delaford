@@ -21,6 +21,9 @@ export const GEAR_DROP_POOL = [
   'bronze-mace',
   'bronze-battleaxe',
   'bronze-spear',
+  'flint-spear',
+  'bronze-pike',
+  'skymetal-longsword',
   'iron-sword',
   'iron-dagger',
   'iron-warhammer',
@@ -41,10 +44,17 @@ export const GEAR_DROP_POOL = [
   'iron-shield',
   'leather-cowl',
   'cape',
+  'hide-wrap',
+  'bronze-scale-vest',
+  'bronze-war-helm',
+  'hide-sandals',
+  'bronze-roundshield',
   // jewelry
   'ring',
   'gold-ring',
   'garnet-amulet',
+  'jade-gorget',
+  'copper-coil',
 ];
 
 const sameTile = (left, right) => (

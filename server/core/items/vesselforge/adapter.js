@@ -45,12 +45,22 @@ export const createVesselBlock = (baseItem, options = {}) => {
   forge.reseed(Math.floor(rng() * 2 ** 32));
 
   const forms = SLOT_FORMS[baseItem.slot];
-  const formId = forms[Math.floor(rng() * forms.length) % forms.length];
+  const requestedForm = typeof baseItem.vesselForm === 'string' ? baseItem.vesselForm : null;
+  const formId = requestedForm && verdigrisPack.forms[requestedForm]
+    ? requestedForm
+    : forms[Math.floor(rng() * forms.length) % forms.length];
+  const form = verdigrisPack.forms[formId];
+  const requestedMaterial = typeof baseItem.vesselMaterial === 'string'
+    ? baseItem.vesselMaterial
+    : null;
+  const materialId = requestedMaterial && form.materials.includes(requestedMaterial)
+    ? requestedMaterial
+    : undefined;
   const ilvl = Number.isFinite(options.ilvl) && options.ilvl > 0
     ? Math.min(80, Math.floor(options.ilvl))
     : DEFAULT_ITEM_LEVEL;
 
-  const vesselItem = forge.generateItem({ ilvl, formId });
+  const vesselItem = forge.generateItem({ ilvl, formId, materialId });
   return {
     packId: verdigrisPack.id,
     item: vesselItem,

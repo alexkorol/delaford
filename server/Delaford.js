@@ -327,6 +327,7 @@ class Delaford {
         size: i.size,
         stackable: i.stackable,
         twoHanded: i.twoHanded,
+        artId: i.artId,
         graphics: i.graphics,
       };
 

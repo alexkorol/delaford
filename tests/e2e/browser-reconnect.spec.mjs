@@ -121,4 +121,56 @@ test.describe('browser session resilience', () => {
     expect(firstPageKinds).not.toContain('client:uncaught-error');
     await secondPage.close();
   });
+
+  test('renders WIZARD item art, shows the vessel tooltip, and equips through the real server', async ({ page }) => {
+    await loginGuest(page);
+    await page.keyboard.press('i');
+    await expect(page.locator('.inventory-pane')).toBeVisible();
+
+    const starterItem = page.locator('.inventory-item[aria-label*="Bronze Pickaxe"]');
+    await expect(starterItem.locator('.inventory-item__art')).toBeVisible();
+    await starterItem.hover();
+    await expect(page.locator('.item-tooltip')).toBeVisible();
+    await expect(page.locator('.item-tooltip')).toContainText('Bronze Pickaxe');
+
+    await page.evaluate(() => {
+      window.ws.send(JSON.stringify({
+        event: 'dev:give',
+        data: { itemId: 'bronze-pike', qty: 1 },
+      }));
+    });
+
+    const pike = page.locator('.inventory-item[aria-label*="Bronze Pike"]');
+    await expect(pike).toBeVisible();
+    await expect(pike.locator('.inventory-item__art')).toHaveAttribute('src', /boar_pike/i);
+    await pike.hover();
+    await expect(page.locator('.item-tooltip')).toContainText('Vessel');
+    await expect(page.locator('.item-tooltip')).toContainText('Bronze');
+
+    const weaponSlot = page.locator('[data-equipment-slot="right_hand"]');
+    const pikeBox = await pike.boundingBox();
+    const slotBox = await weaponSlot.boundingBox();
+    expect(pikeBox).not.toBeNull();
+    expect(slotBox).not.toBeNull();
+
+    await page.mouse.move(
+      pikeBox.x + (pikeBox.width / 2),
+      pikeBox.y + (pikeBox.height / 2),
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      slotBox.x + (slotBox.width / 2),
+      slotBox.y + (slotBox.height / 2),
+      { steps: 8 },
+    );
+    await page.mouse.up();
+
+    await expect(weaponSlot).toHaveAttribute('aria-label', /Bronze Pike/);
+    await expect(weaponSlot.locator('.equipment-slot__art')).toHaveAttribute('src', /boar_pike/i);
+
+    const diagnostics = await page.evaluate(() => window.__verdigrisDiagnostics());
+    const kinds = diagnostics.records.map(record => record.kind);
+    expect(kinds).not.toContain('client:event-handler-error');
+    expect(kinds).not.toContain('client:uncaught-error');
+  });
 });

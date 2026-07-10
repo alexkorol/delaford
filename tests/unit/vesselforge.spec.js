@@ -280,6 +280,20 @@ describe('Vesselforge game integration', () => {
     expect(JSON.parse(JSON.stringify(instance.vessel))).toEqual(instance.vessel);
   });
 
+  it('keeps curated Verdigris bases aligned with their art and vessel identity', () => {
+    const pike = ItemFactory.createById('bronze-pike', {
+      rng: () => 0.5,
+      itemLevel: 18,
+    });
+
+    expect(pike.artId).toBe('boar_pike');
+    expect(pike.size).toEqual({ width: 1, height: 4 });
+    expect(pike.equipSlot).toBe('right_hand');
+    expect(pike.vessel.item.formId).toBe('spear');
+    expect(pike.vessel.item.materialId).toBe('bronze');
+    expect(pike.vessel.item.ilvl).toBe(18);
+  });
+
   it('skips vessel blocks for stackables and plain items', () => {
     const coins = ItemFactory.createById('coins', { quantity: 5 });
     expect(coins.vessel).toBeUndefined();

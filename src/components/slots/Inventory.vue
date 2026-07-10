@@ -2,10 +2,12 @@
   <div class="inventory-pane">
     <header class="inventory-pane__summary">
       <div>
-        <span class="inventory-pane__eyebrow">Backpack</span>
-        <strong>{{ occupiedCells }} / {{ totalCells }}</strong>
+        <span class="inventory-pane__eyebrow">Inventory</span>
+        <strong>Backpack · {{ occupiedCells }} / {{ totalCells }}</strong>
       </div>
-      <span class="inventory-pane__grid-size">{{ grid.columns }} x {{ grid.rows }}</span>
+      <span class="inventory-pane__grid-size">
+        {{ grid.columns }} × {{ grid.rows }} · R rotates
+      </span>
     </header>
 
     <div class="inventory-pane__body">
@@ -239,8 +241,15 @@ export default {
   width: 100%;
   height: 100%;
   min-height: 0;
+  padding: 10px;
   box-sizing: border-box;
   color: var(--color-text-primary);
+  background:
+    radial-gradient(circle at 50% 0, rgba(94, 66, 25, 0.1), transparent 36%),
+    linear-gradient(180deg, rgba(20, 18, 15, 0.97), rgba(8, 8, 8, 0.96));
+  border: 14px solid transparent;
+  border-image: url('@/assets/inventory/frame_ornate.png') 118 / 14px stretch;
+  box-shadow: 0 15px 38px rgba(0, 0, 0, 0.5);
 
   &__summary {
     display: flex;
@@ -248,10 +257,10 @@ export default {
     justify-content: space-between;
     gap: 12px;
     padding: 8px 10px;
-    border: 1px solid rgba(215, 180, 103, 0.24);
+    border: 1px solid rgba(215, 180, 103, 0.18);
     border-radius: var(--radius-sm);
     background:
-      linear-gradient(90deg, rgba(82, 18, 24, 0.22), rgba(20, 25, 31, 0.72), rgba(18, 45, 70, 0.18)),
+      linear-gradient(90deg, rgba(93, 63, 20, 0.18), rgba(20, 20, 19, 0.76), rgba(18, 45, 70, 0.12)),
       rgba(0, 0, 0, 0.24);
     box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
   }
@@ -260,7 +269,9 @@ export default {
     display: block;
     margin-top: 2px;
     font-size: 15px;
-    color: #f4d28a;
+    color: #e8c76a;
+    font-family: Georgia, 'Times New Roman', serif;
+    letter-spacing: 0.04em;
   }
 
   &__eyebrow,
@@ -272,7 +283,7 @@ export default {
   }
 
   &__grid-size {
-    color: rgba(148, 180, 214, 0.86);
+    color: rgba(182, 166, 134, 0.78);
   }
 
   &__body {

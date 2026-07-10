@@ -18,14 +18,39 @@
         :key="item.uuid"
         :class="itemClasses(item)"
         :style="itemStyle(item)"
-        :title="itemTooltip(item)"
+        :aria-label="itemTooltip(item)"
+        tabindex="0"
         @pointerdown.prevent="beginPointerDrag($event, item)"
+        @pointerenter="showItemTooltip(item, $event)"
+        @pointermove="moveItemTooltip($event)"
+        @pointerleave="hideItemTooltip"
+        @focus="showFocusedItemTooltip(item, $event)"
+        @blur="hideItemTooltip"
         @dblclick.prevent="handleDoubleClick(item)"
       >
+        <img
+          v-if="itemArt(item)"
+          class="inventory-item__art"
+          :src="itemArt(item)"
+          alt=""
+          draggable="false"
+        >
         <div
+          v-else
           class="inventory-item__sprite"
           :style="itemSpriteStyle(item)"
         />
+        <div
+          v-if="itemPips(item).length"
+          class="inventory-item__pips"
+          aria-hidden="true"
+        >
+          <span
+            v-for="(pip, pipIndex) in itemPips(item)"
+            :key="`${pip.kind}-${pipIndex}`"
+            :class="`inventory-item__pip--${pip.kind}`"
+          >{{ pip.symbol }}</span>
+        </div>
         <span
           v-if="item.stackable && item.qty > 1"
           class="inventory-item__quantity"
@@ -39,6 +64,14 @@
       :class="ghostClasses"
       :style="ghostStyle"
     />
+
+    <Teleport to="body">
+      <InventoryItemTooltip
+        v-if="hoveredItem && !isDragging"
+        :item="hoveredItem"
+        :position="tooltipPosition"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -49,10 +82,19 @@ import { storeToRefs } from 'pinia';
 import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
+import { resolveInventoryItemArt } from '@/core/inventory/item-art.js';
+import {
+  getInventoryItemRarity,
+  getInventoryVesselPips,
+} from '@/core/inventory/item-presentation.js';
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
+import InventoryItemTooltip from './InventoryItemTooltip.vue';
 
 export default {
   name: 'InventoryGrid',
+  components: {
+    InventoryItemTooltip,
+  },
   emits: ['commit'],
   props: {
     images: {
@@ -70,6 +112,8 @@ export default {
   },
   setup(props, { emit }) {
     const gridRef = ref(null);
+    const hoveredItem = ref(null);
+    const tooltipPosition = ref({ x: 0, y: 0 });
     const inventoryStore = useInventoryStore();
     const {
       items,
@@ -122,6 +166,7 @@ export default {
     };
 
     const handlePointerLeave = () => {
+      hoveredItem.value = null;
       if (!isDragging.value) {
         return;
       }
@@ -187,6 +232,7 @@ export default {
     };
 
     const beginPointerDrag = (event, item) => {
+      hoveredItem.value = null;
       const cell = pointerCellFromEvent(event) || coordsFromIndex(item.slot, props.columns);
       const offset = {
         x: cell.x - item.position.x,
@@ -273,31 +319,54 @@ export default {
       };
     };
 
-    const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
+    const itemArt = item => resolveInventoryItemArt(item);
+    const itemPips = item => getInventoryVesselPips(item).filter(pip => pip.kind !== 'empty');
 
-    const itemRarity = (item) => {
-      if (item?.rarity) {
-        return String(item.rarity).toLowerCase();
+    const setTooltipPosition = (event) => {
+      if (!event) {
+        return;
       }
-
-      if (item?.vessel?.item?.awakened) {
-        return 'rare';
-      }
-
-      if (item?.affixes && (item.affixes.brand || item.affixes.bond)) {
-        return 'magic';
-      }
-
-      if (item?.vessel?.item?.brands?.length || item?.vessel?.item?.bonds?.length) {
-        return 'magic';
-      }
-
-      return 'normal';
+      tooltipPosition.value = {
+        x: Number.isFinite(event.clientX) ? event.clientX : 0,
+        y: Number.isFinite(event.clientY) ? event.clientY : 0,
+      };
     };
+
+    const showItemTooltip = (item, event) => {
+      if (isDragging.value) {
+        return;
+      }
+      hoveredItem.value = item;
+      setTooltipPosition(event);
+    };
+
+    const moveItemTooltip = (event) => {
+      if (!hoveredItem.value || isDragging.value) {
+        return;
+      }
+      setTooltipPosition(event);
+    };
+
+    const showFocusedItemTooltip = (item, event) => {
+      if (isDragging.value) {
+        return;
+      }
+      const rect = event?.currentTarget?.getBoundingClientRect?.();
+      hoveredItem.value = item;
+      tooltipPosition.value = rect
+        ? { x: rect.right, y: rect.top }
+        : { x: 0, y: 0 };
+    };
+
+    const hideItemTooltip = () => {
+      hoveredItem.value = null;
+    };
+
+    const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
 
     const itemClasses = (item) => ([
       'inventory-item',
-      `inventory-item--rarity-${itemRarity(item)}`,
+      `inventory-item--rarity-${getInventoryItemRarity(item)}`,
       { 'inventory-item--dragging': isItemDragging(item.uuid) },
     ]);
 
@@ -358,12 +427,21 @@ export default {
       dragState,
       gridStyle,
       totalSlots,
+      hoveredItem,
+      tooltipPosition,
+      isDragging,
       handlePointerMove,
       handlePointerLeave,
       beginPointerDrag,
       handleDoubleClick,
+      showItemTooltip,
+      moveItemTooltip,
+      showFocusedItemTooltip,
+      hideItemTooltip,
       itemStyle,
       itemSpriteStyle,
+      itemArt,
+      itemPips,
       itemClasses,
       itemTooltip,
       isItemDragging,
@@ -421,8 +499,8 @@ export default {
   cursor: grab;
   border: 1px solid rgba(156, 137, 100, 0.52);
   background:
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.07), transparent 42%),
-    linear-gradient(180deg, rgba(37, 40, 44, 0.94), rgba(13, 14, 16, 0.94));
+    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.055), transparent 52%),
+    rgba(8, 9, 11, 0.18);
   border-radius: 4px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.035),
@@ -443,6 +521,12 @@ export default {
 .inventory-item:hover {
   transform: translateY(-1px);
   border-color: rgba(236, 202, 122, 0.86);
+  filter: brightness(1.08);
+}
+
+.inventory-item:focus-visible {
+  outline: 1px solid rgba(236, 202, 122, 0.92);
+  outline-offset: 2px;
 }
 
 .inventory-item--rarity-magic {
@@ -478,8 +562,54 @@ export default {
   image-rendering: pixelated;
 }
 
+.inventory-item__art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  width: 92%;
+  height: 90%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.72));
+  pointer-events: none;
+  user-select: none;
+}
+
+.inventory-item__pips {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  left: 3px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 1px 2px #000;
+}
+
+.inventory-item__pip--brand {
+  color: #dfb84e;
+}
+
+.inventory-item__pip--bond {
+  color: #65b8a7;
+}
+
+.inventory-item__pip--trophy {
+  color: #b88bea;
+}
+
+.inventory-item__pip--scar {
+  color: #a75d5d;
+}
+
 .inventory-item__quantity {
   position: relative;
+  z-index: 3;
   margin: 4px;
   padding: 2px 4px;
   background: rgba(0, 0, 0, 0.6);

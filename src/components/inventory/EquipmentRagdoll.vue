@@ -1,10 +1,14 @@
 <template>
   <div class="equipment-ragdoll">
+    <header class="equipment-ragdoll__header">
+      <span>Equipment</span>
+    </header>
     <div class="equipment-ragdoll__slots">
       <equipment-slot
         v-for="descriptor in slotLayout"
         :key="descriptor.id"
         :slot-id="descriptor.id"
+        :label="descriptor.label"
         :wear="wear"
         :images="resolvedImages"
         :style="slotStyle(descriptor)"
@@ -29,15 +33,15 @@ import EquipmentSlot from '../sub/EquipmentSlot.vue';
 // Diablo/PoE-style footprints on an 8x6 cell grid.
 // column/row are 1-based CSS grid lines; width/height are cell spans.
 const SLOT_LAYOUT = [
-  { id: 'right_hand', column: 1, row: 1, width: 2, height: 4 }, // weapon, up to 2x4 two-hander
-  { id: 'back', column: 3, row: 1, width: 1, height: 2 }, // cape
-  { id: 'head', column: 4, row: 1, width: 2, height: 2 },
-  { id: 'necklace', column: 6, row: 2, width: 1, height: 1 },
-  { id: 'left_hand', column: 7, row: 1, width: 2, height: 4 }, // offhand/shield
-  { id: 'armor', column: 4, row: 3, width: 2, height: 3 }, // body armour 2x3
-  { id: 'ring', column: 3, row: 4, width: 1, height: 1 },
-  { id: 'gloves', column: 1, row: 5, width: 2, height: 2 },
-  { id: 'feet', column: 7, row: 5, width: 2, height: 2 },
+  { id: 'right_hand', label: 'Main hand', column: 1, row: 1, width: 2, height: 4 }, // weapon, up to 2x4 two-hander
+  { id: 'back', label: 'Back', column: 3, row: 1, width: 1, height: 2 }, // cape
+  { id: 'head', label: 'Head', column: 4, row: 1, width: 2, height: 2 },
+  { id: 'necklace', label: 'Neck', column: 6, row: 2, width: 1, height: 1 },
+  { id: 'left_hand', label: 'Off hand', column: 7, row: 1, width: 2, height: 4 }, // offhand/shield
+  { id: 'armor', label: 'Body', column: 4, row: 3, width: 2, height: 3 }, // body armour 2x3
+  { id: 'ring', label: 'Ring', column: 3, row: 4, width: 1, height: 1 },
+  { id: 'gloves', label: 'Hands', column: 1, row: 5, width: 2, height: 2 },
+  { id: 'feet', label: 'Feet', column: 7, row: 5, width: 2, height: 2 },
 ];
 
 const ARROWS_DESCRIPTOR = {
@@ -121,22 +125,47 @@ export default {
 
 <style lang="scss" scoped>
 .equipment-ragdoll {
-  --eq-cell: clamp(40px, 3.4vw, 60px);
+  --eq-cell: clamp(38px, 2.8vw, 54px);
   --eq-gap: 6px;
 
   position: relative;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   padding: clamp(12px, 1.4vw, 22px);
   background:
-    radial-gradient(circle at 50% 42%, rgba(82, 18, 24, 0.2), transparent 48%),
-    linear-gradient(180deg, rgba(26, 29, 33, 0.94), rgba(8, 9, 11, 0.92));
+    radial-gradient(circle at 50% 42%, rgba(96, 71, 28, 0.12), transparent 45%),
+    linear-gradient(180deg, rgba(25, 23, 19, 0.95), rgba(8, 8, 8, 0.94));
   border: 1px solid rgba(180, 145, 86, 0.34);
   border-radius: 6px;
   font-family: 'GameFont', sans-serif;
   box-shadow:
     inset 0 0 0 1px rgba(255, 240, 190, 0.04),
     inset 0 0 24px rgba(0, 0, 0, 0.72);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    margin: -4px 0 10px;
+    color: #e8c76a;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+
+  &__header::before,
+  &__header::after {
+    flex: 1;
+    height: 12px;
+    content: '';
+    opacity: 0.5;
+    background: url('@/assets/inventory/divider.png') center / contain no-repeat;
+  }
 
   &__slots {
     position: relative;
@@ -154,7 +183,7 @@ export default {
 }
 
 .slot.arrows {
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: rgba(0, 0, 0, 0.32);
   border: 1px dashed rgba(180, 145, 86, 0.28);
   border-radius: 4px;
   background-image: url(../../assets/graphics/ui/client/slots/wear/arrows.png);
