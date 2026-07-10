@@ -82,4 +82,17 @@ describe('server-side Chronicles repository', () => {
     expect(repository.createScion('account:intruder', houseId, 'Vesper').ok).toBe(false);
     expect(repository.getLivingScion('account:intruder', scionId)).toBeNull();
   });
+
+  it('records personal and House depth records without allowing regressions', () => {
+    const { houseId, scionId } = createLineage();
+    expect(repository.recordDepth(accountId, houseId, scionId, 4)).toBe(4);
+    expect(repository.recordDepth(accountId, houseId, scionId, 2)).toBe(2);
+
+    const chronicle = repository.getChronicle(accountId);
+    expect(chronicle.bestDepth).toBe(4);
+    expect(chronicle.houses[0].bestDepth).toBe(4);
+    expect(chronicle.houses[0].scions[0].bestDepth).toBe(4);
+    expect(chronicle.leaderboard[0]).toMatchObject({ houseName: 'Ashford', bestDepth: 4 });
+    expect(repository.recordDepth('account:intruder', houseId, scionId, 99)).toBeNull();
+  });
 });

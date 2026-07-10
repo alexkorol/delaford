@@ -5,6 +5,7 @@ import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
+import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -424,6 +425,16 @@ class PartyService {
     party.metadata.completedAt = null;
 
     this.teleportMembersToSpawns(party, scene);
+    this.forEachMember(party, (member) => {
+      if (!member?.scionId || !member.accountId || !member.houseId) return;
+      const recorded = chroniclesRepository.recordDepth(
+        member.accountId,
+        member.houseId,
+        member.scionId,
+        depth,
+      );
+      if (recorded) member.bestDepth = Math.max(member.bestDepth || 0, recorded);
+    });
     this.forEachMember(party, member => notifyTutorial(member, 'delve'));
 
     this.sendPartyUpdate(party);

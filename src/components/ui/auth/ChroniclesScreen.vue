@@ -71,6 +71,15 @@
             <span>Level {{ scion.level }} · {{ scion.cause || 'Fell in battle' }}</span>
             <small v-if="scion.relics?.length">Relics: {{ scion.relics.join(', ') }}</small>
           </article>
+          <div v-if="chronicle.leaderboard?.length" class="chronicles__leaderboard">
+            <h2>Deepest Houses</h2>
+            <ol>
+              <li v-for="entry in chronicle.leaderboard" :key="entry.houseId">
+                <span>House {{ entry.houseName }}</span>
+                <strong>{{ entry.bestDepth }}</strong>
+              </li>
+            </ol>
+          </div>
         </section>
       </div>
     </template>
@@ -276,6 +285,29 @@ button:focus-visible {
 .chronicles__error {
   color: #efb3ad;
   text-align: center;
+}
+
+.chronicles__leaderboard {
+  margin-top: 1.25rem;
+}
+
+.chronicles__leaderboard ol {
+  padding-left: 1.4rem;
+  margin: 0;
+}
+
+.chronicles__leaderboard li {
+  padding: 0.25rem 0;
+  color: #9c9181;
+}
+
+.chronicles__leaderboard li span {
+  display: inline-block;
+  min-width: 10rem;
+}
+
+.chronicles__leaderboard li strong {
+  color: #73b9a6;
 }
 
 @media (width <= 650px) {

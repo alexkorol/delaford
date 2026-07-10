@@ -181,7 +181,33 @@ export class ChroniclesRepository {
       activeHouseId,
       bestDepth: account.best_depth,
       runCount: account.run_count,
+      leaderboard: this.getLeaderboard(),
     };
+  }
+
+  getLeaderboard(limit = 10) {
+    return this.db.prepare(`
+      SELECT id AS houseId, name AS houseName, best_depth AS bestDepth, renown
+      FROM chronicle_houses
+      WHERE best_depth > 0
+      ORDER BY best_depth DESC, renown DESC, founded_at ASC
+      LIMIT ?
+    `).all(Math.max(1, Math.min(50, Math.floor(limit || 10))));
+  }
+
+  recordDepth(accountId, houseId, scionId, depth) {
+    const value = Math.max(1, Math.floor(Number(depth) || 1));
+    const scion = this.getLivingScion(accountId, scionId);
+    if (!scion || scion.houseId !== houseId) return null;
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicle_scions SET best_depth = MAX(best_depth, ?) WHERE id = ?')
+        .run(value, scionId);
+      this.db.prepare('UPDATE chronicle_houses SET best_depth = MAX(best_depth, ?) WHERE id = ?')
+        .run(value, houseId);
+      this.db.prepare('UPDATE chronicle_accounts SET best_depth = MAX(best_depth, ?) WHERE account_id = ?')
+        .run(value, accountId);
+    })();
+    return value;
   }
 
   foundHouse(accountId, name) {

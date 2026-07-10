@@ -56,6 +56,17 @@ export default async function chronicles({ connect, assert }) {
     heir.devTeleport(ring.x, ring.y + 1);
     await heir.takeItem(ring);
     assert(true, 'a later scion recovered the ancestral ring through real pickup');
+
+    const beforeDescent = await heir.state();
+    const transitionsBefore = heir.sceneTransitions || 0;
+    heir.devTeleport(beforeDescent.sceneMetadata.stairsDown.x, beforeDescent.sceneMetadata.stairsDown.y);
+    await heir.waitFor(() => (heir.sceneTransitions || 0) > transitionsBefore, {
+      timeoutMs: 8000,
+      label: 'infinite-ladder descent',
+    });
+    const deeper = await heir.state();
+    assert(deeper.sceneMetadata.depth === 2, 'stairs generated floor 2 of the endless descent');
+    assert(deeper.bestDepth >= 2, `server recorded the scion depth record (${deeper.bestDepth})`);
   } finally {
     heir.close();
   }

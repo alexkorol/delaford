@@ -47,6 +47,7 @@ const buildStateSnapshot = (player) => {
     hp: player.stats && player.stats.resources ? { ...player.stats.resources.health } : null,
     mana: player.stats && player.stats.resources ? { ...player.stats.resources.mana } : null,
     lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle.state : null,
+    bestDepth: player.bestDepth || 0,
     inventory: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(item => ({
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,

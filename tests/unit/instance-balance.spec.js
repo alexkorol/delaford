@@ -176,4 +176,38 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     // is not zero, but the floor should read as populated.
     expect(avgDead).toBeLessThan(0.8);
   });
+
+  it('forms an infinite ladder whose real combat pressure rises into a wall', async () => {
+    const measurements = [];
+    for (const depth of [1, 3, 6, 10]) {
+      const generation = await GameMap.generateInstance({ seed: 20260710, template: 'dungeon', depth });
+      const monsters = generation.monsters
+        .map(definition => new Monster({ ...definition, sceneId: `depth-${depth}` }))
+        .filter(monster => monster.rarityId !== 'elite')
+        .slice(0, 5);
+      measurements.push({
+        averageHp: monsters.reduce((sum, monster) => sum + monster.stats.resources.health.max, 0) / monsters.length,
+        averageDamage: monsters.reduce((sum, monster) => sum + averageMonsterDamage(monster), 0) / monsters.length,
+        monsters,
+      });
+    }
+
+    for (let index = 1; index < measurements.length; index += 1) {
+      expect(measurements[index].averageHp).toBeGreaterThan(measurements[index - 1].averageHp);
+      expect(measurements[index].averageDamage).toBeGreaterThan(measurements[index - 1].averageDamage);
+    }
+
+    const fresh = makeLevelOnePlayer(0);
+    const freshDps = averagePlayerDamage(fresh) / PLAYER_ATTACK_INTERVAL;
+    expect(simulatePackFocusFire(
+      measurements[0].monsters,
+      freshDps,
+      fresh.stats.resources.health.max,
+    )).toBeGreaterThan(0);
+    expect(simulatePackFocusFire(
+      measurements[2].monsters,
+      freshDps,
+      fresh.stats.resources.health.max,
+    )).toBe(-1);
+  });
 });
