@@ -301,10 +301,16 @@ class Delaford {
     const buckets = {
       critical: { tokens: 40, max: 40, refill: 25, last: Date.now() },
       general: { tokens: 30, max: 30, refill: 10, last: Date.now() },
+      // Development diagnostics are production-gated and can poll rapidly in
+      // the playability harness. Keep them from starving real UI writes such
+      // as a skill-tree save on the same connection.
+      development: { tokens: 20, max: 20, refill: 10, last: Date.now() },
     };
 
     const consumeRateToken = (eventName) => {
-      const bucket = CRITICAL_EVENTS.has(eventName) ? buckets.critical : buckets.general;
+      const bucket = eventName.startsWith('dev:')
+        ? buckets.development
+        : CRITICAL_EVENTS.has(eventName) ? buckets.critical : buckets.general;
       const now = Date.now();
       bucket.tokens = Math.min(bucket.max, bucket.tokens + (((now - bucket.last) / 1000) * bucket.refill));
       bucket.last = now;

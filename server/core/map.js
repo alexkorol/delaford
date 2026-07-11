@@ -779,6 +779,7 @@ class Map {
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
       healthMultiplier = 0.13, damageMultiplier = 0.35,
     }) => {
+      const monsterLevel = Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus;
       const behaviour = {
         type: role,
         aggressionRange: role === 'support' ? 6 : 8,
@@ -816,7 +817,7 @@ class Map {
         // Floor-1 trash tracks a fresh character (level 1-3); depth and role
         // bonuses layer on top. Bosses take an explicit levelBonus. Scaling is
         // gentle so a floor is uniformly mow-through rather than spiking late.
-        level: Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus,
+        level: monsterLevel,
         archetype,
         rarity,
         graphic: { column: graphicColumn, row: 0 },
@@ -830,7 +831,12 @@ class Map {
         },
         behaviour,
         rewards: {
-          experience: Math.round((30 + (index * 18)) * depthRewardMultiplier * rewardMultiplier),
+          // Reward the threat, not the creature's spawn order. The old global
+          // index term made a floor's XP grow quadratically: clearing an
+          // ordinary 40-monster first floor jumped a scion to level 33-36.
+          // Six ordinary opening kills must still cross the level-2 threshold
+          // so the fight -> point -> tree loop starts promptly.
+          experience: Math.round((12 + monsterLevel) * depthRewardMultiplier * rewardMultiplier),
           coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier),
         },
         respawn: {
@@ -1023,7 +1029,9 @@ class Map {
           coinsPerPlayer: Math.round((120 + (instanceMonsters.length * 20)) * depthRewardMultiplier),
           experience: {
             skill: 'attack',
-            amount: Math.round((40 + (instanceMonsters.length * 10)) * depthRewardMultiplier),
+            // Completion is a satisfying bump, not a second floor's worth of
+            // XP. Most progression already came from the monsters themselves.
+            amount: Math.round((40 + Math.floor(instanceMonsters.length / 3)) * depthRewardMultiplier),
           },
         },
       },

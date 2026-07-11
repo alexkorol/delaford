@@ -67,6 +67,20 @@ describe('Verdigris geometric skill tree model', () => {
     expect(tree.log[0]).toContain('Allocated');
   });
 
+  it('allocates the exact route in one click on its conduit variant', () => {
+    const tree = makeTree();
+    const conduit = tree.conduits.get(edgeKey('0,0', '1,0'));
+    const chosen = conduit.options.find(option => option.id === 'outer');
+
+    expect(tree.isAvailableConduit(conduit, chosen.id)).toBe(true);
+    tree.handleConduitClick(conduit.id, chosen.id);
+
+    expect(tree.nodes.get('1,0').active).toBe(true);
+    expect(conduit.allocatedVariant).toBe(chosen.id);
+    expect(tree.pending).toBe(null);
+    expect(tree.points.skill).toBe(VERDIGRIS_SKILL_TREE_POINTS.skill - 2);
+  });
+
   it('starts a fresh level-1 character with zero skill points', () => {
     const tree = new VerdigrisGeometricTree();
     expect(tree.points.skill).toBe(0);

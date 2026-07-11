@@ -242,6 +242,9 @@ describe('inventory drag target component wiring', () => {
     expect(equipmentSlot).not.toContain('inventoryDragStore.dragState.value');
 
     expect(inventoryGrid).toContain('const externalDropTargetFromEvent = (event) => {');
+    expect(inventoryGrid).toContain(':style="cellStyle(slotIndex - 1)"');
+    expect(inventoryGrid).toContain('gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`');
+    expect(inventoryGrid).not.toContain("gridAutoRows: 'var(--cell-size)'");
     expect(inventoryGrid).toContain('document.elementFromPoint(event.clientX, event.clientY)');
     expect(inventoryGrid).toContain("const equipmentSlot = closest('[data-equipment-slot]');");
     expect(inventoryGrid).toContain('valid: canEquipInventoryItemToSlot(activeItem.value, slotId)');

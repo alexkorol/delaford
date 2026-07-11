@@ -10,6 +10,7 @@
       v-for="slotIndex in totalSlots"
       :key="slotIndex"
       class="inventory-grid__cell"
+      :style="cellStyle(slotIndex - 1)"
     />
 
     <transition-group name="inventory-item">
@@ -126,10 +127,21 @@ export default {
       '--cell-size': `${CELL_SIZE_PX}px`,
       '--cell-gap': `${CELL_GAP_PX}px`,
       gridTemplateColumns: `repeat(${props.columns}, var(--cell-size))`,
-      gridAutoRows: 'var(--cell-size)',
+      gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`,
     }));
 
     const totalSlots = computed(() => props.columns * props.rows);
+
+    // Background cells and items deliberately share the same explicit grid
+    // coordinates. Leaving cells to CSS auto-placement makes the algorithm
+    // dodge occupied item tiles and create implicit rows below the backpack.
+    const cellStyle = (slotIndex) => {
+      const { x, y } = coordsFromIndex(slotIndex, props.columns);
+      return {
+        gridColumnStart: x + 1,
+        gridRowStart: y + 1,
+      };
+    };
 
     const pointerCellFromEvent = (event) => {
       const element = gridRef.value;
@@ -427,6 +439,7 @@ export default {
       dragState,
       gridStyle,
       totalSlots,
+      cellStyle,
       hoveredItem,
       tooltipPosition,
       isDragging,

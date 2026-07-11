@@ -914,11 +914,14 @@ export class VerdigrisGeometricTree {
   }
 
   isAvailableConduit(conduit, optionId = null) {
-    if (!conduit || conduit.allocated || !this.isConduitVisible(conduit) || this.points.skill < 1) return false;
+    if (!conduit || conduit.allocated || !this.isConduitVisible(conduit)) return false;
     if (optionId && !conduit.getOption(optionId)) return false;
     const fromNode = this.nodes.get(conduit.fromId);
     const toNode = this.nodes.get(conduit.toId);
-    return Boolean(fromNode && toNode && fromNode.active && toNode.active);
+    if (!fromNode || !toNode) return false;
+    if (fromNode.active && toNode.active) return this.points.skill >= 1;
+    const target = fromNode.active ? toNode : toNode.active ? fromNode : null;
+    return Boolean(target && this.points.skill >= target.cost + 1);
   }
 
   handleNodeClick(id) {
@@ -1005,6 +1008,13 @@ export class VerdigrisGeometricTree {
     if (this.isAvailableConduit(conduit, optionId)) {
       const option = conduit.getOption(optionId);
       if (!option) return;
+      const fromNode = this.nodes.get(conduit.fromId);
+      const toNode = this.nodes.get(conduit.toId);
+      const target = fromNode.active ? toNode : toNode.active ? fromNode : null;
+      if (target && !target.active) {
+        this.allocateNodeWithConduit(target, conduit, option.id);
+        return;
+      }
       this.saveHistory();
       conduit.allocatedVariant = option.id;
       this.points.skill -= 1;

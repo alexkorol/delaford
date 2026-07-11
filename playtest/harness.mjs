@@ -181,15 +181,22 @@ export class HeadlessPlayer {
     this.stateCounter += 1;
     const requestId = `state-${this.stateCounter}`;
     return new Promise((resolve, reject) => {
+      // This read still uses a bounded development-rate bucket. Retry the
+      // idempotent request below that bucket's refill rate instead of failing
+      // the whole playtest on one dropped diagnostic frame.
+      const request = () => this.emit('dev:state', { requestId });
+      const retry = setInterval(request, 1000);
       const timer = setTimeout(() => {
+        clearInterval(retry);
         this.pendingState.delete(requestId);
         reject(new Error('dev:state timed out — is the server running with NODE_ENV!==production?'));
       }, timeoutMs);
       this.pendingState.set(requestId, (value) => {
+        clearInterval(retry);
         clearTimeout(timer);
         resolve(value);
       });
-      this.emit('dev:state', { requestId });
+      request();
     });
   }
 

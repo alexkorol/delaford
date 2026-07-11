@@ -62,7 +62,11 @@ export default async function loot({ connect, assert }) {
     }, { label: 'underfoot equipment drop' });
     p.devTeleport(shield.x, shield.y);
     p.pickupUnderfoot();
-    await p.waitFor(async () => !(await p.state()).groundItems.some(item => item.uuid === shield.uuid), {
+    await p.waitFor(async () => {
+      const shieldRemains = (await p.state()).groundItems.some(item => item.uuid === shield.uuid);
+      if (shieldRemains) p.pickupUnderfoot();
+      return !shieldRemains;
+    }, {
       timeoutMs: 6000,
       label: 'underfoot equipment pickup',
     });

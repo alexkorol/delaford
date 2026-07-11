@@ -84,6 +84,8 @@ vi.mock('#server/player/handler.js', () => ({
     'player:move': vi.fn(),
     'player:say': vi.fn(),
     'player:context-menu:action': vi.fn(),
+    'player:skilltree:save': vi.fn(),
+    'dev:state': vi.fn(),
   },
 }));
 
@@ -348,5 +350,17 @@ describe('Delaford.connection – rate limiting', () => {
     const move = JSON.stringify({ event: 'player:move', data: {} });
     await ws._triggerMessage(move);
     expect(Handler['player:move']).toHaveBeenCalled();
+  });
+
+  it('keeps development diagnostics from starving real UI writes', async () => {
+    const diagnostics = JSON.stringify({ event: 'dev:state', data: {} });
+    for (let i = 0; i < 25; i += 1) {
+      await ws._triggerMessage(diagnostics);
+    }
+    vi.clearAllMocks();
+
+    const save = JSON.stringify({ event: 'player:skilltree:save', data: {} });
+    await ws._triggerMessage(save);
+    expect(Handler['player:skilltree:save']).toHaveBeenCalled();
   });
 });

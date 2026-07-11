@@ -51,7 +51,12 @@ export default async function combat({ connect, assert }) {
 
     const after = await p.state();
     assert(after.lifecycle === 'alive', `survived the pack (hp ${after.hp.current}/${after.hp.max})`);
-    assert(p.hits.some(hit => hit.died), 'combat log recorded the kill');
+    const killHit = await p.waitFor(() => p.hits.some(hit => hit.died), {
+      timeoutMs: 2000,
+      intervalMs: 50,
+      label: 'lethal combat event',
+    });
+    assert(killHit, 'combat log recorded the kill');
   } finally {
     p.close();
   }

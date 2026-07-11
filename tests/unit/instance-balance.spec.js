@@ -93,8 +93,8 @@ const measureFloor = (map, monsters, items) => {
   };
 };
 
-const buildFloor = async (seed) => {
-  const generation = await GameMap.generateInstance({ seed, template: 'dungeon', depth: 1 });
+const buildFloor = async (seed, layout = 'warren') => {
+  const generation = await GameMap.generateInstance({ seed, template: 'dungeon', layout, depth: 1 });
   const monsters = generation.monsters.map(def => new Monster({ ...def, sceneId: 'balance-scene' }));
   return { generation, monsters };
 };
@@ -175,6 +175,21 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     // Was ~0.91 before the room/corridor rework; corridors still exist so this
     // is not zero, but the floor should read as populated.
     expect(avgDead).toBeLessThan(0.8);
+  });
+
+  it('keeps a full first-floor clear inside the early progression band', async () => {
+    for (const layout of ['warren', 'gauntlet', 'clearings']) {
+      for (const seed of seeds) {
+        const { generation } = await buildFloor(seed, layout);
+        const killExperience = generation.monsters
+          .reduce((total, monster) => total + monster.rewards.experience, 0);
+        const completionExperience = generation.metadata.rewards.experience.amount;
+        const resultingLevel = UI.getLevel(killExperience + completionExperience);
+
+        expect(resultingLevel, `${layout} seed ${seed}`).toBeGreaterThanOrEqual(6);
+        expect(resultingLevel, `${layout} seed ${seed}`).toBeLessThanOrEqual(10);
+      }
+    }
   });
 
   it('forms an infinite ladder whose real combat pressure rises into a wall', async () => {
