@@ -1,8 +1,6 @@
 /**
- * Core loop: LOOT. Kill a monster, watch its drop hit the floor, right-click
- * it through the REAL server-built context menu, Take it, and see it in the
- * inventory. Regression: the Take flow was unreachable when right-click was
- * dead, and coins always drop so this is deterministic.
+ * Core loop: LOOT. Equipment remains a deliberate Take interaction while
+ * monster gold flows into the backpack automatically at melee distance.
  */
 export default async function loot({ connect, assert }) {
   const p = await connect();
@@ -11,60 +9,40 @@ export default async function loot({ connect, assert }) {
     p.devSetLevel(5);
     p.devHeal();
 
+    // Exercise the real context-menu Take path with equipment.
+    p.devDrop('bronze-sword');
+    const sword = await p.waitFor(async () => {
+      const s = await p.state();
+      return s.groundItems.find(item => item.id === 'bronze-sword') || false;
+    }, { label: 'equipment drop' });
+    const menu = await p.rightClick(sword.x, sword.y);
+    assert(menu.some(entry => entry.action?.actionId === 'player:take'), 'equipment exposes the real Take action');
+    p.devTeleport(sword.x, sword.y + 1);
+    await p.waitFor(async () => (await p.state()).y === sword.y + 1, { label: 'equipment pickup approach' });
+    await p.takeItem(sword);
+    assert((await p.state()).inventory.some(item => item.id === 'bronze-sword'), 'taken equipment enters inventory');
+
     let scene = await p.state();
+    const coinsBefore = scene.inventory
+      .filter(item => item.id === 'coins')
+      .reduce((sum, item) => sum + (item.qty || 0), 0);
     const target = scene.monsters
-      .filter(m => m.rarity !== 'elite')
+      .filter(monster => monster.rarity !== 'elite')
       .sort((a, b) => (Math.abs(a.x - scene.x) + Math.abs(a.y - scene.y))
         - (Math.abs(b.x - scene.x) + Math.abs(b.y - scene.y)))[0];
     assert(target, 'found a monster to loot');
-    p.devTeleport(target.x + 1, target.y);
+    p.devTeleport(Math.round(target.x) + 1, Math.round(target.y));
     await p.attack(target);
 
-    // Wait for the kill and its coin drop.
-    const drop = await p.waitFor(async () => {
-      const s = await p.state();
-      if (s.lifecycle !== 'alive') {
-        p.devHeal();
-      }
-      const coins = s.groundItems.find(item => item.id === 'coins');
-      if (coins) {
-        return coins;
-      }
-      const nearest = s.monsters
-        .filter(m => m.rarity !== 'elite')
-        .sort((a, b) => (Math.abs(a.x - s.x) + Math.abs(a.y - s.y))
-          - (Math.abs(b.x - s.x) + Math.abs(b.y - s.y)))[0];
-      if (nearest && Math.abs(nearest.x - s.x) <= 1 && Math.abs(nearest.y - s.y) <= 1) {
-        await p.attack(nearest);
-      } else if (nearest) {
-        p.devTeleport(nearest.x + 1, nearest.y);
-      }
-      return false;
-    }, { timeoutMs: 30000, intervalMs: 400, label: 'a coin drop' });
-
-    // The real menu must offer Take for it.
-    p.devTeleport(drop.x, drop.y + 1); // stand adjacent, like a player
-    const before = await p.state();
-    const coinsBefore = before.inventory
-      .filter(item => item.id === 'coins')
-      .reduce((sum, item) => sum + (item.qty || 0), 0);
-
-    await p.takeItem(drop);
-
-    scene = await p.state();
-    const coinsAfter = scene.inventory
-      .filter(item => item.id === 'coins')
-      .reduce((sum, item) => sum + (item.qty || 0), 0);
-    assert(coinsAfter > coinsBefore, `coins entered the inventory (${coinsBefore} -> ${coinsAfter})`);
-
-    // Underfoot grab key: kill another mob, stand ON its drop, press grab.
-    const drop2 = await p.waitFor(async () => {
+    await p.waitFor(async () => {
       const s = await p.state();
       if (s.lifecycle !== 'alive') p.devHeal();
-      const coins = s.groundItems.find(item => item.id === 'coins');
-      if (coins) return coins;
+      const coins = s.inventory
+        .filter(item => item.id === 'coins')
+        .reduce((sum, item) => sum + (item.qty || 0), 0);
+      if (coins > coinsBefore) return true;
       const nearest = s.monsters
-        .filter(m => m.rarity !== 'elite')
+        .filter(monster => monster.rarity !== 'elite')
         .sort((a, b) => (Math.abs(a.x - s.x) + Math.abs(a.y - s.y))
           - (Math.abs(b.x - s.x) + Math.abs(b.y - s.y)))[0];
       if (nearest && Math.abs(nearest.x - s.x) <= 1.6 && Math.abs(nearest.y - s.y) <= 1.6) {
@@ -73,19 +51,21 @@ export default async function loot({ connect, assert }) {
         p.devTeleport(Math.round(nearest.x) + 1, Math.round(nearest.y));
       }
       return false;
-    }, { timeoutMs: 30000, intervalMs: 400, label: 'a second coin drop' });
+    }, { timeoutMs: 30000, intervalMs: 400, label: 'automatic monster-gold pickup' });
+    assert(true, 'monster gold is collected automatically');
 
-    p.devTeleport(drop2.x, drop2.y); // stand ON it
-    p.pickupUnderfoot();
-    await p.waitFor(async () => {
+    // Keep the keyboard grab path covered for non-currency loot.
+    p.devDrop('bronze-shield');
+    const shield = await p.waitFor(async () => {
       const s = await p.state();
-      if (!s.groundItems.some(item => item.uuid === drop2.uuid)) return true;
-      // Multiple drops can share/neighbor a death tile. The grab key takes
-      // one reachable item per press, so keep pressing until the asserted
-      // coin itself is collected rather than flaking on a preceding item.
-      p.pickupUnderfoot();
-      return false;
-    }, { timeoutMs: 6000, label: 'underfoot pickup' });
+      return s.groundItems.find(item => item.id === 'bronze-shield') || false;
+    }, { label: 'underfoot equipment drop' });
+    p.devTeleport(shield.x, shield.y);
+    p.pickupUnderfoot();
+    await p.waitFor(async () => !(await p.state()).groundItems.some(item => item.uuid === shield.uuid), {
+      timeoutMs: 6000,
+      label: 'underfoot equipment pickup',
+    });
   } finally {
     p.close();
   }

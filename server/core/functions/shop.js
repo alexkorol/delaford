@@ -88,9 +88,18 @@ class Shop {
    * @return {object}
    */
   static load() {
-    return shops.map((s) => {
-      // Format to more consise properties
-      s.inventory = s.inventory.map(Shop.formatData);
+    return shops.map((definition) => {
+      const s = {
+        ...definition,
+        displays: Array.isArray(definition.displays)
+          ? definition.displays.map(display => ({ ...display }))
+          : [],
+      };
+      // Accept both source definitions and already formatted stale data.
+      s.inventory = definition.inventory.map((item, index) => Shop.formatData({
+        item: item.item || item.id,
+        stock: Number.isFinite(item.stock) ? item.stock : item.qty,
+      }, index));
       // Take stock of original items sold in general stores
       s.originalStock = s.inventory.map(q => q.id);
       return s;

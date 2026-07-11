@@ -39,6 +39,7 @@ export class HeadlessPlayer {
     this.scionFalls = [];
     this.party = null;
     this.partyInvites = [];
+    this.screens = [];
     this.pendingState = new Map(); // requestId -> resolver
     this.stateCounter = 0;
     this.chronicle = null;
@@ -138,6 +139,9 @@ export class HeadlessPlayer {
         break;
       case 'core:refresh:inventory':
         this.inventory = data.data || data || [];
+        break;
+      case 'open:screen':
+        this.screens.push({ screen: data.screen, payload: data.payload });
         break;
       case 'player:session-replaced':
         this.sessionReplaced = true;
@@ -388,6 +392,10 @@ export class HeadlessPlayer {
 
   devHeal() {
     this.emit('dev:heal', {});
+  }
+
+  devHurt(amount = 5) {
+    this.emit('dev:hurt', { amount });
   }
 
   devPrepareFinalDeath() {

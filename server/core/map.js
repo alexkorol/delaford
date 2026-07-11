@@ -1182,6 +1182,20 @@ class Map {
     // Load shops
     world.shops = Shop.load();
 
+    // Floor samples make the traders legible at a glance. They use the
+    // normal world-item renderer, but are marked as displays so interaction
+    // opens the owning shop instead of taking the sample for free.
+    const shopDisplays = world.shops.flatMap(shop => shop.displays.map((display) => {
+      const item = ItemFactory.createById(display.item);
+      if (!item) return null;
+      const worldItem = ItemFactory.toWorldInstance(item, { x: display.x, y: display.y });
+      worldItem.shopDisplay = true;
+      worldItem.shopNpcId = shop.npcId;
+      worldItem.timestamp = Date.now();
+      return worldItem;
+    })).filter(Boolean);
+    world.items.push(...shopDisplays);
+
     // Add a timestamp to all dropped items
     world.items = world.items.map((i) => {
       i.timestamp = Date.now();

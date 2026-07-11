@@ -28,18 +28,8 @@ import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
-import { claimCirculatingRelic } from '#server/core/services/chronicles.js';
-
-const refreshInventory = (player) => {
-  if (!player || !player.socket_id) {
-    return;
-  }
-
-  Socket.emit('core:refresh:inventory', {
-    player: { socket_id: player.socket_id },
-    data: player.inventory.slots,
-  });
-};
+import { commitGroundItemPickup, refreshInventory } from '#server/core/items/pickup.js';
+import { MAIN_TOWN_FOUNTAIN } from '#server/core/town-amenities.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -119,44 +109,6 @@ const getSceneRecipients = scene => (
 const broadcastSceneItems = (scene, eventName) => {
   const items = getSceneItems(scene);
   Socket.broadcast(eventName, items, getSceneRecipients(scene));
-};
-
-const commitGroundItemPickup = (player, scene, itemIndex) => {
-  const sceneItems = getSceneItems(scene);
-  const worldItem = sceneItems[itemIndex];
-  if (!player || !worldItem || !player.inventory || typeof player.inventory.add !== 'function') {
-    return { ok: false, added: 0, remainder: worldItem?.qty || 1 };
-  }
-
-  const baseData = Query.getItemData(worldItem.id) || {};
-  const quantity = Number.isFinite(worldItem.qty) ? Math.max(1, Math.floor(worldItem.qty)) : 1;
-  const result = player.inventory.add(baseData.id || worldItem.id, quantity, {
-    uuid: worldItem.uuid,
-    existingItem: worldItem,
-  });
-  const added = result && Number.isFinite(result.added) ? result.added : 0;
-  const remainder = result && Number.isFinite(result.remainder) ? result.remainder : quantity;
-
-  if (added <= 0) {
-    return { ok: false, added: 0, remainder: quantity };
-  }
-
-  if (remainder > 0) {
-    worldItem.qty = remainder;
-  } else {
-    sceneItems.splice(itemIndex, 1);
-  }
-
-  broadcastSceneItems(scene, 'item:change');
-  refreshInventory(player);
-  if (remainder === 0 && claimCirculatingRelic(worldItem, player)) {
-    const origin = worldItem.legacy?.sourceScionName || 'a fallen scion';
-    Socket.emit('game:send:message', {
-      player: { socket_id: player.socket_id },
-      text: `You found ${worldItem.displayName || worldItem.name} — once carried by ${origin}.`,
-    });
-  }
-  return { ok: remainder === 0, added, remainder };
 };
 
 const getInventoryItemIndex = (slots = [], reference = {}) => {
@@ -1031,9 +983,66 @@ const actionEvents = {
     notifyTutorial(player, 'loot');
   },
 
+  'player:fountain:drink': (data = {}, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(candidate => candidate.socket_id === ws?.id);
+    const scene = player ? getPlayerScene(player) : null;
+    if (!player || scene?.type !== 'town') return;
+
+    const distance = Math.max(
+      Math.abs(player.x - MAIN_TOWN_FOUNTAIN.x),
+      Math.abs(player.y - MAIN_TOWN_FOUNTAIN.y),
+    );
+    if (distance > 1) return;
+
+    const health = player.stats?.resources?.health;
+    if (!health || health.current <= 0) return;
+    const missing = Math.max(0, health.max - health.current);
+    if (missing > 0 && typeof player.applyHealing === 'function') {
+      player.applyHealing(missing);
+      Player.broadcastStats(player);
+    }
+
+    Socket.emit('game:send:message', {
+      player: { socket_id: player.socket_id },
+      text: missing > 0
+        ? 'You drink from the Crossroads fountain. Its cold water restores you completely.'
+        : 'You drink from the Crossroads fountain. You are already at full health.',
+    });
+  },
+
   /**
    * A player wants opening a trade shop
    */
+  'player:screen:shop-display': (data = {}) => {
+    const player = getPlayerFromPayload(data);
+    const shopNpcId = data.item?.id;
+    const shopItemId = data.item?.shopItemId;
+    const scene = player ? getPlayerScene(player) : null;
+    const display = scene?.items?.find(item => (
+      item.shopDisplay
+      && item.shopNpcId === shopNpcId
+      && item.id === shopItemId
+    ));
+    if (!player || !display) return;
+
+    const withinReach = Math.max(
+      Math.abs(player.x - display.x),
+      Math.abs(player.y - display.y),
+    ) <= 1;
+    if (!withinReach) return;
+
+    const shop = world.shops.find(entry => entry.npcId === shopNpcId);
+    if (!shop) return;
+    player.currentPane = 'shop';
+    player.objectId = shopNpcId;
+    Socket.emit('open:screen', {
+      player: { socket_id: player.socket_id },
+      screen: 'shop',
+      payload: shop,
+    });
+  },
+
   'player:screen:npc:trade': (data) => {
     if (data.playerIndex === undefined) {
       data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);

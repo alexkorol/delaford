@@ -17,6 +17,15 @@ export default [
     queueable: true,
   },
   {
+    name: 'Drink',
+    actionId: 'player:fountain:drink',
+    context: ['gameMap'],
+    allow: ['foreground'],
+    nearby: 'edge',
+    weight: 1,
+    queueable: true,
+  },
+  {
     name: 'Examine',
     actionId: 'player:examine',
     context: ['gameMap', 'inventorySlot', 'bankSlot', 'furnaceSlot'],
@@ -141,6 +150,15 @@ export default [
     nearby: 'edge',
     weight: 1,
     queueable: true,
+  },
+  {
+    name: 'Browse',
+    actionId: 'player:screen:shop-display',
+    context: ['gameMap'],
+    allow: ['item'],
+    nearby: false,
+    weight: 1,
+    queueable: false,
   },
   {
     name: 'Buy',

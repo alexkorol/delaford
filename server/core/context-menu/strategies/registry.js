@@ -1,5 +1,6 @@
 import bankActionStrategy from './bank-action.js';
 import cancelStrategy from './cancel.js';
+import drinkFountainStrategy from './drink-fountain.js';
 import equipStrategy from './equip.js';
 import examineStrategy from './examine.js';
 import inventoryDropStrategy from './inventory-drop.js';
@@ -14,6 +15,7 @@ import walkHereStrategy from './walk-here.js';
 
 const strategies = [
   cancelStrategy,
+  drinkFountainStrategy,
   walkHereStrategy,
   inventoryDropStrategy,
   takeStrategy,

@@ -163,6 +163,42 @@ describe('ContextMenu strategies', () => {
     expect(takeActions[0].type).toBe('item');
   });
 
+  it('offers fountain healing at the Crossroads fountain', async () => {
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, {
+      x: 0,
+      y: 0,
+      world: { x: 38, y: 115 },
+    }, miscData);
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:fountain:drink')).toMatchObject({
+      label: 'Drink from the Crossroads Fountain',
+      id: 'crossroads-fountain',
+    });
+  });
+
+  it('opens shop displays for trade without offering Take', async () => {
+    world.items = [{
+      id: 'bronze-sword',
+      x: player.x,
+      y: player.y,
+      uuid: 'display-sword',
+      shopDisplay: true,
+      shopNpcId: 2,
+    }];
+    world.shops = [{ npcId: 2, name: 'General Store', inventory: [] }];
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:screen:shop-display')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
+    expect(actions.some(entry => entry.action.actionId === 'player:take')).toBe(false);
+  });
+
   it('produces take options from the active scene instead of default town items', async () => {
     const scene = world.ensureScene('zone:context-menu-test', {
       map: { foreground: [], background: [] },

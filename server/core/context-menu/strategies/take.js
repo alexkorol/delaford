@@ -11,6 +11,7 @@ const takeStrategy = {
     }
 
     return groundItems.reduce((accumulator, item) => {
+      if (item.shopDisplay) return accumulator;
       const baseData = Query.getItemData(item.id) || {};
       const combined = { ...baseData, ...item };
       const {

@@ -1,10 +1,11 @@
 <template>
   <div class="shopView">
     <pane-header :text="data.name" />
+    <p class="shopHint">Right-click an item to buy. Right-click your backpack to sell.</p>
     <item-grid
       :images="game.map.images"
       :items="data.inventory"
-      :slots="200"
+      :slots="44"
       screen="shop"
     />
   </div>
@@ -46,6 +47,14 @@ $default_color: #383838;
   background-color: $color;
   font-family: "GameFont", sans-serif;
   border: 5px solid color.adjust($color, $lightness: -10%);
+
+  .shopHint {
+    margin: 0;
+    padding: 8px 10px;
+    background: #332d27;
+    color: #f4dfad;
+    font-size: .75rem;
+  }
 
   .header {
     background: color.adjust($color, $lightness: 10%);

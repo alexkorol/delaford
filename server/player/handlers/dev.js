@@ -227,6 +227,19 @@ const devEvents = {
     sendDevMessage(player, 'Fully healed.');
   },
 
+  /** Apply nonlethal damage so amenities can be exercised quickly. */
+  'dev:hurt': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    const health = player?.stats?.resources?.health;
+    if (!DEV_MODE || !player || !health || health.current <= 1) return;
+    const requested = Number.isFinite(payload.amount) ? Math.max(1, Math.floor(payload.amount)) : 5;
+    health.current = Math.max(1, health.current - requested);
+    if (player.hp) player.hp.current = health.current;
+    broadcastStats(player);
+    sendDevMessage(player, `Took ${requested} nonlethal damage.`);
+  },
+
   /** Put the scion one real monster hit away from its final death. */
   'dev:prepare-final-death': (data, ws) => {
     const player = getPlayerBySocket(ws);

@@ -18,7 +18,7 @@ export default [
   },
   {
     id: 2,
-    name: 'Shop keeper',
+    name: 'Mara, General Trader',
     examine: 'Sells and buys items in exchange for coins.',
     graphic: {
       row: 0,
@@ -30,13 +30,13 @@ export default [
     ],
     spawn: {
       x: 49,
-      y: 109,
-      range: 2,
+      y: 103,
+      range: 1,
     },
   },
   {
     id: 3,
-    name: 'Ludovicus',
+    name: 'Ludovicus, Weapons Trader',
     examine: 'Woodhurst\'s cheerful town shopkeeper.',
     graphic: {
       row: 0,
@@ -49,7 +49,7 @@ export default [
     spawn: {
       x: 19,
       y: 113,
-      range: 4,
+      range: 2,
     },
   },
   {

@@ -79,8 +79,10 @@ export default {
     },
   },
   created() {
-    this.$forceUpdate();
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
+  },
+  beforeUnmount() {
+    bus.$off('game:context-menu:first-only', ClientUI.displayFirstAction);
   },
   methods: {
     /**

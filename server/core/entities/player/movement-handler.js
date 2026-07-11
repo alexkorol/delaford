@@ -5,6 +5,7 @@ import config from '#server/config.js';
 import playerEvent from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import { autoPickupCurrency } from '#server/core/items/pickup.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
@@ -370,6 +371,7 @@ const move = (player, direction, options = {}) => {
   });
   setAnimationState(player, 'run', { direction: facing, duration });
   transitionPlayerIfOnPortal(player);
+  autoPickupCurrency(player);
 
   return true;
 };

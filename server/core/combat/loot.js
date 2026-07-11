@@ -1,4 +1,5 @@
 import ItemFactory from '#server/core/items/factory.js';
+import { autoPickupCurrency } from '#server/core/items/pickup.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import config from '#server/config.js';
@@ -214,6 +215,7 @@ export const dropMonsterLoot = (monster, options = {}) => {
       scene.items = [];
     }
     scene.items.push(...drops);
+    if (options.killer) autoPickupCurrency(options.killer);
     Socket.broadcast('world:itemDropped', scene.items, world.getScenePlayers(scene.id));
   }
 
