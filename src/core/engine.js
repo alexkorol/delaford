@@ -114,6 +114,10 @@ class Engine {
     // Draw the tile map
     this.game.map.drawMap();
 
+    if (typeof this.game.map.drawGroundTelegraphs === 'function') {
+      this.game.map.drawGroundTelegraphs();
+    }
+
     // Draw dropped items
     this.game.map.drawItems();
 

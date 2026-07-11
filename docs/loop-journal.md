@@ -133,6 +133,30 @@
 - Next target: Tier 2 boss proof — give each biome a readable boss mechanic,
   beginning with one scenario-backed Old Barrow boss encounter.
 
+## 2026-07-10 — Make biome bosses readable and dodgeable
+
+- Goal: turn procedural biome bosses from oversized melee trash into a real,
+  readable encounter with one avoidable mechanic.
+- Failing scenario: `boss-mechanic` found the named Warden of the Deep, then
+  timed out waiting for any pre-hit boss warning; the existing elite only used
+  an ordinary 320ms adjacent swing.
+- Scenario added: the harness approaches the Old Barrow Warden, verifies a
+  server-authored Ground Slam radius and one-second dodge window, leaves the
+  circle and takes no hit, then stays inside a second warning and receives the
+  named impact while surviving at level 5.
+- Implementation: every generated biome boss now commits in place to a
+  2.5-tile Ground Slam. The authoritative server anchors the warning and
+  resolves damage against that exact circle. The client renders a dashed
+  orange danger ring whose inner ring fills toward impact.
+- Evidence: `npm run playtest` — 17/17 scenarios; `npm run test:unit` — 77
+  files and 516 tests; `npm run lint` — exit 0; `npm run smoke:browser` — 1/1.
+  The three required balance specs passed, and generation tests cover dungeon,
+  grove, crypt, wilds, and marsh bosses.
+- Critic score: 100/100. Final sample: first combat 0.58s, first drop 0.73s,
+  level-1 TTK 0.63s, level-5 TTK 0.32s, 6 choices, 0 deaths, depth 4.
+- Next target: Tier 2 depth-based loot proof — make deeper-floor rewards
+  visibly and measurably stronger through the live drop pipeline.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -161,3 +185,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T03:43:00.739Z | session-arc | 80 | 0.59 | 0.76 | 0.63 | 0.63 | 6 | 0 | 4
 
 2026-07-11T03:44:12.440Z | session-arc | 80 | 0.58 | 0.74 | 0.64 | 1.26 | 6 | 0 | 4
+
+2026-07-11T03:54:22.594Z | session-arc | 100 | 0.58 | 0.73 | 0.63 | 0.32 | 6 | 0 | 4

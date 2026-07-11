@@ -154,6 +154,21 @@ describe('melee behaviour', () => {
     expect(monster.resolvePendingAttack).not.toHaveBeenCalled();
   });
 
+  it('holds position while a ground slam is winding up', () => {
+    monster.state.pendingAttack = {
+      resolveAt: 5_000,
+      skillId: 'boss:ground-slam',
+    };
+    monster.resolveTarget.mockReturnValue({ x: 10, y: 10 });
+
+    registerMeleeBehaviour({ world, entity, monster });
+    world.update(16, { now: 1_000 });
+
+    expect(monster.resolveTarget).not.toHaveBeenCalled();
+    expect(monster.pursue).not.toHaveBeenCalled();
+    expect(monster.tryAttack).not.toHaveBeenCalled();
+  });
+
   it('resets lifecycle.dirty to false at the start of each tick', () => {
     registerMeleeBehaviour({ world, entity, monster });
 

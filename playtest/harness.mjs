@@ -32,6 +32,7 @@ export class HeadlessPlayer {
     this.scene = null; // latest scene payload (login or transition)
     this.messages = []; // game:send:message texts
     this.hits = []; // combat:hit payloads
+    this.telegraphs = []; // monster:telegraph payloads
     this.inventory = [];
     this.stats = null; // latest player:stats:update for us
     this.lastMovement = null;
@@ -136,6 +137,9 @@ export class HeadlessPlayer {
         break;
       case 'combat:hit':
         this.hits.push(data);
+        break;
+      case 'monster:telegraph':
+        this.telegraphs.push(data);
         break;
       case 'core:refresh:inventory':
         this.inventory = data.data || data || [];

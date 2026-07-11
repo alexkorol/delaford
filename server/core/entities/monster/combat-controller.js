@@ -118,9 +118,11 @@ const tryAttack = (monster, target, now = Date.now()) => {
     return false;
   }
 
+  const skillId = attack.skillId || 'monster:attack';
+  const isGroundSlam = skillId === 'boss:ground-slam';
   const range = Math.max(1, attack.range || 1);
   const distance = euclideanDistance(monster, target);
-  if (distance > range + REACH_TOLERANCE) {
+  if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
     return false;
   }
 
@@ -135,14 +137,33 @@ const tryAttack = (monster, target, now = Date.now()) => {
     duration: attack.windupMs,
     startedAt: now,
     holdState: 'idle',
-    skillId: 'monster:attack',
+    skillId,
   });
 
   monster.state.pendingAttack = {
     targetId: target.uuid,
     resolveAt,
     damage,
+    skillId,
+    skillName: attack.skillName || 'Attack',
+    originX: monster.x,
+    originY: monster.y,
+    radius: isGroundSlam ? Math.max(1, Number(attack.radius) || 2) : null,
   };
+
+  if (isGroundSlam) {
+    Socket.broadcast('monster:telegraph', {
+      attackerId: monster.uuid,
+      attackerName: monster.name,
+      skillId,
+      skillName: attack.skillName || 'Ground Slam',
+      x: monster.x,
+      y: monster.y,
+      radius: monster.state.pendingAttack.radius,
+      durationMs: attack.windupMs,
+      startedAt: now,
+    }, world.getScenePlayers(monster.sceneId));
+  }
 
   monster.state.lastAttackAt = now;
 
@@ -198,9 +219,13 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   }
 
   const attack = monster.behaviour.attack || DEFAULT_BEHAVIOUR.attack;
-  const range = Math.max(1, attack.range || 1);
-  const distance = euclideanDistance(monster, target);
-  if (distance > range + REACH_TOLERANCE) {
+  const isGroundSlam = payload.skillId === 'boss:ground-slam';
+  const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
+  const source = isGroundSlam
+    ? { x: payload.originX, y: payload.originY }
+    : monster;
+  const distance = euclideanDistance(source, target);
+  if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
     return false;
   }
 
@@ -247,6 +272,8 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     damage,
     rawDamage: payload.damage,
     mitigation,
+    skillId: payload.skillId || 'monster:attack',
+    skillName: payload.skillName || 'Attack',
   } : false;
 };
 

@@ -39,6 +39,7 @@ class Map {
     // Transient combat feedback (floating damage numbers, hit flashes)
     this.combatFeedback = [];
     this.attackEffects = [];
+    this.groundTelegraphs = [];
 
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
@@ -1087,6 +1088,48 @@ class Map {
         ctx.arc(from.x, from.y, radius, angle - spread, angle + spread);
         ctx.stroke();
       }
+      ctx.restore();
+      return true;
+    });
+  }
+
+  /** Register a server-authored area warning before a boss attack resolves. */
+  addGroundTelegraph(data = {}) {
+    if (!Number.isFinite(data.x) || !Number.isFinite(data.y) || !Number.isFinite(data.radius)) return;
+    this.groundTelegraphs.push({
+      ...data,
+      durationMs: Math.max(100, data.durationMs || 1000),
+      receivedAt: now(),
+    });
+    if (this.groundTelegraphs.length > 12) this.groundTelegraphs.splice(0, this.groundTelegraphs.length - 12);
+  }
+
+  /** Draw the danger circle filling toward impact so the dodge window reads. */
+  drawGroundTelegraphs() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !this.groundTelegraphs.length) return;
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+
+    this.groundTelegraphs = this.groundTelegraphs.filter((telegraph) => {
+      const progress = Math.max(0, Math.min(1, (timestamp - telegraph.receivedAt) / telegraph.durationMs));
+      if (progress >= 1) return false;
+      const center = this.worldToScreen(centerOfTile(telegraph.x, telegraph.y, tileSize), metrics);
+      const radius = telegraph.radius * tileSize;
+      ctx.save();
+      ctx.strokeStyle = '#ff6b45';
+      ctx.fillStyle = `rgba(255, 69, 45, ${0.08 + (progress * 0.2)})`;
+      ctx.lineWidth = Math.max(2, tileSize * 0.08);
+      ctx.setLineDash([Math.max(3, tileSize * 0.2), Math.max(2, tileSize * 0.12)]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius * progress, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
       return true;
     });

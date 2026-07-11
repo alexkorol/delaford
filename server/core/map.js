@@ -927,6 +927,14 @@ class Map {
           // boss without three-tapping fresh characters.
           damageMultiplier: 0.5,
         }));
+        const boss = instanceMonsters[instanceMonsters.length - 1];
+        boss.behaviour.attack = {
+          ...boss.behaviour.attack,
+          skillId: 'boss:ground-slam',
+          skillName: 'Ground Slam',
+          radius: 2.5,
+          windupMs: 1000,
+        };
         monsterIndex += 1;
         return;
       }

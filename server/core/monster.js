@@ -161,7 +161,9 @@ class Monster {
       return false;
     }
 
-    const { target, result, damage } = outcome;
+    const {
+      target, result, damage, skillId, skillName,
+    } = outcome;
     syncShortcuts(target.stats, target);
     Player.broadcastAnimation(target);
     Player.broadcastStats(target);
@@ -175,9 +177,11 @@ class Monster {
       targetId: target.uuid,
       targetName: target.username || 'Adventurer',
       targetType: 'player',
-      skillId: 'monster:attack',
-      skillName: 'Attack',
-      attackStyle: this.behaviour?.type === 'ranged' ? 'stab' : 'claw',
+      skillId,
+      skillName,
+      attackStyle: skillId === 'boss:ground-slam'
+        ? 'crush'
+        : (this.behaviour?.type === 'ranged' ? 'stab' : 'claw'),
       amount,
       health: {
         current: target.stats.resources.health.current,

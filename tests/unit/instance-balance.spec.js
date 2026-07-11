@@ -180,6 +180,24 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     expect(bossTtk).toBeLessThan(20); // but killable within a fight, not a 26s grind
   });
 
+  it('gives every procedural biome boss the readable ground-slam mechanic', async () => {
+    for (const template of ['dungeon', 'grove', 'crypt', 'wilds', 'marsh']) {
+      const generation = await GameMap.generateInstance({
+        seed: 20260710,
+        template,
+        depth: 1,
+      });
+      const boss = generation.monsters.find(monster => monster.rarity === 'elite');
+      expect(boss, `${template} boss`).toBeTruthy();
+      expect(boss.behaviour.attack, `${template} boss attack`).toMatchObject({
+        skillId: 'boss:ground-slam',
+        skillName: 'Ground Slam',
+        radius: 2.5,
+        windupMs: 1000,
+      });
+    }
+  });
+
   it('keeps floors from being mostly empty corridor', async () => {
     const deadFractions = [];
     for (const seed of seeds) {
