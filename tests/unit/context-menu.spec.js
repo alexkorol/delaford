@@ -29,6 +29,7 @@ vi.mock('#server/core/data/query.js', () => ({
 import ContextMenu, { actionCatalog } from '#server/core/context-menu.js';
 import Config from '#server/config.js';
 import Action from '#server/player/action.js';
+import actionEvents from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_ACTIONS = [
@@ -346,5 +347,24 @@ describe('ContextMenu strategies', () => {
         },
       },
     }, null)).not.toThrow();
+  });
+
+  it('ignores malformed context-menu action payloads without reaching Action', () => {
+    const malformed = [
+      {},
+      { data: {} },
+      { data: { player: { socket_id: player.socket_id }, data: {} } },
+      {
+        data: {
+          player: { socket_id: player.socket_id },
+          data: { tile, item: { action: null } },
+        },
+      },
+    ];
+
+    malformed.forEach((payload) => {
+      expect(() => actionEvents['player:context-menu:action'](payload)).not.toThrow();
+    });
+    expect(player.queue).toBeUndefined();
   });
 });

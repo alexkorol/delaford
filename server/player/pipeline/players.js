@@ -109,7 +109,11 @@ export default {
     if (typeof player.refreshDerivedStats === 'function') {
       player.refreshDerivedStats();
     }
-    Socket.broadcast('player:equippedAnItem', player);
+    Socket.broadcast(
+      'player:equippedAnItem',
+      player,
+      world.getScenePlayers(player.sceneId),
+    );
   },
 
   /**
@@ -208,7 +212,11 @@ export default {
         player.refreshDerivedStats();
       }
 
-      Socket.broadcast('player:unequippedAnItem', player);
+      Socket.broadcast(
+        'player:unequippedAnItem',
+        player,
+        world.getScenePlayers(player.sceneId),
+      );
       resolve(200);
     });
   },

@@ -259,7 +259,7 @@ const dropEquippedItem = (player, slotId) => {
   world.addItem(dropped, scene.id);
   broadcastSceneItems(scene, 'world:itemDropped');
   broadcastSceneItems(scene, 'item:change');
-  Socket.broadcast('player:unequippedAnItem', player);
+  Socket.broadcast('player:unequippedAnItem', player, getSceneRecipients(scene));
 
   return dropped;
 };
@@ -711,9 +711,21 @@ const actionEvents = {
     }
   },
   'player:context-menu:action': (incoming) => {
-    const miscData = incoming.data.data.item.miscData || false;
-    const action = new Action(incoming.data.player.socket_id, miscData);
-    action.do(incoming.data.data, incoming.data.queueItem);
+    const payload = incoming?.data;
+    const actionData = payload?.data;
+    const item = actionData?.item;
+    const selectedAction = item?.action;
+    const socketId = payload?.player?.socket_id;
+    if (!socketId
+      || !actionData?.tile
+      || !selectedAction
+      || typeof selectedAction.name !== 'string') {
+      return;
+    }
+
+    const action = new Action(socketId, item.miscData || false);
+    if (!action.player) return;
+    action.do(actionData, payload.queueItem);
   },
 
   'player:resource:smelt:anvil:action': (data) => {

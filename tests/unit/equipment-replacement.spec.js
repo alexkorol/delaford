@@ -146,6 +146,7 @@ describe('equipment replacement inventory safety', () => {
       position: { x: 0, y: 0 },
     });
     expect(player.inventory.slots.some(item => item.slot === false)).toBe(false);
+    expect(Socket.broadcast).toHaveBeenCalledWith('player:equippedAnItem', player, [player]);
   });
 
   it('rejects replacement when the old equipped item cannot fit in a full backpack', async () => {
@@ -318,6 +319,7 @@ describe('equipment replacement inventory safety', () => {
       position: positionFromSlot(5),
     });
     expect(player.refreshDerivedStats).toHaveBeenCalled();
+    expect(Socket.broadcast).toHaveBeenCalledWith('player:unequippedAnItem', player, [player]);
   });
 
   it('drops equipped paperdoll items into the active scene', () => {
@@ -359,6 +361,6 @@ describe('equipment replacement inventory safety', () => {
     });
     expect(Socket.broadcast).toHaveBeenCalledWith('world:itemDropped', scene.items, [player]);
     expect(Socket.broadcast).toHaveBeenCalledWith('item:change', scene.items, [player]);
-    expect(Socket.broadcast).toHaveBeenCalledWith('player:unequippedAnItem', player);
+    expect(Socket.broadcast).toHaveBeenCalledWith('player:unequippedAnItem', player, [player]);
   });
 });

@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Contain malformed actions and instance broadcasts
+
+- Goal: exercise hostile context-menu input and audit broadcasts for state
+  leaking between independent scenes.
+- Bugs found: `player:context-menu:action` dereferenced an assumed nested item
+  shape before validation, and equip/unequip notifications omitted recipients,
+  sending one scion's complete refreshed state to every connected client.
+- Implementation: malformed action envelopes now fail closed before creating an
+  `Action`; valid actions also require a socket-bound player. Equip and unequip
+  updates now target only players in the acting scion's current scene, including
+  paperdoll-to-world drops.
+- Regression proof: context-menu specs cover four malformed shapes; equipment
+  specs require explicit scene recipients for equip, backpack unequip, and
+  world-drop unequip.
+- Evidence: focused authorization/context/equipment run — 4 files and 30 tests;
+  `npm run playtest` — 18/18 scenarios; `npm run test:unit` — 79 files and 525
+  tests; `npm run lint` — exit 0.
+- Next target: fuzz stale Chronicle snapshots through the real Player loader,
+  especially malformed skills and inventory records.
+
 ## 2026-07-10 — Finish development account registration
 
 - Goal: finish and isolate the existing landing/auth restyle and make local
@@ -297,3 +317,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T04:24:43.698Z | session-arc | 100 | 0.6 | 4.18 | 1.27 | 0.62 | 6 | 1 | 4
 
 2026-07-11T04:26:02.492Z | session-arc | 100 | 0.58 | 4.72 | 0.97 | 0.31 | 6 | 1 | 4
+
+2026-07-11T07:00:34.046Z | session-arc | 80 | 0.6 | 16.91 | 13.69 | 0.63 | 6 | 1 | 4
