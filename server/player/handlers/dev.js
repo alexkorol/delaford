@@ -109,6 +109,15 @@ const buildStateSnapshot = (player) => {
         y: m.y,
         level: m.level,
         rarity: m.rarityId,
+        modifiers: structuredClone(m.modifiers || []),
+        behaviour: {
+          type: m.behaviour?.type || 'melee',
+          aura: structuredClone(m.behaviour?.aura || null),
+        },
+        state: {
+          mode: m.state?.mode || 'idle',
+          effects: structuredClone(m.state?.effects || {}),
+        },
         hp: m.stats && m.stats.resources ? { ...m.stats.resources.health } : null,
       }))
       : [],

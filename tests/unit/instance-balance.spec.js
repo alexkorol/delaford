@@ -149,6 +149,34 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     expect(avgRemaining).toBeGreaterThan(0.15); // but usually survives with a buffer
   });
 
+  it('keeps aura-empowered marsh packs killable through the measured damage pipeline', async () => {
+    let survived = 0;
+    for (const seed of seeds) {
+      const generation = await GameMap.generateInstance({ seed, template: 'marsh', depth: 1 });
+      const pack = generation.monsters
+        .map(definition => new Monster({ ...definition, sceneId: `aura-${seed}` }))
+        .filter(monster => monster.rarityId !== 'elite')
+        .slice(0, 5);
+      pack.forEach((monster) => {
+        monster.state.effects = {
+          measuredAura: {
+            damageMultiplier: 1.12,
+            expiresAt: Date.now() + 60000,
+          },
+        };
+      });
+      const player = makeLevelOnePlayer(0);
+      const left = simulatePackFocusFire(
+        pack,
+        averagePlayerDamage(player) / PLAYER_ATTACK_INTERVAL,
+        player.stats.resources.health.max,
+      );
+      if (left >= 0) survived += 1;
+    }
+
+    expect(survived).toBeGreaterThanOrEqual(seeds.length - 2);
+  });
+
   it('used to be lethal: the pre-tune config would kill the player on the same packs', async () => {
     // Sanity anchor — with the old squishiness (much tankier/harder-hitting
     // trash) a level-1 player dies clearing a 5-pack. Confirms the regression

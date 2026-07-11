@@ -46,9 +46,17 @@ const rollDamage = (monster) => {
   const rarityMultiplier = rarity.damageMultiplier || 1;
   // Optional per-monster damage scale (instance trash hits softer than bosses).
   const monsterMultiplier = Number.isFinite(monster.damageMultiplier) ? monster.damageMultiplier : 1;
+  const now = Date.now();
+  const effectMultiplier = Object.entries(monster.state?.effects || {}).reduce((total, [id, effect]) => {
+    if (!effect || !Number.isFinite(effect.expiresAt) || effect.expiresAt <= now) {
+      delete monster.state.effects[id];
+      return total;
+    }
+    return total * (Number.isFinite(effect.damageMultiplier) ? effect.damageMultiplier : 1);
+  }, 1);
 
-  min *= damageMultiplier * rarityMultiplier * monsterMultiplier;
-  max *= damageMultiplier * rarityMultiplier * monsterMultiplier;
+  min *= damageMultiplier * rarityMultiplier * monsterMultiplier * effectMultiplier;
+  max *= damageMultiplier * rarityMultiplier * monsterMultiplier * effectMultiplier;
 
   const rolled = UI.getRandomInt(Math.max(1, Math.floor(min)), Math.max(1, Math.ceil(max)));
   return Math.max(1, rolled);

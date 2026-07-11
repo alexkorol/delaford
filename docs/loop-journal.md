@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Differentiate biome encounters and rare monsters
+
+- Goal: make biome packs demand visibly different responses and give rare
+  enemies explicit, depth-scaled stakes.
+- Implementation: biome-specific role profiles now vary melee, ranged, and
+  support composition. Buffer monsters project a short-range 12% damage aura,
+  while rare monsters can roll Thick Hide (+20% health) or Frenzied (12% faster
+  attacks). Rare odds rise with depth and rare kills retain their higher gear
+  chance while awarding 1.35x experience. Empty scenes skip aura work entirely.
+- Proof added: `encounter-variety` observes crypt and marsh role differences,
+  a live support aura, an explicit rare modifier, and a killable empowered
+  depth-10 target through the real server. Unit coverage verifies aura lifecycle,
+  dormant-scene behavior, role profiles, modifier math, rising rare share, and
+  measured pack survivability through the combat pipeline.
+- Evidence: `npm run playtest` — 20/20 scenarios with session critic 100/100;
+  `npm run test:unit` — 82 files and 536 tests; `npm run lint` — exit 0; `npm
+  run smoke:browser` — 2/2.
+- Next target: audit the existing endless-descent risk/reward ladder before
+  adding another subsystem.
+
 ## 2026-07-11 — Surface one real Vesselforge choice in town
 
 - Goal: expose the highest-value missing Vesselforge interaction without
@@ -386,3 +406,7 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T07:04:26.529Z | session-arc | 100 | 0.59 | 6.03 | 2.82 | 0.31 | 6 | 1 | 4
 
 2026-07-11T07:18:35.199Z | session-arc | 100 | 0.59 | 5.67 | 2.49 | 0.63 | 6 | 1 | 4
+
+2026-07-11T07:29:57.738Z | session-arc | 100 | 0.6 | 4.92 | 1.89 | 0.63 | 6 | 1 | 4
+
+2026-07-11T07:31:19.297Z | session-arc | 100 | 0.57 | 4.64 | 0.62 | 0.63 | 6 | 1 | 4

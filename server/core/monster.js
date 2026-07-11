@@ -32,6 +32,7 @@ class Monster {
     // Optional per-monster stat scales (instance trash is squishy; bosses 1.0).
     this.healthMultiplier = Number.isFinite(definition.healthMultiplier) ? definition.healthMultiplier : 1;
     this.damageMultiplier = Number.isFinite(definition.damageMultiplier) ? definition.damageMultiplier : 1;
+    this.modifiers = clone(definition.modifiers) || [];
     this.spawn = {
       x: definition.spawn && Number.isFinite(definition.spawn.x) ? definition.spawn.x : 0,
       y: definition.spawn && Number.isFinite(definition.spawn.y) ? definition.spawn.y : 0,
@@ -246,17 +247,20 @@ class Monster {
       sceneId: this.sceneId,
       archetype: this.archetypeId,
       rarity: this.rarityId,
+      modifiers: this.modifiers,
       x: this.x,
       y: this.y,
       spawn: this.spawn,
       column: this.column,
       row: this.row,
       behaviour: {
+        type: this.behaviour.type,
         aggressionRange: this.behaviour.aggressionRange,
         pursuitRange: this.behaviour.pursuitRange,
         leash: this.behaviour.leash,
         patrolRadius: this.behaviour.patrolRadius,
         attack: this.behaviour.attack,
+        aura: this.behaviour.aura || null,
       },
       stats: statsToClientPayload(this.stats),
       movementStep: this.movementStep,

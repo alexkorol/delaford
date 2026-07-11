@@ -266,6 +266,21 @@ const THEME_MONSTER_COLUMNS = {
   wilds: [3, 11, 17],
 };
 
+const THEME_ROLE_CYCLES = {
+  stone: ['melee', 'ranged', 'support'],
+  crypt: ['melee', 'melee', 'support', 'buffer'],
+  sand: ['ranged', 'ranged', 'buffer', 'melee'],
+  volcanic: ['melee', 'buffer', 'melee', 'ranged'],
+  marsh: ['support', 'ranged', 'buffer', 'melee'],
+  grove: ['melee', 'ranged', 'buffer', 'support'],
+  wilds: ['melee', 'melee', 'ranged', 'buffer'],
+};
+
+const RARE_MODIFIERS = [
+  { id: 'thick-hide', label: 'Thick Hide', healthMultiplier: 1.2 },
+  { id: 'frenzied', label: 'Frenzied', attackIntervalMultiplier: 0.88 },
+];
+
 // Treasure-room gear pools; deeper floors roll better bases.
 const INSTANCE_LOOT_TIERS = [
   { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
@@ -780,7 +795,7 @@ class Map {
       ? 1 + Math.floor(rng() * (carvedRooms.length - 2))
       : -1;
 
-    const roleCycle = ['melee', 'ranged', 'support'];
+    const roleCycle = THEME_ROLE_CYCLES[themeName] || THEME_ROLE_CYCLES.stone;
     const buildMonsterDefinition = ({
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
       healthMultiplier = 0.13, damageMultiplier = 0.35,
@@ -788,13 +803,13 @@ class Map {
       const monsterLevel = Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus;
       const behaviour = {
         type: role,
-        aggressionRange: role === 'support' ? 6 : 8,
+        aggressionRange: ['support', 'buffer'].includes(role) ? 6 : 8,
         pursuitRange: role === 'melee' ? 9 : 11,
         patrolRadius: 4,
         attack: {
           intervalMs: role === 'melee' ? 1500 : 1900,
           windupMs: role === 'melee' ? 320 : 480,
-          damageMultiplier: role === 'support' ? 0.85 : 1.1,
+          damageMultiplier: ['support', 'buffer'].includes(role) ? 0.85 : 1.1,
           range: role === 'melee' ? 1 : 5,
           minimumRange: role === 'support' ? 2 : 1,
         },
@@ -811,11 +826,31 @@ class Map {
         };
       }
 
+      if (role === 'buffer') {
+        behaviour.aura = {
+          radius: 6,
+          damageMultiplier: 1.12,
+          intervalMs: 1500,
+          durationMs: 2200,
+        };
+      }
+
       const archetype = role === 'melee' ? 'brute' : 'mystic';
-      const roleIndex = Math.max(0, roleCycle.indexOf(role));
+      const roleIndex = role === 'melee' ? 0 : role === 'ranged' ? 1 : 2;
       const graphicColumn = rarity === 'elite'
         ? (themeMonsterColumns[roleIndex] + 7) % 18
         : themeMonsterColumns[roleIndex];
+
+      const rareModifier = rarity === 'rare'
+        ? RARE_MODIFIERS[(seed + index) % RARE_MODIFIERS.length]
+        : null;
+      if (rareModifier?.attackIntervalMultiplier) {
+        behaviour.attack.intervalMs = Math.round(
+          behaviour.attack.intervalMs * rareModifier.attackIntervalMultiplier,
+        );
+      }
+      const modifiedHealth = healthMultiplier * (rareModifier?.healthMultiplier || 1);
+      const rareRewardMultiplier = rareModifier ? 1.35 : 1;
 
       return {
         id: `instance-${seed}-${index}`,
@@ -828,8 +863,9 @@ class Map {
         rarity,
         graphic: { column: graphicColumn, row: 0 },
         // Squishy trash so packs can be mown through; bosses pass 1.0.
-        healthMultiplier,
+        healthMultiplier: modifiedHealth,
         damageMultiplier,
+        modifiers: rareModifier ? [{ id: rareModifier.id, label: rareModifier.label }] : [],
         spawn: {
           x: center.x,
           y: center.y,
@@ -842,8 +878,8 @@ class Map {
           // ordinary 40-monster first floor jumped a scion to level 33-36.
           // Six ordinary opening kills must still cross the level-2 threshold
           // so the fight -> point -> tree loop starts promptly.
-          experience: Math.round((12 + monsterLevel) * depthRewardMultiplier * rewardMultiplier),
-          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier),
+          experience: Math.round((12 + monsterLevel) * depthRewardMultiplier * rewardMultiplier * rareRewardMultiplier),
+          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier * rareRewardMultiplier),
         },
         respawn: {
           delayMs: 600000,
@@ -853,7 +889,8 @@ class Map {
 
     const rollRarity = () => {
       const roll = rng();
-      if (roll < 0.12) {
+      const rareThreshold = Math.min(0.3, 0.12 + ((depth - 1) * 0.02));
+      if (roll < rareThreshold) {
         return 'rare';
       }
       if (roll < 0.4) {
@@ -975,7 +1012,7 @@ class Map {
           index: monsterIndex,
           role: isTreasureGuard ? 'melee' : role,
           rarity: isTreasureGuard ? 'rare' : rollRarity(),
-          name: themeMonsters[isTreasureGuard ? 'melee' : role],
+          name: themeMonsters[isTreasureGuard ? 'melee' : role] || themeMonsters.support,
           rewardMultiplier: isTreasureGuard ? 1.5 : 1,
           // Trash is squishy so a pack can be mown through before it focus-
           // fires the player down; treasure guards are a step tankier.
