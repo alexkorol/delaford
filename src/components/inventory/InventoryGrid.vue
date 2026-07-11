@@ -28,6 +28,7 @@
         @focus="showFocusedItemTooltip(item, $event)"
         @blur="hideItemTooltip"
         @dblclick.prevent="handleDoubleClick(item)"
+        @contextmenu.stop.prevent="showItemContextMenu($event, item)"
       >
         <img
           v-if="itemArt(item)"
@@ -89,6 +90,8 @@ import {
   getInventoryVesselPips,
 } from '@/core/inventory/item-presentation.js';
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
+import UI from '@shared/ui.js';
+import bus from '@/core/utilities/bus.js';
 import InventoryItemTooltip from './InventoryItemTooltip.vue';
 
 export default {
@@ -275,6 +278,16 @@ export default {
       });
     };
 
+    const showItemContextMenu = (event, item) => {
+      if (!event || !item) return;
+      bus.$emit('PLAYER:MENU', {
+        event,
+        coordinates: UI.getViewportCoordinates(event),
+        slot: item.slot,
+        target: event.target,
+      });
+    };
+
     const handleKeyUp = (event) => {
       if (!isDragging.value) {
         return;
@@ -378,6 +391,7 @@ export default {
 
     const itemClasses = (item) => ([
       'inventory-item',
+      'inventorySlot',
       `inventory-item--rarity-${getInventoryItemRarity(item)}`,
       { 'inventory-item--dragging': isItemDragging(item.uuid) },
     ]);
@@ -447,6 +461,7 @@ export default {
       handlePointerLeave,
       beginPointerDrag,
       handleDoubleClick,
+      showItemContextMenu,
       showItemTooltip,
       moveItemTooltip,
       showFocusedItemTooltip,

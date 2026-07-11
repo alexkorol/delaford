@@ -62,18 +62,25 @@ Wiz/dev commands (server-side, disabled in production):
 export `async ({ connect, assert }) => {…}`. Add one for every new gameplay
 feature. Full details: `playtest/README.md`.
 
-## What the harness does NOT cover — browser pass
+## What the harness does NOT cover — browser smoke
 
 The harness drives server truth over the real protocol. Client-side bugs
 (dead Vue event bindings, canvas focus traps, stale HUD labels, raw-HTML
-rendering) are invisible to it. After client/UI changes, open the app in a
-real browser (`npm run dev`, http://localhost:5173, Login button is
-prefilled) and check at minimum:
+rendering) are invisible to it. After every client/UI change, run:
+
+```bash
+npm run smoke:browser   # builds, boots a real server, drives Playwright
+```
+
+The browser gate checks:
 
 1. WASD moves the character AFTER clicking a UI element (chat, a pane).
 2. Right-click opens the game menu on the canvas AND on an inventory item.
 3. Open the skill tree (press `p`), allocate, close, reopen — build intact.
 4. Enter a zone from the Adventure menu; minimap label shows the zone name.
+
+Use `npm run dev` for additional exploratory browser checks when the changed
+surface extends beyond these four contracts; do not leave it running.
 
 ## Commands
 
@@ -82,6 +89,7 @@ npm run dev          # client :5173 + server :6500 (concurrently)
 npm run test:unit    # vitest (448+ tests)
 npm run lint         # eslint
 npm run playtest     # goal harness — run before claiming playability
+npm run smoke:browser # required after client/UI changes
 ```
 
 Process hygiene (matters for sandboxed/CLI agents):

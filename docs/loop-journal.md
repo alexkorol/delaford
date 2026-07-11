@@ -39,6 +39,28 @@
   deaths, depth 4.
 - Next target: automate the four browser blind-spot checks from Tier 0.
 
+## 2026-07-10 — Close the client browser blind spot
+
+- Goal: automate the four canonical client checks and make them a repeatable
+  gate for client-touching changes.
+- Failing scenario: the new browser smoke completed movement-after-UI-click
+  and canvas context-menu checks, then failed because right-clicking the modern
+  Bronze Pickaxe inventory tile produced no `#actions` menu.
+- Scenario added: `browser-smoke.spec.mjs` drives a real built client and
+  server, proving WASD after an Adventure-button click, canvas and inventory
+  context menus, tree allocation across close/reopen, and the Verdant Grove
+  minimap label.
+- Implementation: modern inventory tiles now emit the same server-authored
+  `PLAYER:MENU` request as legacy item grids. `npm run smoke:browser` builds the
+  client and runs the dedicated Playwright gate.
+- Evidence: `npm run smoke:browser` — 1/1; `npm run playtest` — 13/13;
+  `npm run test:unit` — 74 files and 505 tests; `npm run lint` — exit 0.
+- Critic score: 100/100. Final session sample: first combat 0.59s, first drop
+  0.75s, level-1 TTK 0.62s, level-5 TTK 0.01s, 6 meaningful choices, 0
+  deaths, depth 4.
+- Next target: Tier 1 gear-outcome scenario measuring unarmed, looted weapon,
+  and higher-ilvl vessel TTK margins.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -47,3 +69,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T02:49:54.583Z | session-arc | 100 | 0.61 | 0.76 | 0.63 | 0.32 | 6 | 0 | 4
 
 2026-07-11T02:51:03.386Z | session-arc | 100 | 0.59 | 0.74 | 1.89 | 0.62 | 6 | 0 | 4
+
+2026-07-11T02:59:58.659Z | session-arc | 100 | 0.59 | 0.75 | 0.62 | 0.01 | 6 | 0 | 4

@@ -29,6 +29,7 @@
     "playtest": "node playtest/run.mjs",
     "smoke:public": "node playtest/public-smoke.mjs",
     "smoke:production-local": "node playtest/local-production-smoke.mjs",
+    "smoke:browser": "npm run build && playwright test tests/e2e/browser-smoke.spec.mjs",
     "smoke:public-tunnel": "node playtest/public-tunnel-smoke.mjs"
   },
   "dependencies": {

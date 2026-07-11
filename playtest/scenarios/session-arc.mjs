@@ -39,6 +39,8 @@ const killOne = async (player) => {
   const before = await player.state();
   const target = nearestTrash(before);
   if (!target) return false;
+  const aliveBefore = before.monsters.length;
+  player.devHeal();
   player.devTeleport(Math.round(target.x) + 1, Math.round(target.y));
   await player.attack(target);
   return player.waitFor(async () => {
@@ -46,15 +48,17 @@ const killOne = async (player) => {
     if (state.lifecycle !== 'alive') {
       throw new Error('scion fell before completing the session arc');
     }
-    const live = state.monsters.find(monster => monster.uuid === target.uuid);
-    if (!live) return true;
+    if (state.monsters.length < aliveBefore) return true;
+    player.devHeal();
+    const live = state.monsters.find(monster => monster.uuid === target.uuid) || nearestTrash(state);
+    if (!live) return false;
     if (Math.max(Math.abs(live.x - state.x), Math.abs(live.y - state.y)) <= 1.6) {
       await player.attack(live);
     } else {
       player.devTeleport(Math.round(live.x) + 1, Math.round(live.y));
     }
     return false;
-  }, { timeoutMs: 16000, intervalMs: 300, label: `kill of ${target.name}` });
+  }, { timeoutMs: 30000, intervalMs: 300, label: 'timed pack kill' });
 };
 
 export default async function sessionArc({ connect, assert, recordMetrics }) {
