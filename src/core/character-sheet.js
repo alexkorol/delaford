@@ -13,12 +13,12 @@ export const EQUIPMENT_SLOTS = [
 ];
 
 export const RESISTANCE_ROWS = [
-  { id: 'fire', label: 'rF' },
-  { id: 'cold', label: 'rC' },
-  { id: 'poison', label: 'rPois' },
-  { id: 'electric', label: 'rElec' },
-  { id: 'negative', label: 'rN' },
-  { id: 'willpower', label: 'Will' },
+  { id: 'fire', label: 'Fire' },
+  { id: 'cold', label: 'Cold' },
+  { id: 'poison', label: 'Poison' },
+  { id: 'electric', label: 'Lightning' },
+  { id: 'negative', label: 'Necrotic' },
+  { id: 'willpower', label: 'Willpower' },
 ];
 
 export const DCSS_TILE_SIZE = 32;

@@ -564,7 +564,7 @@ export function createForge(pack, opts = {}) {
       push('vessel', `Vessel ${item.vessel} · Patience ${item.patience}/${item.patienceMax}`);
     }
     if (f.weapon) push('stat', `Damage ${Math.round(f.weapon.dmg[0] * mat.statMult)}–${Math.round(f.weapon.dmg[1] * mat.statMult)} · Speed ${f.weapon.aps}`);
-    if (f.armor) push('stat', `Ward ${Math.round(f.armor * mat.statMult)}`);
+    if (f.armor) push('stat', `Armour ${Math.round(f.armor * mat.statMult)}`);
     if (f.implicit) push('implicit', f.implicit.label);
     item.brands.forEach(b => push('brand', `✦ ${fmt(brandMod(b).label, b.value)} (T${b.tier})`));
     item.bonds.forEach((b) => {

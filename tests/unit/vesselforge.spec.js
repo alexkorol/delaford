@@ -15,6 +15,23 @@ describe('Vesselforge pack validation', () => {
     expect(VesselForge.validatePack(pack)).toEqual([]);
   });
 
+  it('uses plain mechanical language in player-facing item labels', () => {
+    const labels = [
+      ...Object.values(pack.forms).map(form => form.implicit?.label),
+      ...Object.values(pack.brandMods).map(mod => mod.label),
+      ...Object.values(pack.themes).flatMap(theme => Object.values(theme.mods).map(mod => mod.label)),
+      ...Object.values(pack.trophies).flatMap(trophy => [
+        ...trophy.mods.map(mod => mod.label),
+        trophy.completionBonus?.label,
+      ]),
+    ].filter(Boolean).join('\n');
+
+    expect(labels).not.toMatch(/Ember (?:Damage|Resistance)|River Resistance/);
+    expect(labels).not.toMatch(/Maximum Spirit|Rite Power|Goods Found|\bWard\b/);
+    expect(pack.brandMods.emberward.label).toContain('Fire Resistance');
+    expect(pack.brandMods.riverblessed.label).toContain('Cold Resistance');
+  });
+
   it('catches a broken pack', () => {
     const bad = {
       id: 'x',

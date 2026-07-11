@@ -6,6 +6,7 @@ import {
   buildCharacterSheet,
   DCSS_CHARACTER_TILE,
   formatResistancePips,
+  RESISTANCE_ROWS,
   resolveDcssEquipmentTile,
 } from '@/core/character-sheet.js';
 
@@ -15,6 +16,12 @@ describe('character sheet model', () => {
     expect(formatResistancePips(2)).toBe('++');
     expect(formatResistancePips(-2)).toBe('--');
     expect(formatResistancePips(5)).toBe('+++');
+  });
+
+  it('spells out resistance names instead of using insider abbreviations', () => {
+    expect(RESISTANCE_ROWS.map(row => row.label)).toEqual([
+      'Fire', 'Cold', 'Poison', 'Lightning', 'Necrotic', 'Willpower',
+    ]);
   });
 
   it('derives combat ratings from equipped gear when combat totals are not present', () => {
