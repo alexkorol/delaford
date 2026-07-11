@@ -1,6 +1,7 @@
 import { sendMessage } from '#server/core/combat/experience.js';
 import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
+import Socket from '#server/socket.js';
 
 export const FIRST_GOAL_ID = 'firstGoal';
 export const QUEST_POINT_CAP = 23;
@@ -16,6 +17,15 @@ export const ensureFirstGoal = (player) => {
 };
 
 const say = (player, text) => sendMessage(player, `Aldwyn the Guide: ${text}`);
+
+const pushQuestState = (player) => {
+  Socket.emit('quest:update', {
+    player: { socket_id: player.socket_id },
+    quests: player.quests,
+    questPoints: player.questPoints || 0,
+    passiveTree: player.passiveTree || null,
+  });
+};
 
 const refreshTreeBudget = (player) => {
   const incoming = player.passiveTree || {
@@ -39,6 +49,7 @@ export const talkToAldwyn = (player) => {
     goal.stage = 'clear-floor';
     goal.startedAt = Date.now();
     say(player, 'The dead stir in The Old Barrow. Clear floor 1, then return to me in Delaford.');
+    pushQuestState(player);
     playerPersistence.markDirty(player);
     return true;
   }
@@ -66,6 +77,7 @@ export const notifyFirstGoalFloorCleared = (player, { template, layout, depth } 
 
   goal.stage = 'return-to-town';
   say(player, 'The Old Barrow is cleared. Return to Aldwyn in Delaford for your reward.');
+  pushQuestState(player);
   playerPersistence.markDirty(player);
   return true;
 };
@@ -79,6 +91,7 @@ export const notifyFirstGoalReturned = (player) => {
   player.questPoints = Math.min(QUEST_POINT_CAP, Math.max(0, player.questPoints || 0) + 1);
   refreshTreeBudget(player);
   say(player, 'You kept your word. Take this Verdigris point; it opens another path in your skill tree.');
+  pushQuestState(player);
   playerPersistence.markDirty(player);
   return true;
 };

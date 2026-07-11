@@ -42,6 +42,9 @@ describe('Aldwyn first goal', () => {
     expect(talkToAldwyn(player)).toBe(true);
     expect(player.quests.firstGoal.stage).toBe('clear-floor');
     expect(messages().at(-1)).toMatch(/Old Barrow.*floor 1.*return/i);
+    expect(Socket.emit).toHaveBeenCalledWith('quest:update', expect.objectContaining({
+      quests: player.quests,
+    }));
   });
 
   it('advances only for floor 1 of the named zone', () => {

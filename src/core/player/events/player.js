@@ -365,4 +365,11 @@ export default {
       context.game.map.monsters.splice(monsterIndex, 1, monster);
     }
   },
+  'quest:update': (message, context) => {
+    if (!context.game?.player) return;
+    const payload = message.data || {};
+    context.game.player.quests = payload.quests || {};
+    context.game.player.questPoints = payload.questPoints || 0;
+    if (payload.passiveTree) context.game.player.passiveTree = payload.passiveTree;
+  },
 };

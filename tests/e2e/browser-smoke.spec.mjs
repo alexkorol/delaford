@@ -62,7 +62,7 @@ test.describe('canonical browser smoke', () => {
     cleanState();
   });
 
-  test('protects movement, context menus, tree persistence, and zone labels', async ({ page }) => {
+  test('protects movement, context menus, tree persistence, quests, and zone labels', async ({ page }) => {
     await page.goto(`${gameUrl}/?play`);
     const canvas = page.locator('canvas#game-map');
     await expect(canvas).toBeVisible({ timeout: 30000 });
@@ -70,6 +70,11 @@ test.describe('canonical browser smoke', () => {
       window.ws.send(JSON.stringify({ event: 'dev:setlevel', data: { level: 5 } }));
       window.ws.send(JSON.stringify({ event: 'dev:heal', data: {} }));
     });
+
+    await page.keyboard.press('q');
+    await expect(page.locator('.quests')).toContainText('Speak with Aldwyn the Guide in Delaford.');
+    await expect(page.locator('.quests')).toContainText('1 Verdigris point');
+    await page.keyboard.press('Escape');
 
     const minimapCoords = page.locator('.world-minimap__readout span').last();
     const adventure = page.getByRole('button', { name: 'Adventure', exact: true });

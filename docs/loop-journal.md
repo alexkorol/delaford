@@ -179,6 +179,29 @@
 - Next target: Tier 3 UI clarity — replace the hard-coded quest pane with the
   current server-authored Aldwyn objective and reward state.
 
+## 2026-07-10 — Show the live objective in the quest pane
+
+- Goal: replace placeholder quest UI with the current server-authored Aldwyn
+  objective and reward.
+- Failing proof: `quest-pane-ui` could not import any quest presentation model,
+  and the pane source contained only the fictional hard-coded “Haunted
+  Trails.” The first browser attempt also proved the modern shell had no
+  mounted legacy quest icon.
+- Proof added: unit coverage maps all four server stages to concrete objective
+  text and applies live `quest:update` payloads. Browser smoke opens Quests
+  through the new `Q` hotkey and verifies Aldwyn plus the Verdigris reward.
+- Implementation: the pane renders the login snapshot, quest stage changes are
+  pushed after accept/clear/return, completion refreshes the displayed tree
+  budget, and the modern pane system exposes Quests through `Q`.
+- Evidence: `npm run playtest` — 18/18 scenarios; `npm run test:unit` — 78
+  files and 520 tests; `npm run lint` — exit 0; `npm run smoke:browser` — 1/1.
+- Critic score: 80/100 in the final sample. First combat was 0.58s, first drop
+  0.75s, 6 choices, 0 deaths, and depth 4; variable TTK again missed the
+  faster-at-level-5 scorer point (0.32s → 1.02s).
+- Next target: consolidate the charter exit into `session-arc` itself so one
+  command proves the explicit goal, boss mechanic, gear/tree choices,
+  death/relic inheritance, relog, and voluntary second run.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -211,3 +234,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T03:54:22.594Z | session-arc | 100 | 0.58 | 0.73 | 0.63 | 0.32 | 6 | 0 | 4
 
 2026-07-11T04:00:51.605Z | session-arc | 80 | 0.58 | 0.74 | 0.62 | 1.03 | 6 | 0 | 4
+
+2026-07-11T04:10:21.428Z | session-arc | 80 | 0.58 | 0.75 | 0.32 | 1.02 | 6 | 0 | 4

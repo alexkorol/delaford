@@ -1272,6 +1272,7 @@ export default {
           c: 'stats',
           i: 'inventory',
           p: 'flowerOfLife',
+          q: 'quests',
         };
         if (paneHotkeys[key]) {
           this.openPane(paneHotkeys[key]);
