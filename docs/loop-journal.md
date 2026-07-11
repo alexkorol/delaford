@@ -1,5 +1,26 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Close the endless-descent stakes audit
+
+- Goal: verify that looking at and advancing the recorded depth now changes
+  both danger and reward through live gameplay, without duplicating systems.
+- Audit result: the ladder already raises monster levels by two per floor and
+  scales health, damage, experience, coins, completion rewards, treasure base
+  pools, and guaranteed treasure item level. The encounter pass adds a rising
+  rare share (12% on floor 1 toward a 30% cap), so deeper packs contain more
+  Thick Hide and Frenzied enemies. `bestDepth` is persisted for the scion.
+- Existing proof: `instance-balance` measures increasing average health and
+  damage at depths 1, 3, 6, and 10 and proves a fresh build reaches a lethal
+  wall. `depth-loot` descends through real stairs and observes guaranteed gear
+  rise from item level 10 to 50 by floor 5; `chronicles` observes the depth
+  record, and `session-arc` reaches a visible level wall before choosing run two.
+- Evidence: `npm run playtest` — 20/20 scenarios with session critic 100/100;
+  `npm run test:unit` — 82 files and 536 tests; `npm run lint` — exit 0; `npm
+  run smoke:browser` — 2/2.
+- Next target: nested containers are the clearest remaining expansion; start
+  with a small server-owned bag contract and add UI only after persistence and
+  stale-snapshot behavior are specified.
+
 ## 2026-07-11 — Differentiate biome encounters and rare monsters
 
 - Goal: make biome packs demand visibly different responses and give rare
