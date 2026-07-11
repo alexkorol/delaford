@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -8,6 +9,7 @@ const projectRoot = path.resolve(fileURLToPath(new URL('../..', import.meta.url)
 const gamePort = 6512;
 const gameUrl = `http://127.0.0.1:${gamePort}`;
 const guestSaveDir = path.join(os.tmpdir(), `verdigris-browser-${process.pid}`);
+const chronicleDb = path.join(os.tmpdir(), `verdigris-browser-${process.pid}.sqlite`);
 let gameServer = null;
 let serverOutput = '';
 
@@ -36,6 +38,8 @@ const startGameServer = async () => {
       NODE_ENV: 'development',
       PORT: String(gamePort),
       GUEST_SAVE_DIR: guestSaveDir,
+      CHRONICLES_DB_FILE: chronicleDb,
+      IDENTITY_DB_FILE: chronicleDb,
       WS_HEARTBEAT_INTERVAL_MS: '1000',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -63,14 +67,24 @@ const stopGameServer = async () => {
 };
 
 const loginGuest = async (page) => {
-  await page.goto('/?useGuestAccount');
-  await expect(page.locator('#guest_account')).toBeChecked();
-  await page.locator('button.login').click();
+  await page.goto('/?play');
   await expect(page.locator('canvas#game-map')).toBeVisible({ timeout: 30000 });
 };
 
 test.describe('browser session resilience', () => {
   test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(() => {
+    fs.rmSync(guestSaveDir, { recursive: true, force: true });
+    [chronicleDb, `${chronicleDb}-wal`, `${chronicleDb}-shm`]
+      .forEach(file => fs.rmSync(file, { force: true }));
+  });
+
+  test.afterAll(() => {
+    fs.rmSync(guestSaveDir, { recursive: true, force: true });
+    [chronicleDb, `${chronicleDb}-wal`, `${chronicleDb}-shm`]
+      .forEach(file => fs.rmSync(file, { force: true }));
+  });
 
   test.beforeEach(async () => {
     await startGameServer();

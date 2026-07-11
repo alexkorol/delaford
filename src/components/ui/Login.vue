@@ -221,7 +221,12 @@ onMounted(() => {
     applyGuestCredentials(true);
   }
 
-  if (new URLSearchParams(window.location.search).has('play')) {
+  if (new URLSearchParams(window.location.search).has('play')
+    && !window.__verdigrisQuickPlayConsumed) {
+    // The component can remount after logout/session replacement. Auto-play
+    // is a page-entry promise, not permission to steal the scion back from a
+    // newer tab. A full reload gets a fresh window and may auto-play again.
+    window.__verdigrisQuickPlayConsumed = true;
     setTimeout(quickPlay, 50);
     return;
   }

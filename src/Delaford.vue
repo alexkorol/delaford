@@ -790,11 +790,28 @@ export default {
         this.connectionManager.markLoggedOut();
       }
 
-      if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
-        this.game.map.destroy();
-      }
+      const previousEngine = this.engine;
+      const previousMap = this.game?.map;
       this.screen = 'login';
       this.game = { exit: true };
+      this.engine = null;
+      // Auth state must win even if a canvas/map cleanup regresses. A replaced
+      // session must never remain visibly playable after server ownership has
+      // moved to another tab.
+      if (previousEngine) {
+        try {
+          previousEngine.stop();
+        } catch (error) {
+          ClientDiagnostics.record('client:engine-stop-error', error);
+        }
+      }
+      if (previousMap && typeof previousMap.destroy === 'function') {
+        try {
+          previousMap.destroy();
+        } catch (error) {
+          ClientDiagnostics.record('client:map-destroy-error', error);
+        }
+      }
       this.layout.activePane = null;
       this.layout.leftPane = defaultPaneAssignments.left;
       this.layout.rightPane = defaultPaneAssignments.right;

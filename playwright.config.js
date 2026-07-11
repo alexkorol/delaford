@@ -11,17 +11,11 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5174',
+    // Browser resilience specs boot the real game server on :6512, which also
+    // serves dist/. Keeping HTTP and WS same-origin mirrors production and
+    // avoids a second long-lived Vite process on Windows.
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:6512',
     ...(browserChannel ? { channel: browserChannel } : {}),
     headless: true,
-  },
-  webServer: {
-    command: 'npm run dev:client -- --host 127.0.0.1 --port 5174',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: false,
-    env: {
-      ...process.env,
-      VITE_WS_URL: 'ws://127.0.0.1:6512',
-    },
   },
 });
