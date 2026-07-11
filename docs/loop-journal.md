@@ -61,6 +61,29 @@
 - Next target: Tier 1 gear-outcome scenario measuring unarmed, looted weapon,
   and higher-ilvl vessel TTK margins.
 
+## 2026-07-10 — Make gear change combat outcomes
+
+- Goal: prove strict same-monster TTK improvements from unarmed combat to a
+  looted weapon and then to a higher-ilvl Vesselforge drop.
+- Failing scenario: `gear-outcomes` first lacked an exact-monster reset, then
+  showed the core defect directly: ilvl 5 and ilvl 65 vessels both produced 22
+  authoritative slash attack.
+- Scenario added: one seeded battleaxe base is dropped at ilvl 5 and 65; one
+  exact 140-HP monster is restored between all three real combat trials. The
+  scenario requires explicit attack and TTK margins.
+- Implementation: Vesselforge material and brand damage now contributes a
+  per-hit bonus to the base item's dominant physical style. Dev-only setup can
+  seed item drops and restore one monster without regenerating the floor.
+- Evidence: `npm run playtest` — 14/14; `npm run test:unit` — 74 files and 506
+  tests; `npm run lint` — exit 0. The three required balance specs plus
+  `vesselforge.spec.js` passed 43/43.
+- Outcome: full-gate gear trial measured 10.17s unarmed, 2.61s with the ilvl-5
+  vessel, and 2.12s with the ilvl-65 vessel; slash attack rose 33 → 39.
+- Critic score: 100/100. Session-arc remained at first combat 0.58s, first
+  drop 0.76s, 6 meaningful choices, 0 deaths, and depth 4.
+- Next target: Tier 1 build-divergence scenario comparing STR melee and INT
+  skill combat profiles at equal level and point spend.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -71,3 +94,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T02:51:03.386Z | session-arc | 100 | 0.59 | 0.74 | 1.89 | 0.62 | 6 | 0 | 4
 
 2026-07-11T02:59:58.659Z | session-arc | 100 | 0.59 | 0.75 | 0.62 | 0.01 | 6 | 0 | 4
+
+2026-07-11T03:09:38.905Z | session-arc | 100 | 0.58 | 0.76 | 0.62 | 0.01 | 6 | 0 | 4

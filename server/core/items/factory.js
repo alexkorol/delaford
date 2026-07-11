@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import Query from '#server/core/data/query.js';
 import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine.js';
-import { createVesselBlock } from './vesselforge/adapter.js';
+import { applyVesselCombatStats, createVesselBlock } from './vesselforge/adapter.js';
 import { resolveItemSize } from '#shared/inventory-footprints.js';
 
 const composeAffixedName = (baseName, brand, bond) => {
@@ -101,6 +101,7 @@ const createFromBase = (baseItem, options = {}) => {
     const vessel = createVesselBlock(baseItem, { rng, ilvl: itemLevel });
     if (vessel) {
       instance.vessel = vessel;
+      instance.stats = applyVesselCombatStats(instance.stats, vessel);
     }
   }
 

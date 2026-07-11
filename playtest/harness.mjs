@@ -389,8 +389,12 @@ export class HeadlessPlayer {
     this.emit('dev:give', { itemId, qty });
   }
 
-  devDrop(itemId) {
-    this.emit('dev:drop', { itemId });
+  devDrop(itemId, options = {}) {
+    this.emit('dev:drop', { itemId, ...options });
+  }
+
+  devResetMonster(monsterUuid, options = {}) {
+    this.emit('dev:monster:reset', { monsterUuid, ...options });
   }
 
   devSetLevel(level) {

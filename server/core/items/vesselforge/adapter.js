@@ -73,10 +73,38 @@ export const createVesselBlock = (baseItem, options = {}) => {
 
 export const vesselTooltip = (vesselItem, ctx = {}) => forge.tooltip(vesselItem, ctx);
 
+/**
+ * Bridge Vesselforge's DPS-oriented weapon sheet into the legacy per-hit
+ * combat styles. The catalogue remains the base; material and brand power add
+ * a bounded bonus to its dominant physical style.
+ */
+export const applyVesselCombatStats = (stats = {}, vesselBlock = null) => {
+  const vesselItem = vesselBlock?.item;
+  const form = vesselItem ? verdigrisPack.forms[vesselItem.formId] : null;
+  if (!vesselItem || !form?.weapon) return stats;
+
+  const attack = stats.attack || {};
+  const dominantStyle = ['stab', 'slash', 'crush', 'range']
+    .sort((a, b) => (attack[b] || 0) - (attack[a] || 0))[0];
+  if (!dominantStyle || (attack[dominantStyle] || 0) <= 0) return stats;
+
+  const sheet = forge.aggregate([vesselItem]).sheet;
+  const perHitPower = sheet.damage / Math.max(0.1, form.weapon.aps || 1);
+  const vesselBonus = Math.max(0, Math.round(perHitPower));
+  return {
+    ...stats,
+    attack: {
+      ...attack,
+      [dominantStyle]: (attack[dominantStyle] || 0) + vesselBonus,
+    },
+  };
+};
+
 export const getForge = () => forge;
 
 export default {
   createVesselBlock,
+  applyVesselCombatStats,
   vesselEligible,
   vesselTooltip,
   getForge,

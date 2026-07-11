@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import VesselForge, { createForge, validatePack } from '#server/core/items/vesselforge/engine.js';
 import pack from '#server/core/items/vesselforge/verdigris-pack.js';
-import { createVesselBlock, vesselEligible } from '#server/core/items/vesselforge/adapter.js';
+import {
+  applyVesselCombatStats,
+  createVesselBlock,
+  vesselEligible,
+} from '#server/core/items/vesselforge/adapter.js';
 import ItemFactory from '#server/core/items/factory.js';
 
 const forge = createForge(pack, { seed: 12345 });
@@ -295,6 +299,25 @@ describe('Vesselforge game integration', () => {
     expect(Array.isArray(instance.vessel.lines)).toBe(true);
     expect(instance.vessel.lines.some(line => line.section === 'kind')).toBe(true);
     expect(JSON.parse(JSON.stringify(instance.vessel))).toEqual(instance.vessel);
+  });
+
+  it('projects Vesselforge weapon power into the dominant live combat style', () => {
+    const stats = {
+      attack: { stab: -2, slash: 19, crush: 13, range: 0 },
+      defense: { stab: 0, slash: 1, crush: 2, range: 2 },
+    };
+    const vessel = {
+      item: forge.generateItem({
+        ilvl: 65,
+        formId: 'sling',
+        materialId: 'quilted',
+        brands: 2,
+      }),
+    };
+
+    const result = applyVesselCombatStats(stats, vessel);
+    expect(result.attack.slash).toBeGreaterThan(stats.attack.slash);
+    expect(result.attack.crush).toBe(stats.attack.crush);
   });
 
   it('keeps curated Verdigris bases aligned with their art and vessel identity', () => {

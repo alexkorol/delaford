@@ -9,6 +9,7 @@
  */
 
 import Player from '#server/core/player.js';
+import Monster from '#server/core/monster.js';
 import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
@@ -32,6 +33,29 @@ const sendDevMessage = (player, text) => {
     text: `[dev] ${text}`,
   });
 };
+
+const seededRng = (seed) => {
+  let state = (Number(seed) || 0) >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const itemLevel = item => item?.vessel?.item?.ilvl ?? null;
+
+const snapshotItem = item => ({
+  id: item.id,
+  uuid: item.uuid,
+  qty: item.qty || 1,
+  slot: item.slot,
+  itemLevel: itemLevel(item),
+  stats: item.stats ? structuredClone(item.stats) : null,
+  vessel: item.vessel ? structuredClone(item.vessel) : null,
+});
 
 // Snapshot of everything a playtest needs to assert on, in one request.
 const buildStateSnapshot = (player) => {
@@ -61,13 +85,15 @@ const buildStateSnapshot = (player) => {
       defence: player.skills?.defence?.exp || 0,
     },
     inventory: Array.isArray(player.inventory && player.inventory.slots)
-      ? player.inventory.slots.map(item => ({
-        id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
-      }))
+      ? player.inventory.slots.map(snapshotItem)
       : [],
     wear: player.wear
       ? Object.fromEntries(Object.entries(player.wear)
         .map(([slot, item]) => [slot, item ? item.id : null]))
+      : {},
+    wornItems: player.wear
+      ? Object.fromEntries(Object.entries(player.wear)
+        .map(([slot, item]) => [slot, item ? snapshotItem(item) : null]))
       : {},
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
@@ -89,6 +115,9 @@ const buildStateSnapshot = (player) => {
         x: item.x,
         y: item.y,
         qty: item.qty || 1,
+        itemLevel: itemLevel(item),
+        stats: item.stats ? structuredClone(item.stats) : null,
+        vessel: item.vessel ? structuredClone(item.vessel) : null,
         legacyRelicId: item.legacyRelicId || null,
         legacy: item.legacy || null,
       }))
@@ -176,13 +205,35 @@ const devEvents = {
     const player = getPlayerBySocket(ws);
     const payload = (data && data.data) || {};
     if (!DEV_MODE || !player || typeof payload.itemId !== 'string') return;
-    const item = ItemFactory.createById(payload.itemId);
+    const rng = Number.isFinite(payload.seed) ? seededRng(payload.seed) : undefined;
+    const item = ItemFactory.createById(payload.itemId, {
+      itemLevel: payload.itemLevel,
+      rng,
+    });
     const scene = world.getSceneForPlayer(player);
     if (!item || !scene) return;
     const dropped = ItemFactory.toWorldInstance(item, { x: player.x, y: player.y });
     world.addItem(dropped, scene.id);
     Socket.broadcast('world:itemDropped', scene.items, world.getScenePlayers(scene.id));
     sendDevMessage(player, `Dropped ${payload.itemId} on the active floor.`);
+  },
+
+  /** Restore one exact comparison monster without regenerating the floor. */
+  'dev:monster:reset': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    const scene = player ? world.getSceneForPlayer(player) : null;
+    const monster = scene?.monsters?.find(entry => entry.uuid === payload.monsterUuid);
+    if (!DEV_MODE || !player || !monster) return;
+    monster.respawnNow();
+    if (monster.stats?.resources?.health) {
+      if (Number.isFinite(payload.maxHealth) && payload.maxHealth > 0) {
+        monster.stats.resources.health.max = Math.floor(payload.maxHealth);
+      }
+      monster.stats.resources.health.current = monster.stats.resources.health.max;
+    }
+    Monster.broadcast([monster], { players: world.getScenePlayers(scene.id) });
+    sendDevMessage(player, `Reset ${monster.name} for a comparison trial.`);
   },
 
   /**
