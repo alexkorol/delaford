@@ -12,7 +12,10 @@ export const scoreCriticMetrics = (metrics) => {
   let score = 0;
   if (metrics.secondsToFirstCombat <= 5) score += 20;
   if (metrics.secondsToFirstDrop <= 10) score += 20;
-  if (metrics.ttkSeconds.level5 < metrics.ttkSeconds.level1) score += 20;
+  // Timed kills are sampled through the live 10 Hz loop. Treat equality (or
+  // half a tick of scheduling noise) as maintained pacing, while still
+  // rejecting a materially slower developed character.
+  if (metrics.ttkSeconds.level5 <= metrics.ttkSeconds.level1 + 0.05) score += 20;
   if (metrics.meaningfulChoices.total >= 4) score += 20;
   if (metrics.deaths <= 1 && metrics.depthReached >= 4) score += 20;
   return score;

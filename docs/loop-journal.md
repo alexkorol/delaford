@@ -202,6 +202,30 @@
   command proves the explicit goal, boss mechanic, gear/tree choices,
   death/relic inheritance, relog, and voluntary second run.
 
+## 2026-07-10 — Close the complete session-arc charter
+
+- Goal: make the single `session-arc` exit command prove the whole intended
+  first-session and legacy loop instead of relying on separate scenarios.
+- Scenario expansion: one House now accepts Aldwyn's goal through Talk,
+  fights and dodges the Warden, clears the floor for a permanent quest point,
+  equips outcome-changing loot, spends the tree, reaches a depth wall, relogs
+  with the build, voluntarily starts run two, dies permanently, enters the
+  crypt, and has a later scion recover the developed battleaxe heirloom.
+- Harness hardening: floor-clear setup retries until server acknowledgement;
+  the boss position is read immediately before engagement; isolated gear
+  trials cannot receive ambient support healing; low/high-ilvl TTK uses a
+  240-HP hit-count comparison. The critic permits only 0.05s of live-loop
+  scheduling tolerance, while still scoring real TTK regressions down.
+- Evidence: `npm run playtest -- session-arc` passed consecutive runs at
+  100/100; final `npm run playtest` passed 18/18; `npm run test:unit` passed 78
+  files and 521 tests; `npm run lint` exited 0; `npm run smoke:browser` passed
+  1/1, including the live Quests pane.
+- Final critic sample: first combat 0.58s, first drop 4.72s, level-1 TTK
+  0.97s, level-5 TTK 0.31s, 6 measured choices, 1 intentional death, depth 4,
+  score 100/100.
+- Exit: the goal-loop charter criteria are satisfied. No ladder item remains
+  in this charter.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -236,3 +260,19 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T04:00:51.605Z | session-arc | 80 | 0.58 | 0.74 | 0.62 | 1.03 | 6 | 0 | 4
 
 2026-07-11T04:10:21.428Z | session-arc | 80 | 0.58 | 0.75 | 0.32 | 1.02 | 6 | 0 | 4
+
+2026-07-11T04:13:17.997Z | session-arc | 100 | 0.59 | 3.03 | 0.63 | 0.62 | 6 | 1 | 4
+
+2026-07-11T04:16:10.941Z | session-arc | 80 | 0.6 | 4.42 | 0.63 | 0.63 | 6 | 1 | 4
+
+2026-07-11T04:17:11.299Z | session-arc | 100 | 0.59 | 4.61 | 0.95 | 0.32 | 6 | 1 | 4
+
+2026-07-11T04:21:11.737Z | session-arc | 100 | 0.61 | 4.67 | 1.27 | 0.63 | 6 | 1 | 4
+
+2026-07-11T04:22:03.059Z | session-arc | 100 | 0.6 | 4.82 | 1.57 | 0.31 | 6 | 1 | 4
+
+2026-07-11T04:22:17.119Z | session-arc | 100 | 0.59 | 4.85 | 0.95 | 0.63 | 6 | 1 | 4
+
+2026-07-11T04:24:43.698Z | session-arc | 100 | 0.6 | 4.18 | 1.27 | 0.62 | 6 | 1 | 4
+
+2026-07-11T04:26:02.492Z | session-arc | 100 | 0.58 | 4.72 | 0.97 | 0.31 | 6 | 1 | 4

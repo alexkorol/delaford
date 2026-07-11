@@ -237,6 +237,10 @@ const devEvents = {
       }
       monster.stats.resources.health.current = monster.stats.resources.health.max;
     }
+    // Deterministic combat comparisons must not be extended indefinitely by
+    // an unrelated support monster. This override exists only in dev mode and
+    // only for the explicitly selected disposable floor monster.
+    if (payload.isolate === true) monster.heal = () => false;
     Monster.broadcast([monster], { players: world.getScenePlayers(scene.id) });
     sendDevMessage(player, `Reset ${monster.name} for a comparison trial.`);
   },

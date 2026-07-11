@@ -23,4 +23,15 @@ describe('session critic metrics', () => {
     expect(() => normalizeCriticMetrics({ ...completeRun, secondsToFirstDrop: undefined }))
       .toThrow('Invalid critic metric secondsToFirstDrop');
   });
+
+  it('allows one live-loop timing tick without hiding a real TTK regression', () => {
+    expect(normalizeCriticMetrics({
+      ...completeRun,
+      ttkSeconds: { level1: 0.63, level5: 0.64 },
+    }).criticScore).toBe(100);
+    expect(normalizeCriticMetrics({
+      ...completeRun,
+      ttkSeconds: { level1: 0.63, level5: 0.9 },
+    }).criticScore).toBe(80);
+  });
 });

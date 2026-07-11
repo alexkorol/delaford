@@ -75,8 +75,24 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
   let treePointsSpent = 0;
   let equipSwaps = 0;
   let zonePicks = 0;
+  let fallenName;
 
   try {
+    const town = await first.state();
+    const aldwyn = town.npcs.find(npc => npc.name === 'Aldwyn the Guide');
+    assert(aldwyn, 'the session begins with Aldwyn present in town');
+    first.devTeleport(aldwyn.x + 1, aldwyn.y);
+    await first.waitFor(async () => (await first.state()).x === aldwyn.x + 1, { label: 'Aldwyn approach' });
+    const menu = await first.rightClick(aldwyn.x, aldwyn.y);
+    const talk = menu.find(entry => entry.action?.actionId === 'player:npc:talk');
+    assert(talk, 'the first goal begins through an in-world Talk action');
+    first.choose(talk, { x: 0, y: 0, world: { x: aldwyn.x, y: aldwyn.y } });
+    await first.waitFor(async () => (await first.state()).quests?.firstGoal?.stage === 'clear-floor', {
+      label: 'accepted first goal',
+    });
+    assert(first.messages.some(message => /Old Barrow.*floor 1/i.test(message)),
+      'Aldwyn names The Old Barrow floor 1');
+
     await first.enterZone('dungeon', 'warren');
     zonePicks += 1;
     let state = await first.state();
@@ -84,6 +100,52 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
     assert(baselineTarget, 'first run begins with a real fight');
     const baselineHit = await hitOnce(first, baselineTarget, 'unarmed baseline hit');
     secondsToFirstCombat = secondsSince(sessionStartedAt);
+    const openingKillStartedAt = Date.now();
+    await killOne(first);
+    ttkLevel1Seconds = secondsSince(openingKillStartedAt);
+
+    state = await first.state();
+    const boss = state.monsters.find(monster => monster.rarity === 'elite');
+    assert(boss?.name === 'Warden of the Deep', 'the first goal culminates in the named Warden');
+    // Use the boss tile for this diagnostic setup. Its continuous patrol
+    // position can move just over diagonal melee reach between snapshot and
+    // command processing; overlapping guarantees the real AI starts windup.
+    first.devTeleport(Math.round(boss.x), Math.round(boss.y));
+    const bossTelegraph = await first.waitFor(() => first.telegraphs.find(event => (
+      event.attackerId === boss.uuid && event.skillId === 'boss:ground-slam'
+    )), { timeoutMs: 12000, label: 'session boss mechanic' });
+    const bossHitsBefore = first.hits.length;
+    first.devTeleport(
+      Math.round(bossTelegraph.x + bossTelegraph.radius + 2),
+      Math.round(bossTelegraph.y),
+    );
+    await new Promise(resolve => { setTimeout(resolve, bossTelegraph.durationMs + 250); });
+    assert(!first.hits.slice(bossHitsBefore).some(hit => (
+      hit.attackerId === boss.uuid && hit.skillId === 'boss:ground-slam'
+    )), 'the Warden ground slam is readable and avoidable');
+
+    const clearMessagesBefore = first.messages.length;
+    first.devClearFloor();
+    await first.waitFor(() => {
+      if (first.messages.slice(clearMessagesBefore).some(message => /Cleared the active floor/i.test(message))) {
+        return true;
+      }
+      first.devClearFloor();
+      return false;
+    }, { timeoutMs: 8000, intervalMs: 500, label: 'acknowledged floor clear setup' });
+    await first.waitFor(async () => (await first.state()).quests?.firstGoal?.stage === 'return-to-town', {
+      timeoutMs: 15000,
+      intervalMs: 500,
+      label: 'first goal floor clear',
+    });
+    first.emit('party:returnToTown', {});
+    const goalReward = await first.waitFor(async () => {
+      const current = await first.state();
+      if (current.quests?.firstGoal?.stage === 'complete') return current;
+      first.emit('party:returnToTown', {});
+      return false;
+    }, { label: 'first goal reward', intervalMs: 500 });
+    assert(goalReward.questPoints === 1, 'returning from the first goal awards a Verdigris point');
 
     // Leave the active pack behind, then deterministically place the reward on
     // the next floor. Pickup and equip are the same events the browser sends.
@@ -123,9 +185,7 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
       if (state.level > startingLevel) break;
       const killStartedAt = Date.now();
       await killOne(first);
-      if (ttkLevel1Seconds === undefined && startingLevel === 1) {
-        ttkLevel1Seconds = secondsSince(killStartedAt);
-      }
+      if (ttkLevel1Seconds === undefined) ttkLevel1Seconds = secondsSince(killStartedAt);
     }
     state = await first.state();
     assert(state.level > startingLevel, `real combat advanced the scion to level ${state.level}`);
@@ -196,8 +256,42 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
     const nextRun = await second.state();
     assert(nextRun.sceneMetadata.depth === 1 && nextRun.monsters.length > 0,
       'the scion voluntarily starts another populated run');
+    fallenName = second.player.username;
+    const executioner = nearestTrash(nextRun);
+    assert(executioner, 'the second run contains a mortal threat');
+    second.devPrepareFinalDeath();
+    second.devTeleport(Math.round(executioner.x) + 1, Math.round(executioner.y));
+    const memorial = await second.waitFor(() => second.scionFalls[0], {
+      timeoutMs: 15000,
+      intervalMs: 250,
+      label: 'session-arc final death',
+    });
+    assert(memorial.fallen.name === fallenName, 'the developed scion enters the crypt by name');
+    assert(memorial.relicCount >= 1, 'the developed vessel becomes an heirloom candidate');
   } finally {
     second.close();
+  }
+
+  await new Promise(resolve => { setTimeout(resolve, 500); });
+  const laterRunOne = await connect({ guestId });
+  laterRunOne.close();
+  await new Promise(resolve => { setTimeout(resolve, 350); });
+  const laterRunTwo = await connect({ guestId });
+  laterRunTwo.close();
+  await new Promise(resolve => { setTimeout(resolve, 350); });
+  const heir = await connect({ guestId });
+  try {
+    await heir.enterZone('crypt', 'warren');
+    heir.devReleaseRelic();
+    const heirloom = await heir.waitFor(async () => {
+      const current = await heir.state();
+      return current.groundItems.find(item => item.legacy?.sourceScionName === fallenName) || false;
+    }, { timeoutMs: 6000, label: 'session-arc heirloom return' });
+    heir.devTeleport(heirloom.x, heirloom.y + 1);
+    await heir.takeItem(heirloom);
+    assert(heirloom.id === 'steel-battleaxe', 'a later scion recovers the developed battleaxe heirloom');
+  } finally {
+    heir.close();
   }
 
   recordMetrics({
@@ -213,7 +307,7 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
       equipSwaps,
       zonePicks,
     },
-    deaths: 0,
+    deaths: 1,
     depthReached,
   });
 }

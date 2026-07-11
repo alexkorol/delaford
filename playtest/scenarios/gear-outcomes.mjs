@@ -26,14 +26,15 @@ const timeKill = async (player, targetUuid) => {
 };
 
 const COMPARISON_HEALTH = 100;
+const DEEP_COMPARISON_HEALTH = 240;
 
-const resetMonster = async (player, targetUuid) => {
-  player.devResetMonster(targetUuid, { maxHealth: COMPARISON_HEALTH });
+const resetMonster = async (player, targetUuid, maxHealth = COMPARISON_HEALTH) => {
+  player.devResetMonster(targetUuid, { maxHealth, isolate: true });
   return player.waitFor(async () => {
     const state = await player.state();
     const target = state.monsters.find(monster => monster.uuid === targetUuid);
-    return target && target.hp.current === COMPARISON_HEALTH
-      && target.hp.max === COMPARISON_HEALTH ? target : false;
+    return target && target.hp.current === maxHealth
+      && target.hp.max === maxHealth ? target : false;
   }, { label: 'same comparison monster reset to full health' });
 };
 
@@ -74,7 +75,9 @@ export default async function gearOutcomes({ connect, assert }) {
     const lowState = await lootAndEquip(player, 5);
     const lowAttack = lowState.combat.attack.slash;
     const lowTtk = await timeKill(player, target.uuid);
-    await resetMonster(player, target.uuid);
+    await resetMonster(player, target.uuid, DEEP_COMPARISON_HEALTH);
+    const lowDeepTtk = await timeKill(player, target.uuid);
+    await resetMonster(player, target.uuid, DEEP_COMPARISON_HEALTH);
 
     const highState = await lootAndEquip(player, 65);
     const highAttack = highState.combat.attack.slash;
@@ -84,8 +87,8 @@ export default async function gearOutcomes({ connect, assert }) {
 
     assert(unarmedTtk >= lowTtk * 1.25,
       `looted weapon cuts same-monster TTK by at least 20% (${unarmedTtk.toFixed(2)}s -> ${lowTtk.toFixed(2)}s)`);
-    assert(lowTtk >= highTtk * 1.15,
-      `higher-ilvl vessel cuts same-monster TTK by at least 13% (${lowTtk.toFixed(2)}s -> ${highTtk.toFixed(2)}s)`);
+    assert(lowDeepTtk >= highTtk * 1.15,
+      `higher-ilvl vessel cuts same-monster TTK by at least 13% (${lowDeepTtk.toFixed(2)}s -> ${highTtk.toFixed(2)}s)`);
   } finally {
     player.close();
   }
