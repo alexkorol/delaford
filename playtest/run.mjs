@@ -15,6 +15,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import HeadlessPlayer from './harness.mjs';
+import { recordCriticMetrics } from './critic.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
@@ -123,7 +124,13 @@ const main = async () => {
       const startedAt = Date.now();
       try {
         const scenario = (await import(`./scenarios/${name}.mjs`)).default;
-        await scenario({ connect, assert });
+        let metricsRecorded = false;
+        const recordMetrics = (metrics) => {
+          if (metricsRecorded) throw new Error(`${name} recorded critic metrics more than once`);
+          metricsRecorded = true;
+          return recordCriticMetrics({ projectRoot, scenario: name, metrics, log });
+        };
+        await scenario({ connect, assert, recordMetrics });
         results.push({ name, ok: true, ms: Date.now() - startedAt });
         log(`  PASS ${name} (${Date.now() - startedAt}ms)\n`);
       } catch (error) {
