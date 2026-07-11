@@ -397,6 +397,10 @@ export class HeadlessPlayer {
     this.emit('dev:monster:reset', { monsterUuid, ...options });
   }
 
+  devClearFloor() {
+    this.emit('dev:clear-floor', {});
+  }
+
   devSetLevel(level) {
     this.emit('dev:setlevel', { level });
   }

@@ -4,11 +4,14 @@ import {
   VERDIGRIS_SKILL_TREE_SOURCES,
 } from '../../../src/core/passives/verdigris-skill-tree.js';
 
-export const earnedVerdigrisPoints = level => Math.min(
+export const earnedVerdigrisPoints = (level, questPoints = 0) => Math.min(
   VERDIGRIS_SKILL_TREE_POINTS.skill,
   Math.min(
     Math.max(2, Math.floor(Number(level) || 1)),
     VERDIGRIS_SKILL_TREE_SOURCES.levels,
+  ) + Math.min(
+    Math.max(0, Math.floor(Number(questPoints) || 0)),
+    VERDIGRIS_SKILL_TREE_SOURCES.quests,
   ),
 );
 
@@ -19,12 +22,12 @@ const reject = reason => ({ ok: false, reason });
  * graph. The server owns the point budget, adjacency, conduit variants, and
  * resulting attributes; snapshots are no longer trusted save blobs.
  */
-export const resolveVerdigrisTree = (incoming, level = 1) => {
+export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
   if (!incoming || !Array.isArray(incoming.nodes) || !Array.isArray(incoming.conduits)) {
     return reject('Malformed passive tree.');
   }
 
-  const earned = earnedVerdigrisPoints(level);
+  const earned = earnedVerdigrisPoints(level, questPoints);
   const tree = new VerdigrisGeometricTree({ availablePoints: earned });
   const nodes = [...new Set(incoming.nodes.filter(id => typeof id === 'string'))];
   if (!nodes.includes('0,0')) return reject('The passive tree must include its origin.');

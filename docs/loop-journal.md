@@ -106,6 +106,33 @@
   fall, crypt provenance, same-House successor recovery), so the next
   unfinished target is Tier 2's in-world first-session goal chain.
 
+## 2026-07-10 — Put the first goal in the world
+
+- Goal: give a new scion one explicit in-world objective from a town NPC,
+  through a named zone clear, to a permanent character reward.
+- Failing scenario: `first-goal` failed because the town guide exposed no
+  Talk action. The full-sequence proof then caught a stale-coordinate defect
+  when the original wandering NPC moved before the interaction.
+- Scenario added: the harness discovers Aldwyn from the authoritative town
+  scene, accepts “clear The Old Barrow floor 1,” clears the real instance,
+  receives the return objective, and proves exactly one Verdigris point on
+  returning to Delaford.
+- Implementation: Baynard is now the stationary Aldwyn guide with a
+  server-authorized Talk action. The server owns quest stages and advances
+  them only for the Old Barrow template/layout/depth and the real return path.
+  Quest state and its 23-point capped reward source persist with guest,
+  Chronicle, and account snapshots; tree allocations are revalidated against
+  the enlarged 123-point budget.
+- Evidence: `npm run playtest` — 16/16 scenarios; `npm run test:unit` — 75
+  files and 510 tests, including all three balance specs; `npm run lint` —
+  exit 0; `npm run smoke:browser` — 1/1.
+- Critic score: 80/100 in the final sample. First combat remained 0.58s,
+  first drop 0.74s, 6 measured choices, 0 deaths, and depth 4; the unscored new
+  quest adds an explicit objective and reward, while the variable level-5 TTK
+  sample missed the scorer's strict faster-than-level-1 point.
+- Next target: Tier 2 boss proof — give each biome a readable boss mechanic,
+  beginning with one scenario-backed Old Barrow boss encounter.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -126,3 +153,11 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T03:27:43.689Z | session-arc | 100 | 0.57 | 0.74 | 1.24 | 0.32 | 6 | 0 | 4
 
 2026-07-11T03:30:51.801Z | session-arc | 100 | 0.59 | 0.76 | 0.62 | 0.02 | 6 | 0 | 4
+
+2026-07-11T03:39:57.407Z | session-arc | 100 | 0.58 | 0.75 | 1.88 | 0.62 | 6 | 0 | 4
+
+2026-07-11T03:41:49.059Z | session-arc | 80 | 0.59 | 0.75 | 0.63 | 0.64 | 6 | 0 | 4
+
+2026-07-11T03:43:00.739Z | session-arc | 80 | 0.59 | 0.76 | 0.63 | 0.63 | 6 | 0 | 4
+
+2026-07-11T03:44:12.440Z | session-arc | 80 | 0.58 | 0.74 | 0.64 | 1.26 | 6 | 0 | 4

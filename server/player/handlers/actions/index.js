@@ -30,6 +30,7 @@ import world from '#server/core/world.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import { commitGroundItemPickup, refreshInventory } from '#server/core/items/pickup.js';
 import { MAIN_TOWN_FOUNTAIN } from '#server/core/town-amenities.js';
+import { talkToAldwyn } from '#server/core/first-goal.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -422,6 +423,14 @@ const actionEvents = {
         socket_id: data.player.socket_id,
       },
     });
+  },
+  'player:npc:talk': (data) => {
+    const player = getPlayerFromPayload(data);
+    const scene = player && getPlayerScene(player);
+    const npc = scene?.npcs?.find(entry => entry.id === data.item?.id);
+    const nearby = npc && Math.max(Math.abs(player.x - npc.x), Math.abs(player.y - npc.y)) <= 1;
+    if (!player || scene?.type !== 'town' || !npc || npc.id !== 1 || !nearby) return;
+    talkToAldwyn(player);
   },
   'player:inventory-drop': (data) => {
     const player = world.players.find(p => p.uuid === data.id) || getPlayerFromPayload(data);

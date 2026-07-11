@@ -96,6 +96,11 @@ const buildStateSnapshot = (player) => {
         .map(([slot, item]) => [slot, item ? snapshotItem(item) : null]))
       : {},
     passiveTree: player.passiveTree || null,
+    quests: structuredClone(player.quests || {}),
+    questPoints: player.questPoints || 0,
+    npcs: scene && Array.isArray(scene.npcs)
+      ? scene.npcs.map(npc => ({ id: npc.id, name: npc.name, x: Math.round(npc.x), y: Math.round(npc.y) }))
+      : [],
     monsters: scene && Array.isArray(scene.monsters)
       ? scene.monsters.filter(m => m && m.isAlive).map(m => ({
         uuid: m.uuid,
@@ -234,6 +239,19 @@ const devEvents = {
     }
     Monster.broadcast([monster], { players: world.getScenePlayers(scene.id) });
     sendDevMessage(player, `Reset ${monster.name} for a comparison trial.`);
+  },
+
+  /** Defeat the active floor's monsters so scenario setup can exercise completion. */
+  'dev:clear-floor': (_data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const scene = player ? world.getSceneForPlayer(player) : null;
+    if (!DEV_MODE || !player || scene?.type !== 'instance') return;
+    scene.monsters.forEach((monster) => {
+      if (monster?.stats?.resources?.health) monster.stats.resources.health.current = 0;
+      if (monster?.stats?.lifecycle) monster.stats.lifecycle.state = 'permadead';
+    });
+    Monster.broadcast(scene.monsters, { players: world.getScenePlayers(scene.id) });
+    sendDevMessage(player, 'Cleared the active floor for objective verification.');
   },
 
   /**

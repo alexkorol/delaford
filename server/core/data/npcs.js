@@ -1,19 +1,20 @@
 export default [
   {
     id: 1,
-    name: 'Baynard',
-    examine: 'Local town bum. Phew!',
+    name: 'Aldwyn the Guide',
+    examine: 'A weathered guide who watches over Delaford\'s newest scions.',
     graphic: {
       row: 0,
       column: 0,
     },
     actions: [
+      'talk',
       'examine',
     ],
     spawn: {
       x: 34,
       y: 116,
-      range: 3,
+      range: 0,
     },
   },
   {

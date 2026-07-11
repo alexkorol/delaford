@@ -31,6 +31,8 @@ class Player {
     this.y = data.y;
     this.level = data.level;
     this.skills = data.skills;
+    this.quests = data.quests && typeof data.quests === 'object' ? data.quests : {};
+    this.questPoints = Math.max(0, Math.min(23, Math.floor(Number(data.questPoints) || 0)));
 
     this.buildInitialStats(data);
 
@@ -74,9 +76,11 @@ class Player {
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).
-    const restoredTree = data.passiveTree
-      ? resolveVerdigrisTree(data.passiveTree, this.level)
-      : null;
+    const restoredTree = resolveVerdigrisTree(data.passiveTree || {
+      nodes: ['0,0'],
+      conduits: [],
+      selectedNodeId: '0,0',
+    }, this.level, this.questPoints);
     this.passiveTree = restoredTree?.ok ? restoredTree.snapshot : null;
     this.passiveTreeStats = restoredTree?.ok ? restoredTree.stats : null;
 

@@ -60,6 +60,8 @@ export const buildGuestSnapshot = (player) => ({
   inventory: slimInventory(player.inventory && player.inventory.slots),
   bank: Array.isArray(player.bank) ? player.bank : [],
   passiveTree: player.passiveTree || null,
+  quests: player.quests || {},
+  questPoints: player.questPoints || 0,
 });
 
 export const saveGuest = (player) => {

@@ -6,6 +6,10 @@ import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
+import {
+  notifyFirstGoalFloorCleared,
+  notifyFirstGoalReturned,
+} from '#server/core/first-goal.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -621,6 +625,7 @@ class PartyService {
       player.preInstancePosition = null;
 
       world.assignPlayerToScene(player, returnScene.id);
+      if (returnScene.type === 'town') notifyFirstGoalReturned(player);
       if (typeof player.cancelPathfinding === 'function') {
         player.cancelPathfinding();
       }
@@ -757,6 +762,11 @@ class PartyService {
     const completionMessage = options.message
       || `Floor ${depth} cleared! Rewards distributed — find the stairs to descend, or take the entry stairs to leave.`;
     this.sendInstanceComplete(party, rewards, completionMessage);
+    this.forEachMember(party, player => notifyFirstGoalFloorCleared(player, {
+      template: party.metadata.template,
+      layout: party.metadata.layout,
+      depth,
+    }));
     this.sendLoadingState(party, 'idle');
     return true;
   }

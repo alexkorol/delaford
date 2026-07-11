@@ -36,5 +36,14 @@ describe('server-authoritative Verdigris tree', () => {
     expect(earnedVerdigrisPoints(1)).toBe(2);
     expect(earnedVerdigrisPoints(50)).toBe(50);
     expect(earnedVerdigrisPoints(999)).toBe(100);
+    expect(earnedVerdigrisPoints(100, 1)).toBe(101);
+    expect(earnedVerdigrisPoints(100, 999)).toBe(123);
+  });
+
+  it('adds earned quest points to the authoritative allocation budget', () => {
+    const result = resolveVerdigrisTree(firstAllocation(), 1, 1);
+    expect(result.ok).toBe(true);
+    expect(result.snapshot.earned).toBe(3);
+    expect(result.snapshot.points.skill).toBe(1);
   });
 });

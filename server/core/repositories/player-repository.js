@@ -76,6 +76,8 @@ export class PlayerRepository {
       skillsData: cloneValue(player.skills || {}),
       bankData: cloneValue(player.bank || []),
       passiveTreeData: cloneValue(player.passiveTree || null),
+      questsData: cloneValue(player.quests || {}),
+      questPoints: player.questPoints || 0,
     };
   }
 

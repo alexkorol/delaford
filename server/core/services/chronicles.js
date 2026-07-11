@@ -47,6 +47,8 @@ export const buildScionSnapshot = player => ({
   inventory: cleanInventory(player.inventory?.slots || []),
   bank: clone(Array.isArray(player.bank) ? player.bank : []),
   passiveTree: clone(player.passiveTree || null),
+  quests: clone(player.quests || {}),
+  questPoints: player.questPoints || 0,
   lifecycle: clone(player.stats?.lifecycle || { mode: 'hard', state: 'alive' }),
   resources: clone(player.stats?.resources || {}),
 });

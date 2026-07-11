@@ -26,6 +26,14 @@ export default [
     queueable: true,
   },
   {
+    name: 'Talk',
+    actionId: 'player:npc:talk',
+    context: ['gameMap'],
+    allow: ['npc'],
+    nearby: false,
+    weight: 1,
+  },
+  {
     name: 'Examine',
     actionId: 'player:examine',
     context: ['gameMap', 'inventorySlot', 'bankSlot', 'furnaceSlot'],

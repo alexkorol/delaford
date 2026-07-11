@@ -9,6 +9,7 @@ import openScreenStrategy from './open-screen.js';
 import resourcePaneStrategy from './resource-pane.js';
 import smeltActionStrategy from './smelt-action.js';
 import takeStrategy from './take.js';
+import talkStrategy from './talk.js';
 import tradeActionStrategy from './trade-action.js';
 import unequipStrategy from './unequip.js';
 import walkHereStrategy from './walk-here.js';
@@ -19,6 +20,7 @@ const strategies = [
   walkHereStrategy,
   inventoryDropStrategy,
   takeStrategy,
+  talkStrategy,
   equipStrategy,
   unequipStrategy,
   examineStrategy,

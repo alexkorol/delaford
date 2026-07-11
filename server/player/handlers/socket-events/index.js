@@ -164,7 +164,7 @@ export default {
     }
 
     const sanitised = sanitisePassiveTree(data && data.snapshot);
-    const resolved = sanitised && resolveVerdigrisTree(sanitised, player.level);
+    const resolved = sanitised && resolveVerdigrisTree(sanitised, player.level, player.questPoints);
     if (!resolved?.ok) {
       Socket.emit('game:send:message', {
         player: { socket_id: player.socket_id },
