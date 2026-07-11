@@ -325,6 +325,8 @@ class Delaford {
     const PUBLIC_EVENTS = new Set(['player:login']);
     const UNBOUND_AUTH_EVENTS = new Set([
       'chronicles:house:found',
+      'chronicles:house:claim-daily',
+      'chronicles:house:upgrade',
       'chronicles:scion:create',
       'chronicles:scion:set-out',
     ]);

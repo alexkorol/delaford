@@ -54,9 +54,31 @@ export default async function townAmenities({ connect, assert }) {
     await p.waitFor(async () => (await p.state()).y === 102, { label: 'General Store approach' });
     const displayMenu = await p.rightClick(45, 101);
     const browse = displayMenu.find(entry => entry.action?.actionId === 'player:screen:shop-display');
+    const buy = displayMenu.find(entry => entry.action?.actionId === 'player:shop-display:buy');
+    const appraise = displayMenu.find(entry => entry.action?.actionId === 'player:shop-display:appraise');
     const take = displayMenu.find(entry => entry.action?.actionId === 'player:take');
-    assert(browse && browse.shopItemId === 'bronze-sword', 'floor stock opens the General Store');
+    assert(buy && buy.shopItemId === 'bronze-sword', 'floor stock exposes a direct Buy action');
+    assert(appraise && appraise.shopItemId === 'bronze-sword', 'floor stock exposes an Appraise action');
     assert(!take, 'shop display stock cannot be taken for free');
+
+    const messagesBefore = p.messages.length;
+    p.choose(appraise, { x: 0, y: 0, world: { x: 45, y: 101 } });
+    await p.waitFor(() => p.messages.slice(messagesBefore).some(message => /coins\./i.test(message)), {
+      label: 'floor stock appraisal price',
+    });
+    assert(true, 'Appraise reports the authoritative coin price');
+
+    p.devGive('coins', 5000);
+    await p.waitFor(async () => (await p.state()).inventory
+      .filter(item => item.id === 'coins')
+      .reduce((sum, item) => sum + item.qty, 0) >= 5000, { label: 'shop purchase funds' });
+    p.choose(buy, { x: 0, y: 0, world: { x: 45, y: 101 } });
+    await p.waitFor(async () => (await p.state()).inventory.some(item => item.id === 'bronze-sword'), {
+      label: 'direct floor purchase',
+    });
+    assert(true, 'Buy purchases directly without opening the shop pane');
+
+    assert(browse && browse.shopItemId === 'bronze-sword', 'floor stock still offers the full General Store');
     p.choose(browse, { x: 0, y: 0, world: { x: 45, y: 101 } });
     await p.waitFor(() => p.screens.some(screen => (
       screen.screen === 'shop' && screen.payload?.name === 'General Store'

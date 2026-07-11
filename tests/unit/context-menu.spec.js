@@ -196,6 +196,14 @@ describe('ContextMenu strategies', () => {
       id: 2,
       shopItemId: 'bronze-sword',
     });
+    expect(actions.find(entry => entry.action.actionId === 'player:shop-display:buy')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
+    expect(actions.find(entry => entry.action.actionId === 'player:shop-display:appraise')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
     expect(actions.some(entry => entry.action.actionId === 'player:take')).toBe(false);
   });
 

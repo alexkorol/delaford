@@ -57,6 +57,15 @@ describe('WIZARD HUD orbs', () => {
     expect(source).toContain('bottom: calc(var(--hud-chat-inset) + var(--hud-chat-clearance));');
   });
 
+  it('gets the minimap out of the way whenever a pane is open', () => {
+    const container = readSource('src/components/layout/GameContainer.vue');
+    const canvas = readSource('src/components/GameCanvas.vue');
+
+    expect(container).toContain('v-if="!uiHidden && !legacyPaneOpen && !hasDockedPane"');
+    expect(container).toContain('@pane-state="legacyPaneOpen = $event"');
+    expect(canvas).toContain("emits: ['pane-state']");
+  });
+
   it('makes the message log dock draggable inside the playfield', () => {
     const source = readSource('src/components/layout/GameContainer.vue');
 

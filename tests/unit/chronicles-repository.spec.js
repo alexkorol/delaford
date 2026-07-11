@@ -92,8 +92,26 @@ describe('server-side Chronicles repository', () => {
     expect(chronicle.bestDepth).toBe(4);
     expect(chronicle.houses[0].bestDepth).toBe(4);
     expect(chronicle.houses[0].scions[0].bestDepth).toBe(4);
+    expect(chronicle.houses[0].treasury).toBe(100);
     expect(chronicle.leaderboard[0]).toMatchObject({ houseName: 'Ashford', bestDepth: 4 });
     expect(repository.recordDepth('account:intruder', houseId, scionId, 99)).toBeNull();
+  });
+
+  it('funds persistent House development through daily gold and depth gains', () => {
+    const { houseId, scionId } = createLineage();
+    const daily = repository.claimDailyGold(accountId, houseId);
+    expect(daily).toMatchObject({ ok: true, amount: 100 });
+    expect(repository.claimDailyGold(accountId, houseId).ok).toBe(false);
+    repository.recordDepth(accountId, houseId, scionId, 6);
+
+    let house = repository.getChronicle(accountId).houses[0];
+    expect(house.treasury).toBe(250);
+    expect(house.dailyClaimAvailable).toBe(false);
+    expect(repository.upgradeHouse(accountId, houseId, 'hall').ok).toBe(true);
+    house = repository.getChronicle(accountId).houses[0];
+    expect(house.treasury).toBe(0);
+    expect(house.upgrades.hall).toBe(1);
+    expect(house.dailyGold).toBe(125);
   });
 
   it('lets a death witness find the friend House relic after three of their runs', () => {

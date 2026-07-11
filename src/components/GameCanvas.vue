@@ -45,6 +45,7 @@ import InputController from '../core/utilities/input-controller.js';
 
 export default {
   name: 'Game',
+  emits: ['pane-state'],
   props: {
     game: {
       type: Object,
@@ -124,6 +125,7 @@ export default {
   },
   watch: {
     current(newVal) {
+      this.$emit('pane-state', typeof newVal !== 'boolean');
       if (typeof newVal === 'boolean') {
         Socket.emit('player:pane:close', {
           id: this.game.player.uuid,

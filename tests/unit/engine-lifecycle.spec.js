@@ -65,7 +65,7 @@ describe('Engine lifecycle', () => {
   it('initialises with correct default state', () => {
     expect(engine._running).toBe(false);
     expect(engine._rafId).toBeNull();
-    expect(engine.maxFps).toBe(20);
+    expect(engine.maxFps).toBe(60);
   });
 
   it('start() sets running flag and requests first frame', () => {

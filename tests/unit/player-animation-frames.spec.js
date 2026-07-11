@@ -43,4 +43,17 @@ describe('player animation frames stay within the sprite sheet', () => {
       expect(PLAYER_SPRITE_CONFIG.states[stateName].frames.length).toBeGreaterThan(0);
     });
   });
+
+  it('composes worn equipment and attack reach above the actor sprite', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../src/core/map.js', import.meta.url)),
+      'utf8',
+    );
+
+    expect(source).toContain('drawPaperdoll(ctx, actor');
+    expect(source).toContain('wear.right_hand');
+    expect(source).toContain('drawAttackEffects()');
+    expect(source).toContain("effect.style === 'stab'");
+    expect(source).toContain("effect.style === 'crush'");
+  });
 });

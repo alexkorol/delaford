@@ -29,9 +29,10 @@
               ref="canvasRef"
               :game="game"
               :world-viewport="worldViewport"
+              @pane-state="legacyPaneOpen = $event"
             />
             <WorldMinimap
-              v-if="!uiHidden"
+              v-if="!uiHidden && !legacyPaneOpen && !hasDockedPane"
               :game="game"
             />
             <div
@@ -389,8 +390,14 @@ export default {
     };
 
     const uiHidden = ref(false);
+    const legacyPaneOpen = ref(false);
     const partyOpen = ref(false);
     const adventureOpen = ref(false);
+    const hasDockedPane = computed(() => Boolean(
+      props.defaultLeftPane
+      || props.defaultRightPane
+      || props.activeOverlayDescriptor?.id,
+    ));
 
     // Zone menu must match the server's ADVENTURE_ZONES; each zone pairs an art
     // template with a layout shape (warren/clearings/gauntlet). The server
@@ -666,6 +673,8 @@ export default {
       handleQuickbarRemap,
       triggerSkill,
       uiHidden,
+      legacyPaneOpen,
+      hasDockedPane,
       partyOpen,
       adventureOpen,
       adventureZones,

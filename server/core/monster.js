@@ -177,6 +177,7 @@ class Monster {
       targetType: 'player',
       skillId: 'monster:attack',
       skillName: 'Attack',
+      attackStyle: this.behaviour?.type === 'ranged' ? 'stab' : 'claw',
       amount,
       health: {
         current: target.stats.resources.health.current,

@@ -4,7 +4,7 @@
       <p class="chronicles__eyebrow">The Chronicles</p>
       <h1 id="chronicles-title">{{ activeHouse ? `House ${activeHouse.name}` : 'Found Your House' }}</h1>
       <p v-if="activeHouse" class="chronicles__ledger">
-        {{ activeHouse.renown }} renown · deepest descent {{ activeHouse.bestDepth || 0 }}
+        {{ activeHouse.renown }} renown · {{ activeHouse.treasury || 0 }} House gold · deepest descent {{ activeHouse.bestDepth || 0 }}
       </p>
     </header>
 
@@ -31,6 +31,42 @@
     </form>
 
     <template v-else>
+      <section class="chronicles__domain" aria-label="House development">
+        <div class="chronicles__domain-summary">
+          <div>
+            <small>Treasury</small>
+            <strong>{{ activeHouse.treasury || 0 }} gold</strong>
+          </div>
+          <div>
+            <small>Heirlooms abroad</small>
+            <strong>{{ activeHouse.heirloomCount || 0 }}</strong>
+          </div>
+          <button type="button" :disabled="!activeHouse.dailyClaimAvailable" @click="claimDaily">
+            {{ activeHouse.dailyClaimAvailable ? `Claim daily ${activeHouse.dailyGold} gold` : 'Daily stipend claimed' }}
+          </button>
+        </div>
+        <div class="chronicles__upgrades">
+          <article v-for="upgrade in houseUpgrades" :key="upgrade.id">
+            <div class="chronicles__upgrade-copy">
+              <strong>{{ upgrade.label }}</strong>
+              <span>Level {{ upgrade.level }} / {{ upgrade.maxLevel }}</span>
+            </div>
+            <button
+              type="button"
+              :disabled="upgrade.level >= upgrade.maxLevel || activeHouse.treasury < upgrade.cost"
+              @click="improveHouse(upgrade.id)"
+            >
+              {{ upgrade.level >= upgrade.maxLevel ? 'Complete' : `Improve · ${upgrade.cost} gold` }}
+            </button>
+          </article>
+        </div>
+        <p class="chronicles__crafting">
+          <strong>House craft:</strong>
+          {{ activeHouse.craftingBases?.length ? activeHouse.craftingBases.join(', ') : 'Build the House Forge to commission your own item bases.' }}
+        </p>
+        <small>New personal depth records add 25 gold per floor. Party-witnessed relics become heirloom leads for other Houses.</small>
+      </section>
+
       <div class="chronicles__columns">
         <section>
           <h2>Living Scions</h2>
@@ -110,6 +146,15 @@ const activeHouse = computed(() => {
 });
 const fallen = computed(() => props.fall?.fallen || null);
 const relicCount = computed(() => Number(props.fall?.relicCount) || 0);
+const houseUpgrades = computed(() => Object.entries(props.chronicle?.houseUpgrades || {}).map(([id, definition]) => {
+  const level = Number(activeHouse.value?.upgrades?.[id]) || 0;
+  return {
+    id,
+    ...definition,
+    level,
+    cost: Number(definition.baseCost || 0) * (level + 1),
+  };
+}));
 
 const foundHouse = () => {
   Socket.emit('chronicles:house:found', { name: houseName.value });
@@ -122,6 +167,16 @@ const createScion = () => {
     name: scionName.value,
   });
   scionName.value = '';
+};
+
+const claimDaily = () => {
+  if (!activeHouse.value) return;
+  Socket.emit('chronicles:house:claim-daily', { houseId: activeHouse.value.id });
+};
+
+const improveHouse = (upgradeId) => {
+  if (!activeHouse.value) return;
+  Socket.emit('chronicles:house:upgrade', { houseId: activeHouse.value.id, upgradeId });
 };
 
 const setOut = (scionId) => {
@@ -183,6 +238,63 @@ button {
 button:hover,
 button:focus-visible {
   border-color: #79bda9;
+}
+
+button:disabled {
+  cursor: default;
+  filter: grayscale(0.7);
+  opacity: 0.55;
+}
+
+.chronicles__domain {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  background: rgba(13, 18, 17, 0.72);
+  border: 1px solid rgba(115, 185, 166, 0.35);
+}
+
+.chronicles__domain-summary,
+.chronicles__upgrades article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chronicles__domain-summary div,
+.chronicles__upgrade-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.chronicles__domain-summary strong {
+  color: #e7c978;
+}
+
+.chronicles__upgrades {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.chronicles__upgrades article {
+  align-items: stretch;
+  flex-direction: column;
+  padding: 0.55rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(179, 151, 98, 0.22);
+}
+
+.chronicles__upgrades span,
+.chronicles__crafting {
+  color: #a99d89;
+  font-size: 0.76rem;
+}
+
+.chronicles__crafting {
+  margin: 0;
 }
 
 .chronicles__header {
@@ -311,6 +423,16 @@ button:focus-visible {
 }
 
 @media (width <= 650px) {
+  .chronicles__domain-summary,
+  .chronicles__upgrades article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chronicles__upgrades {
+    grid-template-columns: 1fr;
+  }
+
   .chronicles__columns {
     grid-template-columns: 1fr;
   }

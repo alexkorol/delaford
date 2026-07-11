@@ -2,7 +2,13 @@ import UI from '#shared/ui.js';
 import Query from '#server/core/data/query.js';
 
 const openScreenStrategy = {
-  actionIds: ['player:screen:bank', 'player:screen:npc:trade', 'player:screen:shop-display'],
+  actionIds: [
+    'player:screen:bank',
+    'player:screen:npc:trade',
+    'player:screen:shop-display',
+    'player:shop-display:buy',
+    'player:shop-display:appraise',
+  ],
   description: 'Open banking or trading panes from world interactions.',
   canExecute: ({ menu, foregroundData, npcs, groundItems }) => (
     menu.isFromGameCanvas()
@@ -44,13 +50,14 @@ const openScreenStrategy = {
       });
     }
 
-    if (action.actionId === 'player:screen:shop-display' && Array.isArray(groundItems)) {
+    if (Array.isArray(groundItems) && (action.actionId.startsWith('player:shop-display:')
+      || action.actionId === 'player:screen:shop-display')) {
       groundItems.filter(item => item.shopDisplay && item.shopNpcId).forEach((item) => {
         const itemData = Query.getItemData(item.id) || item;
         const shop = menu.shops.find(entry => entry.npcId === item.shopNpcId);
         const color = UI.getContextSubjectColor('item');
         results.push({
-          label: `Browse <span style='color:${color}'>${itemData.name || item.id}</span>${shop ? ` at ${shop.name}` : ''}`,
+          label: `${action.name} <span style='color:${color}'>${itemData.name || item.id}</span>${shop ? ` · ${shop.name}` : ''}`,
           action,
           type: 'shop-display',
           id: item.shopNpcId,

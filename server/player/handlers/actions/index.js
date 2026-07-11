@@ -74,6 +74,31 @@ const getPlayerScene = player => (
   world.getSceneForPlayer(player) || world.getDefaultTown()
 );
 
+const getReachableShopDisplay = (player, reference = {}) => {
+  const scene = player ? getPlayerScene(player) : null;
+  const display = scene?.items?.find(item => (
+    item.shopDisplay
+    && item.shopNpcId === reference.id
+    && item.id === reference.shopItemId
+  ));
+  if (!player || !display) return null;
+  return Math.max(Math.abs(player.x - display.x), Math.abs(player.y - display.y)) <= 1
+    ? display
+    : null;
+};
+
+const refreshShopPurchase = (shop, response) => {
+  if (!Shop.successfulSale(response)) return false;
+  const player = world.players[shop.playerIndex];
+  world.shops[shop.shopIndex].inventory = response.shopItems;
+  player.inventory.slots = response.inventory;
+  Socket.emit('core:refresh:inventory', {
+    player: { socket_id: player.socket_id },
+    data: response.inventory,
+  });
+  return true;
+};
+
 const getSceneItems = (scene) => {
   if (!scene) {
     return world.items;
@@ -1018,19 +1043,8 @@ const actionEvents = {
     const player = getPlayerFromPayload(data);
     const shopNpcId = data.item?.id;
     const shopItemId = data.item?.shopItemId;
-    const scene = player ? getPlayerScene(player) : null;
-    const display = scene?.items?.find(item => (
-      item.shopDisplay
-      && item.shopNpcId === shopNpcId
-      && item.id === shopItemId
-    ));
+    const display = getReachableShopDisplay(player, { id: shopNpcId, shopItemId });
     if (!player || !display) return;
-
-    const withinReach = Math.max(
-      Math.abs(player.x - display.x),
-      Math.abs(player.y - display.y),
-    ) <= 1;
-    if (!withinReach) return;
 
     const shop = world.shops.find(entry => entry.npcId === shopNpcId);
     if (!shop) return;
@@ -1041,6 +1055,35 @@ const actionEvents = {
       screen: 'shop',
       payload: shop,
     });
+  },
+
+  'player:shop-display:buy': (data = {}) => {
+    const player = getPlayerFromPayload(data);
+    const reference = data.item || {};
+    if (!getReachableShopDisplay(player, reference)) return;
+    try {
+      const shop = new Shop(reference.id, player.uuid, reference.shopItemId, 'buy', 1);
+      refreshShopPurchase(shop, shop.buy());
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+    }
+  },
+
+  'player:shop-display:appraise': (data = {}) => {
+    const player = getPlayerFromPayload(data);
+    const reference = data.item || {};
+    if (!getReachableShopDisplay(player, reference)) return;
+    try {
+      new Shop(reference.id, player.uuid, reference.shopItemId, 'value', 1).value();
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+    }
   },
 
   'player:screen:npc:trade': (data) => {

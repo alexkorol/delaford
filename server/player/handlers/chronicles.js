@@ -24,6 +24,20 @@ export default {
     return sendChronicleState(ws, { createdScionId: result.scionId });
   },
 
+  'chronicles:house:claim-daily': ({ data }, ws) => {
+    const accountId = ws.chronicleAuth?.accountId;
+    const result = chroniclesRepository.claimDailyGold(accountId, data?.houseId);
+    if (!result.ok) return sendError(ws, result.reason);
+    return sendChronicleState(ws, { houseReward: { amount: result.amount, reason: 'daily stipend' } });
+  },
+
+  'chronicles:house:upgrade': ({ data }, ws) => {
+    const accountId = ws.chronicleAuth?.accountId;
+    const result = chroniclesRepository.upgradeHouse(accountId, data?.houseId, data?.upgradeId);
+    if (!result.ok) return sendError(ws, result.reason);
+    return sendChronicleState(ws);
+  },
+
   'chronicles:scion:set-out': async ({ data }, ws) => {
     const result = await beginScionSession(ws, data?.scionId);
     if (!result.ok) sendError(ws, result.reason);

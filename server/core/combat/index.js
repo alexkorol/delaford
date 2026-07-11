@@ -327,6 +327,10 @@ const applyHitToMonster = (player, monster, skill, now) => {
     notifyTutorial(player, 'slay');
   }
 
+  const weaponStyle = Object.entries(player.combat?.attack || {})
+    .filter(([, value]) => Number(value) > 0)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))[0]?.[0] || 'slash';
+
   return {
     attackerId: player.uuid,
     attackerName: player.username || 'Adventurer',
@@ -335,6 +339,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
     targetType: 'monster',
     skillId: skill.id,
     skillName: skill.label || skill.name || skill.id,
+    attackStyle: skill.behaviour?.area ? 'sweep' : weaponStyle,
     amount: result.amount !== undefined ? result.amount : damage,
     health: {
       current: monster.stats.resources.health.current,

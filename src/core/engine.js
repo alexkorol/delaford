@@ -4,7 +4,9 @@ class Engine {
   constructor(game) {
     this.game = game;
 
-    this.maxFps = 20;
+    // A 150ms player step only received three frames at 20fps, which made the
+    // locally-predicted actor read as tile-locked beside smoothly moving AI.
+    this.maxFps = 60;
     this.fps = {
       current: 0,
       accumulator: 0,
@@ -128,6 +130,11 @@ class Engine {
 
     // Draw the player
     this.game.map.drawPlayer();
+
+    // Telegraph melee reach and area before floating damage text obscures it.
+    if (typeof this.game.map.drawAttackEffects === 'function') {
+      this.game.map.drawAttackEffects();
+    }
 
     // Draw in-flight projectiles above actors
     if (typeof this.game.map.drawProjectiles === 'function') {

@@ -10,6 +10,18 @@ const DEFAULT_DB_FILE = path.resolve(here, '..', '..', 'data', 'verdigris.sqlite
 const isoNow = () => new Date().toISOString();
 const clone = value => JSON.parse(JSON.stringify(value));
 
+export const HOUSE_UPGRADES = Object.freeze({
+  hall: { label: 'Great Hall', baseCost: 250, maxLevel: 5 },
+  forge: { label: 'House Forge', baseCost: 400, maxLevel: 3 },
+  archives: { label: 'Relic Archives', baseCost: 300, maxLevel: 3 },
+});
+
+const normaliseUpgrades = value => ({
+  hall: Math.max(0, Math.floor(Number(value?.hall) || 0)),
+  forge: Math.max(0, Math.floor(Number(value?.forge) || 0)),
+  archives: Math.max(0, Math.floor(Number(value?.archives) || 0)),
+});
+
 const parseJson = (value, fallback) => {
   try {
     const parsed = JSON.parse(value);
@@ -130,6 +142,16 @@ export class ChroniclesRepository {
         FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
       );
     `);
+    const houseColumns = new Set(this.db.pragma('table_info(chronicle_houses)').map(column => column.name));
+    if (!houseColumns.has('treasury')) {
+      this.db.exec('ALTER TABLE chronicle_houses ADD COLUMN treasury INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!houseColumns.has('upgrades_json')) {
+      this.db.exec("ALTER TABLE chronicle_houses ADD COLUMN upgrades_json TEXT NOT NULL DEFAULT '{}'");
+    }
+    if (!houseColumns.has('last_daily_claim')) {
+      this.db.exec('ALTER TABLE chronicle_houses ADD COLUMN last_daily_claim TEXT');
+    }
   }
 
   close() {
@@ -163,11 +185,26 @@ export class ChroniclesRepository {
     const relicNames = this.db.prepare(`
       SELECT item_json FROM chronicle_relics WHERE source_scion_id = ? ORDER BY created_at ASC
     `);
+    const heirloomCount = this.db.prepare(`
+      SELECT COUNT(*) AS count FROM chronicle_relics WHERE house_id = ?
+    `);
 
-    const houses = houseRows.map(row => ({
+    const houses = houseRows.map((row) => {
+      const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+      return {
       id: row.id,
       name: row.name,
       renown: row.renown,
+      treasury: Math.max(0, Number(row.treasury) || 0),
+      upgrades,
+      dailyClaimAvailable: row.last_daily_claim !== isoNow().slice(0, 10),
+      dailyGold: 100 + (upgrades.hall * 25),
+      craftingBases: [
+        ...(upgrades.forge >= 1 ? ['House weapon blanks'] : []),
+        ...(upgrades.forge >= 2 ? ['House armour blanks'] : []),
+        ...(upgrades.forge >= 3 ? ['Named heirloom bases'] : []),
+      ],
+      heirloomCount: heirloomCount.get(row.id).count,
       bestDepth: row.best_depth,
       foundedAt: row.founded_at,
       scions: livingQuery.all(row.id).map(rowToScion),
@@ -178,7 +215,8 @@ export class ChroniclesRepository {
           .filter(Boolean)
           .map(item => item.displayName || item.name || item.baseName || item.id),
       })),
-    }));
+      };
+    });
 
     const activeHouseId = houses.some(house => house.id === account.active_house_id)
       ? account.active_house_id
@@ -190,6 +228,7 @@ export class ChroniclesRepository {
       bestDepth: account.best_depth,
       runCount: account.run_count,
       leaderboard: this.getLeaderboard(),
+      houseUpgrades: HOUSE_UPGRADES,
     };
   }
 
@@ -207,15 +246,61 @@ export class ChroniclesRepository {
     const value = Math.max(1, Math.floor(Number(depth) || 1));
     const scion = this.getLivingScion(accountId, scionId);
     if (!scion || scion.houseId !== houseId) return null;
+    const previousDepth = Math.max(0, Number(scion.bestDepth) || 0);
+    const treasuryGain = Math.max(0, value - previousDepth) * 25;
     this.db.transaction(() => {
       this.db.prepare('UPDATE chronicle_scions SET best_depth = MAX(best_depth, ?) WHERE id = ?')
         .run(value, scionId);
       this.db.prepare('UPDATE chronicle_houses SET best_depth = MAX(best_depth, ?) WHERE id = ?')
         .run(value, houseId);
+      if (treasuryGain > 0) {
+        this.db.prepare('UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ?')
+          .run(treasuryGain, houseId);
+      }
       this.db.prepare('UPDATE chronicle_accounts SET best_depth = MAX(best_depth, ?) WHERE account_id = ?')
         .run(value, accountId);
     })();
     return value;
+  }
+
+  claimDailyGold(accountId, houseId) {
+    const today = isoNow().slice(0, 10);
+    const row = this.db.prepare(`
+      SELECT * FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    if (row.last_daily_claim === today) {
+      return { ok: false, reason: 'Today\'s House stipend has already been claimed.' };
+    }
+    const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+    const amount = 100 + (upgrades.hall * 25);
+    this.db.prepare(`
+      UPDATE chronicle_houses
+      SET treasury = treasury + ?, last_daily_claim = ?
+      WHERE id = ? AND account_id = ?
+    `).run(amount, today, houseId, accountId);
+    return { ok: true, amount, chronicle: this.getChronicle(accountId) };
+  }
+
+  upgradeHouse(accountId, houseId, upgradeId) {
+    const definition = HOUSE_UPGRADES[upgradeId];
+    if (!definition) return { ok: false, reason: 'Unknown House improvement.' };
+    const row = this.db.prepare(`
+      SELECT * FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+    const current = upgrades[upgradeId];
+    if (current >= definition.maxLevel) return { ok: false, reason: `${definition.label} is complete.` };
+    const cost = definition.baseCost * (current + 1);
+    if ((Number(row.treasury) || 0) < cost) return { ok: false, reason: `The House needs ${cost} gold.` };
+    upgrades[upgradeId] = current + 1;
+    this.db.prepare(`
+      UPDATE chronicle_houses
+      SET treasury = treasury - ?, upgrades_json = ?
+      WHERE id = ? AND account_id = ?
+    `).run(cost, JSON.stringify(upgrades), houseId, accountId);
+    return { ok: true, cost, chronicle: this.getChronicle(accountId) };
   }
 
   foundHouse(accountId, name) {

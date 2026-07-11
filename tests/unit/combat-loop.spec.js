@@ -262,7 +262,11 @@ describe('tryUseSkill', () => {
     expect(monster.takeDamage).toHaveBeenCalled();
     expect(Socket.broadcast).toHaveBeenCalledWith(
       'combat:hit',
-      expect.objectContaining({ targetId: monster.uuid, targetType: 'monster' }),
+      expect.objectContaining({
+        targetId: monster.uuid,
+        targetType: 'monster',
+        attackStyle: 'slash',
+      }),
       expect.anything(),
     );
   });
