@@ -157,6 +157,28 @@
 - Next target: Tier 2 depth-based loot proof — make deeper-floor rewards
   visibly and measurably stronger through the live drop pipeline.
 
+## 2026-07-10 — Make deeper treasure visibly stronger
+
+- Goal: prove that endless-depth progression changes the guaranteed treasure
+  through the live generated-floor loot pipeline.
+- Failing scenario: `depth-loot` reached both treasure rooms successfully but
+  measured item level 10 on floor 1 and the same item level 10 on floor 5.
+- Scenario added: a scion reads the guaranteed floor-1 Vesselforge treasure,
+  descends through real stair transitions to floor 5, and compares the deep
+  treasure's authoritative vessel item level.
+- Implementation: guaranteed instance treasure now gains 10 item levels per
+  floor after the first, capped at 80. Existing depth-based base pools and
+  monster-drop scaling remain unchanged.
+- Evidence: `npm run playtest` — 18/18 scenarios; `npm run test:unit` — 77
+  files and 517 tests; `npm run lint` — exit 0; `npm run smoke:browser` — 1/1.
+  The live comparison measured item level 10 → 50, and all three required
+  balance specs passed.
+- Critic score: 80/100 in the final sample. First combat was 0.58s, first drop
+  0.74s, 6 choices, 0 deaths, and depth 4; the variable level-5 TTK sample was
+  1.03s versus 0.62s at level 1 and missed that scorer point.
+- Next target: Tier 3 UI clarity — replace the hard-coded quest pane with the
+  current server-authored Aldwyn objective and reward state.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -187,3 +209,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T03:44:12.440Z | session-arc | 80 | 0.58 | 0.74 | 0.64 | 1.26 | 6 | 0 | 4
 
 2026-07-11T03:54:22.594Z | session-arc | 100 | 0.58 | 0.73 | 0.63 | 0.32 | 6 | 0 | 4
+
+2026-07-11T04:00:51.605Z | session-arc | 80 | 0.58 | 0.74 | 0.62 | 1.03 | 6 | 0 | 4

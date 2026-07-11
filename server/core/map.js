@@ -278,6 +278,11 @@ const gearPoolForDepth = (depth) => {
   return eligible.length ? eligible[eligible.length - 1].gear : INSTANCE_LOOT_TIERS[0].gear;
 };
 
+export const instanceItemLevelForDepth = depth => Math.min(
+  80,
+  10 + ((Math.max(1, Math.floor(Number(depth) || 1)) - 1) * 10),
+);
+
 class Map {
   constructor(level) {
     // Getters & Setters
@@ -1015,7 +1020,10 @@ class Map {
 
         const gearPool = gearPoolForDepth(depth);
         const gearId = gearPool[Math.floor(rng() * gearPool.length)];
-        const gear = ItemFactory.createById(gearId, { rng });
+        const gear = ItemFactory.createById(gearId, {
+          rng,
+          itemLevel: instanceItemLevelForDepth(depth),
+        });
         if (gear && treasureSpots.length > 1) {
           instanceItems.push(ItemFactory.toWorldInstance(gear, treasureSpots[1]));
         }

@@ -61,6 +61,17 @@ describe('instance treasure generation', () => {
     });
   });
 
+  it('raises guaranteed treasure item level with endless depth', async () => {
+    const shallow = await GameMap.generateInstance({ seed: 1717, template: 'dungeon', depth: 1 });
+    const deep = await GameMap.generateInstance({ seed: 1717, template: 'dungeon', depth: 5 });
+    const shallowGear = shallow.items.find(item => item.id !== 'coins');
+    const deepGear = deep.items.find(item => item.id !== 'coins');
+
+    expect(shallowGear.vessel.item.ilvl).toBe(10);
+    expect(deepGear.vessel.item.ilvl).toBe(50);
+    expect(deepGear.vessel.item.ilvl - shallowGear.vessel.item.ilvl).toBeGreaterThanOrEqual(30);
+  });
+
   it('guards the stairs down with an elite boss', async () => {
     const floor = await GameMap.generateInstance({ seed: 1717, template: 'tomb' });
     const { metadata, monsters } = floor;
