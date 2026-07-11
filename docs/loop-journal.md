@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Tolerate stale Chronicle player snapshots
+
+- Goal: prove renamed ids and malformed old snapshot fields cannot prevent a
+  Chronicle scion from loading.
+- Failing proof: a non-object `inventory` reached `.map`, and missing/null skill
+  entries reached the Player constructor's level reconciliation unchecked.
+- Implementation: the loader rebuilds the six canonical skills from safe XP,
+  defaults malformed bank/friend data, discards malformed inventory entries,
+  and preserves unknown-but-structured item ids as inert possessions with no
+  actions. Existing wear and passive-tree validators clear renamed ids.
+- Regression proof: a fuzzed old snapshot with renamed skills, inventory,
+  wear, and tree ids constructs a real Player; focused specs also prove valid
+  inventory siblings survive. The full suite initially caught an overly
+  destructive unknown-item policy, so opaque legacy records are retained.
+- Evidence: focused stale/schema coverage — 5 files and 32 tests; `npm run
+  playtest` — 18/18 scenarios with session critic 100/100; `npm run test:unit`
+  — 80 files and 528 tests; `npm run lint` — exit 0.
+- Next target: verify the July 4 drag-to-equip and floating vessel tooltip
+  claims against the live client and close any remaining proof gap.
+
 ## 2026-07-11 — Contain malformed actions and instance broadcasts
 
 - Goal: exercise hostile context-menu input and audit broadcasts for state
@@ -319,3 +339,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T04:26:02.492Z | session-arc | 100 | 0.58 | 4.72 | 0.97 | 0.31 | 6 | 1 | 4
 
 2026-07-11T07:00:34.046Z | session-arc | 80 | 0.6 | 16.91 | 13.69 | 0.63 | 6 | 1 | 4
+
+2026-07-11T07:04:26.529Z | session-arc | 100 | 0.59 | 6.03 | 2.82 | 0.31 | 6 | 1 | 4

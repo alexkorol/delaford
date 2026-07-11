@@ -5,13 +5,16 @@ import ItemFactory from '#server/core/items/factory.js';
 import { packInventoryItems, positionFromSlot } from '#shared/inventory-footprints.js';
 
 const hydrateInventoryItem = (item = {}) => {
-  if (!item || !item.id) {
-    return item;
+  if (!item || typeof item !== 'object' || typeof item.id !== 'string') {
+    return null;
   }
 
   const baseItem = Query.getItemData(item.id);
   if (!baseItem) {
-    return item;
+    // Persisted inventories can outlive item catalogue renames. Preserve the
+    // opaque record so old saves do not silently lose possessions, but strip
+    // actions that can no longer be validated against a current definition.
+    return { ...item, actions: [] };
   }
 
   const equipSlot = item.equipSlot
@@ -32,7 +35,8 @@ const hydrateInventoryItem = (item = {}) => {
 
 export default class Inventory {
   constructor(slots, socketId, playerUuid = null) {
-    this.slots = packInventoryItems((slots || []).map(hydrateInventoryItem));
+    const persistedSlots = Array.isArray(slots) ? slots : [];
+    this.slots = packInventoryItems(persistedSlots.map(hydrateInventoryItem).filter(Boolean));
     this.socketId = socketId;
     this.playerUuid = playerUuid;
   }

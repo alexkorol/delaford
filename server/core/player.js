@@ -18,6 +18,19 @@ import createPlayerStatsManager, {
 import Wear from '#server/core/utilities/wear.js';
 import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
+const PLAYER_SKILL_IDS = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
+
+export const normalisePlayerSkills = (skills) => {
+  const source = skills && typeof skills === 'object' && !Array.isArray(skills) ? skills : {};
+  return Object.fromEntries(PLAYER_SKILL_IDS.map((skillId) => {
+    const persisted = source[skillId] && typeof source[skillId] === 'object'
+      ? source[skillId]
+      : {};
+    const exp = Number.isFinite(persisted.exp) ? Math.max(0, persisted.exp) : 0;
+    return [skillId, { ...persisted, exp, level: UI.getLevel(exp) }];
+  }));
+};
+
 class Player {
   constructor(data, token, socketId) {
     this.movement = createPlayerMovementHandler(this);
@@ -30,14 +43,16 @@ class Player {
     this.x = data.x;
     this.y = data.y;
     this.level = data.level;
-    this.skills = data.skills;
+    this.skills = normalisePlayerSkills(data.skills);
     this.quests = data.quests && typeof data.quests === 'object' ? data.quests : {};
     this.questPoints = Math.max(0, Math.min(23, Math.floor(Number(data.questPoints) || 0)));
 
     this.buildInitialStats(data);
 
     // A player's bank
-    this.bank = data.bank;
+    this.bank = Array.isArray(data.bank)
+      ? data.bank.filter(item => item && typeof item === 'object' && item.id)
+      : [];
 
     // Worn items statistics
     this.combat = {
@@ -68,7 +83,7 @@ class Player {
     this.sceneId = data.sceneId || world.defaultTownId;
 
     // Tabs
-    this.friend_list = data.friend_list;
+    this.friend_list = Array.isArray(data.friend_list) ? data.friend_list : [];
     this.wear = Player.constructWear(data.wear);
     const restoredCombat = Wear.updateCombat(this);
     this.combat.attack = restoredCombat.attack;
@@ -156,8 +171,7 @@ class Player {
     });
 
     // Fix Skill Levels according to XP on Player constructor
-    const skillsName = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
-    skillsName.forEach((skillName) => {
+    PLAYER_SKILL_IDS.forEach((skillName) => {
       const skill = this.skills[skillName];
       skill.exp = skill.exp > 0 ? skill.exp : 0;
       skill.level = UI.getLevel(skill.exp);
