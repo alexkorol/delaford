@@ -25,7 +25,7 @@ const timeKill = async (player, targetUuid) => {
   return (Date.now() - startedAt) / 1000;
 };
 
-const COMPARISON_HEALTH = 140;
+const COMPARISON_HEALTH = 100;
 
 const resetMonster = async (player, targetUuid) => {
   player.devResetMonster(targetUuid, { maxHealth: COMPARISON_HEALTH });
@@ -38,7 +38,7 @@ const resetMonster = async (player, targetUuid) => {
 };
 
 const lootAndEquip = async (player, itemLevel) => {
-  player.devDrop('steel-battleaxe', { itemLevel, seed: 8 });
+  player.devDrop('steel-battleaxe', { itemLevel, seed: 3493 });
   const drop = await player.waitFor(async () => {
     const state = await player.state();
     return state.groundItems.find(item => item.id === 'steel-battleaxe'

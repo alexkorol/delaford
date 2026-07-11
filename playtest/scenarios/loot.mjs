@@ -15,10 +15,17 @@ export default async function loot({ connect, assert }) {
       const s = await p.state();
       return s.groundItems.find(item => item.id === 'bronze-sword') || false;
     }, { label: 'equipment drop' });
-    const menu = await p.rightClick(sword.x, sword.y);
-    assert(menu.some(entry => entry.action?.actionId === 'player:take'), 'equipment exposes the real Take action');
     p.devTeleport(sword.x, sword.y + 1);
     await p.waitFor(async () => (await p.state()).y === sword.y + 1, { label: 'equipment pickup approach' });
+    let menu = await p.rightClick(sword.x, sword.y);
+    let hasTake = menu.some(entry => entry.action?.actionId === 'player:take');
+    if (!hasTake) {
+      menu = await p.rightClick(sword.x, sword.y);
+      hasTake = menu.some(entry => entry.action?.actionId === 'player:take');
+    }
+    assert(hasTake, `equipment exposes the real Take action (${menu
+      .map(entry => `${entry.action?.actionId || entry.action?.name}:${entry.label}`)
+      .join(' | ') || 'empty menu'})`);
     await p.takeItem(sword);
     assert((await p.state()).inventory.some(item => item.id === 'bronze-sword'), 'taken equipment enters inventory');
 

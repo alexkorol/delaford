@@ -84,6 +84,28 @@
 - Next target: Tier 1 build-divergence scenario comparing STR melee and INT
   skill combat profiles at equal level and point spend.
 
+## 2026-07-10 — Prove equal-point builds diverge
+
+- Goal: compare equal-level, equal-spend STR and INT scions against the same
+  pack and prove distinct melee and mana-skill profiles.
+- Scenario result: the new scenario passed before production changes, proving
+  this item was already implemented but lacked a goal-harness contract. Two
+  level-20 party members spend exactly 20 points down opposite tree axes and
+  strike one exact reset monster.
+- Evidence: the full run measured STR 83 vs 20 and INT 83 vs 11; STR melee won
+  37 vs 9 damage while INT Frost Nova won 40 vs 10. `npm run playtest` passed
+  15/15, `npm run test:unit` passed 74 files and 506 tests, and `npm run lint`
+  exited 0.
+- Harness hardening: comparison gear uses a stronger deterministic vessel seed;
+  combat measurements heal through unrelated focus fire; loot approaches its
+  item before requesting the server-authored context menu. Required margins
+  were preserved.
+- Critic score: 100/100. Session sample: first combat 0.59s, first drop 0.76s,
+  6 meaningful choices, 0 deaths, depth 4.
+- Ladder audit: Tier 1 death stakes are already proven by `chronicles` (mortal
+  fall, crypt provenance, same-House successor recovery), so the next
+  unfinished target is Tier 2's in-world first-session goal chain.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -96,3 +118,11 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T02:59:58.659Z | session-arc | 100 | 0.59 | 0.75 | 0.62 | 0.01 | 6 | 0 | 4
 
 2026-07-11T03:09:38.905Z | session-arc | 100 | 0.58 | 0.76 | 0.62 | 0.01 | 6 | 0 | 4
+
+2026-07-11T03:24:56.337Z | session-arc | 100 | 0.58 | 0.75 | 0.63 | 0.01 | 6 | 0 | 4
+
+2026-07-11T03:26:06.718Z | session-arc | 80 | 0.58 | 0.74 | 0.62 | 0.93 | 6 | 0 | 4
+
+2026-07-11T03:27:43.689Z | session-arc | 100 | 0.57 | 0.74 | 1.24 | 0.32 | 6 | 0 | 4
+
+2026-07-11T03:30:51.801Z | session-arc | 100 | 0.59 | 0.76 | 0.62 | 0.02 | 6 | 0 | 4

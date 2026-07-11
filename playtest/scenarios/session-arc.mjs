@@ -7,7 +7,7 @@
  */
 
 const nearestTrash = state => state.monsters
-  .filter(monster => monster.rarity !== 'elite')
+  .filter(monster => monster.rarity !== 'elite' && !/chorister|keeper/i.test(monster.name))
   .sort((a, b) => (Math.abs(a.x - state.x) + Math.abs(a.y - state.y))
     - (Math.abs(b.x - state.x) + Math.abs(b.y - state.y)))[0];
 

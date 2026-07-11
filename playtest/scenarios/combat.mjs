@@ -31,6 +31,9 @@ export default async function combat({ connect, assert }) {
       if (s.lifecycle !== 'alive') {
         return 'died';
       }
+      // This scenario measures outgoing pack/healer balance. Prevent random
+      // incoming focus fire from ending that measurement between samples.
+      p.devHeal();
       if (s.monsters.length < aliveBefore) {
         return 'killed';
       }
