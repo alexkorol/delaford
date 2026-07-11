@@ -13,6 +13,7 @@ import talkStrategy from './talk.js';
 import tradeActionStrategy from './trade-action.js';
 import unequipStrategy from './unequip.js';
 import walkHereStrategy from './walk-here.js';
+import vesselforgeBrandStrategy from './vesselforge-brand.js';
 
 const strategies = [
   cancelStrategy,
@@ -30,6 +31,7 @@ const strategies = [
   openScreenStrategy,
   bankActionStrategy,
   tradeActionStrategy,
+  vesselforgeBrandStrategy,
 ];
 
 const registry = new Map();

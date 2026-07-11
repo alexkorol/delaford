@@ -138,6 +138,10 @@ test.describe('browser session resilience', () => {
 
   test('renders WIZARD item art, shows the vessel tooltip, and equips through the real server', async ({ page }) => {
     await loginGuest(page);
+    await page.evaluate(() => {
+      window.ws.send(JSON.stringify({ event: 'party:returnToTown', data: {} }));
+    });
+    await expect(page.locator('.world-minimap__readout')).toContainText('Delaford');
     await page.keyboard.press('i');
     await expect(page.locator('.inventory-pane')).toBeVisible();
 
@@ -150,7 +154,7 @@ test.describe('browser session resilience', () => {
     await page.evaluate(() => {
       window.ws.send(JSON.stringify({
         event: 'dev:give',
-        data: { itemId: 'bronze-pike', qty: 1 },
+        data: { itemId: 'bronze-pike', qty: 1, seed: 1, itemLevel: 20 },
       }));
     });
 
@@ -160,6 +164,15 @@ test.describe('browser session resilience', () => {
     await pike.hover();
     await expect(page.locator('.item-tooltip')).toContainText('Vessel');
     await expect(page.locator('.item-tooltip')).toContainText('Bronze');
+    const brandLinesBefore = await page.locator('.item-tooltip__line--brand').count();
+
+    await pike.click({ button: 'right' });
+    const addBrand = page.getByText(/Add a random brand.*100 coins/);
+    await expect(addBrand).toBeVisible();
+    await addBrand.click();
+    await pike.hover();
+    await expect.poll(() => page.locator('.item-tooltip__line--brand').count())
+      .toBe(brandLinesBefore + 1);
 
     const weaponSlot = page.locator('[data-equipment-slot="right_hand"]');
     const pikeBox = await pike.boundingBox();

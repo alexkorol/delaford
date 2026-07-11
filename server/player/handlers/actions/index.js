@@ -31,6 +31,9 @@ import { notifyTutorial } from '#server/core/tutorial.js';
 import { commitGroundItemPickup, refreshInventory } from '#server/core/items/pickup.js';
 import { MAIN_TOWN_FOUNTAIN } from '#server/core/town-amenities.js';
 import { talkToAldwyn } from '#server/core/first-goal.js';
+import { applyVesselCombatStats, getForge, vesselTooltip } from '#server/core/items/vesselforge/adapter.js';
+import { BRAND_COST } from '#server/core/context-menu/strategies/vesselforge-brand.js';
+import playerPersistence from '#server/core/services/player-persistence.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -231,6 +234,30 @@ const refreshEquipmentStats = (player) => {
   if (typeof player.refreshDerivedStats === 'function') {
     player.refreshDerivedStats();
   }
+};
+
+const coinTotal = player => player.inventory.slots
+  .filter(item => item?.id === 'coins')
+  .reduce((total, item) => total + Math.max(0, Number(item.qty) || 0), 0);
+
+const spendCoins = (player, amount) => {
+  let remaining = amount;
+  player.inventory.slots.forEach((item) => {
+    if (remaining <= 0 || item?.id !== 'coins') return;
+    const available = Math.max(0, Number(item.qty) || 0);
+    const spent = Math.min(available, remaining);
+    item.qty = available - spent;
+    remaining -= spent;
+  });
+  player.inventory.slots = player.inventory.slots
+    .filter(item => item?.id !== 'coins' || item.qty > 0);
+};
+
+const sendPlayerMessage = (player, text) => {
+  Socket.emit('game:send:message', {
+    player: { socket_id: player.socket_id },
+    text,
+  });
 };
 
 const dropEquippedItem = (player, slotId) => {
@@ -655,6 +682,62 @@ const actionEvents = {
       },
     };
     pipe.player.unequipItem(newData);
+  },
+
+  'player:vesselforge:add-brand': (incoming) => {
+    const player = getPlayerFromPayload(incoming);
+    const payload = incoming?.item ? incoming : (incoming?.data || {});
+    const reference = payload.item || {};
+    const scene = player && getPlayerScene(player);
+    if (!player || scene?.id !== world.defaultTownId) {
+      if (player) sendPlayerMessage(player, 'Brands can only be added at the Delaford forge.');
+      return;
+    }
+
+    const item = player.inventory?.slots?.find(entry => (
+      entry
+      && reference.uuid
+      && entry.uuid === reference.uuid
+      && (!reference.id || entry.id === reference.id)
+    ));
+    if (!item?.vessel?.item) {
+      sendPlayerMessage(player, 'That item cannot hold brands.');
+      return;
+    }
+    if (coinTotal(player) < BRAND_COST) {
+      sendPlayerMessage(player, `Adding a brand costs ${BRAND_COST} coins.`);
+      return;
+    }
+
+    const oldVessel = item.vessel;
+    const result = getForge().sear(oldVessel.item);
+    if (!result.item) {
+      sendPlayerMessage(player, 'That item cannot take another brand.');
+      return;
+    }
+
+    const baseItem = Query.getItemData(item.id);
+    const oldProjected = applyVesselCombatStats(baseItem?.stats || {}, oldVessel);
+    const newVessel = {
+      ...oldVessel,
+      item: result.item,
+      lines: vesselTooltip(result.item),
+    };
+    const newProjected = applyVesselCombatStats(baseItem?.stats || {}, newVessel);
+    const currentAttack = item.stats?.attack || {};
+    item.stats = {
+      ...(item.stats || {}),
+      attack: Object.fromEntries(['stab', 'slash', 'crush', 'range'].map(style => [
+        style,
+        (currentAttack[style] || 0)
+          + ((newProjected.attack?.[style] || 0) - (oldProjected.attack?.[style] || 0)),
+      ])),
+    };
+    item.vessel = newVessel;
+    spendCoins(player, BRAND_COST);
+    playerPersistence.markDirty(player);
+    refreshInventory(player);
+    sendPlayerMessage(player, result.event?.text?.replace(/^Seared:/, 'Brand added:') || 'Brand added.');
   },
 
   /**

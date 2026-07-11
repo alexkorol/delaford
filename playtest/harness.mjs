@@ -305,6 +305,33 @@ export class HeadlessPlayer {
     return menuPromise;
   }
 
+  async inventoryMenu(item, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const menuPromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('inventory context menu build timed out')), timeoutMs);
+      const onMessage = (raw) => {
+        try {
+          const message = JSON.parse(raw.toString());
+          if (message.event === 'game:context-menu:items') {
+            clearTimeout(timer);
+            this.ws.off('message', onMessage);
+            resolve(message.data.data || []);
+          }
+        } catch (error) { /* ignore */ }
+      };
+      this.ws.on('message', onMessage);
+    });
+
+    this.emit('player:context-menu:build', {
+      miscData: {
+        clickedOn: { 0: 'inventory-item', 1: 'inventorySlot' },
+        slot: item.slot,
+      },
+      tile: { x: 0, y: 0 },
+      player: { socket_id: this.player.socket_id },
+    });
+    return menuPromise;
+  }
+
   /** Choose a context-menu entry (as returned by rightClick). */
   choose(menuItem, tile = {}) {
     this.emit('player:context-menu:action', {
@@ -389,8 +416,8 @@ export class HeadlessPlayer {
     this.emit('dev:teleport', { x, y, sceneId });
   }
 
-  devGive(itemId, qty = 1) {
-    this.emit('dev:give', { itemId, qty });
+  devGive(itemId, qty = 1, options = {}) {
+    this.emit('dev:give', { itemId, qty, ...options });
   }
 
   devDrop(itemId, options = {}) {

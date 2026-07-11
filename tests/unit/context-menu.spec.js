@@ -144,6 +144,34 @@ describe('ContextMenu strategies', () => {
     expect(dropAction.type).toBe('item');
   });
 
+  it('surfaces the town brand service for vessel items with capacity', async () => {
+    player.inventory.slots = [{
+      slot: 0,
+      id: 'bronze-pike',
+      name: 'Bronze Pike',
+      uuid: 'vessel-pike',
+      vessel: {
+        item: {
+          vessel: 4,
+          patience: 3,
+          brands: [],
+          bonds: [],
+          trophies: [],
+          scars: 0,
+        },
+      },
+    }];
+
+    const menu = new ContextMenu(player, tile, {
+      clickedOn: { 0: 'inventorySlot' },
+      slot: 0,
+    });
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:vesselforge:add-brand'))
+      .toMatchObject({ label: 'Add a random brand (100 coins)', uuid: 'vessel-pike' });
+  });
+
   it('produces take options for ground items at the clicked location', async () => {
     world.items = [{
       id: 2,

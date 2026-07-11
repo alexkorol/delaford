@@ -60,6 +60,15 @@ export default [
     weight: 1,
   },
   {
+    name: 'Add brand',
+    actionId: 'player:vesselforge:add-brand',
+    context: ['inventorySlot'],
+    disallowWhile: ['bank', 'shop'],
+    allow: ['item'],
+    nearby: false,
+    weight: 2,
+  },
+  {
     name: 'Unequip',
     actionId: 'item:unequip',
     context: ['wearSlot'],

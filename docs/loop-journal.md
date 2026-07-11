@@ -1,5 +1,28 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Surface one real Vesselforge choice in town
+
+- Goal: expose the highest-value missing Vesselforge interaction without
+  changing the existing crafting engine.
+- Implementation: in Delaford, right-clicking a vessel item with patience and
+  an open slot now offers `Add a random brand (100 coins)`. The server validates
+  town location, exact owned item UUID, capacity, patience, and funds; it then
+  calls the existing `sear` operation, spends exactly 100 coins, refreshes the
+  vessel tooltip/combat projection, and marks the scion dirty for persistence.
+  Out-of-town and invalid direct requests fail without mutation.
+- Harness/browser support: the harness can now build the real server-authored
+  inventory context menu, and deterministic dev grants accept seed/item level.
+  The new `vesselforge-brand` scenario proves discovery, stated cost, mutation,
+  payment, and refreshed tooltip lines. Browser resilience returns from the
+  quick-start instance to town, adds a brand through the visible context menu,
+  sees the new tooltip line, then drags the crafted pike into main hand.
+- Evidence: focused Vesselforge/context coverage — 4 files and 47 tests; `npm
+  run playtest` — 19/19 scenarios, session critic 100/100; `npm run test:unit`
+  — 81 files and 531 tests; `npm run lint` — exit 0; `npm run smoke:browser`
+  — 2/2; browser resilience — 3/3.
+- Next target: audit encounter and descent tracks against current rare-tier,
+  biome-boss, and depth-reward code before adding anything else.
+
 ## 2026-07-11 — Verify July 4 inventory remainders live
 
 - Goal: check the July 4 fix-plan's drag-to-equip and floating tooltip claims
@@ -361,3 +384,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T07:00:34.046Z | session-arc | 80 | 0.6 | 16.91 | 13.69 | 0.63 | 6 | 1 | 4
 
 2026-07-11T07:04:26.529Z | session-arc | 100 | 0.59 | 6.03 | 2.82 | 0.31 | 6 | 1 | 4
+
+2026-07-11T07:18:35.199Z | session-arc | 100 | 0.59 | 5.67 | 2.49 | 0.63 | 6 | 1 | 4

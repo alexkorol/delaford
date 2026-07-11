@@ -197,7 +197,11 @@ const devEvents = {
     }
 
     const quantity = Number.isFinite(payload.qty) ? Math.max(1, Math.floor(payload.qty)) : 1;
-    player.inventory.add(payload.itemId, quantity);
+    const rng = Number.isFinite(payload.seed) ? seededRng(payload.seed) : undefined;
+    const existingItem = quantity === 1 && (rng || Number.isFinite(payload.itemLevel))
+      ? ItemFactory.createById(payload.itemId, { rng, itemLevel: payload.itemLevel })
+      : null;
+    player.inventory.add(payload.itemId, quantity, existingItem ? { existingItem } : {});
     Socket.emit('core:refresh:inventory', {
       player: { socket_id: player.socket_id },
       data: player.inventory.slots,
