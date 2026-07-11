@@ -232,8 +232,13 @@ onMounted(() => {
   }
 
   const storedAccount = uiStore.account;
+  const registeredUsername = window.sessionStorage.getItem('verdigris_registered_username');
+  if (registeredUsername) {
+    username.value = registeredUsername;
+    window.sessionStorage.removeItem('verdigris_registered_username');
+  }
   if (storedAccount?.username) {
-    username.value = storedAccount.username;
+    username.value = registeredUsername || storedAccount.username;
     password.value = storedAccount.password;
     if (window.location.href.includes('#autologin')) {
       setTimeout(() => document.querySelector('button.login')?.click(), 250);

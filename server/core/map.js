@@ -14,6 +14,7 @@ import createWorldLayout from './world-layout.js';
 const DEFAULT_INSTANCE_ROOM_COUNT = 12;
 const DEFAULT_OUTDOOR_CLEARING_COUNT = 9;
 const DEFAULT_CORRIDOR_WIDTH = 3;
+export const INSTANCE_SPAWN_SAFE_RADIUS = 6;
 
 // Layout recipes are the *shape* of a floor, kept independent of the theme
 // (which is only art). Any theme can pair with any recipe, PoE-style: a crypt
@@ -859,6 +860,7 @@ class Map {
     const instanceMonsters = [];
     let monsterIndex = 0;
     const exitRoomIndex = carvedRooms.length - 1;
+    const entry = carvedRooms[0];
 
     // A monster may only spawn on an open tile (not a wall, tree, or water),
     // so spread packs across a clearing safely: spiral out from the desired
@@ -866,6 +868,12 @@ class Map {
     const monIdx = (x, y) => (y * width) + x;
     const isSpawnable = (x, y) => {
       if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) {
+        return false;
+      }
+      // Keep the landing room readable and fair even when procedural rooms
+      // overlap. Skipping room zero alone was insufficient: packs belonging
+      // to a neighbouring room could still be placed beside the stairs.
+      if (Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= INSTANCE_SPAWN_SAFE_RADIUS) {
         return false;
       }
       const bgOk = UI.tileWalkable(background[monIdx(x, y)] - 1);
@@ -885,6 +893,16 @@ class Map {
           }
         }
       }
+      // A heavily overlapping layout may have no safe tile in the local
+      // room. Fall back to the nearest room centre, then any safe floor tile,
+      // instead of silently putting the monster back in the landing zone.
+      const roomFallback = carvedRooms.find(room => isSpawnable(room.x, room.y));
+      if (roomFallback) return { x: roomFallback.x, y: roomFallback.y };
+      for (let y = 1; y < height - 1; y += 1) {
+        for (let x = 1; x < width - 1; x += 1) {
+          if (isSpawnable(x, y)) return { x, y };
+        }
+      }
       return { x: cx, y: cy };
     };
 
@@ -897,7 +915,7 @@ class Map {
         // The stairs down are guarded by the floor boss — a real damage sponge
         // that hits hard, unlike the trash (full health, near-full damage).
         instanceMonsters.push(buildMonsterDefinition({
-          center,
+          center: findSpawn(center.x, center.y, center.x, center.y),
           index: monsterIndex,
           role: 'melee',
           rarity: 'elite',
@@ -957,7 +975,6 @@ class Map {
 
     // Players spawn on the walkable tiles around the entry stairs,
     // never on the stairs themselves (stepping on them transitions).
-    const entry = carvedRooms[0];
     const exit = carvedRooms.length > 1 ? carvedRooms[carvedRooms.length - 1] : null;
     const idx = (x, y) => (y * width) + x;
     const tileIsOpen = (x, y) => {

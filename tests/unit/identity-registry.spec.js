@@ -23,4 +23,23 @@ describe('SQLite identity registry', () => {
       .run('{broken', 'account-stale');
     expect(registry.getAccount('account-stale')).toBeNull();
   });
+
+  it('creates and authenticates a local account without storing its password', () => {
+    const created = registry.createLoginAccount({ username: 'Mara_Stone', password: 'safe-passphrase' });
+    expect(created).toMatchObject({ ok: true, username: 'Mara_Stone' });
+    expect(registry.authenticateLogin({ username: 'mara_stone', password: 'safe-passphrase' }))
+      .toMatchObject({ uuid: created.accountId, username: 'Mara_Stone' });
+    expect(registry.authenticateLogin({ username: 'Mara_Stone', password: 'wrong-passphrase' }))
+      .toBeNull();
+    const row = registry.db.prepare('SELECT * FROM login_accounts WHERE account_id = ?')
+      .get(created.accountId);
+    expect(JSON.stringify(row)).not.toContain('safe-passphrase');
+  });
+
+  it('rejects invalid and duplicate account names', () => {
+    expect(registry.createLoginAccount({ username: 'x', password: 'safe-passphrase' }).ok).toBe(false);
+    expect(registry.createLoginAccount({ username: 'Mara', password: 'short' }).ok).toBe(false);
+    expect(registry.createLoginAccount({ username: 'Mara', password: 'safe-passphrase' }).ok).toBe(true);
+    expect(registry.createLoginAccount({ username: 'mara', password: 'another-safe-passphrase' }).ok).toBe(false);
+  });
 });

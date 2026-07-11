@@ -6,7 +6,7 @@
     >
       <LoginBackdrop />
     </div>
-    <div class="auth-container__frame">
+    <div class="auth-container__frame" :class="{ 'auth-container__frame--landing': screen === 'main' }">
       <AudioMainMenu />
       <i
         class="auth-container__corner auth-container__corner--tl"
@@ -38,12 +38,10 @@
           v-if="screen === 'register'"
           class="auth-container__register"
         >
-          <p class="auth-container__register-intro">
-            To register an account, please visit
-            <a href="https://delaford.com/register">this page</a>
-            to get started and then come back. Once you have an account ID, reserve your in-world identity below.
-          </p>
-          <CharacterCreate />
+          <AccountCreate
+            @cancel="emitNavigate('main')"
+            @registered="emitNavigate('login')"
+          />
         </div>
 
         <div
@@ -67,8 +65,17 @@
         <div v-else>
           <div class="auth-container__wordmark">
             <h1 class="auth-container__title">Verdigris</h1>
-            <p class="auth-container__tagline">a multiplayer adventure</p>
+            <p class="auth-container__tagline">Every scion dies. Every House remembers.</p>
             <div class="auth-container__rule"><span /></div>
+          </div>
+          <p class="auth-container__lede">
+            A persistent-House action RPG where mortal scions descend together,
+            build strange gear, and leave relics for future adventurers to find.
+          </p>
+          <div class="auth-container__features">
+            <article><strong>Descend</strong><span>Procedural floors grow harsher until your build breaks.</span></article>
+            <article><strong>Build</strong><span>Shape a scion through loot and a 271-node passive lattice.</span></article>
+            <article><strong>Be remembered</strong><span>Final deaths enter the crypt; notable gear returns to the world.</span></article>
           </div>
           <div class="auth-container__button-group">
             <button
@@ -76,16 +83,19 @@
               type="button"
               @click="emitNavigate('login')"
             >
-              Login
+              Sign in
             </button>
             <button
               class="auth-container__button auth-container__button--register"
               type="button"
               @click="emitNavigate('register')"
             >
-              Register
+              Create account
             </button>
           </div>
+          <p class="auth-container__credit">
+            Verdigris grew from Delaford, created by Dan Jasnowski, and preserves its MIT-licensed foundation.
+          </p>
         </div>
       </div>
     </div>
@@ -96,7 +106,7 @@
 import AudioMainMenu from '../sub/AudioMainMenu.vue';
 import LoginBackdrop from '../sub/LoginBackdrop.vue';
 import Login from '../ui/Login.vue';
-import CharacterCreate from '../ui/auth/CharacterCreate.vue';
+import AccountCreate from '../ui/auth/AccountCreate.vue';
 import ChroniclesScreen from '../ui/auth/ChroniclesScreen.vue';
 
 export default {
@@ -105,7 +115,7 @@ export default {
     AudioMainMenu,
     LoginBackdrop,
     Login,
-    CharacterCreate,
+    AccountCreate,
     ChroniclesScreen,
   },
   props: {
@@ -181,6 +191,8 @@ export default {
     inset 0 0 48px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(240, 230, 210, 0.06);
 }
+
+.auth-container__frame--landing { min-height: 650px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .auth-container__backdrop::after {
@@ -268,6 +280,59 @@ export default {
   a {
     color: #f3b15b;
     text-decoration: underline;
+  }
+}
+
+.auth-container__lede {
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+  line-height: 1.55;
+  color: rgba(235, 225, 205, 0.82);
+}
+
+.auth-container__features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+
+  article {
+    display: grid;
+    gap: var(--space-xs);
+    padding: var(--space-md);
+    background: rgba(8, 7, 5, 0.5);
+    border: 1px solid rgba(95, 168, 147, 0.25);
+  }
+
+  strong {
+    font-family: 'GameFont', sans-serif;
+    color: #d9bd72;
+  }
+
+  span {
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: rgba(225, 215, 195, 0.68);
+  }
+}
+
+.auth-container__credit {
+  margin: var(--space-lg) auto 0;
+  max-width: 500px;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(220, 210, 190, 0.48);
+}
+
+@media (width <= 620px) {
+  .auth-container__features {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-container__button-group {
+    flex-direction: column;
+    gap: var(--space-sm);
   }
 }
 

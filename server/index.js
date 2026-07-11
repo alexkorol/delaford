@@ -10,6 +10,7 @@ import secure from 'ssl-express-www';
 import Delaford from './Delaford.js';
 import world from './core/world.js';
 import nameValidationService from './core/services/name-validation.js';
+import identityRegistry from './core/services/identity-registry.js';
 import { recentRuntimeEvents } from './core/services/runtime-diagnostics.js';
 
 const serverDir = fileURLToPath(new URL('.', import.meta.url));
@@ -99,6 +100,12 @@ const serializeJob = (job) => {
 
   return payload;
 };
+
+app.post('/api/accounts', (req, res) => {
+  const result = identityRegistry.createLoginAccount(req.body || {});
+  if (!result.ok) return res.status(400).json({ message: result.reason });
+  return res.status(201).json({ accountId: result.accountId, username: result.username });
+});
 
 app.post('/api/identity/name-validations', (req, res) => {
   const { name, accountId } = req.body || {};

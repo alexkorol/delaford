@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import GameMap from '#server/core/map.js';
+import GameMap, { INSTANCE_SPAWN_SAFE_RADIUS } from '#server/core/map.js';
 import Monster from '#server/core/monster.js';
 import { rollPlayerDamage } from '#server/core/combat/index.js';
 import UI from '#shared/ui.js';
@@ -106,6 +106,23 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     for (const seed of seeds) {
       const { monsters } = await buildFloor(seed);
       expect(monsters.length, `seed ${seed}`).toBeGreaterThanOrEqual(18);
+    }
+  });
+
+  it('keeps every procedural landing zone clear of monsters', async () => {
+    for (const layout of ['warren', 'gauntlet', 'clearings']) {
+      for (const seed of seeds) {
+        const { generation } = await buildFloor(seed, layout);
+        const entry = generation.metadata.stairsUp;
+        generation.monsters.forEach((monster) => {
+          const distance = Math.max(
+            Math.abs(monster.spawn.x - entry.x),
+            Math.abs(monster.spawn.y - entry.y),
+          );
+          expect(distance, `${layout} seed ${seed}: ${monster.id}`)
+            .toBeGreaterThan(INSTANCE_SPAWN_SAFE_RADIUS);
+        });
+      }
     }
   });
 

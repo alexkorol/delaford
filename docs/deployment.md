@@ -1,4 +1,4 @@
-# Running Delaford 24/7 on a home server
+# Running Verdigris 24/7 on a home server
 
 The production server is a single Node process: express serves the built
 client from `dist/` and the game WebSocket rides the same HTTP server, so
@@ -8,9 +8,9 @@ client from `dist/` and the game WebSocket rides the same HTTP server, so
 
 Requirements: Node >= 22, npm >= 10, git.
 
+Clone your Verdigris repository, then from its game directory run:
+
 ```sh
-git clone https://github.com/alexkorol/Delaford.git
-cd Delaford
 npm ci
 npm run build          # builds the client into dist/
 npm install -g pm2
@@ -28,8 +28,8 @@ Make pm2 itself survive reboots:
 - **Linux:** `pm2 startup` and run the command it prints.
 - **Windows:** `npm i -g pm2-windows-startup && pm2-startup install`.
 
-Useful commands: `pm2 status`, `pm2 logs delaford`, `pm2 restart delaford`,
-`pm2 stop delaford`. Logs also land in `logs/`.
+Useful commands: `pm2 status`, `pm2 logs server`, `pm2 restart server`,
+`pm2 stop server`. Logs also land in `logs/`.
 
 ## Updating to a new version
 
@@ -37,7 +37,7 @@ Useful commands: `pm2 status`, `pm2 logs delaford`, `pm2 restart delaford`,
 git pull
 npm ci
 npm run build
-pm2 restart delaford
+pm2 restart server
 ```
 
 ## Public TLS deployment (recommended)
@@ -101,7 +101,6 @@ loaded from**, so no client configuration is needed for any of these:
 | `NODE_ENV` | — | `production` enables compression/static serving behaviour |
 | `FORCE_HTTPS` | unset | `true` redirects HTTP→HTTPS (only behind a TLS proxy) |
 | `VITE_WS_URL` | same-origin | Build-time client override for the WebSocket URL |
-| `SITE_URL` | unset | Auth/persistence API for non-guest accounts (not yet self-hostable) |
 | `CHRONICLES_DB_FILE` | `server/data/verdigris.sqlite` | SQLite House/scion/relic database |
 | `IDENTITY_DB_FILE` | Chronicle DB path | Optional separate SQLite identity database |
 

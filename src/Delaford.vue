@@ -200,7 +200,9 @@ export default {
       config,
       loaded: false,
       game: { exit: true },
-      screen: 'login',
+      screen: typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('play')
+        ? 'login'
+        : 'main',
       connectionLost: false,
       reconnectAttempts: 0,
       sessionNotice: '',

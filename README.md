@@ -1,98 +1,43 @@
-<h1 align="center">Delaford Fork</h1>
-<p align="center">Action RPG sandbox prototype exploring WASD-first controls, Diablo/PoE-inspired systems, and party-based instances.</p>
+# Verdigris
 
----
+Verdigris is a multiplayer action RPG about persistent Houses and mortal
+scions. Descend through procedural instances, shape a build through loot and a
+271-node passive lattice, and leave a permanent crypt record when a scion
+falls. Notable equipment from the dead can circulate back into future world
+drops.
 
-## Project Vision
+## Run locally
 
-This fork is a fresh take on the original Delaford codebase. The goal is to build a modern 2D ARPG that:
-
-- Puts **keyboard movement and combat** front and center, with mouse interactions as optional overlays.
-- Features a **Diablo/PoE-style inventory** with spatial constraints, nested containers, and deep itemisation (brands/bonds).
-- Favors **meaningful character identity**: permadeath with tradeoffs, RP-enforced names via LLM validation, shared stat frameworks for monsters and players.
-- Supports **party-based instanced worlds** and persistent player-modifiable towns.
-
-The high-level roadmap is captured in [`docs/vision.md`](docs/vision.md). Its a living document that gathers feature specs, UX references, and open questions.
-
-## Fork Highlights
-
-- Smooth, interpolated movement controllers for local and remote entities, improving playback without sacrificing authority.
-- Modernized Vite/Volta dev stack with parallel client/server startup and refreshed linting/testing harnesses (Vitest + Playwright).
-- WASD-first input and Diablo/PoE-inspired systems guiding new content and UX planning.
-
-## Quick Start
+Requirements: Node 22+ and npm 10+.
 
 ```bash
-git clone git@github.com:YOUR_USERNAME/delaford_fork.git
-cd delaford_fork
-volta install node@22 npm@10 # or use nvm/asdf to match .nvmrc
 npm install
-npm run dev           # spins up Vite + the game server in parallel
+npm run dev
 ```
 
-The Vite dev server runs at `http://localhost:5173`, the websocket server on `9000`, and the Express wrapper on `6500`.
+Open `http://localhost:5173`. The client runs on port 5173 and the game/API
+server on port 6500.
 
-Common scripts:
+Before treating a gameplay change as complete, run the real loop:
 
 ```bash
-npm run build        # bundle the client via Vite
-npm run test:unit    # execute Vitest-powered unit tests
-npm run test:e2e     # run Playwright end-to-end smoke tests against a preview build
+npm run test:unit
+npm run playtest
 ```
 
-Troubleshooting tips and platform-specific notes live in [`docs/development-setup.md`](docs/development-setup.md).
+The playtest boots a server and drives login, movement, combat, loot, zones,
+and skill-tree persistence through the production WebSocket protocol.
 
-## Repository Layout
+## Project layout
 
-- `server/`  gameplay logic, networking, data tables.
-- `src/`  Vue SPA client, assets, and UI widgets.
-- `docs/`  project vision, setup notes, feature planning.
-- `src/stores/`  Pinia stores and legacy adapters.
+- `server/` — authoritative world, combat, accounts, and Chronicle persistence
+- `src/` — Vue client, canvas renderer, and interface
+- `playtest/` — headless playable-loop harness
+- `tests/` — focused unit and balance specifications
+- `docs/` — design, operations, and deployment notes
 
-Legacy docs from the original project have been removed or archived. Everything in this fork will track the new gameplay direction.
+## Attribution
 
-## Active Work Streams
-
-1. **Foundation & Tooling**
-   - Dependency audit & upgrades.
-   - VS Code tasks / npm scripts for one-command dev setup.
-   - CI hooks, lint/format rules, testing harness.
-2. **Gameplay Core**
-   - Character stats (Str/Dex/Int), permadeath, cheat-death mechanics.
-   - LLM-backed RP name validation.
-   - Passive flower of life skill tree.
-3. **Inventory & Items**
-   - 127 backpack grid, equipment paper doll, nested containers.
-   - Brands/bonds affix model and item binding to player identity.
-4. **UI/UX**
-   - PoE-style left/right panes (stats & inventory), semi-transparent chat.
-   - Pixel-perfect rendering with graceful handling on small displays.
-5. **Monsters & Combat**
-   - Shared stat pipeline with players, monster categories & rarities.
-   - Combat loop tuning, AI behaviors.
-6. **Networking & World**
-   - Party instances, persistent towns, semi-random tileset generator.
-   - Infinite realm concepts (Abyss/Pandemonium equivalents).
-
-Each stream will break into issues/PRs with detailed implementation notes.
-
-## Roadmap
-
-- [x] Foundation & Tooling — Vite/Volta dev stack, linting rules, and testing harnesses are in place.
-- [ ] Gameplay Core — Str/Dex/Int stats, permadeath/cheat-death loops, and RP name validation.
-- [ ] Inventory & Items — 127-slot backpack, nested containers, and brands/bonds affixes.
-- [ ] UI/UX — PoE-inspired panes, chat overlay, and pixel-perfect rendering that degrades gracefully.
-- [ ] Monsters & Combat — Shared stat pipeline, AI behaviours, and interpolated movement during fights.
-- [ ] Networking & World — Party instances, persistent towns, and semi-random map generation.
-
-## Contribution Guide (WIP)
-
-Contribution standards are being refreshed to match the new scope. Until a formal guide is published:
-
-- Prefer opening an issue/discussion before major work.
-- Follow existing lint rules (`npm run lint`).
-- Document feature behaviour in `/docs` as you implement it.
-
-## License & Attribution
-
-Some assets still originate from the original Delaford project (tilesets, fonts, music). Attribution details remain in the asset folders. As the fork evolves, well re-evaluate asset licensing and replacements.
+Verdigris grew from Delaford, created by Dan Jasnowski, and preserves its
+MIT-licensed foundation. The original copyright notice remains in `LICENSE`.
+Additional asset-specific credits are kept beside their respective assets.
