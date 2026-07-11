@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Verify July 4 inventory remainders live
+
+- Goal: check the July 4 fix-plan's drag-to-equip and floating tooltip claims
+  against current code and the actual browser/server path.
+- Audit result: both were already implemented in commit `2dddfea`; no duplicate
+  production change was needed. Pointer drag resolves a paperdoll target and
+  emits the same authoritative equip commit as other inventory paths. The
+  floating ornate tooltip renders rarity-colored headers, live combat values,
+  vessel lines and pips, attunement, relic names, and viewport-aware placement.
+- Live proof: the dedicated browser resilience spec granted a generated Bronze
+  Pike, verified its WIZARD art and vessel material lines, dragged it onto the
+  main-hand slot, and observed the server-refreshed equipped art/name. It also
+  asserted no client handler or uncaught errors.
+- Evidence: `npm run build` — exit 0; `npx playwright test
+  tests/e2e/browser-reconnect.spec.mjs` — 3/3 passed, including the real
+  tooltip/drag/equip case.
+- Next target: relic circulation is already scenario-backed in `chronicles` and
+  `session-arc`; audit and surface the highest-value missing Vesselforge player
+  interaction.
+
 ## 2026-07-11 — Tolerate stale Chronicle player snapshots
 
 - Goal: prove renamed ids and malformed old snapshot fields cannot prevent a
