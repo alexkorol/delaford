@@ -1,5 +1,8 @@
 <template>
-  <div class="auth-container">
+  <div
+    class="auth-container"
+    :class="{ 'auth-container--landing': screen === 'main' }"
+  >
     <div
       class="auth-container__backdrop"
       aria-hidden="true"
@@ -145,6 +148,10 @@ export default {
   margin: auto;
 }
 
+.auth-container--landing {
+  width: min(800px, 94vw);
+}
+
 /* Fullscreen scene behind the panel: live-rendered dungeon vestibule
  * (LoginBackdrop canvas) under a vignette and a slow warm glow. */
 .auth-container__backdrop {
@@ -192,7 +199,10 @@ export default {
     inset 0 1px 0 rgba(240, 230, 210, 0.06);
 }
 
-.auth-container__frame--landing { min-height: 650px; }
+.auth-container__frame--landing {
+  min-height: 650px;
+  padding-inline: clamp(32px, 6vw, 64px);
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .auth-container__backdrop::after {
@@ -294,12 +304,13 @@ export default {
 .auth-container__features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
+  gap: 14px;
 
   article {
     display: grid;
     gap: var(--space-xs);
-    padding: var(--space-md);
+    min-height: 112px;
+    padding: 16px;
     background: rgba(8, 7, 5, 0.5);
     border: 1px solid rgba(95, 168, 147, 0.25);
   }
@@ -386,11 +397,12 @@ export default {
 .auth-container__button-group {
   display: flex;
   justify-content: center;
-  gap: var(--space-xl);
+  gap: 24px;
   margin-top: var(--space-lg);
 }
 
 .auth-container__button {
+  min-width: 180px;
   font-family: 'GameFont', sans-serif;
   font-size: 1.15rem;
   letter-spacing: 0.06em;
@@ -425,6 +437,16 @@ export default {
   &:focus-visible {
     outline: 2px solid var(--color-accent-strong);
     outline-offset: 2px;
+  }
+}
+
+.auth-container__button--register {
+  background: linear-gradient(180deg, #4d8878 0%, #356559 55%, #294e45 100%);
+  border-top-color: rgba(174, 232, 212, 0.55);
+  border-left-color: rgba(174, 232, 212, 0.35);
+
+  &:hover {
+    background: linear-gradient(180deg, #5b9c8a 0%, #3d7567 55%, #2d594e 100%);
   }
 }
 </style>

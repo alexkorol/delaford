@@ -62,6 +62,19 @@ test.describe('canonical browser smoke', () => {
     cleanState();
   });
 
+  test('creates a local account and returns to sign-in with the username', async ({ page }) => {
+    await page.goto(gameUrl);
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    await page.getByLabel('Username').fill('SmokeFounder');
+    await page.getByLabel('Password', { exact: true }).fill('smoke-passphrase');
+    await page.getByLabel('Confirm password').fill('smoke-passphrase');
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+
+    await expect(page.locator('#login-username')).toHaveValue('SmokeFounder');
+    await expect(page.locator('#login-password')).toHaveValue('');
+    await expect(page.locator('#guest_account')).not.toBeChecked();
+  });
+
   test('protects movement, context menus, tree persistence, quests, and zone labels', async ({ page }) => {
     await page.goto(`${gameUrl}/?play`);
     const canvas = page.locator('canvas#game-map');

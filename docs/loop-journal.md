@@ -1,5 +1,26 @@
 # Verdigris loop journal
 
+## 2026-07-10 — Finish development account registration
+
+- Goal: finish and isolate the existing landing/auth restyle and make local
+  account creation work when Vite and the authoritative server use different
+  ports.
+- Review result: the presentation changes were complete, but cross-port
+  routing and the development CORS allowlist had no focused regression proof.
+- Implementation: registration derives its HTTP endpoint from the selected
+  WebSocket server, returns safely to same-origin for unavailable/malformed
+  sockets, and development CORS accepts only the same host (including loopback
+  aliases) on Vite port 5173. The landing and registration panels have wider,
+  clearer spacing and a distinct primary registration action.
+- Proof added: unit coverage exercises ws/wss/fallback endpoint routing and
+  rejects hostile origins and wrong ports. Browser smoke now creates a real
+  local account and verifies that sign-in receives the username with a blank
+  password and guest mode disabled.
+- Evidence: focused registration/server specs — 3 files and 8 tests passed;
+  touched-file ESLint — exit 0; `npm run smoke:browser` — 2/2 passed.
+- Next target: audit the robustness checklist for full-message payload mistakes,
+  cross-instance broadcasts, and stale persisted-data failures.
+
 ## 2026-07-10 — Stabilize the session-arc baseline
 
 - Goal: restore a green baseline before beginning the Tier 0 critic work.

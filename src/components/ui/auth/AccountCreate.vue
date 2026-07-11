@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { accountEndpoint } from '@/lib/account-endpoint.js';
 
 const emit = defineEmits(['cancel', 'registered']);
 const username = ref('');
@@ -69,17 +70,25 @@ const createAccount = async () => {
   }
   submitting.value = true;
   try {
-    const response = await fetch('/api/accounts', {
+    // During Vite development the page and authoritative server use different
+    // ports. Follow the selected socket so registration reaches that server.
+    const response = await fetch(accountEndpoint(window.ws?.url), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value }),
     });
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('The account service is unavailable. Restart the Verdigris server and try again.');
+    }
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message || 'Could not create that account.');
     window.sessionStorage.setItem('verdigris_registered_username', payload.username);
     emit('registered', payload);
   } catch (cause) {
-    error.value = cause.message || 'Could not create that account.';
+    error.value = cause instanceof TypeError
+      ? 'Cannot reach the account service. Restart the Verdigris server and try again.'
+      : (cause.message || 'Could not create that account.');
   } finally {
     submitting.value = false;
   }
@@ -92,7 +101,7 @@ const createAccount = async () => {
 .account-create {
   display: grid;
   gap: var(--space-lg);
-  max-width: 440px;
+  max-width: 500px;
   margin: auto;
   color: var(--color-text-primary);
 
@@ -105,7 +114,7 @@ const createAccount = async () => {
   p {
     margin: 0;
     line-height: 1.5;
-    color: var(--color-text-secondary);
+    color: rgba(235, 225, 205, 0.82);
   }
 
   form {
@@ -115,7 +124,7 @@ const createAccount = async () => {
 
   label {
     font-family: 'ChatFont', sans-serif;
-    color: #d9c8a6;
+    color: #ead8ae;
   }
 
   input {
@@ -131,6 +140,7 @@ const createAccount = async () => {
   }
 
   button {
+    min-width: 150px;
     padding: 0.65rem 1rem;
     font-family: 'GameFont', sans-serif;
     color: #f7eeda;

@@ -210,9 +210,11 @@ onMounted(() => {
   invalid.value = false;
 
   const tempGuest = window.location.href.includes('?useGuestAccount');
+  const registeredUsername = window.sessionStorage.getItem('verdigris_registered_username');
 
   rememberMe.value = uiStore.rememberMe;
-  guestAccount.value = tempGuest || uiStore.guestAccount;
+  guestAccount.value = registeredUsername ? false : (tempGuest || uiStore.guestAccount);
+  if (registeredUsername) uiStore.setGuestAccount(false);
 
   bus.on('player:login-error', handleLoginError);
   bus.on('login:done', handleLoginComplete);
@@ -232,14 +234,13 @@ onMounted(() => {
   }
 
   const storedAccount = uiStore.account;
-  const registeredUsername = window.sessionStorage.getItem('verdigris_registered_username');
   if (registeredUsername) {
     username.value = registeredUsername;
     window.sessionStorage.removeItem('verdigris_registered_username');
   }
   if (storedAccount?.username) {
     username.value = registeredUsername || storedAccount.username;
-    password.value = storedAccount.password;
+    password.value = registeredUsername ? '' : storedAccount.password;
     if (window.location.href.includes('#autologin')) {
       setTimeout(() => document.querySelector('button.login')?.click(), 250);
     }

@@ -12,6 +12,7 @@ import world from './core/world.js';
 import nameValidationService from './core/services/name-validation.js';
 import identityRegistry from './core/services/identity-registry.js';
 import { recentRuntimeEvents } from './core/services/runtime-diagnostics.js';
+import { permittedDevelopmentOrigin } from './core/http/development-cors.js';
 
 const serverDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = path.resolve(serverDir, '..');
@@ -72,6 +73,24 @@ if (env === 'production' && process.env.FORCE_HTTPS === 'true') {
 
 app.use(compression());
 app.use(express.json({ limit: '32kb' }));
+
+// The Vite client runs on :5173 while the authoritative API/WS server runs on
+// :6500. Permit that same-host development pairing without opening production
+// account endpoints to arbitrary cross-origin requests.
+if (env === 'development') {
+  app.use('/api', (req, res, next) => {
+    const origin = req.get('origin');
+    const permittedOrigin = permittedDevelopmentOrigin(origin, req.hostname);
+    if (permittedOrigin) {
+      res.set('Access-Control-Allow-Origin', permittedOrigin);
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+      res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.vary('Origin');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    return next();
+  });
+}
 
 if (hasClientBundle()) {
   app.use(express.static(distDir));
