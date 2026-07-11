@@ -86,6 +86,7 @@ vi.mock('#server/player/handler.js', () => ({
     'player:context-menu:action': vi.fn(),
     'player:skilltree:save': vi.fn(),
     'dev:state': vi.fn(),
+    'dev:teleport': vi.fn(),
   },
 }));
 
@@ -362,5 +363,17 @@ describe('Delaford.connection – rate limiting', () => {
     const save = JSON.stringify({ event: 'player:skilltree:save', data: {} });
     await ws._triggerMessage(save);
     expect(Handler['player:skilltree:save']).toHaveBeenCalled();
+  });
+
+  it('keeps development diagnostics from starving harness control commands', async () => {
+    const diagnostics = JSON.stringify({ event: 'dev:state', data: {} });
+    for (let i = 0; i < 25; i += 1) {
+      await ws._triggerMessage(diagnostics);
+    }
+    vi.clearAllMocks();
+
+    const teleport = JSON.stringify({ event: 'dev:teleport', data: { x: 9, y: 9 } });
+    await ws._triggerMessage(teleport);
+    expect(Handler['dev:teleport']).toHaveBeenCalledOnce();
   });
 });

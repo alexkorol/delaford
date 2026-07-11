@@ -303,13 +303,16 @@ class Delaford {
       general: { tokens: 30, max: 30, refill: 10, last: Date.now() },
       // Development diagnostics are production-gated and can poll rapidly in
       // the playability harness. Keep them from starving real UI writes such
-      // as a skill-tree save on the same connection.
-      development: { tokens: 20, max: 20, refill: 10, last: Date.now() },
+      // as a skill-tree save or harness control command on the same connection.
+      developmentRead: { tokens: 20, max: 20, refill: 10, last: Date.now() },
+      developmentControl: { tokens: 20, max: 20, refill: 10, last: Date.now() },
     };
 
     const consumeRateToken = (eventName) => {
-      const bucket = eventName.startsWith('dev:')
-        ? buckets.development
+      const bucket = eventName === 'dev:state'
+        ? buckets.developmentRead
+        : eventName.startsWith('dev:')
+          ? buckets.developmentControl
         : CRITICAL_EVENTS.has(eventName) ? buckets.critical : buckets.general;
       const now = Date.now();
       bucket.tokens = Math.min(bucket.max, bucket.tokens + (((now - bucket.last) / 1000) * bucket.refill));
