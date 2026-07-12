@@ -130,6 +130,53 @@ describe('ranged monster combat', () => {
     expect(player.combat.lastCombatAt).toBe(5_300);
   });
 
+  it('misses when the target dodges away from the visible projectile endpoint', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    const player = makeTargetPlayer(sceneId);
+
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+
+    expect(monster.tryAttack(player, 5_000)).toBe(true);
+    expect(Socket.broadcast).toHaveBeenCalledWith('world:projectile', expect.objectContaining({
+      fromX: 14,
+      fromY: 10,
+      toX: 10,
+      toY: 10,
+    }), expect.anything());
+
+    // Still comfortably inside the archer's five-tile range, but one tile
+    // clear of the missile path and its captured visual endpoint.
+    player.y = 11;
+
+    expect(monster.resolvePendingAttack(5_300)).toBe(false);
+    expect(player.applyDamage).not.toHaveBeenCalled();
+  });
+
+  it('hits when the target remains at the visible projectile endpoint', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    const player = makeTargetPlayer(sceneId);
+
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+
+    expect(monster.tryAttack(player, 5_000)).toBe(true);
+    expect(monster.resolvePendingAttack(5_300)).toBeTruthy();
+    expect(player.applyDamage).toHaveBeenCalled();
+  });
+
   it('refuses to attack beyond its configured range', () => {
     const sceneId = 'test:ranged-attack-range';
     const monster = makeRangedMonster(sceneId);

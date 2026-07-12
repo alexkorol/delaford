@@ -10,6 +10,10 @@ import { hasProjectileLineOfSight } from '#shared/projectile-collision.js';
 // Continuous positions: melee pursuit stands off ~1 tile from the target
 // (never on its tile), so reach checks are radii with diagonal headroom.
 const REACH_TOLERANCE = 0.6;
+// Projectiles are rendered as a point travelling to the target position that
+// was captured when the attack began. A half-tile radius matches the visible
+// player body without turning the missile into an invisible range-wide hit.
+const PROJECTILE_HIT_RADIUS = 0.55;
 
 const getSceneMap = monster => monster.activeScene?.map || world.getScene(monster.sceneId)?.map || world.map;
 
@@ -166,6 +170,9 @@ const tryAttack = (monster, target, now = Date.now()) => {
     skillName: attack.skillName || 'Attack',
     originX: monster.x,
     originY: monster.y,
+    targetX: target.x,
+    targetY: target.y,
+    projectile: range > 1 && !isGroundSlam,
     radius: isGroundSlam ? Math.max(1, Number(attack.radius) || 2) : null,
   };
 
@@ -238,16 +245,30 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
 
   const attack = monster.behaviour.attack || DEFAULT_BEHAVIOUR.attack;
   const isGroundSlam = payload.skillId === 'boss:ground-slam';
-  const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
-  const source = isGroundSlam
+  const isProjectile = payload.projectile === true
+    && Number.isFinite(payload.targetX)
+    && Number.isFinite(payload.targetY);
+  const source = isGroundSlam || isProjectile
     ? { x: payload.originX, y: payload.originY }
     : monster;
-  const distance = euclideanDistance(source, target);
-  if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
-    return false;
-  }
-  if (range > 1 && !isGroundSlam && !hasProjectileLineOfSight(getSceneMap(monster), source, target)) {
-    return false;
+
+  if (isProjectile) {
+    const impact = { x: payload.targetX, y: payload.targetY };
+    if (euclideanDistance(impact, target) > PROJECTILE_HIT_RADIUS) {
+      return false;
+    }
+    if (!hasProjectileLineOfSight(getSceneMap(monster), source, impact)) {
+      return false;
+    }
+  } else {
+    const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
+    const distance = euclideanDistance(source, target);
+    if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
+      return false;
+    }
+    if (range > 1 && !isGroundSlam && !hasProjectileLineOfSight(getSceneMap(monster), source, target)) {
+      return false;
+    }
   }
 
   const nowTs = now;
