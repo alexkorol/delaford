@@ -323,7 +323,7 @@ export default {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 32px;
-  border-radius: 4px;
+  border-radius: 0;
   cursor: pointer;
   border: 1px solid rgba(180, 145, 86, 0.32);
   background-color: rgba(5, 6, 8, 0.72);

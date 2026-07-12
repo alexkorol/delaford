@@ -335,11 +335,14 @@ export default {
   flex-direction: column;
   width: var(--chat-width);
   max-width: 100%;
-  background: rgba(7, 8, 10, 0.72);
-  border: 1px solid rgba(180, 145, 86, 0.22);
-  border-radius: var(--radius-md);
-  color: #f0e6d2;
+  background: var(--panel-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  color: var(--color-text-primary);
   overflow: hidden;
+  outline: 1px solid rgba(5, 5, 5, 0.9);
+  outline-offset: -4px;
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.42);
   transition: transform 180ms ease-out, opacity 180ms ease-out;
 
   &--collapsed {
@@ -361,9 +364,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-xs) var(--space-sm);
-  background:
-    linear-gradient(90deg, rgba(82, 18, 24, 0.24), rgba(10, 12, 15, 0.78));
-  border-bottom: 1px solid rgba(180, 145, 86, 0.2);
+  background: var(--panel-header);
+  border-bottom: 1px solid rgba(183, 146, 79, 0.4);
 }
 
 .chatbox__meta {
@@ -375,9 +377,9 @@ export default {
 .chatbox__title {
   margin: 0;
   font-size: 12px;
-  letter-spacing: 0;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #f2d391;
+  color: var(--color-accent-strong);
 }
 
 .chatbox__countdown {
@@ -395,9 +397,9 @@ export default {
 .chatbox__badge {
   min-width: 18px;
   padding: 1px 5px;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: #12100e;
+  border-radius: 0;
+  background: var(--color-ruby);
+  color: #fff0df;
   font-size: 0.7em;
   text-align: center;
   font-weight: 700;
@@ -405,17 +407,18 @@ export default {
 
 .chatbox__pin {
   appearance: none;
-  border: 1px solid rgba(180, 145, 86, 0.32);
-  background: rgba(0, 0, 0, 0.42);
-  color: #f0e6d2;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-frame-dark);
+  background: var(--control-surface);
+  color: var(--color-text-secondary);
+  border-radius: 0;
   padding: 4px 10px;
   font-size: var(--font-size-sm);
   cursor: pointer;
 
   &:hover {
     border-color: var(--color-border-strong);
-    background: rgba(0, 0, 0, 0.55);
+    color: var(--color-accent-strong);
+    background: var(--control-surface-hover);
   }
 
   &:focus-visible {
@@ -429,7 +432,10 @@ export default {
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-md);
-  background: rgba(0, 0, 0, 0.18);
+  background:
+    linear-gradient(90deg, rgba(183, 146, 79, 0.025) 1px, transparent 1px),
+    var(--color-bg-inset);
+  background-size: 12px 12px, auto;
   overflow-y: auto;
   max-height: 320px;
   scroll-behavior: smooth;
@@ -449,7 +455,7 @@ export default {
   grid-template-columns: auto 1fr auto;
   gap: var(--space-xs);
   font-size: 12px;
-  color: #f0e6d2;
+  color: var(--color-text-primary);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.72);
 }
 
@@ -480,10 +486,10 @@ export default {
 
 .chatbox__input {
   flex: 1;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.32);
-  background: rgba(2, 3, 5, 0.78);
-  color: #f0e6d2;
+  border-radius: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-inset);
+  color: var(--color-text-primary);
   padding: 6px 8px;
   font-family: 'ChatFont', 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
@@ -495,17 +501,20 @@ export default {
 }
 
 .chatbox__submit {
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.46);
-  background: linear-gradient(180deg, #3b3d42 0%, #18191d 100%);
-  color: #f0e6d2;
+  border-radius: 0;
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(218, 184, 112, 0.34);
+  background: var(--control-surface);
+  color: var(--color-text-primary);
   padding: 6px 12px;
   font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
   cursor: pointer;
 
   &:hover {
-    background: linear-gradient(180deg, #444850 0%, #202228 100%);
+    color: var(--color-accent-strong);
+    border-color: var(--color-frame-light);
+    background: var(--control-surface-hover);
   }
 
   &:active {
@@ -539,7 +548,7 @@ export default {
     bottom: 0;
     margin: auto;
     width: 100%;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-radius: 0;
     box-shadow: 0 -16px 32px rgba(0, 0, 0, 0.55);
     transform: translateY(0);
   }

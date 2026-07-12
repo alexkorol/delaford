@@ -491,7 +491,7 @@ export default {
   background:
     linear-gradient(180deg, rgba(23, 25, 29, 0.92), rgba(9, 10, 12, 0.96)),
     rgba(0, 0, 0, 0.76);
-  border-radius: 6px;
+  border-radius: 0;
   border: 2px solid #17100b;
   border-top-color: rgba(167, 132, 74, 0.55);
   border-left-color: rgba(126, 104, 69, 0.48);
@@ -529,7 +529,7 @@ export default {
   background:
     radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.055), transparent 52%),
     rgba(8, 9, 11, 0.18);
-  border-radius: 4px;
+  border-radius: 0;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.035),
     inset 0 -8px 14px rgba(0, 0, 0, 0.48),
@@ -541,7 +541,7 @@ export default {
   content: '';
   position: absolute;
   inset: 2px;
-  border-radius: 3px;
+  border-radius: 0;
   border: 1px solid rgba(255, 235, 180, 0.08);
   pointer-events: none;
 }

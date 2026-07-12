@@ -723,6 +723,35 @@
 - Next: continue the visual unification through the context menu, party/chat,
   remaining Chronicle/auth surfaces, and narrow-viewport QA.
 
+## 2026-07-12 — Reachable UI convergence and responsive proof
+
+- Goal: finish the visual convergence pass across the remaining reachable
+  systems and prove the new interface holds together outside the happy-path
+  desktop pane layout.
+- Replaced the last flat-gray Delaford context menu with an iron/brass action
+  frame and migrated the blue rounded party widget to the same inset surfaces,
+  square controls, ruby destructive state, and restrained green ready state as
+  the rest of Verdigris. Chat, smithing choices, minimap, character sections,
+  equipment slots, inventory grids, container stack, and ground-drop target now
+  share the same construction language without discarding the stronger ornate
+  inventory and geometric tree identities.
+- Live browser review covered the landing screen, registration, Chronicles,
+  HUD, minimap, chat, party, right-click actions, Escape menu, character sheet,
+  inventory, and skill tree. The audit preserved the DCSS-backed world/item art
+  and the reference-inspired orb and inventory treatments while removing the
+  remaining web-panel and legacy-gray outliers.
+- Browser smoke now includes a 480 × 800 journey that opens the real Escape
+  menu and Inventory panel, requires exact document-width containment, and
+  checks every panel edge remains inside the viewport.
+- Completion audit: the shared theme is globally authoritative; all reachable
+  panels and controls use its iron, brass, parchment, ruby, sapphire, or
+  intentionally specialized ornate variants; the legacy gray/blue panel
+  palettes are absent; logout and narrow overlays are bounded; desktop and
+  narrow live paths are covered.
+- Evidence: `npm run lint` and `npm run lint:css` exited 0; `npm run test:unit`
+  passed 85 files / 533 tests; `npm run smoke:browser` rebuilt production and
+  passed 3/3 browser journeys; full `npm run playtest` passed 21/21 scenarios.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -817,3 +846,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T08:07:32.434Z | session-arc | 100 | 0.6 | 6.42 | 2.22 | 0.32 | 6 | 1 | 4
 
 2026-07-12T19:55:31.224Z | session-arc | 100 | 0.59 | 5.98 | 2.78 | 0.62 | 6 | 1 | 4
+
+2026-07-12T20:10:28.182Z | session-arc | 100 | 0.6 | 5.29 | 1.56 | 0.63 | 6 | 1 | 4

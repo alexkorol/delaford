@@ -127,7 +127,7 @@ export default {
     radial-gradient(circle at 50% 42%, rgba(96, 71, 28, 0.12), transparent 45%),
     linear-gradient(180deg, rgba(25, 23, 19, 0.95), rgba(8, 8, 8, 0.94));
   border: 1px solid rgba(180, 145, 86, 0.34);
-  border-radius: 6px;
+  border-radius: 0;
   font-family: 'GameFont', sans-serif;
   box-shadow:
     inset 0 0 0 1px rgba(255, 240, 190, 0.04),

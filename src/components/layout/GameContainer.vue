@@ -1153,16 +1153,18 @@ export default {
 .game-container__chat-overlay :deep(.chatbox) {
   --chat-width: 100%;
 
-  background: rgba(4, 5, 7, 0.34);
-  border-color: rgba(180, 145, 86, 0.16);
+  background:
+    linear-gradient(90deg, rgba(91, 26, 29, 0.08), transparent 46%, rgba(35, 65, 84, 0.08)),
+    rgba(6, 7, 8, 0.9);
+  border-color: rgba(183, 146, 79, 0.38);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  box-shadow: none;
-  backdrop-filter: blur(1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48), inset 0 0 22px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(3px);
 }
 
 .game-container__chat-overlay :deep(.chatbox__header) {
-  background: rgba(4, 5, 7, 0.28);
+  background: rgba(14, 12, 10, 0.78);
 }
 
 .game-container__chat-overlay :deep(.chatbox__messages) {

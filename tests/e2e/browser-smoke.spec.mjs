@@ -236,4 +236,37 @@ test.describe('canonical browser smoke', () => {
     await page.getByRole('button', { name: 'Verdant Grove Lv 1–6', exact: true }).click();
     await expect(page.locator('.world-minimap__readout')).toContainText('Verdant Grove');
   });
+
+  test('keeps the game menu and inventory contained on a narrow viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 480, height: 800 });
+    await page.goto(`${gameUrl}/?play`);
+
+    const canvas = page.locator('canvas#game-map');
+    await expect(canvas).toBeVisible({ timeout: 30000 });
+    await page.keyboard.press('Escape');
+
+    const escapeMenu = page.locator('.escape-menu');
+    await expect(escapeMenu).toBeVisible();
+    await expect.poll(() => page.evaluate(() => ({
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+    }))).toEqual({ viewport: 480, document: 480 });
+
+    const menuBounds = await escapeMenu.boundingBox();
+    expect(menuBounds).toBeTruthy();
+    expect(menuBounds.x).toBeGreaterThanOrEqual(0);
+    expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(480);
+    expect(menuBounds.y).toBeGreaterThanOrEqual(0);
+    expect(menuBounds.y + menuBounds.height).toBeLessThanOrEqual(800);
+
+    await escapeMenu.getByRole('button', { name: 'Inventory I' }).click();
+    const inventory = page.getByRole('region', { name: 'Inventory panel' });
+    await expect(inventory).toBeVisible();
+    const inventoryBounds = await inventory.boundingBox();
+    expect(inventoryBounds).toBeTruthy();
+    expect(inventoryBounds.x).toBeGreaterThanOrEqual(0);
+    expect(inventoryBounds.x + inventoryBounds.width).toBeLessThanOrEqual(480);
+    expect(inventoryBounds.y).toBeGreaterThanOrEqual(0);
+    expect(inventoryBounds.y + inventoryBounds.height).toBeLessThanOrEqual(800);
+  });
 });

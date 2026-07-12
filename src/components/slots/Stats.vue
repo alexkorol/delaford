@@ -381,7 +381,7 @@ div.stats_slot {
   section {
     padding: 10px;
     border: 1px solid rgba(180, 145, 86, 0.24);
-    border-radius: 6px;
+    border-radius: 0;
     background:
       linear-gradient(180deg, rgba(21, 23, 26, 0.82), rgba(5, 7, 9, 0.78)),
       rgba(0, 0, 0, 0.36);
@@ -457,7 +457,7 @@ div.stats_slot {
     width: 54px;
     height: 54px;
     border: 1px solid rgba(219, 181, 98, 0.38);
-    border-radius: 4px;
+    border-radius: 0;
     background:
       radial-gradient(circle at 50% 38%, rgba(92, 121, 90, 0.38), transparent 44%),
       linear-gradient(180deg, #191814, #080908);
@@ -513,7 +513,7 @@ div.stats_slot {
     display: block;
     padding: 5px 7px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
+    border-radius: 0;
     background: rgba(0, 0, 0, 0.34);
     color: rgba(235, 226, 203, 0.8);
     text-align: right;
@@ -540,7 +540,7 @@ div.stats_slot {
     min-height: 38px;
     padding: 4px 6px;
     border: 1px solid rgba(202, 172, 104, 0.14);
-    border-radius: 4px;
+    border-radius: 0;
     background: rgba(2, 3, 5, 0.22);
 
     .label,
@@ -566,7 +566,7 @@ div.stats_slot {
     width: 34px;
     height: 34px;
     border: 1px solid rgba(213, 181, 112, 0.18);
-    border-radius: 3px;
+    border-radius: 0;
     background: rgba(1, 2, 4, 0.5);
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.62);
 
@@ -603,7 +603,7 @@ div.stats_slot {
   gap: 6px;
   padding: 6px 7px;
   border: 1px solid rgba(202, 172, 104, 0.22);
-  border-radius: 4px;
+  border-radius: 0;
   background: rgba(2, 3, 5, 0.46);
 
 }
@@ -676,8 +676,8 @@ div.stats_slot {
     margin-top: 2px;
     padding: 6px 9px;
     border: 1px solid rgba(208, 171, 90, 0.35);
-    border-radius: 4px;
-    background: rgba(30, 37, 40, 0.76);
+    border-radius: 0;
+    background: var(--control-surface);
     color: #f1f1f1;
     font-size: var(--font-size-sm);
     letter-spacing: 0.03em;
@@ -687,7 +687,7 @@ div.stats_slot {
 
     &:hover {
       border-color: rgba(255, 215, 79, 0.55);
-      background: rgba(86, 70, 35, 0.42);
+      background: var(--control-surface-hover);
     }
   }
 }
