@@ -1,5 +1,24 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Remove archived dependencies and duplicate runtime paths
+
+- Goal: keep one documented production configuration and eliminate dependencies
+  and binaries that the current scripts cannot use.
+- Audit result: `node_modules_old` contained two tracked Windows binaries totaling
+  about 12.6 MB; `ecosystem.config.js` duplicated the documented `.cjs` PM2 file;
+  HANDOFF described a superseded June session; the ignored build directory was
+  stale; two HTTPS middleware packages ran back to back; and
+  `start-server-and-test` had no script consumer.
+- Implementation: deleted and ignored `node_modules_old`, removed the duplicate
+  config, stale handoff, and local build output, retained `express-sslify` as the
+  single proxy-aware HTTPS redirect, uninstalled `ssl-express-www` and the unused
+  test helper, and removed the no-op authentication logout call while keeping the
+  authoritative local save on disconnect.
+- Evidence: `npm run test:unit` — 83 files and 530 tests; `npm run lint` — exit
+  0; `npm run playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: archive clearly completed planning/review documents and perform a
+  final requirement-by-requirement audit.
+
 ## 2026-07-12 — Delete verified dead art and font files
 
 - Goal: remove binary assets that no runtime loader, server item, README, or
@@ -686,3 +705,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:54:42.555Z | session-arc | 100 | 0.57 | 5.42 | 1.25 | 0.63 | 6 | 1 | 4
 
 2026-07-12T07:01:25.042Z | session-arc | 100 | 0.59 | 4.24 | 1.24 | 0.92 | 6 | 1 | 4
+
+2026-07-12T07:08:27.339Z | session-arc | 100 | 0.6 | 5.17 | 1.27 | 0.31 | 6 | 1 | 4

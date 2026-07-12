@@ -160,16 +160,13 @@ class Delaford {
       // Logout the player out and save the profile
       try {
         await player.update();
-        if (player.token && player.token !== 'none') {
-          await Authentication.logout(player.token);
-        }
       } catch (err) {
         console.log(err);
       }
 
       console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
 
-      // Cleanup must happen even when persistence/the account API fails;
+      // Cleanup must happen even when local persistence fails;
       // otherwise a disconnected member strands the party forever.
       if (!logout) {
         world.clients = world.clients.filter(c => c.id !== ws.id);

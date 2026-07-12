@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import secure from 'ssl-express-www';
 
 import Delaford from './Delaford.js';
 import world from './core/world.js';
@@ -67,7 +66,6 @@ const hasClientBundle = () => (
 // plain HTTP and would redirect-loop. Set FORCE_HTTPS=true behind a TLS proxy.
 if (env === 'production' && process.env.FORCE_HTTPS === 'true') {
   app.use(enforce.HTTPS({ trustProtoHeader: true }));
-  app.use(secure);
 }
 
 app.use(compression());

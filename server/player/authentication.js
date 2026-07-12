@@ -20,15 +20,6 @@ class Authentication {
   }
 
   /**
-   * Logs the player out and saves the data.
-   *
-   * @param {string} token Their JWT authentication token
-   */
-  static async logout(token) {
-    return { ok: Boolean(token) };
-  }
-
-  /**
    * Adds the player to world and logs them in
    *
    * @param {object} player The player who has just joined the server
