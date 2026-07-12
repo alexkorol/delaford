@@ -12,12 +12,22 @@ const readSource = relativePath => readFileSync(
 describe('WIZARD HUD orbs', () => {
   it('uses the pane host instead of the retired tab-strip shell', () => {
     const delaford = readSource('src/Delaford.vue');
+    const container = readSource('src/components/layout/GameContainer.vue');
     const retiredSlots = fileURLToPath(new URL('../../src/components/Slots.vue', import.meta.url));
+    const retiredWear = fileURLToPath(new URL('../../src/components/slots/Wear.vue', import.meta.url));
+    const retiredFriends = fileURLToPath(new URL('../../src/components/slots/FriendList.vue', import.meta.url));
 
     expect(delaford).toContain('<GameContainer');
     expect(delaford).toContain(':pane-registry="paneRegistryMap"');
     expect(delaford).not.toContain("from './components/Slots.vue'");
+    expect(delaford).not.toContain('WearPane');
+    expect(delaford).not.toContain('FriendListPane');
+    expect(container).toContain("@click=\"$emit('request-pane', 'quests')\"");
+    expect(container).toContain("@click=\"$emit('request-pane', 'settings')\"");
+    expect(container).toContain("@click=\"$emit('request-pane', 'logout')\"");
     expect(existsSync(retiredSlots)).toBe(false);
+    expect(existsSync(retiredWear)).toBe(false);
+    expect(existsSync(retiredFriends)).toBe(false);
   });
 
   it('renders the orb art without visible redundant text or bar overlays', () => {

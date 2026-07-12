@@ -39,6 +39,30 @@
               v-if="!uiHidden"
               class="game-container__party-overlay"
             >
+              <nav class="game-container__pane-menu" aria-label="Game panels">
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  title="Quests (Q)"
+                  @click="$emit('request-pane', 'quests')"
+                >
+                  Quests
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="$emit('request-pane', 'settings')"
+                >
+                  Settings
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="$emit('request-pane', 'logout')"
+                >
+                  Exit
+                </button>
+              </nav>
               <button
                 type="button"
                 class="game-container__party-toggle"
@@ -325,6 +349,7 @@ export default {
     'overlay-close',
     'quick-slot',
     'request-remap',
+    'request-pane',
     'party-create',
     'party-leave',
     'party-toggle-ready',
@@ -849,6 +874,13 @@ export default {
 
 .game-container__party-toggle:hover {
   background: rgba(40, 36, 28, 0.95);
+}
+
+.game-container__pane-menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-xs);
 }
 
 .game-container__party-overlay :deep(.party-panel) {

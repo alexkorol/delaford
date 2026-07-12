@@ -1,5 +1,22 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Make every retained game pane reachable
+
+- Goal: remove pane registry entries that could not be reached through the live
+  shell and expose the useful overlays through visible controls.
+- Audit result: Equipment duplicated the ragdoll already mounted inside
+  Inventory, while Friends showed inert Add/Remove buttons. Quests had only a
+  keyboard shortcut; Settings and Logout had no visible route.
+- Implementation: deleted the duplicate Equipment and unfinished Friends panes,
+  removed their registry and legacy slot mappings, and added visible Quests,
+  Settings, and Exit controls to the in-game menu cluster. The bank's old
+  `show-sidebar` bridge is now explicitly limited to opening Inventory.
+- Proof added: HUD source regression coverage requires all three menu routes and
+  verifies the two retired pane files and imports remain absent.
+- Evidence: `npm run test:unit` — 83 files and 530 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests.
+- Next target: remove verified dead binary assets and repository/config cruft.
+
 ## 2026-07-12 — Remove detached identity and UI protocols
 
 - Goal: delete verified unreachable APIs, socket events, and UI signals while
