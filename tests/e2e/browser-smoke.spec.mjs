@@ -264,6 +264,13 @@ test.describe('canonical browser smoke', () => {
     await escapeMenu.getByRole('button', { name: 'Inventory I' }).click();
     const inventory = page.getByRole('region', { name: 'Inventory panel' });
     await expect(inventory).toBeVisible();
+    await page.getByRole('button', { name: 'Open auxiliary inventory' }).click();
+    const auxiliaryDrawer = page.getByRole('complementary', { name: 'Auxiliary inventory' });
+    await expect(auxiliaryDrawer).toBeVisible();
+    const auxiliaryBounds = await auxiliaryDrawer.boundingBox();
+    expect(auxiliaryBounds).toBeTruthy();
+    expect(auxiliaryBounds.x).toBeGreaterThanOrEqual(0);
+    expect(auxiliaryBounds.x + auxiliaryBounds.width).toBeLessThanOrEqual(480);
     const inventoryBounds = await inventory.boundingBox();
     expect(inventoryBounds).toBeTruthy();
     expect(inventoryBounds.x).toBeGreaterThanOrEqual(0);

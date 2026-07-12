@@ -1,15 +1,5 @@
 <template>
   <div class="inventory-pane">
-    <header class="inventory-pane__summary">
-      <div>
-        <span class="inventory-pane__eyebrow">Inventory</span>
-        <strong>Backpack · {{ occupiedCells }} / {{ totalCells }}</strong>
-      </div>
-      <span class="inventory-pane__grid-size">
-        {{ grid.columns }} × {{ grid.rows }} · R rotates
-      </span>
-    </header>
-
     <div class="inventory-pane__body">
       <EquipmentRagdoll
         :game="game"
@@ -19,6 +9,10 @@
       />
 
       <div class="inventory-pane__grid">
+        <div class="inventory-pane__backpack-meta" aria-label="Backpack capacity">
+          <span>Backpack</span>
+          <span>{{ occupiedCells }} / {{ totalCells }}</span>
+        </div>
         <InventoryGrid
           :images="resolvedImages"
           :columns="grid.columns"
@@ -232,7 +226,7 @@ export default {
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 10px;
+  padding: 10px 8px 8px;
   box-sizing: border-box;
   color: var(--color-text-primary);
   background:
@@ -242,46 +236,11 @@ export default {
   border-image: url('@/assets/inventory/frame_ornate.png') 118 / 14px stretch;
   box-shadow: 0 15px 38px rgba(0, 0, 0, 0.5);
 
-  &__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 10px;
-    border: 1px solid rgba(215, 180, 103, 0.18);
-    border-radius: var(--radius-sm);
-    background:
-      linear-gradient(90deg, rgba(93, 63, 20, 0.18), rgba(20, 20, 19, 0.76), rgba(18, 45, 70, 0.12)),
-      rgba(0, 0, 0, 0.24);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
-  }
-
-  &__summary strong {
-    display: block;
-    margin-top: 2px;
-    font-size: 15px;
-    color: #e8c76a;
-    font-family: Georgia, 'Times New Roman', serif;
-    letter-spacing: 0.04em;
-  }
-
-  &__eyebrow,
-  &__grid-size {
-    font-size: 11px;
-    color: rgba(231, 218, 190, 0.78);
-    text-transform: uppercase;
-    letter-spacing: 0;
-  }
-
-  &__grid-size {
-    color: rgba(182, 166, 134, 0.78);
-  }
-
   &__body {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
     width: 100%;
     min-width: 0;
@@ -299,10 +258,23 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
     min-width: 0;
     max-width: 100%;
     overflow-x: auto;
+  }
+
+  &__backpack-meta {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 4px;
+    box-sizing: border-box;
+    color: rgba(190, 172, 137, 0.7);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    line-height: 1.4;
+    text-transform: uppercase;
   }
 
   &__utility-row {

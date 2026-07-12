@@ -20,6 +20,7 @@
           :aria-label="`${leftPaneTitle} panel`"
           :compressed="layoutMode !== 'desktop'"
           :dismissible="true"
+          :minimal-header="leftPaneMinimalHeader"
           @dismiss="$emit('overlay-close', leftPane)"
         >
           <component
@@ -49,6 +50,7 @@
           :aria-label="`${rightPaneTitle} panel`"
           :compressed="layoutMode !== 'desktop'"
           :dismissible="true"
+          :minimal-header="rightPaneMinimalHeader"
           @dismiss="$emit('overlay-close', rightPane)"
         >
           <component
@@ -153,6 +155,12 @@ export default {
     },
     rightPaneComponent() {
       return this.rightPaneEntry && this.rightPaneEntry.component;
+    },
+    leftPaneMinimalHeader() {
+      return Boolean(this.leftPaneEntry?.options?.minimalHeader);
+    },
+    rightPaneMinimalHeader() {
+      return Boolean(this.rightPaneEntry?.options?.minimalHeader);
     },
     overlayComponent() {
       return this.overlayPaneEntry && this.overlayPaneEntry.component;

@@ -334,6 +334,7 @@ export default {
 
   &.wearSlot {
     background-color: rgba(7, 8, 10, 0.8);
+    background-image: none !important;
     border-color: rgba(231, 199, 124, 0.62);
   }
 

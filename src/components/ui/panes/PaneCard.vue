@@ -1,11 +1,14 @@
 <template>
   <section
     class="pane-card"
-    :class="{ 'pane-card--compressed': compressed }"
+    :class="{
+      'pane-card--compressed': compressed,
+      'pane-card--minimal-header': minimalHeader,
+    }"
     :aria-label="ariaLabel"
   >
     <header class="pane-card__header">
-      <h2 class="pane-card__title">{{ title }}</h2>
+      <h2 :class="['pane-card__title', { 'sr-only': minimalHeader }]">{{ title }}</h2>
       <div class="pane-card__actions">
         <slot name="actions" />
         <button
@@ -38,6 +41,10 @@ export default {
       default: false,
     },
     dismissible: {
+      type: Boolean,
+      default: false,
+    },
+    minimalHeader: {
       type: Boolean,
       default: false,
     },
@@ -162,6 +169,27 @@ export default {
     linear-gradient(rgba(183, 146, 79, 0.025) 1px, transparent 1px),
     linear-gradient(180deg, rgba(6, 7, 8, 0.26), rgba(0, 0, 0, 0.12));
   background-size: 32px 32px, 32px 32px, auto;
+}
+
+.pane-card--minimal-header {
+  overflow: visible;
+}
+
+.pane-card--minimal-header .pane-card__header {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pane-card--minimal-header .pane-card__body {
+  height: 100%;
+  padding: 0;
 }
 
 .sr-only {

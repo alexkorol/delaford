@@ -127,7 +127,12 @@ const createDefaultQuickSlots = () => createQuickbarSlots();
 
 const paneRegistry = {
   stats: { component: StatsPane, title: 'Character', slot: 'left' },
-  inventory: { component: InventoryPane, title: 'Inventory', slot: 'right' },
+  inventory: {
+    component: InventoryPane,
+    title: 'Inventory',
+    slot: 'right',
+    options: { minimalHeader: true },
+  },
   settings: { component: SettingsPane, title: 'Settings' },
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },

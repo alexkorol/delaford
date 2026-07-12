@@ -238,6 +238,11 @@ describe('inventory drag target component wiring', () => {
 
     expect(equipmentRagdoll).not.toMatch(/arrows|quiver/i);
     expect(equipmentRagdoll).toContain("{ id: 'feet', label: 'Feet'");
+    expect(equipmentRagdoll).toContain("{ id: 'right_hand', label: 'Main hand', column: 1, row: 1, width: 2, height: 4 }");
+    expect(equipmentRagdoll).toContain("{ id: 'back', label: 'Cloak', column: 3, row: 1, width: 2, height: 3 }");
+    expect(equipmentRagdoll).toContain("{ id: 'armor', label: 'Body', column: 5, row: 3, width: 2, height: 3 }");
+    expect(equipmentRagdoll).toContain("class=\"equipment-ragdoll__aux-toggle\"");
+    expect(equipmentRagdoll).toContain("{{ auxiliaryOpen ? '>>' : '<<' }}");
 
     expect(equipmentSlot).toContain(':data-equipment-slot="slotId"');
     expect(equipmentSlot).toContain('@pointerup.left.stop.prevent="handlePointerUp"');
@@ -248,6 +253,7 @@ describe('inventory drag target component wiring', () => {
     expect(equipmentSlot).not.toContain('inventoryDragStore.isDragging.value');
     expect(equipmentSlot).not.toContain('inventoryDragStore.activeItem.value');
     expect(equipmentSlot).not.toContain('inventoryDragStore.dragState.value');
+    expect(equipmentSlot).toContain('background-image: none !important;');
 
     expect(inventoryGrid).toContain('const externalDropTargetFromEvent = (event) => {');
     expect(inventoryGrid).toContain(':style="cellStyle(slotIndex - 1)"');

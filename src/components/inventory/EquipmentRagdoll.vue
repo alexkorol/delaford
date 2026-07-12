@@ -1,8 +1,31 @@
 <template>
   <div class="equipment-ragdoll">
-    <header class="equipment-ragdoll__header">
-      <span>Equipment</span>
-    </header>
+    <button
+      type="button"
+      class="equipment-ragdoll__aux-toggle"
+      :aria-expanded="auxiliaryOpen"
+      :aria-label="auxiliaryOpen ? 'Close auxiliary inventory' : 'Open auxiliary inventory'"
+      aria-controls="inventory-auxiliary-drawer"
+      :title="auxiliaryOpen ? 'Close auxiliary inventory' : 'Open auxiliary inventory'"
+      @click="auxiliaryOpen = !auxiliaryOpen"
+    >{{ auxiliaryOpen ? '>>' : '<<' }}</button>
+
+    <aside
+      v-if="auxiliaryOpen"
+      id="inventory-auxiliary-drawer"
+      class="equipment-ragdoll__aux-drawer"
+      aria-label="Auxiliary inventory"
+    >
+      <section
+        v-for="panel in auxiliaryPanels"
+        :key="panel.id"
+        class="equipment-ragdoll__aux-panel"
+      >
+        <span>{{ panel.label }}</span>
+        <small>{{ panel.detail }}</small>
+      </section>
+    </aside>
+
     <div class="equipment-ragdoll__slots">
       <equipment-slot
         v-for="descriptor in slotLayout"
@@ -30,12 +53,12 @@ import EquipmentSlot from '../sub/EquipmentSlot.vue';
 // column/row are 1-based CSS grid lines; width/height are cell spans.
 const SLOT_LAYOUT = [
   { id: 'right_hand', label: 'Main hand', column: 1, row: 1, width: 2, height: 4 }, // weapon, up to 2x4 two-hander
-  { id: 'back', label: 'Back', column: 3, row: 1, width: 1, height: 2 }, // cape
-  { id: 'head', label: 'Head', column: 4, row: 1, width: 2, height: 2 },
-  { id: 'necklace', label: 'Neck', column: 6, row: 2, width: 1, height: 1 },
+  { id: 'back', label: 'Cloak', column: 3, row: 1, width: 2, height: 3 },
+  { id: 'necklace', label: 'Neck', column: 3, row: 4, width: 2, height: 2 },
+  { id: 'ring', label: 'Ring', column: 4, row: 6, width: 1, height: 1 },
+  { id: 'head', label: 'Head', column: 5, row: 1, width: 2, height: 2 },
+  { id: 'armor', label: 'Body', column: 5, row: 3, width: 2, height: 3 },
   { id: 'left_hand', label: 'Off hand', column: 7, row: 1, width: 2, height: 4 }, // offhand/shield
-  { id: 'armor', label: 'Body', column: 4, row: 3, width: 2, height: 3 }, // body armour 2x3
-  { id: 'ring', label: 'Ring', column: 3, row: 4, width: 1, height: 1 },
   { id: 'gloves', label: 'Hands', column: 1, row: 5, width: 2, height: 2 },
   { id: 'feet', label: 'Feet', column: 7, row: 5, width: 2, height: 2 },
 ];
@@ -55,6 +78,16 @@ export default {
       type: Object,
       default: () => ({}),
     },
+  },
+  data() {
+    return {
+      auxiliaryOpen: false,
+      auxiliaryPanels: [
+        { id: 'relics', label: 'Relics & charts', detail: 'Auxiliary pack' },
+        { id: 'reagents', label: 'Reagents & utility', detail: 'Auxiliary pack' },
+        { id: 'special', label: 'Special seats', detail: 'War-horn · Orb' },
+      ],
+    };
   },
   computed: {
     wear() {
@@ -114,15 +147,15 @@ export default {
 
 <style lang="scss" scoped>
 .equipment-ragdoll {
-  --eq-cell: clamp(38px, 2.8vw, 54px);
-  --eq-gap: 6px;
+  --eq-cell: clamp(38px, 2.65vw, 50px);
+  --eq-gap: 5px;
 
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: clamp(12px, 1.4vw, 22px);
+  padding: 8px;
   background:
     radial-gradient(circle at 50% 42%, rgba(96, 71, 28, 0.12), transparent 45%),
     linear-gradient(180deg, rgba(25, 23, 19, 0.95), rgba(8, 8, 8, 0.94));
@@ -132,29 +165,6 @@ export default {
   box-shadow:
     inset 0 0 0 1px rgba(255, 240, 190, 0.04),
     inset 0 0 24px rgba(0, 0, 0, 0.72);
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    margin: -4px 0 10px;
-    color: #e8c76a;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 12px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  }
-
-  &__header::before,
-  &__header::after {
-    flex: 1;
-    height: 12px;
-    content: '';
-    opacity: 0.5;
-    background: url('@/assets/inventory/divider.png') center / contain no-repeat;
-  }
 
   &__slots {
     position: relative;
@@ -168,6 +178,79 @@ export default {
   &__slot {
     width: 100%;
     height: 100%;
+  }
+
+  &__aux-toggle {
+    position: absolute;
+    top: 10px;
+    left: calc(50% - (var(--eq-cell) * 4) - (var(--eq-gap) * 3.5) - 25px);
+    z-index: 5;
+    width: 22px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(184, 147, 80, 0.46);
+    border-right-color: rgba(226, 192, 119, 0.7);
+    color: rgba(226, 205, 159, 0.84);
+    background: linear-gradient(180deg, rgba(34, 29, 21, 0.98), rgba(8, 8, 8, 0.98));
+    box-shadow: inset 0 0 7px rgba(0, 0, 0, 0.75), 0 3px 8px rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+    font-family: 'GameFont', sans-serif;
+    font-size: 9px;
+    line-height: 1;
+  }
+
+  &__aux-toggle:hover,
+  &__aux-toggle:focus-visible {
+    border-color: rgba(235, 199, 116, 0.9);
+    color: #f2d886;
+    outline: none;
+  }
+
+  &__aux-drawer {
+    position: absolute;
+    top: 8px;
+    right: calc(50% + (var(--eq-cell) * 4) + (var(--eq-gap) * 3.5) + 6px);
+    z-index: 4;
+    display: grid;
+    gap: 5px;
+    width: 184px;
+    padding: 7px;
+    box-sizing: border-box;
+    border: 1px solid rgba(184, 147, 80, 0.4);
+    background:
+      radial-gradient(circle at 100% 0, rgba(104, 73, 26, 0.16), transparent 42%),
+      linear-gradient(180deg, rgba(20, 18, 15, 0.98), rgba(7, 7, 7, 0.98));
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.72), 0 12px 26px rgba(0, 0, 0, 0.58);
+  }
+
+  &__aux-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 38px;
+    padding: 7px 8px;
+    box-sizing: border-box;
+    border: 1px solid rgba(161, 135, 91, 0.24);
+    color: rgba(224, 205, 163, 0.82);
+    background: rgba(5, 6, 8, 0.68);
+    box-shadow: inset 0 0 9px rgba(0, 0, 0, 0.66);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  &__aux-panel small {
+    color: rgba(164, 150, 123, 0.62);
+    font-size: 8px;
+    letter-spacing: 0.05em;
+  }
+}
+
+@media (width <= 700px) {
+  .equipment-ragdoll__aux-drawer {
+    right: 8px;
+    left: 8px;
+    width: auto;
   }
 }
 
