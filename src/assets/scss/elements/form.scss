@@ -4,19 +4,26 @@
   appearance: none;
   border-radius: var(--radius-sm);
   padding: var(--space-xs) var(--space-md);
-  border: 2px solid var(--color-frame-dark);
+  min-height: 38px;
+  border: 1px solid var(--color-frame-dark);
   border-top-color: var(--color-bevel-light);
   border-left-color: var(--color-bevel-light);
-  background: linear-gradient(180deg, #5a4e3a 0%, #3a3020 100%);
+  background: var(--control-surface);
   color: var(--color-text-primary);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(183, 146, 79, 0.16),
+    inset 0 8px 12px rgba(255, 244, 205, 0.025),
+    0 2px 8px rgba(0, 0, 0, 0.42);
+  text-shadow: 0 1px 0 #000;
   font-family: 'GameFont', sans-serif;
   font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: background 100ms ease-out;
+  text-transform: uppercase;
+  transition: color 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
 
   &:hover {
-    background: linear-gradient(180deg, #6a5e4a 0%, #4a4030 100%);
+    color: #fff0c2;
+    background: var(--control-surface-hover);
     border-top-color: var(--color-frame-light);
     border-left-color: var(--color-frame-light);
   }
@@ -26,11 +33,42 @@
     border-left-color: var(--color-frame-dark);
     border-bottom-color: var(--color-bevel-light);
     border-right-color: var(--color-bevel-light);
-    background: linear-gradient(180deg, #2a2218 0%, #1a1610 100%);
+    background: linear-gradient(180deg, #12110f 0%, #211a12 100%);
   }
 
   &:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: var(--color-text-dim);
+    cursor: default;
+    filter: saturate(0.4);
+    opacity: 0.58;
+  }
+}
+
+input:not([type='checkbox'], [type='radio'], [type='range']),
+textarea,
+select {
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: #090806;
+  border-left-color: #090806;
+  border-bottom-color: rgba(167, 131, 70, 0.52);
+  box-shadow: var(--shadow-inset);
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-frame-light);
+    box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(183, 146, 79, 0.18);
+  }
+
+  &::placeholder {
+    color: var(--color-text-dim);
   }
 }

@@ -186,12 +186,15 @@ export default {
     overlayClasses() {
       return {
         'pane-host__overlay--fullscreen': this.overlayOptions.fullscreen,
+        [`pane-host__overlay--${this.overlayPane?.id || 'none'}`]: true,
       };
     },
     overlayCardClasses() {
+      const compact = ['logout', 'settings', 'quests'].includes(this.overlayPane?.id);
       return {
         'pane-host__overlay-card': true,
         'pane-host__overlay-card--fullscreen': this.overlayOptions.fullscreen,
+        'pane-host__overlay-card--compact': compact,
       };
     },
     showLeftPane() {
@@ -291,9 +294,9 @@ export default {
   position: fixed;
   inset: var(--pane-host-panel-top) var(--pane-host-panel-gutter) var(--pane-host-panel-bottom);
   background:
-    radial-gradient(circle at 20% 10%, rgba(88, 18, 26, 0.18), transparent 32%),
-    radial-gradient(circle at 80% 10%, rgba(18, 45, 78, 0.14), transparent 30%),
-    rgba(6, 7, 8, 0.88);
+    radial-gradient(circle at 20% 10%, rgba(91, 26, 29, 0.2), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(35, 65, 84, 0.16), transparent 31%),
+    rgba(4, 5, 6, 0.91);
   display: grid;
   align-items: center;
   justify-items: center;
@@ -302,8 +305,17 @@ export default {
 }
 
 .pane-host__overlay-card {
-  max-width: min(820px, 94vw);
+  max-width: min(760px, calc(100vw - 32px));
   width: 100%;
+}
+
+.pane-host__overlay-card--compact {
+  max-width: min(560px, calc(100vw - 32px));
+}
+
+.pane-host__overlay-card--compact :deep(.pane-card__body) {
+  max-height: min(68vh, 520px);
+  overflow: auto;
 }
 
 .pane-host__overlay--fullscreen {

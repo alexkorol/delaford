@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { plugin as VueTippy } from 'vue-tippy';
 import 'tippy.js/dist/tippy.css';
+import './assets/scss/main.scss';
 
 import Delaford from './Delaford.vue';
 import { registerGlobalComponents } from './plugins/register-components.js';

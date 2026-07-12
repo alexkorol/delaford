@@ -1,6 +1,17 @@
 <template>
   <div class="form">
     <div
+      v-if="isLoginInProgress"
+      class="login_progress"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="login_progress__sigil" aria-hidden="true"></span>
+      <strong>Opening the Chronicle</strong>
+      <span>Your credentials have been sealed. Calling your House&hellip;</span>
+    </div>
+    <template v-else>
+    <div
       v-tippy
       title="Play with a persistent guest House on this browser."
       class="checkbox guest_account"
@@ -99,6 +110,7 @@
         Cancel
       </button>
     </div>
+    </template>
   </div>
 </template>
 
@@ -192,6 +204,11 @@ const login = (quickGuest = false) => {
     ...(useQuickGuest ? { quickGuest: true } : {}),
   };
 
+  // Keep credentials in the outbound payload only. Removing the controls on
+  // this same render also prevents password managers from repainting a saved
+  // localhost/dev credential while the authenticated screen is loading.
+  password.value = '';
+
   if (!guestAccount.value) {
     uiStore.rememberAccountUsername({
       username: username.value,
@@ -257,10 +274,47 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss" scoped>
-@use "@/assets/scss/main" as *;
-
 div.form {
   width: 100%;
+
+  .login_progress {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-sm);
+    min-height: 260px;
+    place-content: center;
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.55);
+
+    strong {
+      font-family: 'GameFont', sans-serif;
+      font-size: 1.2rem;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-accent-strong);
+    }
+
+    span:last-child {
+      font-family: 'ChatFont', sans-serif;
+      font-size: 0.88rem;
+    }
+  }
+
+  .login_progress__sigil {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-accent);
+    transform: rotate(45deg);
+    box-shadow:
+      0 0 0 4px rgba(212, 173, 90, 0.08),
+      0 0 18px rgba(212, 173, 90, 0.24);
+    animation: login-sigil 900ms ease-in-out infinite alternate;
+  }
 
   form {
     display: flex;
@@ -408,6 +462,17 @@ div.form {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+}
+
+@keyframes login-sigil {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login_progress__sigil {
+    animation: none;
   }
 }
 </style>

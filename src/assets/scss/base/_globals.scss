@@ -8,7 +8,9 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: var(--color-bg-primary);
+  background:
+    radial-gradient(circle at 50% -20%, #22201b 0%, transparent 44%),
+    var(--color-bg-primary);
   color: var(--color-text-primary);
 }
 
@@ -16,8 +18,17 @@ a {
   color: var(--color-accent);
 }
 
-button, input {
+button, input, select, textarea {
   font: inherit;
+}
+
+button {
+  letter-spacing: 0.035em;
+}
+
+::selection {
+  color: #fff4d2;
+  background: rgba(139, 48, 52, 0.72);
 }
 
 /* Dark scrollbars everywhere — no white browser-default bars over the UI */

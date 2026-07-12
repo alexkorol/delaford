@@ -5,7 +5,10 @@
       :class="{ 'quest--complete': quest.completed }"
     >
       <header>
-        <span class="name">{{ quest.title }}</span>
+        <div>
+          <span class="quest__eyebrow">Active Chronicle</span>
+          <h2 class="name">{{ quest.title }}</h2>
+        </div>
         <span class="status">{{ quest.status }}</span>
       </header>
       <p class="objective">
@@ -37,51 +40,67 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
 div.quests {
-  height: 100%;
+  width: 100%;
 
   article.quest {
-    min-height: 100%;
-    padding: 10px;
-    border: 4px solid color.adjust(grey, $lightness: -10%);
-    background-color: color.adjust(grey, $lightness: 8%);
+    padding: 18px;
+    border: 1px solid var(--color-border-strong);
+    outline: 1px solid #100c08;
+    outline-offset: -4px;
+    background:
+      linear-gradient(90deg, rgba(139, 48, 52, 0.12), transparent 36%),
+      var(--color-bg-inset);
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.58);
     box-sizing: border-box;
     margin: 0;
     text-align: left;
-    font-size: 14px;
-    line-height: 1.5em;
-    color: #e8ddc4;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--color-text-primary);
 
     header {
       display: flex;
       gap: 8px;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(232, 221, 196, 0.25);
-      padding-bottom: 6px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--color-border-subtle);
+      padding-bottom: 12px;
     }
 
     .name {
-      color: #f2c879;
-      text-shadow: 1px 1px 0 black;
-      font-family: "ChatFont", sans-serif;
+      margin: 4px 0 0;
+      color: var(--color-accent-strong);
+      text-shadow: 0 2px 0 #000;
+      font: 500 0.95rem "GameFont", sans-serif;
+    }
+
+    .quest__eyebrow {
+      color: var(--color-text-dim);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
     }
 
     .status {
-      color: #d7aa66;
-      font-size: 11px;
+      padding: 5px 7px;
+      color: var(--color-accent);
+      background: rgba(183, 146, 79, 0.08);
+      border: 1px solid var(--color-border-subtle);
+      font-size: 9px;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
     .objective {
-      margin: 10px 0;
+      margin: 16px 0;
+      font-family: "ChatFont", sans-serif;
     }
 
     .reward {
-      color: #a8cf91;
+      color: #9fbd81;
       margin: 0;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     &.quest--complete {

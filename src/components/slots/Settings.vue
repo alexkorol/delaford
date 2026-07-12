@@ -1,8 +1,11 @@
 <template>
   <div class="settings">
-    <h2>Settings</h2>
-    <div class="section">
-      <label class="label" for="frame-rate">Frame rate cap</label>
+    <p class="settings__eyebrow">Display</p>
+    <div class="settings__section">
+      <div class="settings__section-heading">
+        <label class="label" for="frame-rate">Frame rate cap</label>
+        <output for="frame-rate">{{ fpsValue }} FPS</output>
+      </div>
       <div class="range">
         <input
           id="frame-rate"
@@ -22,17 +25,20 @@
         <div>50</div>
         <div>60</div>
       </div>
-      <output for="frame-rate">{{ fpsValue }} FPS</output>
     </div>
 
-    <div class="section">
+    <p class="settings__eyebrow">Audio</p>
+    <div class="settings__section">
       <label class="sound-toggle" for="sound-effects">
         <input
           id="sound-effects"
           v-model="selected.soundEffects"
           type="checkbox"
         >
-        Sound effects
+        <span>
+          <strong>Sound effects</strong>
+          <small>Combat, loot, and world cues</small>
+        </span>
       </label>
     </div>
   </div>
@@ -93,28 +99,44 @@ export default {
 
 <style lang="scss" scoped>
 div.settings {
-  height: 100%;
+  width: 100%;
   font-family: "GameFont", sans-serif;
   text-align: left;
-  text-shadow: 1px 1px 0 black;
+  text-shadow: 0 1px 0 #000;
   font-size: 12px;
 
-  h2 {
-    margin: 0 0 1rem;
-    font-size: 1rem;
+  .settings__eyebrow {
+    margin: 0 0 7px;
+    color: var(--color-accent);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
   }
 
-  .section + .section {
-    margin-top: 1.25rem;
+  .settings__section {
+    margin-bottom: 18px;
+    padding: 14px;
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border-subtle);
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.42);
+  }
+
+  .settings__section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
 
   .label {
     display: block;
-    margin-bottom: 0.5em;
+    color: var(--color-text-primary);
   }
 
   input[type="range"] {
     width: 100%;
+    margin: 14px 0 7px;
+    accent-color: var(--color-accent);
   }
 
   div.fps-range {
@@ -134,16 +156,37 @@ div.settings {
   }
 
   output {
-    display: block;
-    margin-top: 0.5rem;
-    color: #e8cd83;
+    color: var(--color-accent-strong);
+    font-size: 0.72rem;
   }
 
   .sound-toggle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     cursor: pointer;
+
+    input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--color-accent);
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    strong {
+      color: var(--color-text-primary);
+      font-weight: 500;
+    }
+
+    small {
+      color: var(--color-text-dim);
+      font: 0.72rem "ChatFont", sans-serif;
+    }
   }
 }
 </style>

@@ -19,20 +19,23 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-
 .header {
-  background: color.adjust($color, $lightness: 10%);
-  height: 30px;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  background: var(--panel-header);
+  border-bottom: 1px solid var(--color-border-strong);
   position: relative;
 
   .text-header {
     cursor: default;
-    text-shadow: 2px 2px 0 black;
-    line-height: 27px;
+    color: var(--color-accent-strong);
+    text-shadow: 0 2px 0 #000;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
   }
-
 }
 </style>

@@ -72,14 +72,26 @@ export default {
 .escape-menu {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: min(460px, 100%);
+  gap: 9px;
+  width: min(480px, 100%);
   margin: 0 auto;
 }
 
 .escape-menu__intro {
-  margin-bottom: 4px;
+  position: relative;
+  margin-bottom: 11px;
+  padding-bottom: 14px;
   text-align: center;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 12%;
+    bottom: 0;
+    left: 12%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-frame-light), transparent);
+  }
 }
 
 .escape-menu__intro h1 {
@@ -87,21 +99,22 @@ export default {
   font-family: 'GameFont', Georgia, serif;
   font-size: clamp(1.5rem, 4vw, 2.2rem);
   font-weight: 500;
-  color: #f2d391;
-  text-shadow: 0 2px 0 #000, 0 0 18px rgba(217, 169, 74, 0.28);
+  color: var(--color-accent-strong);
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 #000, 0 0 18px rgba(217, 169, 74, 0.2);
 }
 
 .escape-menu__intro p,
 .escape-menu__eyebrow {
   margin: 0;
-  color: rgba(231, 218, 190, 0.66);
+  color: var(--color-text-dim);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .escape-menu__eyebrow {
-  color: #a6803d;
+  color: var(--color-accent);
 }
 
 .escape-menu__grid {
@@ -114,41 +127,45 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 46px;
-  padding: 9px 13px;
-  border: 1px solid rgba(180, 145, 86, 0.4);
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, rgba(61, 61, 62, 0.92), rgba(20, 20, 22, 0.96)),
-    #151516;
-  color: #e9dfc7;
+  min-height: 45px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(218, 184, 112, 0.34);
+  border-left-color: rgba(218, 184, 112, 0.24);
+  border-radius: 0;
+  background: var(--control-surface);
+  color: var(--color-text-primary);
   font-family: 'GameFont', sans-serif;
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgba(183, 146, 79, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .escape-menu__action:hover,
 .escape-menu__action:focus-visible {
-  border-color: #cba55a;
+  border-color: var(--color-frame-light);
   color: #fff2c9;
-  background: linear-gradient(180deg, rgba(92, 71, 38, 0.96), rgba(28, 24, 19, 0.98));
+  background: var(--control-surface-hover);
   outline: none;
 }
 
 .escape-menu__action--primary {
   min-height: 54px;
-  border-color: rgba(213, 176, 96, 0.72);
-  background: linear-gradient(180deg, #725525, #36250f);
+  border-color: rgba(225, 193, 116, 0.7);
+  background:
+    linear-gradient(90deg, rgba(139, 48, 52, 0.32), transparent 38%, rgba(49, 91, 122, 0.2)),
+    linear-gradient(180deg, #594522, #241a0e);
   color: #fff1c4;
   font-size: 0.95rem;
 }
 
 .escape-menu__action--danger {
-  border-color: rgba(146, 55, 55, 0.52);
-  color: #e7b2aa;
+  border-color: rgba(139, 48, 52, 0.56);
+  color: #ddb0a8;
 }
 
 .escape-menu__action--danger:hover,
@@ -173,9 +190,9 @@ export default {
   padding: 3px 6px;
   border: 1px solid rgba(231, 218, 190, 0.22);
   border-bottom-color: rgba(0, 0, 0, 0.72);
-  border-radius: 3px;
+  border-radius: 0;
   background: rgba(0, 0, 0, 0.34);
-  color: rgba(242, 211, 145, 0.76);
+  color: var(--color-accent-strong);
   font-family: monospace;
   font-size: 0.68rem;
   text-align: center;

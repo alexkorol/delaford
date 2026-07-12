@@ -623,15 +623,21 @@ div.game {
     width: 30px;
     height: 30px;
     padding: 3px;
-    color: #fff;
+    color: var(--color-text-secondary);
     font: 1rem "GameFont", sans-serif;
-    background: #b30000;
-    border: 0;
+    background: var(--control-surface);
+    border: 1px solid var(--color-frame-dark);
     cursor: pointer;
 
     &:focus-visible {
       outline: 2px solid #fff2c8;
       outline-offset: -3px;
+    }
+
+    &:hover {
+      color: #f0b4a8;
+      border-color: var(--color-danger);
+      background: linear-gradient(180deg, #4c2424, #211111);
     }
   }
 

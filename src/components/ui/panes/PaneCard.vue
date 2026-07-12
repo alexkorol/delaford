@@ -59,17 +59,16 @@ export default {
   flex-direction: column;
   width: 100%;
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 244, 205, 0.05), rgba(255, 244, 205, 0) 30%),
-    linear-gradient(180deg, #191b1d 0%, #101113 100%);
-  border: 2px solid #16100a;
-  border-top-color: #806b45;
-  border-left-color: #6f5a3a;
+  background: var(--panel-surface);
+  border: 1px solid var(--color-frame-black);
+  outline: 1px solid rgba(151, 118, 61, 0.62);
+  outline-offset: -4px;
   box-shadow:
-    inset 0 0 0 1px rgba(215, 180, 103, 0.16),
-    inset 0 18px 26px rgba(255, 255, 255, 0.03),
-    inset 0 -20px 28px rgba(0, 0, 0, 0.55),
-    0 10px 26px rgba(0, 0, 0, 0.72);
+    inset 0 0 0 2px #20170e,
+    inset 0 0 0 5px rgba(4, 5, 6, 0.86),
+    inset 0 22px 30px rgba(255, 245, 207, 0.025),
+    inset 0 -24px 34px rgba(0, 0, 0, 0.64),
+    var(--shadow-strong);
   color: var(--color-text-primary);
   overflow: hidden;
 }
@@ -78,20 +77,20 @@ export default {
 .pane-card::after {
   content: '';
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 14px;
+  right: 14px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(215, 180, 103, 0.55), transparent);
+  background: linear-gradient(90deg, transparent, rgba(225, 193, 116, 0.56), transparent);
   pointer-events: none;
   z-index: 1;
 }
 
 .pane-card::before {
-  top: 5px;
+  top: 7px;
 }
 
 .pane-card::after {
-  bottom: 5px;
+  bottom: 7px;
 }
 
 .pane-card--compressed {
@@ -102,23 +101,23 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 34px;
-  padding: 7px var(--space-md);
+  min-height: 42px;
+  padding: 9px 16px 9px 18px;
   gap: var(--space-md);
-  background:
-    linear-gradient(90deg, rgba(110, 20, 28, 0.42), rgba(20, 22, 26, 0.35) 42%, rgba(26, 44, 70, 0.28)),
-    linear-gradient(180deg, #2d2b28 0%, #191816 100%);
-  border-bottom: 1px solid rgba(215, 180, 103, 0.28);
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.75);
+  background: var(--panel-header);
+  border-bottom: 1px solid rgba(183, 146, 79, 0.48);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(228, 204, 147, 0.08);
 }
 
 .pane-card__title {
   font-family: 'GameFont', sans-serif;
-  font-size: 13px;
-  letter-spacing: 0;
+  font-size: 12px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #f2d391;
-  text-shadow: 0 1px 0 #000, 0 0 8px rgba(217, 169, 74, 0.28);
+  color: var(--color-accent-strong);
+  text-shadow: 0 2px 0 #000, 0 0 10px rgba(217, 169, 74, 0.22);
   margin: 0;
 }
 
@@ -130,12 +129,12 @@ export default {
 
 .pane-card__dismiss {
   appearance: none;
-  border: 1px solid #24170e;
-  background: linear-gradient(180deg, #3b3d42 0%, #18191d 100%);
+  border: 1px solid var(--color-frame-dark);
+  background: var(--control-surface);
   color: var(--color-text-secondary);
-  border-radius: var(--radius-sm);
-  width: 24px;
-  height: 24px;
+  border-radius: 0;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -155,13 +154,14 @@ export default {
 
 .pane-card__body {
   position: relative;
-  padding: var(--space-md);
+  padding: 18px;
   overflow: auto;
   max-height: min(72vh, 640px);
   background:
-    radial-gradient(circle at 18% 0%, rgba(95, 25, 30, 0.16), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(26, 55, 92, 0.14), transparent 24%),
-    linear-gradient(180deg, rgba(9, 10, 11, 0.18), rgba(0, 0, 0, 0.08));
+    linear-gradient(90deg, rgba(183, 146, 79, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(183, 146, 79, 0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(6, 7, 8, 0.26), rgba(0, 0, 0, 0.12));
+  background-size: 32px 32px, 32px 32px, auto;
 }
 
 .sr-only {

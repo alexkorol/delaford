@@ -56,43 +56,28 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
 .shopView {
-  background-color: $color;
+  height: 100%;
+  padding: 5px;
+  background: var(--panel-surface);
   font-family: "GameFont", sans-serif;
-  border: 5px solid color.adjust($color, $lightness: -10%);
+  border: 1px solid var(--color-frame-dark);
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: -4px;
+  box-shadow: var(--shadow-strong);
 
   .shopHint {
     margin: 0;
-    padding: 8px 10px;
-    background: #332d27;
-    color: #f4dfad;
-    font-size: .75rem;
-  }
-
-  .header {
-    background: color.adjust($color, $lightness: 10%);
-    height: 30px;
-
-    .close {
-      float: right;
-      width: 30px;
-      box-sizing: border-box;
-      height: 30px;
-      background-color: color.adjust(red, $lightness: -10%);
-      color: white;
-      font-size: 1em;
-      padding: 5px 2px 5px 5px;
-    }
+    padding: 10px;
+    background: var(--color-bg-inset);
+    border-top: 1px solid var(--color-border-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font: .72rem/1.5 "ChatFont", sans-serif;
   }
 
   .main {
-    padding: .5em;
+    margin: 0 5px 5px;
   }
 }
 </style>

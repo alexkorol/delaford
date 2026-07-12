@@ -113,7 +113,7 @@
               </div>
             </div>
             <div
-              v-if="!uiHidden && !chatExpanded"
+              v-if="!uiHidden && !legacyPaneOpen && !chatExpanded"
               ref="chatPeekRef"
               class="game-container__chat-peek"
               :class="{ 'game-container__chat-peek--dragging': isChatDragging }"
@@ -154,7 +154,7 @@
               </button>
             </div>
             <div
-              v-if="!uiHidden"
+              v-if="!uiHidden && !legacyPaneOpen"
               ref="chatOverlayRef"
               class="game-container__chat-overlay"
               :class="{ 'game-container__chat-overlay--collapsed': !chatExpanded }"
@@ -862,32 +862,43 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-xs);
+  gap: 3px;
   width: min(300px, 40%);
   pointer-events: auto;
 }
 
 .game-container__party-toggle {
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.4);
-  background: rgba(12, 16, 28, 0.85);
-  color: #f5d68a;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  min-height: 29px;
+  padding: 5px 12px;
+  border-radius: 0;
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(218, 184, 112, 0.35);
+  background: var(--control-surface);
+  color: var(--color-accent-strong);
+  font: 0.67rem 'GameFont', sans-serif;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(183, 146, 79, 0.08), 0 3px 10px rgba(0, 0, 0, 0.38);
 }
 
-.game-container__party-toggle:hover {
-  background: rgba(40, 36, 28, 0.95);
+.game-container__party-toggle:hover,
+.game-container__party-toggle:focus-visible {
+  color: #fff0c2;
+  border-color: var(--color-frame-light);
+  background: var(--control-surface-hover);
+  outline: none;
 }
 
 .game-container__pane-menu {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--space-xs);
+  gap: 3px;
+  padding: 3px;
+  background: rgba(5, 6, 7, 0.78);
+  border: 1px solid rgba(120, 95, 54, 0.28);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
 }
 
 .game-container__party-overlay :deep(.party-panel) {
@@ -899,11 +910,14 @@ export default {
   flex-direction: column;
   gap: 4px;
   margin-top: 4px;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.4);
-  background: rgba(10, 12, 20, 0.94);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  min-width: 250px;
+  padding: 10px;
+  border-radius: 0;
+  border: 1px solid var(--color-border-strong);
+  outline: 1px solid #090806;
+  outline-offset: -4px;
+  background: var(--panel-surface);
+  box-shadow: var(--shadow-strong);
 }
 
 .game-container__zone-title {
@@ -911,7 +925,7 @@ export default {
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(231, 218, 190, 0.7);
+  color: var(--color-text-dim);
 }
 
 .game-container__zone {
@@ -919,17 +933,18 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.28);
-  background: linear-gradient(180deg, rgba(58, 30, 26, 0.85), rgba(24, 14, 12, 0.9));
-  color: #f2d391;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 0;
+  border: 1px solid var(--color-frame-dark);
+  background: var(--control-surface);
+  color: var(--color-accent-strong);
   font-family: 'GameFont', sans-serif;
   cursor: pointer;
 
   &:hover {
     border-color: var(--color-accent-strong, #e0b45c);
-    background: linear-gradient(180deg, rgba(78, 40, 34, 0.9), rgba(34, 20, 16, 0.95));
+    background: var(--control-surface-hover);
   }
 }
 

@@ -697,6 +697,32 @@
   tests; `npm run smoke:browser` rebuilt production and passed 2/2 journeys;
   `npm run playtest -- quickstart` passed 1/1.
 
+## 2026-07-12 — Unified interface foundation and sealed login transition
+
+- Goal: replace the visible mixture of legacy gray panes, isolated component
+  styles, and modern rounded overlays with one iron, brass, parchment, ruby,
+  and sapphire interface language while closing the remaining real-account
+  credential flash.
+- The shared SCSS foundation is now imported globally, with common surface,
+  control, border, spacing, and text tokens. Pane frames, Escape, logout,
+  settings, quests, inventory grids, Bank, Shop, Furnace, Anvil, and the game
+  navigation now draw from that foundation; the bank grid also fits beside the
+  inventory without chat obscuring the transfer controls.
+- A submitted account form is removed from the DOM on the same render that
+  starts authentication and replaced by an explicit Chronicle-opening state.
+  The password model is scrubbed after the outbound payload is copied, so a
+  browser password manager has no mounted field in which to repaint a saved
+  localhost `dev` credential during the server transition. Failed sign-in
+  returns to the remembered username with a blank password.
+- Browser smoke now checks the immediate post-click render as well as rapid
+  field samples: the progress state must be visible, both credential controls
+  must be absent, and neither legacy guest credential may appear.
+- Evidence: `npm run lint` and `npm run lint:css` exited 0; `npm run test:unit`
+  passed 85 files / 533 tests; `npm run smoke:browser` rebuilt production and
+  passed 2/2 journeys; full `npm run playtest` passed 21/21 scenarios.
+- Next: continue the visual unification through the context menu, party/chat,
+  remaining Chronicle/auth surfaces, and narrow-viewport QA.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -789,3 +815,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T07:33:12.596Z | session-arc | 100 | 0.6 | 3.8 | 0.93 | 0.64 | 6 | 1 | 4
 
 2026-07-12T08:07:32.434Z | session-arc | 100 | 0.6 | 6.42 | 2.22 | 0.32 | 6 | 1 | 4
+
+2026-07-12T19:55:31.224Z | session-arc | 100 | 0.59 | 5.98 | 2.78 | 0.62 | 6 | 1 | 4

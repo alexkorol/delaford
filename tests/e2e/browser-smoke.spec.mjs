@@ -95,7 +95,7 @@ test.describe('canonical browser smoke', () => {
       .not.toContain('plaintext-legacy-password');
 
     await page.locator('#login-password').fill('smoke-passphrase');
-    const loginFieldSamples = await page.evaluate(() => new Promise((resolve) => {
+    const loginTransition = await page.evaluate(() => new Promise((resolve) => {
       const samples = [];
       const timer = window.setInterval(() => {
         const username = document.querySelector('#login-username')?.value;
@@ -103,13 +103,25 @@ test.describe('canonical browser smoke', () => {
         if (username !== undefined || password !== undefined) samples.push([username, password]);
       }, 5);
       document.querySelector('button.login')?.click();
-      window.setTimeout(() => {
-        window.clearInterval(timer);
-        resolve(samples);
-      }, 750);
+      Promise.resolve().then(() => {
+        const submitted = {
+          progressVisible: Boolean(document.querySelector('.login_progress')),
+          usernameFieldPresent: Boolean(document.querySelector('#login-username')),
+          passwordFieldPresent: Boolean(document.querySelector('#login-password')),
+        };
+        window.setTimeout(() => {
+          window.clearInterval(timer);
+          resolve({ samples, submitted });
+        }, 750);
+      });
     }));
-    expect(loginFieldSamples.flat()).not.toContain('dev');
-    expect(loginFieldSamples.flat()).not.toContain('qwertykeyboard');
+    expect(loginTransition.submitted).toEqual({
+      progressVisible: true,
+      usernameFieldPresent: false,
+      passwordFieldPresent: false,
+    });
+    expect(loginTransition.samples.flat()).not.toContain('dev');
+    expect(loginTransition.samples.flat()).not.toContain('qwertykeyboard');
     await expect(page.getByRole('heading', { name: 'Found Your House' })).toBeVisible();
   });
 
