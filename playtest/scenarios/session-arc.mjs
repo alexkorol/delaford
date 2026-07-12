@@ -133,6 +133,16 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
       first.devClearFloor();
       return false;
     }, { timeoutMs: 8000, intervalMs: 500, label: 'acknowledged floor clear setup' });
+    await first.waitFor(async () => (await first.state()).monsters.length === 0, {
+      timeoutMs: 8000,
+      intervalMs: 500,
+      label: 'authoritative empty first-goal floor',
+    });
+    await first.waitFor(() => first.events.some(event => event.event === 'party:instance:complete'), {
+      timeoutMs: 15000,
+      intervalMs: 500,
+      label: 'first-goal instance completion event',
+    });
     await first.waitFor(async () => (await first.state()).quests?.firstGoal?.stage === 'return-to-town', {
       timeoutMs: 15000,
       intervalMs: 500,

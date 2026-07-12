@@ -7,6 +7,17 @@ import Inventory from '#server/core/utilities/common/player/inventory.js';
 import playerTemplate from '#server/core/data/helpers/player.json';
 
 describe('stale player snapshot tolerance', () => {
+  it('keeps the fresh guest template at baseline progression', () => {
+    const fresh = new Player(structuredClone(playerTemplate), 'none', 'socket-fresh');
+
+    expect(fresh.bank).toEqual([]);
+    expect(Object.values(fresh.skills).every(skill => skill.level === 1 && skill.exp === 0)).toBe(true);
+    expect(fresh.inventory.slots.map(item => item.id)).toEqual(['bronze-pickaxe', 'coins']);
+    expect(playerTemplate).not.toHaveProperty('x_ORIG');
+    expect(playerTemplate).not.toHaveProperty('y_ORIG');
+    expect(playerTemplate).not.toHaveProperty('sign_in');
+  });
+
   it('rebuilds the canonical skill set from malformed and renamed entries', () => {
     const skills = normalisePlayerSkills({
       attack: null,

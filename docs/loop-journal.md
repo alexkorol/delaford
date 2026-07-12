@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Reset the shared player fixture to level-one progression
+
+- Goal: stop fresh guests and local-account fallbacks from inheriting hidden
+  endgame gathering progress and a preloaded bank.
+- Root cause: the shared player fixture still carried Mining 82, Smithing 52,
+  35,000 banked coins, ores, a bronze bar, and three unused timestamp/origin
+  fields even though the visible starter inventory had already been cleaned.
+- Implementation: the fixture now starts every skill at level 1 with zero XP,
+  has an empty bank, retains only the intended pickaxe and 100 carried coins,
+  and no longer carries `x_ORIG`, `y_ORIG`, or `sign_in`.
+- Proof added: constructing a real Player from the fresh fixture must produce an
+  empty bank, six baseline skills, and exactly the intended starter item ids.
+  While verifying, `session-arc` exposed a pre-existing completion race; it now
+  synchronizes on an authoritative empty floor and the real instance-complete
+  event before checking the quest transition.
+- Evidence: `npm run test:unit` — 84 files and 547 tests; `npm run lint` — exit
+  0; `npm run playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: replace the dead remote account POST with authoritative local
+  persistence and remove its obsolete SITE_URL configuration.
+
 ## 2026-07-11 — Remove the final detached socket and tree modules
 
 - Goal: extend the legacy audit from visible components into low-reference
@@ -582,3 +602,7 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:28:39.626Z | session-arc | 100 | 0.58 | 5.07 | 1.24 | 0.62 | 6 | 1 | 4
 
 2026-07-12T06:33:07.581Z | session-arc | 100 | 0.59 | 5.29 | 1.24 | 0.01 | 6 | 1 | 4
+
+2026-07-12T06:47:55.693Z | session-arc | 100 | 0.6 | 4.82 | 0.94 | 0.63 | 6 | 1 | 4
+
+2026-07-12T06:49:28.043Z | session-arc | 100 | 0.59 | 5.43 | 1.23 | 0.62 | 6 | 1 | 4
