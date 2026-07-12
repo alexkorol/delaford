@@ -36,6 +36,7 @@ const sanitisePassiveTree = (snapshot) => {
   }
 
   return {
+    schemaVersion: Number.isInteger(snapshot.schemaVersion) ? snapshot.schemaVersion : null,
     nodes: snapshot.nodes.filter(id => typeof id === 'string').slice(0, 512),
     conduits: snapshot.conduits
       .filter(entry => entry && typeof entry.id === 'string')
@@ -47,6 +48,9 @@ const sanitisePassiveTree = (snapshot) => {
     points: { skill: Math.max(0, Math.floor(Number(snapshot.points && snapshot.points.skill) || 0)) },
     earned: Math.max(0, Math.floor(Number(snapshot.earned) || 0)),
     selectedNodeId: typeof snapshot.selectedNodeId === 'string' ? snapshot.selectedNodeId : '0,0',
+    classOrder: Array.isArray(snapshot.classOrder)
+      ? snapshot.classOrder.filter(id => typeof id === 'string').slice(0, 6)
+      : [],
   };
 };
 

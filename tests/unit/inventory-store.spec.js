@@ -242,7 +242,9 @@ describe('inventory drag target component wiring', () => {
     expect(equipmentRagdoll).toContain("{ id: 'back', label: 'Cloak', column: 3, row: 1, width: 2, height: 3 }");
     expect(equipmentRagdoll).toContain("{ id: 'armor', label: 'Body', column: 5, row: 3, width: 2, height: 3 }");
     expect(equipmentRagdoll).toContain("class=\"equipment-ragdoll__aux-toggle\"");
-    expect(equipmentRagdoll).toContain("{{ auxiliaryOpen ? '>>' : '<<' }}");
+    expect(equipmentRagdoll).toContain("{{ openAuxiliaryId === panel.id ? '>>' : '<<' }}");
+    expect(equipmentRagdoll).toContain("unlock: 'war_call_slot'");
+    expect(equipmentRagdoll).toContain("unlock: 'reliquary_pack'");
 
     expect(equipmentSlot).toContain(':data-equipment-slot="slotId"');
     expect(equipmentSlot).toContain('@pointerup.left.stop.prevent="handlePointerUp"');

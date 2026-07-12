@@ -1,17 +1,17 @@
 // Unified point economy: nodes and conduits each cost 1 point from a single
-// pool, so travel is a real spend. 123 points at max: 100 from levels,
-// 23 from quests (~61 node+path steps of the 271-node lattice).
+// pool, so travel is a real spend. The authored ten-ring tree has a 140-point
+// lifetime budget: 117 from levels and 23 from quests.
 export const VERDIGRIS_SKILL_TREE_POINTS = Object.freeze({
-  skill: 123,
+  skill: 140,
 });
 
 export const VERDIGRIS_SKILL_TREE_SOURCES = Object.freeze({
-  levels: 100,
+  levels: 117,
   quests: 23,
 });
 
 export const VERDIGRIS_SKILL_TREE_TOTALS = Object.freeze({
-  layers: 9,
-  nodes: 271,
+  layers: 10,
+  nodes: 331,
   subtreeNodes: 34,
 });

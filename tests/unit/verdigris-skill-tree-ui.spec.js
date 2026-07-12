@@ -16,9 +16,9 @@ const readSource = relativePath => readFileSync(
 
 describe('Verdigris skill tree UI copy', () => {
   it('uses the unified Verdigris point model in shared UI summaries', () => {
-    expect(VERDIGRIS_SKILL_TREE_POINTS).toEqual({ skill: 123 });
-    expect(VERDIGRIS_SKILL_TREE_TOTALS.layers).toBe(9);
-    expect(VERDIGRIS_SKILL_TREE_TOTALS.nodes).toBe(271);
+    expect(VERDIGRIS_SKILL_TREE_POINTS).toEqual({ skill: 140 });
+    expect(VERDIGRIS_SKILL_TREE_TOTALS.layers).toBe(10);
+    expect(VERDIGRIS_SKILL_TREE_TOTALS.nodes).toBe(331);
     expect(VERDIGRIS_SKILL_TREE_TOTALS.subtreeNodes).toBe(34);
   });
 
@@ -29,6 +29,7 @@ describe('Verdigris skill tree UI copy', () => {
     expect(source).not.toContain('confirm route');
     expect(source).not.toContain('tune conduit');
     expect(source).not.toContain('Choose a path');
+    expect(source).toContain('Calling and armoury unlocks');
   });
 
   it('does not show the retired petal economy in the character screen summary', () => {

@@ -16,7 +16,7 @@ import createPlayerStatsManager, {
   broadcastStats as broadcastPlayerStats,
 } from '#server/core/entities/player/stats-manager.js';
 import Wear from '#server/core/utilities/wear.js';
-import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
+import { resolvePersistedVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
 const PLAYER_SKILL_IDS = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
 
@@ -91,11 +91,7 @@ class Player {
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).
-    const restoredTree = resolveVerdigrisTree(data.passiveTree || {
-      nodes: ['0,0'],
-      conduits: [],
-      selectedNodeId: '0,0',
-    }, this.level, this.questPoints);
+    const restoredTree = resolvePersistedVerdigrisTree(data.passiveTree, this.level, this.questPoints);
     this.passiveTree = restoredTree?.ok ? restoredTree.snapshot : null;
     this.passiveTreeStats = restoredTree?.ok ? restoredTree.stats : null;
 

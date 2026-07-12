@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  VERDIGRIS_CLASS_UNLOCKS,
+  VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
   VERDIGRIS_SIGNS,
   VERDIGRIS_SUBTREES,
   VerdigrisGeometricTree,
@@ -12,6 +14,7 @@ import {
   VERDIGRIS_SKILL_TREE_SOURCES,
   VERDIGRIS_SKILL_TREE_TOTALS,
 } from '@/core/passives/verdigris-skill-tree.js';
+import AUTHORED_TREE_DATA from '@/core/passives/verdigris-authored-tree-data.js';
 
 // Most tests need a spendable pool; a fresh character has none (see the
 // "level scaling" block). Give allocation tests the full cap.
@@ -32,7 +35,7 @@ const allocateFirstChoice = (tree, nodeId) => {
 };
 
 describe('Verdigris geometric skill tree model', () => {
-  it('builds the nine-ring WIZARD lattice plus gateway subtrees', () => {
+  it('builds the authored ten-ring WIZARD lattice plus gateway subtrees', () => {
     const tree = makeTree();
 
     const mainNodes = Array.from(tree.nodes.values()).filter(node => node.source === 'main');
@@ -49,9 +52,23 @@ describe('Verdigris geometric skill tree model', () => {
     expect(firstConduit.options.every(option => option.attrs.STR + option.attrs.DEX + option.attrs.INT > 0)).toBe(true);
   });
 
+  it('uses every imported authored seat without procedural fallback content', () => {
+    const tree = makeTree();
+    const seats = Object.values(AUTHORED_TREE_DATA.seats);
+    expect(seats).toHaveLength(331);
+    expect(new Set(seats.map(seat => seat.name)).size).toBe(331);
+    seats.forEach((seat) => {
+      const node = tree.nodes.get(seat.id);
+      expect(node).toBeTruthy();
+      expect(node.name).toBe(seat.name);
+      expect(node.type).toBe(seat.type === 'gateway' ? 'gateway' : seat.type);
+    });
+    expect(Array.from(tree.nodes.values()).some(node => node.name.startsWith('Unauthored Seat'))).toBe(false);
+  });
+
   it('uses the unified point economy: one pool, 1 per node and 1 per path', () => {
     const tree = makeTree();
-    expect(VERDIGRIS_SKILL_TREE_POINTS.skill).toBe(123);
+    expect(VERDIGRIS_SKILL_TREE_POINTS.skill).toBe(140);
     expect(VERDIGRIS_SKILL_TREE_SOURCES.levels + VERDIGRIS_SKILL_TREE_SOURCES.quests)
       .toBe(VERDIGRIS_SKILL_TREE_POINTS.skill);
 
@@ -121,7 +138,7 @@ describe('Verdigris geometric skill tree model', () => {
     });
   });
 
-  it('places gateways on ring-9 corners and Signs on ring-8 keystones', () => {
+  it('places gateways on ring-10 corners, authored Signs, and six class milestones', () => {
     const tree = makeTree();
 
     VERDIGRIS_SUBTREES.forEach((config) => {
@@ -131,18 +148,46 @@ describe('Verdigris geometric skill tree model', () => {
     });
 
     const signNames = new Set(VERDIGRIS_SIGNS.map(sign => sign.name));
-    const ringEightKeystones = Array.from(tree.nodes.values())
-      .filter(node => node.ring === 8 && node.type === 'keystone');
-    expect(ringEightKeystones.length).toBeGreaterThan(0);
-    ringEightKeystones.forEach((node) => {
+    const ringEightSigns = Array.from(tree.nodes.values())
+      .filter(node => node.ring === 8 && node.type === 'sign');
+    expect(ringEightSigns).toHaveLength(6);
+    ringEightSigns.forEach((node) => {
       expect(signNames.has(node.name)).toBe(true);
-      expect(node.tags).toContain('sign');
     });
 
-    const grandMasteries = Array.from(tree.nodes.values())
-      .filter(node => node.ring === 7 && node.type === 'mastery')
+    const classMilestones = Array.from(tree.nodes.values())
+      .filter(node => node.ring === 7 && node.type === 'class')
       .map(node => node.name);
-    expect(grandMasteries.sort()).toEqual(['Acrobat', 'Archmage', 'Champion']);
+    expect(classMilestones.sort()).toEqual([
+      'Acrobat',
+      'Archmage',
+      'Champion',
+      'Nightblade',
+      'Reaver',
+      'Ritualist',
+    ]);
+  });
+
+  it('preserves calling order while every active class milestone contributes unlocks', () => {
+    const tree = makeTree();
+    tree.restore({
+      nodes: ['0,0', '0,-7', '-7,7'],
+      conduits: [],
+      points: { skill: 136 },
+      log: [],
+      selectedNodeId: '0,0',
+      classOrder: ['-7,7', '0,-7'],
+    });
+
+    expect(tree.stats.characterClass).toBe('Champion');
+    expect(tree.stats.unlocks).toEqual(expect.arrayContaining([
+      ...VERDIGRIS_CLASS_UNLOCKS.Champion,
+      ...VERDIGRIS_CLASS_UNLOCKS.Acrobat,
+    ]));
+    expect(tree.snapshot()).toMatchObject({
+      schemaVersion: VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
+      classOrder: ['-7,7', '0,-7'],
+    });
   });
 
   it('hides subtree nodes until the gateway is allocated and a loop is closed', () => {

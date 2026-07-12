@@ -35,6 +35,14 @@
           <span>INT <b>{{ treeState.stats.attrs.INT }}</b></span>
         </div>
 
+        <div class="calling-readout" aria-label="Calling and armoury unlocks">
+          <b>{{ treeState.stats.characterClass || 'No calling' }}</b>
+          <span v-if="treeState.stats.unlocks.length">
+            {{ treeState.stats.unlocks.map(flag => flag.replace(/_/g, ' ')).join(' · ') }}
+          </span>
+          <span v-else>The first class milestone marks your calling.</span>
+        </div>
+
         <div class="derived-grid" aria-label="Derived passive stats">
           <span
             v-for="row in derivedRows"
@@ -233,13 +241,20 @@ const SEARCH_DIM_OPACITY = '0.18';
 
 // 1 point per level after the first, capped at the lifetime maximum. Quest
 // points (currently 0) will add on top of this later.
-const earnedPointsForLevel = (level) => {
+const earnedPointsForPlayer = (player) => {
   // An allocation costs 2 points (node + its path), so grant at least 2 — a
   // fresh character must be able to make their first pick immediately, not
   // stare at a dead pane. From level 2 on it's one point per level, meeting
-  // the 100-point level budget exactly at the cap.
-  const fromLevels = Math.max(2, Math.floor(Number(level) || 1));
-  return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, Math.min(fromLevels, VERDIGRIS_SKILL_TREE_SOURCES.levels));
+  // the authored level budget exactly at the cap.
+  const fromLevels = Math.min(
+    Math.max(2, Math.floor(Number(player?.level) || 1)),
+    VERDIGRIS_SKILL_TREE_SOURCES.levels,
+  );
+  const fromQuests = Math.min(
+    Math.max(0, Math.floor(Number(player?.questPoints) || 0)),
+    VERDIGRIS_SKILL_TREE_SOURCES.quests,
+  );
+  return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, fromLevels + fromQuests);
 };
 
 const makeSvgEl = (tag, attrs = {}) => {
@@ -262,6 +277,10 @@ const nodeIcon = node => ({
   origin: 'O',
   notable: '*',
   mastery: 'M',
+  waystone: 'W',
+  socket: '◇',
+  class: 'C',
+  sign: '✦',
   gateway: 'G',
   keystone: '!',
 }[node.type] || VERDIGRIS_AXIS_META[node.axis]?.short.slice(0, 1) || '+');
@@ -364,6 +383,7 @@ class SVGRenderer {
       const group = makeSvgEl('g', {
         transform: `translate(${node.pos.x},${node.pos.y})`,
         className: `node-group type-${node.type}`,
+        'data-node-id': node.id,
       });
       group.style.setProperty('--node-axis', axisColor(node.axis));
 
@@ -586,9 +606,11 @@ const initialTreeState = () => ({
   points: {
     skill: 0,
   },
-  stats: {
-    attrs: { STR: 0, DEX: 0, INT: 0 },
-    derived: {},
+    stats: {
+      attrs: { STR: 0, DEX: 0, INT: 0 },
+      derived: {},
+      characterClass: null,
+      unlocks: [],
   },
   selectedNode: {
     id: '0,0',
@@ -647,7 +669,7 @@ export default {
   },
   mounted() {
     this.skillTree = new VerdigrisGeometricTree({
-      availablePoints: earnedPointsForLevel(this.game?.player?.level),
+      availablePoints: earnedPointsForPlayer(this.game?.player),
     });
 
     // Restore saved allocations — a fresh tree on every open threw away the
@@ -664,13 +686,14 @@ export default {
         points: saved.points && typeof saved.points === 'object' ? saved.points : { skill: 0 },
         log: Array.isArray(saved.log) ? saved.log : [],
         selectedNodeId: saved.selectedNodeId,
+        classOrder: saved.classOrder,
       });
       // Reconcile points earned since the save: spent stays spent, newly
       // earned points become available. earned may legitimately be 0.
       if (Number.isFinite(saved.earned)) {
         this.skillTree.initialPoints = Math.max(0, saved.earned);
       }
-      this.skillTree.setAvailablePoints(earnedPointsForLevel(this.game?.player?.level));
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer(this.game?.player));
     }
 
     this.treeState = this.skillTree.toState();
@@ -699,7 +722,15 @@ export default {
   watch: {
     'game.player.level': function watchLevel(level) {
       if (!this.skillTree) return;
-      this.skillTree.setAvailablePoints(earnedPointsForLevel(level));
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer({
+        level,
+        questPoints: this.game?.player?.questPoints,
+      }));
+      this.syncTreeState();
+    },
+    'game.player.questPoints': function watchQuestPoints() {
+      if (!this.skillTree) return;
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer(this.game?.player));
       this.syncTreeState();
     },
   },
@@ -721,6 +752,8 @@ export default {
       if (this.game && this.game.player) {
         // eslint-disable-next-line vue/no-mutating-props
         this.game.player.passiveTree = snapshot;
+        // eslint-disable-next-line vue/no-mutating-props
+        this.game.player.passiveTreeStats = this.skillTree.stats;
       }
       Socket.emit('player:skilltree:save', { snapshot });
     },
@@ -928,6 +961,25 @@ export default {
     b {
       color: #f4dc93;
       font-size: 13px;
+    }
+  }
+
+  .calling-readout {
+    display: grid;
+    gap: 3px;
+    padding: 7px 8px;
+    border: 1px solid rgba(196, 159, 86, 0.24);
+    background: rgba(0, 0, 0, 0.24);
+    color: #9f9478;
+    font-size: 9px;
+    line-height: 1.35;
+    text-transform: capitalize;
+
+    b {
+      color: #f1d67f;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
   }
 
@@ -1274,8 +1326,15 @@ export default {
   }
 
   .node-group.type-keystone .node-shell,
+  .node-group.type-sign .node-shell,
+  .node-group.type-class .node-shell,
+  .node-group.type-waystone .node-shell,
   .node-group.type-gateway .node-shell {
     stroke-width: 3;
+  }
+
+  .node-group.type-socket .node-core {
+    fill: rgba(7, 8, 10, 0.92);
   }
 
   .node-group:hover .node-shell {

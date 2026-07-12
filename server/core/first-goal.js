@@ -1,5 +1,8 @@
 import { sendMessage } from '#server/core/combat/experience.js';
-import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
+import {
+  resetVerdigrisTree,
+  resolveVerdigrisTree,
+} from '#server/core/passives/verdigris-authority.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
 import Socket from '#server/socket.js';
 
@@ -28,12 +31,9 @@ const pushQuestState = (player) => {
 };
 
 const refreshTreeBudget = (player) => {
-  const incoming = player.passiveTree || {
-    nodes: ['0,0'],
-    conduits: [],
-    selectedNodeId: '0,0',
-  };
-  const resolved = resolveVerdigrisTree(incoming, player.level, player.questPoints);
+  const resolved = player.passiveTree
+    ? resolveVerdigrisTree(player.passiveTree, player.level, player.questPoints)
+    : resetVerdigrisTree(player.level, player.questPoints);
   if (!resolved.ok) return false;
   player.passiveTree = resolved.snapshot;
   player.passiveTreeStats = resolved.stats;

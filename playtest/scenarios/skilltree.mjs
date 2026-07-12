@@ -5,11 +5,13 @@
  */
 export default async function skilltree({ connect, assert }) {
   const snapshot = {
+    schemaVersion: 2,
     nodes: ['0,0', '1,0'],
     conduits: [{ id: '0,0:1,0', variant: 'outer' }],
     points: { skill: 0 },
     earned: 2,
     selectedNodeId: '1,0',
+    classOrder: [],
   };
 
   const first = await connect();
@@ -32,7 +34,7 @@ export default async function skilltree({ connect, assert }) {
     assert(restored, 'login block carries the saved tree');
     assert(restored.nodes.includes('1,0'), 'allocated node survived the relog');
     assert(restored.conduits.some(c => c.id === '0,0:1,0'), 'allocated conduit survived the relog');
-    const earnedForLevel = Math.min(100, Math.max(2, Math.floor(second.player.level || 1)));
+    const earnedForLevel = Math.min(117, Math.max(2, Math.floor(second.player.level || 1)));
     assert(restored.earned === earnedForLevel,
       `earned points were reconciled to authoritative level ${second.player.level}`);
     assert(restored.points.skill === earnedForLevel - 2, 'spent and unspent points reconcile after relog');

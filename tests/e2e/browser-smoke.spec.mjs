@@ -185,15 +185,24 @@ test.describe('canonical browser smoke', () => {
     await page.getByText('Cancel', { exact: true }).click();
     await page.keyboard.press('i');
 
+    await page.evaluate(() => {
+      window.ws.send(JSON.stringify({ event: 'dev:setlevel', data: { level: 20 } }));
+    });
     await page.keyboard.press('p');
     const tree = page.locator('.geometric-skill-tree');
     await expect(tree).toBeVisible();
+    await expect(tree.locator('.point-grid strong').first()).toHaveText('20');
     const activeNodes = tree.locator('.node-group.active');
     const activeBefore = await activeNodes.count();
-    await tree.locator('.node-group.available').first().click({ force: true });
-    const pendingChoice = tree.locator('.choice-panel .choice-btn:not(.danger)').first();
-    if (await pendingChoice.isVisible()) await pendingChoice.click();
-    await expect.poll(() => activeNodes.count()).toBeGreaterThan(activeBefore);
+    for (const nodeId of ['1,0', '2,0', '3,0', '4,0', '5,0', '6,0', '7,0']) {
+      await tree.locator(`[data-node-id="${nodeId}"]`).evaluate(element => {
+        element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      const pendingChoice = tree.locator('.choice-panel .choice-btn:not(.danger)').first();
+      if (await pendingChoice.isVisible()) await pendingChoice.click();
+    }
+    await expect.poll(() => activeNodes.count()).toBe(activeBefore + 7);
+    await expect(tree.getByLabel('Calling and armoury unlocks')).toContainText('Archmage');
     const activeAfter = await activeNodes.count();
     await page.keyboard.press('Escape');
     await expect(tree).toBeHidden();
@@ -201,6 +210,13 @@ test.describe('canonical browser smoke', () => {
     await expect(tree).toBeVisible();
     await expect.poll(() => activeNodes.count()).toBe(activeAfter);
     await page.keyboard.press('Escape');
+
+    await page.keyboard.press('i');
+    const attendantTab = page.getByRole('button', { name: 'Open Attendant' });
+    await expect(attendantTab).toBeVisible();
+    await attendantTab.click();
+    await expect(page.getByRole('complementary', { name: 'Attendant' })).toBeVisible();
+    await page.keyboard.press('i');
 
     await page.evaluate(() => {
       window.ws.send(JSON.stringify({
@@ -264,13 +280,7 @@ test.describe('canonical browser smoke', () => {
     await escapeMenu.getByRole('button', { name: 'Inventory I' }).click();
     const inventory = page.getByRole('region', { name: 'Inventory panel' });
     await expect(inventory).toBeVisible();
-    await page.getByRole('button', { name: 'Open auxiliary inventory' }).click();
-    const auxiliaryDrawer = page.getByRole('complementary', { name: 'Auxiliary inventory' });
-    await expect(auxiliaryDrawer).toBeVisible();
-    const auxiliaryBounds = await auxiliaryDrawer.boundingBox();
-    expect(auxiliaryBounds).toBeTruthy();
-    expect(auxiliaryBounds.x).toBeGreaterThanOrEqual(0);
-    expect(auxiliaryBounds.x + auxiliaryBounds.width).toBeLessThanOrEqual(480);
+    await expect(page.getByLabel('Unlocked auxiliary windows')).toHaveCount(0);
     const inventoryBounds = await inventory.boundingBox();
     expect(inventoryBounds).toBeTruthy();
     expect(inventoryBounds.x).toBeGreaterThanOrEqual(0);

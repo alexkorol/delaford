@@ -54,6 +54,8 @@ describe('stale player snapshot tolerance', () => {
       ...structuredClone(playerTemplate),
       uuid: 'stale-player',
       username: 'Old Scion',
+      level: 12,
+      questPoints: 3,
       skills: { attack: null, oldAlchemy: { exp: 500 } },
       inventory: { 0: { id: 'removed-item-id' } },
       bank: 'old-bank-shape',
@@ -74,7 +76,12 @@ describe('stale player snapshot tolerance', () => {
     expect(player.inventory.slots).toEqual([]);
     expect(player.bank).toEqual([]);
     expect(player.wear.right_hand).toBeNull();
-    expect(player.passiveTree).toBeNull();
+    expect(player.passiveTree).toMatchObject({
+      schemaVersion: 2,
+      nodes: ['0,0'],
+      conduits: [],
+      points: { skill: 15 },
+    });
     expect(player.skills.attack).toMatchObject({ exp: 0, level: 1 });
     expect(player.skills.cooking).toMatchObject({ exp: 0, level: 1 });
   });

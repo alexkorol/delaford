@@ -20,11 +20,13 @@ const makePlayer = () => ({
   questPoints: 0,
   quests: {},
   passiveTree: {
+    schemaVersion: 2,
     nodes: ['0,0'],
     conduits: [],
     points: { skill: 2 },
     earned: 2,
     selectedNodeId: '0,0',
+    classOrder: [],
   },
   refreshDerivedStats: vi.fn(),
 });

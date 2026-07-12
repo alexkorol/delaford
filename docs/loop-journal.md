@@ -795,6 +795,26 @@
   Wayfarers Chronicle. Browser smoke asserts the warning and rejects both old
   guest controls from the sign-in screen.
 
+## 2026-07-12 — Port the authored WIZARD tree and armoury windows
+
+- Replaced the procedural nine-ring passive layout with WIZARD's authored
+  331-seat, ten-ring data and added a repeatable import script for future
+  prototype updates. The live game keeps its server-authoritative point,
+  adjacency, and combat-stat validation around that data.
+- Added all six class milestones. The first allocated class remains the
+  character's Calling, while every active class milestone contributes its own
+  armoury unlock: War-call, Quick Rig, Attendant, Spoils Roll, Preparation
+  Case, or Reliquary.
+- Versioned passive snapshots at schema 2. Loading any older persisted tree now
+  creates an origin-only schema-2 snapshot with every level and quest point
+  refunded; subsequent schema-2 saves restore normally instead of resetting
+  again.
+- Inventory auxiliary tabs are driven by the authoritative class unlock set and
+  stay absent until earned. Browser coverage paths to Archmage, relogs the
+  allocation, and opens the Attendant window through the real inventory pane.
+- Proof: 541 unit tests, production browser smoke, focused persistence/build
+  playtests, and the full 21-scenario goal harness pass.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -897,3 +917,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T20:34:17.251Z | session-arc | 100 | 0.61 | 4.43 | 1.24 | 0.62 | 6 | 1 | 4
 
 2026-07-12T22:12:36.927Z | session-arc | 100 | 0.6 | 4.87 | 1.27 | 0.63 | 6 | 1 | 4
+
+2026-07-12T23:24:28.666Z | session-arc | 100 | 0.6 | 5.44 | 2.18 | 0.32 | 6 | 1 | 4

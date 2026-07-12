@@ -15,8 +15,8 @@ const allocateNodeToward = (tree, nodeId, axis) => {
 const axisBuild = (axis) => {
   const tree = new VerdigrisGeometricTree({ availablePoints: 20 });
   const route = axis === 'STR'
-    ? [...Array.from({ length: 9 }, (_, index) => `${index + 1},0`), '9,-1']
-    : [...Array.from({ length: 9 }, (_, index) => `0,${-(index + 1)}`), '1,-9'];
+    ? [...Array.from({ length: 9 }, (_, index) => `${-(index + 1)},${index + 1}`), '-9,8']
+    : [...Array.from({ length: 9 }, (_, index) => `${index + 1},0`), '9,-1'];
   route.forEach(nodeId => allocateNodeToward(tree, nodeId, axis));
   return tree.snapshot();
 };

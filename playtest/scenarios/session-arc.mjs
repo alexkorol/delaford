@@ -204,11 +204,13 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
 
     const earned = Math.max(2, state.level);
     first.saveSkillTree({
+      schemaVersion: 2,
       nodes: ['0,0', '1,0'],
       conduits: [{ id: '0,0:1,0', variant: 'outer' }],
       points: { skill: earned - 2 },
       earned,
       selectedNodeId: '1,0',
+      classOrder: [],
     });
     const treeState = await first.waitFor(async () => {
       const current = await first.state();

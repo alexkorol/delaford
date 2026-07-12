@@ -1,4 +1,7 @@
-import { VerdigrisGeometricTree } from '../../../src/core/passives/verdigris-geometric-tree.js';
+import {
+  VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
+  VerdigrisGeometricTree,
+} from '../../../src/core/passives/verdigris-geometric-tree.js';
 import {
   VERDIGRIS_SKILL_TREE_POINTS,
   VERDIGRIS_SKILL_TREE_SOURCES,
@@ -26,6 +29,9 @@ export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
   if (!incoming || !Array.isArray(incoming.nodes) || !Array.isArray(incoming.conduits)) {
     return reject('Malformed passive tree.');
   }
+  if (incoming.schemaVersion !== VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION) {
+    return reject('The passive tree belongs to an obsolete tree version.');
+  }
 
   const earned = earnedVerdigrisPoints(level, questPoints);
   const tree = new VerdigrisGeometricTree({ availablePoints: earned });
@@ -48,6 +54,15 @@ export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
   }
 
   const active = new Set(nodes);
+  const activeClassIds = nodes.filter(id => tree.nodes.get(id)?.type === 'class');
+  const incomingClassOrder = Array.isArray(incoming.classOrder) ? incoming.classOrder : [];
+  if (incomingClassOrder.some(id => !activeClassIds.includes(id))) {
+    return reject('The passive tree has an invalid calling order.');
+  }
+  const classOrder = [
+    ...new Set(incomingClassOrder),
+    ...activeClassIds.filter(id => !incomingClassOrder.includes(id)),
+  ];
   if (conduits.some((entry) => {
     const conduit = tree.conduits.get(entry.id);
     return !active.has(conduit.fromId) || !active.has(conduit.toId);
@@ -64,6 +79,7 @@ export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
     points: { skill: earned - spent },
     log: [],
     selectedNodeId: active.has(incoming.selectedNodeId) ? incoming.selectedNodeId : '0,0',
+    classOrder,
   });
   const reachable = tree.reachableFromOrigin({});
   if (nodes.some(id => !reachable.has(id))) return reject('Every passive must connect to the origin.');
@@ -77,11 +93,13 @@ export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
   return {
     ok: true,
     snapshot: {
+      schemaVersion: VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
       nodes,
       conduits,
       points: { skill: earned - spent },
       earned,
       selectedNodeId: active.has(incoming.selectedNodeId) ? incoming.selectedNodeId : '0,0',
+      classOrder,
     },
     attributes: {
       strength: tree.stats.attrs.STR,
@@ -92,4 +110,26 @@ export const resolveVerdigrisTree = (incoming, level = 1, questPoints = 0) => {
   };
 };
 
-export default { earnedVerdigrisPoints, resolveVerdigrisTree };
+export const resetVerdigrisTree = (level = 1, questPoints = 0) => resolveVerdigrisTree({
+  schemaVersion: VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
+  nodes: ['0,0'],
+  conduits: [],
+  selectedNodeId: '0,0',
+  classOrder: [],
+}, level, questPoints);
+
+// Persisted snapshots from before the authored ten-ring tree intentionally do
+// not migrate node-for-node. They receive a one-time full refund, while
+// current-schema snapshots continue through normal authoritative validation.
+export const resolvePersistedVerdigrisTree = (incoming, level = 1, questPoints = 0) => (
+  incoming?.schemaVersion === VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION
+    ? resolveVerdigrisTree(incoming, level, questPoints)
+    : resetVerdigrisTree(level, questPoints)
+);
+
+export default {
+  earnedVerdigrisPoints,
+  resetVerdigrisTree,
+  resolvePersistedVerdigrisTree,
+  resolveVerdigrisTree,
+};
