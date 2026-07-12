@@ -282,6 +282,37 @@ export class ChroniclesRepository {
     return { ok: true, amount, chronicle: this.getChronicle(accountId) };
   }
 
+  depositScionGold(accountId, houseId, scionId, amount, snapshot) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Choose some carried gold to deposit.' };
+    if (!snapshot || typeof snapshot !== 'object') {
+      return { ok: false, reason: 'The scion snapshot could not be saved.' };
+    }
+    const scion = this.db.prepare(`
+      SELECT s.id
+      FROM chronicle_scions s
+      JOIN chronicle_houses h ON h.id = s.house_id
+      WHERE s.id = ? AND s.house_id = ? AND h.account_id = ? AND s.status = 'living'
+    `).get(scionId, houseId, accountId);
+    if (!scion) return { ok: false, reason: 'That living scion does not belong to this House.' };
+
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ? AND account_id = ?')
+        .run(value, houseId, accountId);
+      this.db.prepare('UPDATE chronicle_scions SET snapshot_json = ? WHERE id = ?')
+        .run(JSON.stringify(snapshot), scionId);
+    })();
+
+    const chronicle = this.getChronicle(accountId);
+    const house = chronicle.houses.find(entry => entry.id === houseId);
+    return {
+      ok: true,
+      amount: value,
+      treasury: house?.treasury || 0,
+      chronicle,
+    };
+  }
+
   upgradeHouse(accountId, houseId, upgradeId) {
     const definition = HOUSE_UPGRADES[upgradeId];
     if (!definition) return { ok: false, reason: 'Unknown House improvement.' };

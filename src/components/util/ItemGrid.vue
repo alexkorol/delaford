@@ -15,7 +15,11 @@
           backgroundPosition: `left -${(getItem(i).column * 32)}px top -${(getItem(i).row * 32)}px`
         }"
         :class="`slot ${getItemFromSlot(i).isLocked} ${getItemFromSlot(i).id} ${gridData(screen).classId} ${isItemSelected(i)}`"
-        @click.left="selectItem($event)"
+        :aria-label="itemAriaLabel(i)"
+        :role="primaryAction ? 'button' : undefined"
+        :tabindex="primaryAction ? 0 : undefined"
+        @click.left="selectItem($event, i)"
+        @keydown.enter.prevent="selectItem($event, i)"
         @mouseover="showContextMenu($event, i, true)"
         @contextmenu.prevent="showContextMenu($event, i)"
       >
@@ -24,6 +28,7 @@
           :class="`qty ${gridData(screen).classId}`"
           v-text="getItemFromSlot(i).qty"
         />
+        <span v-if="screen === 'shop'" class="price">{{ itemPrice(i) }}</span>
       </div>
       <div
         v-else
@@ -58,6 +63,10 @@ export default {
     screen: {
       type: String,
       required: true,
+    },
+    primaryAction: {
+      type: String,
+      default: '',
     },
   },
   data() {
@@ -157,8 +166,16 @@ export default {
      *
      * @param {integer} slot The item in the slot we are selecting
      */
-    selectItem(event) {
+    selectItem(event, slot) {
       // Allow 'selecting' an item only on the Inventory or if its not already selected
+
+      if (this.primaryAction) {
+        this.$emit('item-primary', {
+          action: this.primaryAction,
+          item: this.getItemFromSlot(slot),
+        });
+        return;
+      }
 
       bus.$emit('canvas:select-action', {
         event,
@@ -258,6 +275,17 @@ export default {
     getItemFromSlot(slotNumber) {
       return this.items.find((s) => s.slot === slotNumber);
     },
+    itemPrice(slotNumber) {
+      return Math.max(0, Number(UI.getItemData(this.getItemFromSlot(slotNumber).id)?.price) || 0);
+    },
+    itemAriaLabel(slotNumber) {
+      const item = this.getItemFromSlot(slotNumber);
+      const definition = UI.getItemData(item.id);
+      if (this.screen === 'shop') {
+        return `Buy ${definition?.name || item.id} for ${this.itemPrice(slotNumber)} coins`;
+      }
+      return definition?.name || item.id;
+    },
     /**
      * Get the correct background URL to show in inventory
      *
@@ -343,6 +371,17 @@ div.grid_container {
       color: yellow;
       text-shadow: 1px 1px 0 black;
       float: left;
+    }
+
+    .price {
+      display: block;
+      float: right;
+      margin-top: 20px;
+      padding: 0 2px;
+      background: rgba(20, 15, 8, .9);
+      color: #ffd978;
+      font-size: 8px;
+      line-height: 11px;
     }
 
     &.selected {

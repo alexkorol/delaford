@@ -114,6 +114,25 @@ describe('server-side Chronicles repository', () => {
     expect(house.dailyGold).toBe(125);
   });
 
+  it('atomically deposits a living scion snapshot and carried gold into their House', () => {
+    const { houseId, scionId } = createLineage();
+    const snapshot = {
+      level: 3,
+      inventory: [{ id: 'coins', uuid: 'coins-left', qty: 25, slot: 0 }],
+    };
+
+    expect(repository.depositScionGold(accountId, houseId, scionId, 175, snapshot))
+      .toMatchObject({ ok: true, amount: 175, treasury: 175 });
+    expect(repository.getChronicle(accountId).houses[0].treasury).toBe(175);
+    expect(repository.getLivingScion(accountId, scionId).snapshot).toEqual(snapshot);
+
+    expect(repository.depositScionGold('account:intruder', houseId, scionId, 100, snapshot).ok)
+      .toBe(false);
+    expect(repository.depositScionGold(accountId, houseId, scionId, 0, snapshot).ok)
+      .toBe(false);
+    expect(repository.getChronicle(accountId).houses[0].treasury).toBe(175);
+  });
+
   it('lets a death witness find the friend House relic after three of their runs', () => {
     const { houseId, scionId } = createLineage();
     repository.beginRun(accountId, houseId);

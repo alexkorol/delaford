@@ -285,6 +285,7 @@ class Shop {
    * Sell an item to the shop
    */
   sell() {
+    let transaction = null;
     if (this.canWeSell()) {
       const quantitySold = this.removeSoldItemsFromInventory();
       if (quantitySold <= 0) {
@@ -312,11 +313,18 @@ class Shop {
         // If not, lets give them their coins to the inventory
         this.inventory.add('coins', saleValue);
       }
+      transaction = {
+        type: 'sell',
+        itemId: this.itemId,
+        quantity: quantitySold,
+        coins: saleValue,
+      };
     }
 
     return {
       inventory: this.inventory.slots,
       shopItems: this.shop,
+      transaction,
     };
   }
 
@@ -378,6 +386,7 @@ class Shop {
     }
 
     // If we completed one round of purchasing
+    let transaction = null;
     if (quantityBought > 0) {
       const toSpend = this.price * quantityBought;
       const moneyLeft = playerGold - toSpend;
@@ -404,6 +413,12 @@ class Shop {
         // when item's origin is from a player.
         this.shop.splice(this.shopItemIndex, 1);
       }
+      transaction = {
+        type: 'buy',
+        itemId: this.itemId,
+        quantity: quantityBought,
+        coins: toSpend,
+      };
     }
 
     // Check to see if purchases can be
@@ -413,6 +428,7 @@ class Shop {
     return {
       inventory: this.inventory.slots,
       shopItems: this.shop,
+      transaction,
     };
   }
 

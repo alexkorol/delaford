@@ -14,6 +14,7 @@ const resetWorld = () => {
   world.clients = [];
   town.players = [];
   town.items = [];
+  town.npcs = [];
   town.respawns = {
     items: [],
     monsters: [],
@@ -135,6 +136,60 @@ describe('pane action authorization', () => {
     }));
   });
 
+  it('opens the bank only for the authenticated socket beside the town banker', () => {
+    player.x = 31;
+    player.y = 122;
+    player.sceneId = world.defaultTownId;
+    world.getDefaultTown().npcs = [{ id: 4, x: 31, y: 121 }];
+
+    actionEvents['player:screen:bank'](
+      { data: { item: { id: 4 } } },
+      { id: player.socket_id },
+    );
+
+    expect(player.currentPane).toBe('bank');
+    expect(Socket.emit).toHaveBeenCalledWith('open:screen', expect.objectContaining({
+      player: { socket_id: player.socket_id },
+      screen: 'bank',
+      payload: expect.objectContaining({ carriedCoins: 10, house: null }),
+    }));
+
+    vi.mocked(Socket.emit).mockClear();
+    player.x = 1;
+    actionEvents['player:screen:bank'](
+      { data: { item: { id: 4 } } },
+      { id: player.socket_id },
+    );
+    expect(Socket.emit).not.toHaveBeenCalledWith('open:screen', expect.anything());
+  });
+
+  it('opens a reachable shop display from the full socket message shape', () => {
+    player.x = 45;
+    player.y = 102;
+    player.sceneId = world.defaultTownId;
+    const stock = [{ id: 'bronze-sword', qty: 10, slot: 0 }];
+    makeGeneralStore(player, stock);
+    world.getDefaultTown().items = [{
+      id: 'bronze-sword',
+      x: 45,
+      y: 101,
+      shopDisplay: true,
+      shopNpcId: 2,
+    }];
+
+    actionEvents['player:screen:shop-display'](
+      { data: { item: { id: 2, shopItemId: 'bronze-sword' } } },
+      { id: player.socket_id },
+    );
+
+    expect(player.currentPane).toBe('shop');
+    expect(Socket.emit).toHaveBeenCalledWith('open:screen', expect.objectContaining({
+      player: { socket_id: player.socket_id },
+      screen: 'shop',
+      payload: world.shops[0],
+    }));
+  });
+
   it('deposits stackable items into an existing full-bank stack', async () => {
     player.inventory.slots = [
       { id: 'coins', qty: 10, slot: 0 },
@@ -251,6 +306,32 @@ describe('pane action authorization', () => {
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
       qty: 5,
     });
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: 'Bought 5 Copper Ore for 45 coins.',
+    }));
+  });
+
+  it('accepts the full socket envelope used by the shop buy-one button', () => {
+    attachInventory(player, [
+      { id: 'coins', qty: 500, slot: 0 },
+    ]);
+    makeGeneralStore(player, [
+      { id: 'bronze-sword', qty: 10, slot: 0 },
+    ]);
+
+    actionEvents['player:screen:npc:trade:action']({
+      data: {
+        player: { socket_id: player.socket_id },
+        doing: 'buy',
+        item: { id: 'bronze-sword', params: { quantity: 1 } },
+      },
+    });
+
+    expect(player.inventory.slots.some(item => item.id === 'bronze-sword')).toBe(true);
+    expect(world.shops[0].inventory[0].qty).toBe(9);
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: expect.stringMatching(/^Bought 1 Bronze Sword for \d+ coins\.$/),
+    }));
   });
 
   it('merges stackable shop buys into an existing full-inventory stack', async () => {
@@ -353,6 +434,9 @@ describe('pane action authorization', () => {
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
       qty: 6,
     });
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: 'Sold 5 Copper Ore for 45 coins.',
+    }));
   });
 
   it('rejects partial stack sales when full inventory has no coin slot for payment', async () => {

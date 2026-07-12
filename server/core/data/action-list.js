@@ -139,7 +139,7 @@ export default [
     allow: ['npc'],
     nearby: 'edge',
     weight: 1,
-    queueable: true,
+    queueable: false,
   },
   {
     name: 'Deposit',
@@ -183,7 +183,7 @@ export default [
     context: ['gameMap'],
     allow: ['item'],
     nearby: false,
-    weight: 2,
+    weight: 1,
     queueable: false,
   },
   {
@@ -210,7 +210,7 @@ export default [
     context: ['inventorySlot'],
     allow: ['item'],
     nearby: false,
-    weight: 2,
+    weight: 1,
     onPane: ['shop'],
   },
   {
@@ -219,7 +219,7 @@ export default [
     context: ['shopSlot', 'inventorySlot'],
     allow: ['item'],
     nearby: false,
-    weight: 1,
+    weight: 2,
     onPane: ['shop'],
   },
 ];

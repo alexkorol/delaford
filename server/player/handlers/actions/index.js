@@ -34,6 +34,7 @@ import { talkToAldwyn } from '#server/core/first-goal.js';
 import { applyVesselCombatStats, getForge, vesselTooltip } from '#server/core/items/vesselforge/adapter.js';
 import { BRAND_COST } from '#server/core/context-menu/strategies/vesselforge-brand.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
+import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -96,10 +97,18 @@ const refreshShopPurchase = (shop, response) => {
   const player = world.players[shop.playerIndex];
   world.shops[shop.shopIndex].inventory = response.shopItems;
   player.inventory.slots = response.inventory;
+  playerPersistence.markDirty(player);
   Socket.emit('core:refresh:inventory', {
     player: { socket_id: player.socket_id },
     data: response.inventory,
   });
+  if (response.transaction) {
+    const itemName = Query.getItemData(response.transaction.itemId)?.name || response.transaction.itemId;
+    sendPlayerMessage(
+      player,
+      `Bought ${response.transaction.quantity} ${itemName} for ${response.transaction.coins} coins.`,
+    );
+  }
   return true;
 };
 
@@ -251,6 +260,22 @@ const spendCoins = (player, amount) => {
   });
   player.inventory.slots = player.inventory.slots
     .filter(item => item?.id !== 'coins' || item.qty > 0);
+};
+
+const buildBankPayload = (player) => {
+  const chronicle = player?.accountId
+    ? chroniclesRepository.getChronicle(player.accountId)
+    : { houses: [] };
+  const house = chronicle.houses.find(entry => entry.id === player?.houseId) || null;
+  return {
+    items: player?.bank || [],
+    carriedCoins: player ? coinTotal(player) : 0,
+    house: house ? {
+      id: house.id,
+      name: house.name,
+      treasury: house.treasury,
+    } : null,
+  };
 };
 
 const sendPlayerMessage = (player, text) => {
@@ -1143,10 +1168,12 @@ const actionEvents = {
   /**
    * A player wants opening a trade shop
    */
-  'player:screen:shop-display': (data = {}) => {
-    const player = getPlayerFromPayload(data);
-    const shopNpcId = data.item?.id;
-    const shopItemId = data.item?.shopItemId;
+  'player:screen:shop-display': (data = {}, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(entry => entry.socket_id === ws?.id);
+    const reference = data.data?.item || data.item || {};
+    const shopNpcId = reference.id;
+    const shopItemId = reference.shopItemId;
     const display = getReachableShopDisplay(player, { id: shopNpcId, shopItemId });
     if (!player || !display) return;
 
@@ -1238,17 +1265,18 @@ const actionEvents = {
    */
   'player:screen:npc:trade:action': (data) => {
     const player = getPlayerFromPayload(data);
-    if (!player || !player.objectId || !data.item?.id) {
+    const payload = data.data || data;
+    if (!player || !player.objectId || !payload.item?.id) {
       return;
     }
 
     // Validate action type before constructing the shop operation.
     const allowedShopActions = ['buy', 'sell', 'value'];
-    if (!allowedShopActions.includes(data.doing)) {
+    if (!allowedShopActions.includes(payload.doing)) {
       return;
     }
 
-    const rawQty = data.item.params ? data.item.params.quantity : 0;
+    const rawQty = payload.item.params ? payload.item.params.quantity : 0;
     const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
     let shop;
     let response;
@@ -1256,13 +1284,13 @@ const actionEvents = {
       shop = new Shop(
         player.objectId,
         player.uuid,
-        data.item.id,
-        data.doing,
+        payload.item.id,
+        payload.doing,
         quantity,
       );
 
       // We will be buying or selling an item
-      response = shop[data.doing]();
+      response = shop[payload.doing]();
     } catch (err) {
       Socket.emit('game:send:message', {
         player: { socket_id: player.socket_id },
@@ -1275,6 +1303,7 @@ const actionEvents = {
     if (Shop.successfulSale(response)) {
       world.shops[shop.shopIndex].inventory = response.shopItems;
       world.players[shop.playerIndex].inventory.slots = response.inventory;
+      playerPersistence.markDirty(world.players[shop.playerIndex]);
 
       // Refresh client with new data
       Socket.emit('core:refresh:inventory', {
@@ -1287,6 +1316,14 @@ const actionEvents = {
         screen: 'shop',
         payload: world.shops[shop.shopIndex],
       });
+      if (response.transaction) {
+        const itemName = Query.getItemData(response.transaction.itemId)?.name || response.transaction.itemId;
+        const verb = response.transaction.type === 'sell' ? 'Sold' : 'Bought';
+        sendPlayerMessage(
+          world.players[shop.playerIndex],
+          `${verb} ${response.transaction.quantity} ${itemName} for ${response.transaction.coins} coins.`,
+        );
+      }
     }
   },
 
@@ -1310,20 +1347,23 @@ const actionEvents = {
   /**
    * A player wants to access their bank
    */
-  'player:screen:bank': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
-      return;
-    }
-    world.players[data.playerIndex].currentPane = 'bank';
+  'player:screen:bank': (data, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(entry => entry.socket_id === ws?.id);
+    const scene = player ? getPlayerScene(player) : null;
+    const reference = data.data?.item || data.item || {};
+    const banker = scene?.npcs?.find(npc => npc.id === reference.id && npc.id === 4);
+    const nearby = banker && Math.max(
+      Math.abs(player.x - banker.x),
+      Math.abs(player.y - banker.y),
+    ) <= 1;
+    if (!player || scene?.type !== 'town' || !banker || !nearby) return;
+    player.currentPane = 'bank';
 
     Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       screen: 'bank',
-      payload: { items: world.players[data.playerIndex].bank },
+      payload: buildBankPayload(player),
     });
   },
 

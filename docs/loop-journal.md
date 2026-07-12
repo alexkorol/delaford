@@ -1,5 +1,32 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Connect scion gold to House development and clarify shops
+
+- Goal: let a newly founded House grow from gold found by its active scion, and
+  make basic purchasing predictable without replacing the existing DCSS item art.
+- Root cause: House treasury had no transfer event or in-game control. It could
+  only receive daily stipends and depth-record rewards, so depositing carried
+  coins was impossible. Shop tiles hid prices and made the primary click appraise
+  an item, leaving buying behind quantity context menus.
+- Implementation: Rhea, House Banker is stationary in Delaford. Her bank pane
+  shows carried gold beside the active House treasury and offers `Deposit 100`
+  and `Deposit all`. The repository commits the reduced scion snapshot and
+  increased treasury in one SQLite transaction, validates living-scion House
+  ownership, and refreshes both balances. Shop stock keeps its current DCSS tile,
+  adds the authoritative coin price, buys one on left click, retains right-click
+  quantities, and reports exact buy/sell totals. Successful trades are marked for
+  persistence. Full-message socket payloads now work for bank and shop openings;
+  development teleports advance their movement sequence so browsers accept them.
+- Proof added: `house-treasury` uses the real banker action, deposits 100 gold,
+  checks both balances, reconnects, and proves neither balance can be duplicated.
+  Repository and handler specs cover atomic persistence, ownership, proximity,
+  full socket envelopes, buy-one, stack quantities, and transaction messages.
+- Evidence: `npm run playtest` — 21/21 scenarios with session critic 100/100;
+  `npm run test:unit` — 83 files and 542 tests; `npm run lint` — exit 0; `npm
+  run smoke:browser` — 2/2.
+- Next target: give the House improvements concrete in-run benefits, beginning
+  with one small Great Hall or House Forge effect surfaced in the Chronicles UI.
+
 ## 2026-07-11 — Close the endless-descent stakes audit
 
 - Goal: verify that looking at and advancing the recorded depth now changes
@@ -431,3 +458,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T07:29:57.738Z | session-arc | 100 | 0.6 | 4.92 | 1.89 | 0.63 | 6 | 1 | 4
 
 2026-07-11T07:31:19.297Z | session-arc | 100 | 0.57 | 4.64 | 0.62 | 0.63 | 6 | 1 | 4
+
+2026-07-12T00:36:11.404Z | session-arc | 100 | 0.6 | 3.79 | 0.94 | 0.62 | 6 | 1 | 4

@@ -185,6 +185,20 @@ const devEvents = {
 
     player.x = Math.floor(payload.x);
     player.y = Math.floor(payload.y);
+    // A teleport must outrank the client's last interpolated movement step.
+    // Reusing the previous sequence makes the browser correctly reject this
+    // authoritative jump as stale even though the server position changed.
+    player.movementStep = {
+      sequence: (Number(player.movementStep?.sequence) || 0) + 1,
+      startedAt: Date.now(),
+      duration: 0,
+      walkId: null,
+      stepIndex: null,
+      steps: null,
+      direction: null,
+      blocked: false,
+      interrupted: true,
+    };
     if (player.path) {
       player.path.grid = null;
     }

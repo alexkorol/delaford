@@ -1,17 +1,23 @@
 <template>
   <div class="shopView">
     <pane-header :text="data.name" />
-    <p class="shopHint">Right-click an item to buy. Right-click your backpack to sell.</p>
+    <p class="shopHint">
+      Left-click stock to buy one. Right-click stock for quantities or a backpack item to sell.
+    </p>
     <item-grid
       :images="game.map.images"
       :items="data.inventory"
       :slots="44"
       screen="shop"
+      primary-action="buy"
+      @item-primary="trade"
     />
   </div>
 </template>
 
 <script>
+import Socket from '../../core/utilities/socket.js';
+
 export default {
   props: {
     game: {
@@ -31,6 +37,19 @@ export default {
   computed: {
     bankItems() {
       return this.game.player.bank;
+    },
+  },
+  methods: {
+    trade({ action, item }) {
+      if (!item?.id || action !== 'buy') return;
+      Socket.emit('player:screen:npc:trade:action', {
+        player: { socket_id: this.game.player.socket_id },
+        doing: 'buy',
+        item: {
+          id: item.id,
+          params: { quantity: 1 },
+        },
+      });
     },
   },
 };

@@ -55,8 +55,8 @@ export default [
   },
   {
     id: 4,
-    name: 'Bank gnome',
-    examine: 'Helps with your finances and assets, I believe.',
+    name: 'Rhea, House Banker',
+    examine: 'Stores items and transfers a scion\'s carried gold into the House treasury.',
     graphic: {
       row: 0,
       column: 3,
@@ -68,7 +68,7 @@ export default [
     spawn: {
       x: 31,
       y: 121,
-      range: 2,
+      range: 0,
     },
   },
 ];
