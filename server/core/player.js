@@ -344,7 +344,7 @@ class Player {
   }
 
   /**
-   * Persist the player profile via the repository layer
+   * Persist the player profile through the local persistence service
    *
    * @param {object} options Additional persistence options
    * @returns {Promise<object|null>}

@@ -154,8 +154,8 @@ export default {
 
   /**
    * A player saves their skill-tree allocations. Stored on the live Player
-   * (so reopening the pane restores it), cached for guest relogs, and pushed
-   * to the account API for real accounts.
+   * (so reopening the pane restores it), cached for guest relogs, and saved
+   * to local SQLite for login accounts.
    */
   'player:skilltree:save': ({ data }, ws) => {
     const player = getPlayerBySocket(ws);
@@ -180,8 +180,8 @@ export default {
     guestPassiveTrees.set(player.uuid, resolved.snapshot);
     playerPersistence.markDirty(player);
 
-    // Chronicle scions save to SQLite even for guests; only legacy guests
-    // without a scion skip the remote account API.
+    // Chronicle scions save to SQLite even for guests. A legacy non-scion
+    // local account uses the login registry profile fallback.
     if (player.scionId || (player.token && player.token !== 'none')) {
       playerPersistence.savePlayer(player).catch(() => {});
     }

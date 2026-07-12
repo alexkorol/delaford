@@ -1,5 +1,25 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Keep account persistence local
+
+- Goal: remove the archived website POST path so local accounts persist on the
+  same machine as their credentials and Chronicle data.
+- Root cause: a `local:` login token still routed autosaves through an Axios
+  repository using the obsolete `SITE_URL`, making saves depend on an unrelated
+  service that is not part of the current game.
+- Implementation: local login profiles now update the SQLite identity registry,
+  Chronicle scions continue to save with their House, and guest or retired-token
+  profiles use the local JSON snapshot store. The remote repository and its
+  `SITE_URL` configuration were removed, and development setup now documents the
+  actual HTTP/WebSocket port and local persistence boundaries.
+- Proof added: registry tests verify profile changes survive without allowing a
+  snapshot to replace account identity; persistence tests cover local accounts,
+  guests, retired tokens, throttling, and error propagation.
+- Evidence: `npm run test:unit` — 84 files and 549 tests; `npm run lint` — exit
+  0; `npm run playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: remove the unreachable account-name moderation backend and its
+  remaining Axios dependency.
+
 ## 2026-07-11 — Reset the shared player fixture to level-one progression
 
 - Goal: stop fresh guests and local-account fallbacks from inheriting hidden
@@ -606,3 +626,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:47:55.693Z | session-arc | 100 | 0.6 | 4.82 | 0.94 | 0.63 | 6 | 1 | 4
 
 2026-07-12T06:49:28.043Z | session-arc | 100 | 0.59 | 5.43 | 1.23 | 0.62 | 6 | 1 | 4
+
+2026-07-12T06:54:42.555Z | session-arc | 100 | 0.57 | 5.42 | 1.25 | 0.63 | 6 | 1 | 4

@@ -1,16 +1,30 @@
-import playerRepository from '#server/core/repositories/player-repository.js';
-import { saveGuest } from '#server/core/repositories/guest-save-store.js';
+import { buildGuestSnapshot, saveGuest } from '#server/core/repositories/guest-save-store.js';
+import identityRegistry from '#server/core/services/identity-registry.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_COOLDOWN_MS = Number(process.env.PLAYER_SAVE_COOLDOWN_MS) || 60000;
 
+const localAccountId = (player) => {
+  const token = typeof player?.token === 'string' ? player.token : '';
+  return token.startsWith('local:') ? token.slice('local:'.length) : null;
+};
+
+export const saveLocalAccountProfile = (player) => {
+  const accountId = localAccountId(player);
+  if (!accountId) return null;
+  const snapshot = buildGuestSnapshot(player);
+  return identityRegistry.updateLoginProfile(accountId, snapshot) ? snapshot : null;
+};
+
 export class PlayerPersistenceService {
   constructor({
-    repository = playerRepository,
+    saveGuestPlayer = saveGuest,
+    saveLocalProfile = saveLocalAccountProfile,
     cooldownMs = DEFAULT_COOLDOWN_MS,
     logger = console,
   } = {}) {
-    this.repository = repository;
+    this.saveGuestPlayer = saveGuestPlayer;
+    this.saveLocalProfile = saveLocalProfile;
     this.cooldownMs = cooldownMs;
     this.logger = logger;
     this.lastSuccessfulSave = new Map();
@@ -37,8 +51,8 @@ export class PlayerPersistenceService {
     }
 
     // Chronicle scions are authoritative server-side characters. Keep their
-    // complete snapshot with the House instead of the legacy guest file or
-    // one-character account API. Dynamic import avoids a Player/service
+    // complete snapshot with the House instead of a fallback profile. Dynamic
+    // import avoids a Player/service
     // initialization cycle.
     if (player.scionId && player.accountId) {
       const { saveLivingScion } = await import('#server/core/services/chronicles.js');
@@ -47,23 +61,19 @@ export class PlayerPersistenceService {
       return snapshot;
     }
 
-    // Guest accounts have no backing account API; they persist to a local
-    // file instead so loot/levels/tree survive relogins during dev.
-    if (!player.token || player.token === 'none') {
-      const snapshot = saveGuest(player);
-      if (snapshot) {
-        this.lastSuccessfulSave.set(player.uuid, Date.now());
-      }
-      return snapshot;
-    }
-
     try {
-      const result = await this.repository.save(player);
+      // Local login accounts live in the same SQLite registry as credentials.
+      // Any older non-local token falls back to a machine-local snapshot; the
+      // archived website API is no longer part of Verdigris persistence.
+      const result = localAccountId(player)
+        ? await this.saveLocalProfile(player)
+        : await this.saveGuestPlayer(player);
+      if (!result) return null;
       this.lastSuccessfulSave.set(player.uuid, Date.now());
       return result;
     } catch (error) {
       if (this.logger && typeof this.logger.error === 'function') {
-        this.logger.error(`[player-persistence] Failed to save ${player.username || player.uuid}`, error);
+        this.logger.error(`[player-persistence] Failed to save ${player.username || player.uuid} locally`, error);
       }
       throw error;
     }

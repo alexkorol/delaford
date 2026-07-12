@@ -40,18 +40,17 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
   npm run dev
   ```
   This runs the Vite dev server and the Express/WebSocket backend in parallel via `concurrently`. Both processes hot-reload on file changes.
-- Visit `http://localhost:5173` to interact with the game client. The Express API wrapper responds on `http://localhost:6500`, and the WebSocket server listens on `ws://localhost:9000`.
+- Visit `http://localhost:5173` to interact with the game client. The Express API and WebSocket server both listen on `http://localhost:6500` / `ws://localhost:6500`.
 - Want to debug the backend only? Use `npm run dev:server`. For client-only work use `npm run dev:client`.
 
 ## Optional environment variables
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `SITE_URL` | Points the authentication layer at your API backend. | `http://website.test` |
 | `PLAYER_AUTO_SAVE_INTERVAL_MS` | Frequency for the server scheduler to flush all connected players to persistent storage. | `120000` (2 minutes) |
 | `PLAYER_SAVE_COOLDOWN_MS` | Minimum delay between saves for the same player when the scheduler runs. Use lower values if you want very aggressive persistence. | `60000` (1 minute) |
 
-The backend now snapshots connected players in the background. Raising the interval lowers write pressure on your API/database, while lowering it gives you quicker crash recovery at the cost of more frequent save calls.
+The backend snapshots connected players in the background. Chronicle scions and local login profiles persist to SQLite; guest profiles use machine-local JSON snapshots. Raising the interval lowers write pressure, while lowering it gives quicker crash recovery at the cost of more frequent writes.
 
 ## Useful commands
 
@@ -75,5 +74,5 @@ The new Delaford shell layers several responsive systems on top of the map rende
 ## Troubleshooting Tips
 
 - After switching Node versions, remove `node_modules` and run `npm install` to refresh native bindings.
-- Authentication relies on `SITE_URL`. Update `.env` if you host the API elsewhere.
+- Local authentication and Chronicle state use the SQLite database under `server/data/` by default.
 - Clearing `node_modules` (`rm -rf node_modules`) and reinstalling often resolves residual dependency issues after switching Node versions.

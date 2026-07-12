@@ -195,6 +195,30 @@ export class IdentityRegistry {
       return null;
     }
   }
+
+  updateLoginProfile(accountId, profile = {}) {
+    if (!accountId || !profile || typeof profile !== 'object' || Array.isArray(profile)) return false;
+    const row = this.db.prepare('SELECT profile_json FROM login_accounts WHERE account_id = ?')
+      .get(String(accountId));
+    if (!row) return false;
+
+    let current;
+    try {
+      current = JSON.parse(row.profile_json);
+    } catch {
+      current = {};
+    }
+
+    const merged = {
+      ...(current && typeof current === 'object' ? current : {}),
+      ...clone(profile),
+      uuid: current?.uuid || String(accountId),
+      username: current?.username || profile.username,
+    };
+    const result = this.db.prepare('UPDATE login_accounts SET profile_json = ? WHERE account_id = ?')
+      .run(JSON.stringify(merged), String(accountId));
+    return result.changes === 1;
+  }
 }
 
 const identityRegistry = new IdentityRegistry();
