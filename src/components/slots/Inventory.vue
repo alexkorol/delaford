@@ -28,7 +28,6 @@
 
         <div class="inventory-pane__utility-row">
           <WorldDropZone />
-          <ContainerStack />
         </div>
       </div>
     </div>
@@ -41,12 +40,10 @@ import { watch } from 'vue';
 import { useInventoryStore } from '@/stores/inventory.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
 import { indexFromCoords } from '@/core/inventory/grid-math.js';
-import bus from '@/core/utilities/bus.js';
 import Socket from '@/core/utilities/socket.js';
 import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
 import InventoryGrid from '../inventory/InventoryGrid.vue';
 import WorldDropZone from '../inventory/WorldDropZone.vue';
-import ContainerStack from '../inventory/ContainerStack.vue';
 
 const INVENTORY_COLUMNS = 12;
 const INVENTORY_ROWS = 7;
@@ -57,7 +54,6 @@ export default {
     EquipmentRagdoll,
     InventoryGrid,
     WorldDropZone,
-    ContainerStack,
   },
   props: {
     game: {
@@ -223,11 +219,6 @@ export default {
       } else {
         this.emitInventoryCommit(result);
       }
-
-      bus.$emit('inventory:interaction', {
-        source: 'inventory-pane',
-        result,
-      });
     },
   },
 };

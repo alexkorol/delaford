@@ -1,5 +1,28 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Remove detached identity and UI protocols
+
+- Goal: delete verified unreachable APIs, socket events, and UI signals while
+  preserving compatibility at save boundaries.
+- Audit result: the retired character-creation flow was the only consumer of
+  asynchronous name moderation; the smelt pane protocol and two resource
+  listeners had no counterpart; five client bus events had no listeners; and
+  the container panel exposed only placeholder text.
+- Implementation: removed the name-validation routes, service, tests, and
+  obsolete operational document; retired the empty JSON identity migration;
+  removed Axios as a direct dependency; deleted the dead smelt pipeline and
+  no-listener bus emissions; hid ContainerStack without deleting its component;
+  and removed the retired quiver image. Pre-quiver save scrubbing remains with
+  explicit compatibility comments.
+- Proof added: inventory wiring now asserts that the placeholder container panel
+  is not mounted. Existing identity, inventory, server-boot, and Chronicle tests
+  cover the retained paths.
+- Evidence: `npm run test:unit` — 83 files and 530 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: make every retained pane reachable and remove the two superseded
+  duplicate panes.
+
 ## 2026-07-11 — Keep account persistence local
 
 - Goal: remove the archived website POST path so local accounts persist on the
@@ -628,3 +651,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:49:28.043Z | session-arc | 100 | 0.59 | 5.43 | 1.23 | 0.62 | 6 | 1 | 4
 
 2026-07-12T06:54:42.555Z | session-arc | 100 | 0.57 | 5.42 | 1.25 | 0.63 | 6 | 1 | 4
+
+2026-07-12T07:01:25.042Z | session-arc | 100 | 0.59 | 4.24 | 1.24 | 0.92 | 6 | 1 | 4

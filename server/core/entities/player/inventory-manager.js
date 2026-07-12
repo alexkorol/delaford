@@ -4,6 +4,7 @@ import { v4 as uuid } from 'uuid';
 
 export const constructWear = (data) => {
   const wearData = { ...data };
+  // Compatibility scrub for pre-quiver save snapshots; arrows are not a live slot.
   delete wearData.arrows;
 
   Object.keys(wearData).forEach((property) => {

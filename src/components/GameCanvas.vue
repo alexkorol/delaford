@@ -305,7 +305,6 @@ export default {
     openScreen(incoming) {
       this.current = incoming.data.screen;
       this.screenData = incoming.data.payload;
-      bus.$emit('pane:data', this.screenData);
     },
     /**
      * Right-click brings up context-menu

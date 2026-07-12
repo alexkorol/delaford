@@ -6,7 +6,6 @@ import Database from 'better-sqlite3';
 
 const serviceDir = fileURLToPath(new URL('.', import.meta.url));
 const DEFAULT_DB_FILE = path.join(serviceDir, '../../data/verdigris.sqlite');
-const LEGACY_STORE_FILE = path.join(serviceDir, '../../data/identity-store.json');
 const clone = value => JSON.parse(JSON.stringify(value));
 
 export class IdentityRegistry {
@@ -14,10 +13,8 @@ export class IdentityRegistry {
     dbFile = process.env.VITEST
       ? ':memory:'
       : (process.env.IDENTITY_DB_FILE || process.env.CHRONICLES_DB_FILE || DEFAULT_DB_FILE),
-    legacyStoreFile = process.env.IDENTITY_STORE_FILE || LEGACY_STORE_FILE,
   } = {}) {
     this.dbFile = dbFile;
-    this.legacyStoreFile = legacyStoreFile;
     if (dbFile !== ':memory:') fs.mkdirSync(path.dirname(dbFile), { recursive: true });
     this.db = new Database(dbFile);
     this.db.pragma('foreign_keys = ON');
@@ -39,32 +36,10 @@ export class IdentityRegistry {
         created_at TEXT NOT NULL
       )
     `);
-    this.migrateLegacyJson();
   }
 
   close() {
     this.db.close();
-  }
-
-  migrateLegacyJson() {
-    if (!this.legacyStoreFile || !fs.existsSync(this.legacyStoreFile)) return;
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this.legacyStoreFile, 'utf8'));
-      const accounts = parsed?.accounts && typeof parsed.accounts === 'object' ? parsed.accounts : {};
-      const insert = this.db.prepare(`
-        INSERT INTO identity_accounts (account_id, state_json, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(account_id) DO NOTHING
-      `);
-      const migrate = this.db.transaction(() => {
-        Object.entries(accounts).forEach(([id, account]) => {
-          insert.run(id, JSON.stringify(account), new Date().toISOString());
-        });
-      });
-      migrate();
-    } catch (error) {
-      process.stderr.write(`[identity-registry] Legacy migration skipped: ${error.message}\n`);
-    }
   }
 
   ensureAccount(accountId) {

@@ -9,6 +9,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 const serialiseWear = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
+    // Keep retired quiver data from being written back by stale Chronicle saves.
     .filter(([slot]) => slot !== 'arrows')
     .map(([slot, item]) => [slot, item && typeof item === 'object' ? clone(item) : item]),
 );

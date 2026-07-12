@@ -22,6 +22,7 @@ const savePath = uuid => path.join(SAVE_DIR, `${String(uuid).replace(/[^a-zA-Z0-
 
 const serialiseWear = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
+    // Keep retired quiver data from being written back by stale guest saves.
     .filter(([slot]) => slot !== 'arrows')
     .map(([slot, item]) => [slot, item && typeof item === 'object'
       ? JSON.parse(JSON.stringify(item))

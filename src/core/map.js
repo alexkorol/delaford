@@ -565,9 +565,6 @@ class Map {
       dungeonImage,
     };
 
-    // Tell client images are loaded
-    bus.$emit('game:images:loaded');
-
     // Set image and config
     this.build();
   }

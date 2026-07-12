@@ -1327,23 +1327,6 @@ const actionEvents = {
     }
   },
 
-  'player:screen:smelt': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
-      return;
-    }
-    world.players[data.playerIndex].currentPane = 'smelt';
-
-    Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
-      screen: 'smelt',
-      payload: { items: world.players[data.playerIndex].skills.smithing.level },
-    });
-  },
-
   /**
    * A player wants to access their bank
    */

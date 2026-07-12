@@ -5,7 +5,7 @@ import { IdentityRegistry } from '#server/core/services/identity-registry.js';
 
 describe('SQLite identity registry', () => {
   let registry;
-  beforeEach(() => { registry = new IdentityRegistry({ dbFile: ':memory:', legacyStoreFile: null }); });
+  beforeEach(() => { registry = new IdentityRegistry({ dbFile: ':memory:' }); });
   afterEach(() => registry.close());
 
   it('persists validation history and the latest bound identity', async () => {

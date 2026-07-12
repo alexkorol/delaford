@@ -33,7 +33,6 @@
     "smoke:public-tunnel": "node playtest/public-tunnel-smoke.mjs"
   },
   "dependencies": {
-    "axios": "^1.7.7",
     "better-sqlite3": "^12.11.1",
     "compression": "^1.7.4",
     "cross-env": "^10.0.0",

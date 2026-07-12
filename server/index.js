@@ -9,7 +9,6 @@ import secure from 'ssl-express-www';
 
 import Delaford from './Delaford.js';
 import world from './core/world.js';
-import nameValidationService from './core/services/name-validation.js';
 import identityRegistry from './core/services/identity-registry.js';
 import { recentRuntimeEvents } from './core/services/runtime-diagnostics.js';
 import { permittedDevelopmentOrigin } from './core/http/development-cors.js';
@@ -98,65 +97,10 @@ if (hasClientBundle()) {
   process.stderr.write('[server] Client bundle not found in dist/. Static assets will be skipped.\n');
 }
 
-const serializeJob = (job) => {
-  const payload = {
-    jobId: job.id,
-    status: job.status,
-    requestedAt: job.requestedAt,
-  };
-
-  if (job.completedAt) {
-    payload.completedAt = job.completedAt;
-  }
-
-  if (job.result) {
-    payload.result = job.result;
-  }
-
-  if (job.error) {
-    payload.error = job.error;
-  }
-
-  return payload;
-};
-
 app.post('/api/accounts', (req, res) => {
   const result = identityRegistry.createLoginAccount(req.body || {});
   if (!result.ok) return res.status(400).json({ message: result.reason });
   return res.status(201).json({ accountId: result.accountId, username: result.username });
-});
-
-app.post('/api/identity/name-validations', (req, res) => {
-  const { name, accountId } = req.body || {};
-
-  if (!name || typeof name !== 'string') {
-    return res.status(400).json({ message: 'Name is required.' });
-  }
-
-  const job = nameValidationService.createJob({ name, accountId });
-  const statusCode = job.status === 'complete' ? 200 : 202;
-
-  return res.status(statusCode).json(serializeJob(job));
-});
-
-app.get('/api/identity/name-validations/:jobId', (req, res) => {
-  const job = nameValidationService.getJob(req.params.jobId);
-
-  if (!job) {
-    return res.status(404).json({ message: 'Validation job not found.' });
-  }
-
-  return res.json(serializeJob(job));
-});
-
-app.get('/api/identity/accounts/:accountId', (req, res) => {
-  const account = nameValidationService.getAccountIdentity(req.params.accountId);
-
-  if (!account) {
-    return res.status(404).json({ message: 'Account not found.' });
-  }
-
-  return res.json(account);
 });
 
 // World data endpoints — only available in development for debugging.

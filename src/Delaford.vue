@@ -73,7 +73,6 @@
       @right-click="nothing"
       @overlay-close="closePane"
       @quick-slot="handleQuickSlot"
-      @request-remap="handleQuickbarRemap"
       @party-create="handlePartyCreate"
       @party-leave="handlePartyLeave"
       @party-toggle-ready="handlePartyReadyToggle"
@@ -933,20 +932,7 @@ export default {
         }
       }
 
-      bus.$emit('quickbar:activate', {
-        slot,
-        index,
-        game: this.game,
-      });
       this.flashQuickbarSlot(index);
-    },
-
-    handleQuickbarRemap(slot, index) {
-      bus.$emit('quickbar:remap', {
-        slot,
-        index,
-        game: this.game,
-      });
     },
 
     requestPane(pane) {
