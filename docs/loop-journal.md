@@ -1,5 +1,29 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Remove the final detached socket and tree modules
+
+- Goal: extend the legacy audit from visible components into low-reference
+  server/client modules without mistaking alias imports or Vite globs for dead
+  code.
+- Audit result: monster rarity, ECS AI, player persistence, foreground data,
+  context actions, and dynamic pane/grid modules are all live and were retained.
+  `server/player/player-socket.js` had no importer and only a commented-out
+  constructor reference; `FlowerOfLifeTree.vue` became detached when its
+  superseded parent pane was removed.
+- Implementation: deleted the unused per-player socket wrapper and old SVG tree
+  child, removed the commented socket-construction remnant, and renamed the
+  cleanup regression from UI-specific to module-wide coverage. Live sockets use
+  the central `Socket` service; the active tree remains
+  `GeometricSkillTreePane` backed by the Flower-of-Life data/stat engine.
+- Proof added: the module cleanup spec covers both deleted modules alongside the
+  live replacements, and the focused server boot test passed before the full
+  gates.
+- Evidence: `npm run test:unit` — 84 files and 546 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: perform a requirement-by-requirement completion audit of the
+  House gold, shop, inventory, legacy cleanup, Git sync, and live-server goals.
+
 ## 2026-07-11 — Remove orphaned parallel UI implementations
 
 - Goal: finish the source-graph portion of the legacy UI audit by removing
@@ -556,3 +580,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:24:42.106Z | session-arc | 100 | 0.6 | 5.31 | 1.57 | 0.32 | 6 | 1 | 4
 
 2026-07-12T06:28:39.626Z | session-arc | 100 | 0.58 | 5.07 | 1.24 | 0.62 | 6 | 1 | 4
+
+2026-07-12T06:33:07.581Z | session-arc | 100 | 0.59 | 5.29 | 1.24 | 0.01 | 6 | 1 | 4

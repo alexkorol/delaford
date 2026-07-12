@@ -134,9 +134,6 @@ class Player {
     // What action are they performing at the moment?
     this.action = false;
 
-    // Socket for Player
-    // this.socket = new PlayerSocket(this.socket_id);
-
     // Pathway blocked
     this.blocked = {
       foreground: null,
