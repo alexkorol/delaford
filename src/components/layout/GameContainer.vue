@@ -14,6 +14,7 @@
       :right-pane="defaultRightPane"
       :overlay-pane="activeOverlayDescriptor"
       @overlay-close="$emit('overlay-close', $event)"
+      @request-pane="$emit('request-pane', $event)"
     >
       <div class="game-container__center">
         <div

@@ -82,6 +82,8 @@
             v-if="overlayComponent"
             :game="game"
             v-bind="overlayPane && overlayPane.props ? overlayPane.props : {}"
+            @resume="$emit('overlay-close')"
+            @open-pane="$emit('request-pane', $event)"
           />
         </PaneCard>
       </div>
@@ -123,7 +125,7 @@ export default {
       default: () => ({ id: null, title: '', props: {} }),
     },
   },
-  emits: ['overlay-close'],
+  emits: ['overlay-close', 'request-pane'],
   computed: {
     paneRegistry() {
       return this.registry || {};

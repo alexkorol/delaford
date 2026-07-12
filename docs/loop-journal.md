@@ -1,5 +1,22 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Add a real Escape game menu
+
+- Goal: replace Escape's close-only behavior with an intentional in-game menu
+  while preserving it as the back key for open panels.
+- Implementation: Escape now closes the active overlay, side panel, or expanded
+  chat first, then opens a centered Game Menu when the playfield is clear. The
+  menu exposes Resume, Character, Inventory, Quests, Skill Tree, Settings, and a
+  save-aware Log Out route, with visible hotkey labels and responsive layout.
+- Proof added: unit coverage locks the menu inventory and Escape ordering;
+  browser smoke opens the menu, switches into Settings, backs out, reopens it,
+  and resumes. A live in-app browser pass also verified the rendered hierarchy,
+  panel replacement, Escape back behavior, and Resume return to the canvas.
+- Evidence: `npm run test:unit` — 84 files and 532 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: let the user exercise the revised menu in the running dev build.
+
 ## 2026-07-12 — Archive completed plans and historical review notes
 
 - Goal: keep current documentation from presenting superseded implementation
@@ -719,3 +736,9 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T07:08:27.339Z | session-arc | 100 | 0.6 | 5.17 | 1.27 | 0.31 | 6 | 1 | 4
 
 2026-07-12T07:12:23.029Z | session-arc | 100 | 0.6 | 4.44 | 1.26 | 0.63 | 6 | 1 | 4
+
+2026-07-12T07:25:50.536Z | session-arc | 100 | 0.6 | 4.3 | 1.59 | 0.64 | 6 | 1 | 4
+
+2026-07-12T07:29:25.614Z | session-arc | 100 | 0.6 | 4.3 | 1.27 | 0.64 | 6 | 1 | 4
+
+2026-07-12T07:33:12.596Z | session-arc | 100 | 0.6 | 3.8 | 0.93 | 0.64 | 6 | 1 | 4

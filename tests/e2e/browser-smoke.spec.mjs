@@ -84,6 +84,21 @@ test.describe('canonical browser smoke', () => {
       window.ws.send(JSON.stringify({ event: 'dev:heal', data: {} }));
     });
 
+    await page.keyboard.press('Escape');
+    const escapeMenu = page.locator('.escape-menu');
+    await expect(escapeMenu).toBeVisible();
+    await expect(escapeMenu.getByRole('button')).toHaveCount(7);
+    await expect(escapeMenu.getByRole('button', { name: 'Resume Esc' })).toBeFocused();
+    await escapeMenu.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.locator('.settings')).toBeVisible();
+    await expect(escapeMenu).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(escapeMenu).toBeVisible();
+    await escapeMenu.getByRole('button', { name: 'Resume Esc' }).click();
+    await expect(escapeMenu).toBeHidden();
+
     await page.keyboard.press('q');
     await expect(page.locator('.quests')).toContainText('Speak with Aldwyn the Guide in Delaford.');
     await expect(page.locator('.quests')).toContainText('1 Verdigris point');
