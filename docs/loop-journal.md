@@ -1,5 +1,28 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Remove orphaned parallel UI implementations
+
+- Goal: finish the source-graph portion of the legacy UI audit by removing
+  single-reference components only after accounting for Vite's dynamic loaders.
+- Audit result: game panes and utility grids that initially looked orphaned are
+  live through `import.meta.glob` and were retained. Four components outside
+  those globs had no importer, renderer, or registry entry: the old `Info`
+  health strip, the unused `FloatingWindow` prototype, the superseded
+  `FlowerOfLifePane`, and an account-ID `CharacterCreate` form bypassed by the
+  Chronicles House/scion flow.
+- Implementation: deleted those four unreachable Vue components. Their live
+  replacements remain `GameHUD`, `PaneHost`, `GeometricSkillTreePane`, and the
+  `ChroniclesScreen` create-scion form. The Flower-of-Life data and stat engine
+  remain in use and were not removed.
+- Proof added: a legacy UI regression spec verifies all four live replacements
+  and asserts that the retired parallel component files no longer exist.
+- Evidence: `npm run test:unit` — 84 files and 546 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: audit server/client event names and old action comments for dead
+  protocols, keeping compatibility handlers only where persisted or deployed
+  clients still require them.
+
 ## 2026-07-11 — Delete the unreachable legacy pane shell
 
 - Goal: remove another proven-dead UI layer without changing any live pane or
@@ -531,3 +554,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:21:21.443Z | session-arc | 100 | 0.6 | 4.43 | 1.24 | 0.63 | 6 | 1 | 4
 
 2026-07-12T06:24:42.106Z | session-arc | 100 | 0.6 | 5.31 | 1.57 | 0.32 | 6 | 1 | 4
+
+2026-07-12T06:28:39.626Z | session-arc | 100 | 0.58 | 5.07 | 1.24 | 0.62 | 6 | 1 | 4
