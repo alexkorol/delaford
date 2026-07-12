@@ -226,10 +226,14 @@ describe('inventory drag store equipment commits', () => {
 
 describe('inventory drag target component wiring', () => {
   it('reads injected Pinia drag-store values after proxy unwrapping', () => {
+    const equipmentRagdoll = readSource('src/components/inventory/EquipmentRagdoll.vue');
     const equipmentSlot = readSource('src/components/sub/EquipmentSlot.vue');
     const inventoryGrid = readSource('src/components/inventory/InventoryGrid.vue');
     const worldDropZone = readSource('src/components/inventory/WorldDropZone.vue');
     const containerStack = readSource('src/components/inventory/ContainerStack.vue');
+
+    expect(equipmentRagdoll).not.toMatch(/arrows|quiver/i);
+    expect(equipmentRagdoll).toContain("{ id: 'feet', label: 'Feet'");
 
     expect(equipmentSlot).toContain(':data-equipment-slot="slotId"');
     expect(equipmentSlot).toContain('@pointerup.left.stop.prevent="handlePointerUp"');

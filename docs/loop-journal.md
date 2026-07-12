@@ -1,5 +1,27 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Remove the retired quiver slot
+
+- Goal: remove the unexplained quiver-shaped slot from the equipment ragdoll
+  without disturbing the available DCSS item and monster art library.
+- Audit result: no item catalogue entry, equip handler, combat rule, or character
+  sheet supports arrows or a quiver. Server hydration and both persistence paths
+  already discard the legacy `arrows` wear key. The only live remnant was a
+  decorative, non-interactive fake slot and its CSS in the client ragdoll.
+- Implementation: removed the fake arrows descriptor, rendered slot, and legacy
+  slot styling. The stale-save filters remain intentionally at persistence
+  boundaries so old snapshots continue to load safely; the general
+  `quiver_rawhide` inventory art remains available with the other source art.
+- Proof added: inventory component wiring now asserts that the live equipment
+  ragdoll contains no arrows or quiver surface while retaining the real feet
+  equipment slot. Existing stale-wear coverage proves old `arrows` keys are
+  still discarded.
+- Evidence: `npm run test:unit` — 83 files and 544 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: inspect pane registrations and duplicate inventory/wear entry
+  points for unreachable legacy UI before removing another bounded slice.
+
 ## 2026-07-11 — Normalize small armor inventory footprints
 
 - Goal: make every helm, glove, and boot occupy a consistent 2×2 inventory
@@ -484,3 +506,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T00:36:11.404Z | session-arc | 100 | 0.6 | 3.79 | 0.94 | 0.62 | 6 | 1 | 4
 
 2026-07-12T06:17:24.731Z | session-arc | 80 | 0.61 | 4.29 | 1.25 | 1.32 | 6 | 1 | 4
+
+2026-07-12T06:21:21.443Z | session-arc | 100 | 0.6 | 4.43 | 1.24 | 0.63 | 6 | 1 | 4

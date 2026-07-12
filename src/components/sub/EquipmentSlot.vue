@@ -444,11 +444,6 @@ export default {
   background-image: url(../../assets/graphics/ui/client/slots/wear/necklace.png);
 }
 
-.slot.arrows {
-  background-image: url(../../assets/graphics/ui/client/slots/wear/arrows.png);
-  border-style: dashed;
-}
-
 .slot.right_hand {
   background-image: url(../../assets/graphics/ui/client/slots/wear/right_hand.png);
 }

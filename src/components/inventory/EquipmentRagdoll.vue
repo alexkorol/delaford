@@ -16,10 +16,6 @@
         @open-context-menu="showContextMenu"
         @commit="$emit('commit', $event)"
       />
-      <div
-        class="slot arrows equipment-ragdoll__slot"
-        :style="slotStyle(arrowsDescriptor)"
-      />
     </div>
   </div>
 </template>
@@ -43,10 +39,6 @@ const SLOT_LAYOUT = [
   { id: 'gloves', label: 'Hands', column: 1, row: 5, width: 2, height: 2 },
   { id: 'feet', label: 'Feet', column: 7, row: 5, width: 2, height: 2 },
 ];
-
-const ARROWS_DESCRIPTOR = {
-  id: 'arrows', column: 6, row: 4, width: 1, height: 2,
-};
 
 export default {
   name: 'EquipmentRagdoll',
@@ -76,9 +68,6 @@ export default {
     },
     slotLayout() {
       return SLOT_LAYOUT;
-    },
-    arrowsDescriptor() {
-      return ARROWS_DESCRIPTOR;
     },
   },
   created() {
@@ -182,13 +171,4 @@ export default {
   }
 }
 
-.slot.arrows {
-  background-color: rgba(0, 0, 0, 0.32);
-  border: 1px dashed rgba(180, 145, 86, 0.28);
-  border-radius: 4px;
-  background-image: url(../../assets/graphics/ui/client/slots/wear/arrows.png);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 32px;
-}
 </style>
