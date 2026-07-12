@@ -152,6 +152,10 @@ class Monster {
     return this.combatController.resolveTarget(now);
   }
 
+  hasLineOfSight(target) {
+    return this.combatController.hasLineOfSight(target);
+  }
+
   tryAttack(target, now = Date.now()) {
     return this.combatController.tryAttack(target, now);
   }

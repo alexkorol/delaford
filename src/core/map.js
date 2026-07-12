@@ -1148,6 +1148,7 @@ class Map {
       toY: data.toY,
       travelMs: Math.max(80, data.travelMs || 280),
       kind: data.kind || 'monster',
+      blocked: data.blocked === true,
       startedAt: now(),
     });
     if (this.projectiles.length > 48) {
@@ -1176,7 +1177,26 @@ class Map {
     this.projectiles = this.projectiles.filter((p) => {
       const t = (timestamp - p.startedAt) / p.travelMs;
       if (t >= 1) {
-        return false;
+        if (!p.blocked || timestamp >= p.startedAt + p.travelMs + 120) {
+          return false;
+        }
+
+        const impact = this.worldToScreen(centerOfTile(p.toX, p.toY, tileSize), metrics);
+        const colour = colours[p.kind] || colours.monster;
+        const fade = 1 - ((timestamp - p.startedAt - p.travelMs) / 120);
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, fade);
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 1.5;
+        for (let ray = 0; ray < 4; ray += 1) {
+          const angle = (Math.PI * 2 * ray) / 4;
+          ctx.beginPath();
+          ctx.moveTo(impact.x, impact.y);
+          ctx.lineTo(impact.x + (Math.cos(angle) * 7), impact.y + (Math.sin(angle) * 7));
+          ctx.stroke();
+        }
+        ctx.restore();
+        return true;
       }
 
       const from = centerOfTile(p.fromX, p.fromY, tileSize);

@@ -4,6 +4,18 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 const scenes = new Map();
 
+const makeProjectileMap = (...walls) => {
+  const tileCount = 200 * 200;
+  const map = {
+    background: new Array(tileCount).fill(1),
+    foreground: new Array(tileCount).fill(0),
+  };
+  walls.forEach(({ x, y }) => {
+    map.background[(y * 200) + x] = 32;
+  });
+  return map;
+};
+
 vi.mock('#server/core/world.js', () => ({
   default: {
     players: [],
@@ -194,6 +206,31 @@ describe('combat hit detection', () => {
 
     const outOfRange = Combat.findProjectileTarget(player, 'right', 2);
     expect(outOfRange).toBeNull();
+  });
+
+  it('stops player projectile damage and rendering at the first wall', () => {
+    const player = makePlayer({ facing: 'right' });
+    const behindWall = makeMonster({ x: 13, y: 10 });
+    scenes.set('scene-1', {
+      id: 'scene-1',
+      players: [player],
+      monsters: [behindWall],
+      map: makeProjectileMap({ x: 12, y: 10 }),
+    });
+
+    const outcome = Combat.tryUseSkill(player, { skillId: 'ability-1', direction: 'right' });
+
+    expect(outcome.hits).toHaveLength(0);
+    expect(behindWall.takeDamage).not.toHaveBeenCalled();
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'world:projectile',
+      expect.objectContaining({
+        fromX: 10,
+        toX: 11.5,
+        blocked: true,
+      }),
+      expect.anything(),
+    );
   });
 });
 

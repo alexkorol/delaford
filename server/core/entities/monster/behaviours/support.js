@@ -136,8 +136,9 @@ const createSupportBehaviourSystem = (entity, monster) => (world, _delta, contex
 
   monster.state.mode = 'engaged';
   const distance = manhattanDistance(monster, target);
+  const clearShot = monster.hasLineOfSight(target);
 
-  if (distance <= rangedPreferred && distance > minimumDistance) {
+  if (clearShot && distance <= rangedPreferred && distance > minimumDistance) {
     dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);
     return;
@@ -155,7 +156,7 @@ const createSupportBehaviourSystem = (entity, monster) => (world, _delta, contex
     return;
   }
 
-  if (distance <= minimumDistance) {
+  if (clearShot && distance <= minimumDistance) {
     // Inside the comfort band but not crowded: hold ground and cast.
     dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);

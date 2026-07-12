@@ -65,8 +65,9 @@ const createRangedBehaviourSystem = (entity, monster) => (world, _delta, context
 
   monster.state.mode = 'engaged';
   const distance = manhattanDistance(monster, target);
+  const clearShot = monster.hasLineOfSight(target);
 
-  if (distance <= preferredRange && distance > minimumDistance) {
+  if (clearShot && distance <= preferredRange && distance > minimumDistance) {
     dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);
     return;
@@ -84,7 +85,7 @@ const createRangedBehaviourSystem = (entity, monster) => (world, _delta, context
     return;
   }
 
-  if (distance <= minimumDistance) {
+  if (clearShot && distance <= minimumDistance) {
     dirty = monster.tryAttack(target, now) || dirty;
     markDirty(entity, dirty);
     return;

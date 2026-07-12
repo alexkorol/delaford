@@ -19,6 +19,15 @@ const makeOpenMap = () => {
   };
 };
 
+const makeMapWithWalls = (...walls) => {
+  const map = makeOpenMap();
+  walls.forEach(({ x, y }) => {
+    // Terrain gid 32 -> zero-based tile 31, an authoritative blocked tile.
+    map.background[(y * 200) + x] = 32;
+  });
+  return map;
+};
+
 const makeWalledMap = () => {
   const tileCount = 200 * 200;
   return {
@@ -137,6 +146,65 @@ describe('ranged monster combat', () => {
     // Distance 12 — outside the 5-tile attack range
     expect(monster.tryAttack(player, 5_000)).toBe(false);
     expect(monster.state.pendingAttack).toBeNull();
+  });
+
+  it('refuses to fire through a wall and paths toward a clear shot', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    const player = makeTargetPlayer(sceneId);
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeMapWithWalls({ x: 12, y: 10 }),
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    const pursue = vi.spyOn(monster, 'pursue').mockReturnValue(true);
+
+    expect(monster.tryAttack(player, 5_000)).toBe(false);
+    expect(monster.state.pendingAttack).toBeNull();
+    expect(Socket.broadcast).not.toHaveBeenCalledWith('world:projectile', expect.anything(), expect.anything());
+
+    monster.update(5_000);
+    expect(pursue).toHaveBeenCalledWith(player, 5_000);
+  });
+
+  it('does not squeeze a diagonal shot through a blocked wall corner', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    monster.x = 12;
+    monster.y = 12;
+    const player = makeTargetPlayer(sceneId);
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeMapWithWalls({ x: 11, y: 10 }),
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+
+    expect(monster.hasLineOfSight(player)).toBe(false);
+    expect(monster.tryAttack(player, 5_000)).toBe(false);
+  });
+
+  it('cancels damage if a wall blocks the shot during its windup', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    const player = makeTargetPlayer(sceneId);
+    const map = makeOpenMap();
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map,
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+
+    expect(monster.tryAttack(player, 5_000)).toBe(true);
+    map.background[(10 * 200) + 12] = 32;
+
+    expect(monster.resolvePendingAttack(5_300)).toBe(false);
+    expect(player.applyDamage).not.toHaveBeenCalled();
   });
 });
 

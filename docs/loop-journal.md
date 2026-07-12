@@ -752,6 +752,29 @@
   passed 85 files / 533 tests; `npm run smoke:browser` rebuilt production and
   passed 3/3 browser journeys; full `npm run playtest` passed 21/21 scenarios.
 
+## 2026-07-12 — Authoritative projectile and wall collision
+
+- Goal: stop monsters and projectile effects from passing through walls, and
+  make ranged combat use one collision answer instead of separate server-hit
+  and client-animation approximations.
+- Added an authoritative supercover projectile trace over background and
+  foreground collision layers. Diagonal rays inspect both cardinal neighbours
+  at a corner, so actors cannot shoot through the seam between wall tiles.
+- Ranged and support monsters now require a clear shot both before beginning a
+  windup and again when it resolves. If a target is in range but occluded, the
+  monster pursues toward a valid firing position instead of repeatedly firing
+  or freezing behind the wall. A wall introduced during the windup cancels the
+  pending damage.
+- Player projectile hit detection and rendering now share the same trace.
+  Misses terminate at the first wall boundary and render a short impact spark
+  there rather than visually flying through solid tiles to maximum range.
+- Regression tests cover straight wall occlusion, diagonal corner occlusion,
+  AI pursuit for a clear shot, mid-windup obstruction, and matching player
+  damage/render endpoints. Live browser review confirmed the wall-bound impact.
+- Evidence: `npm run test:unit` passed 85 files / 537 tests;
+  `npm run smoke:browser` rebuilt production and passed 3/3 browser journeys;
+  full `npm run playtest` passed 21/21 scenarios with a 100/100 session score.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -848,3 +871,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T19:55:31.224Z | session-arc | 100 | 0.59 | 5.98 | 2.78 | 0.62 | 6 | 1 | 4
 
 2026-07-12T20:10:28.182Z | session-arc | 100 | 0.6 | 5.29 | 1.56 | 0.63 | 6 | 1 | 4
+
+2026-07-12T20:19:51.475Z | session-arc | 100 | 0.59 | 5.31 | 1.25 | 0.63 | 6 | 1 | 4

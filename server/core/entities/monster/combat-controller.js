@@ -5,10 +5,17 @@ import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.j
 import { euclideanDistance, manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
 import UI from '#shared/ui.js';
 import { entombFallenScion } from '#server/core/services/chronicles.js';
+import { hasProjectileLineOfSight } from '#shared/projectile-collision.js';
 
 // Continuous positions: melee pursuit stands off ~1 tile from the target
 // (never on its tile), so reach checks are radii with diagonal headroom.
 const REACH_TOLERANCE = 0.6;
+
+const getSceneMap = monster => monster.activeScene?.map || world.getScene(monster.sceneId)?.map || world.map;
+
+const hasLineOfSight = (monster, target) => (
+  Boolean(target) && hasProjectileLineOfSight(getSceneMap(monster), monster, target)
+);
 
 const rollDamage = (monster) => {
   const archetype = monster.archetype || {};
@@ -133,6 +140,9 @@ const tryAttack = (monster, target, now = Date.now()) => {
   if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
     return false;
   }
+  if (range > 1 && !isGroundSlam && !hasLineOfSight(monster, target)) {
+    return false;
+  }
 
   const direction = resolveDirection(monster, target) || monster.facing || DEFAULT_FACING_DIRECTION;
   monster.setFacing(direction);
@@ -236,6 +246,9 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
     return false;
   }
+  if (range > 1 && !isGroundSlam && !hasProjectileLineOfSight(getSceneMap(monster), source, target)) {
+    return false;
+  }
 
   const nowTs = now;
   const mitigation = getArmourMitigation(target, nowTs);
@@ -288,6 +301,7 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
 const createMonsterCombatController = (monster) => ({
   rollDamage: () => rollDamage(monster),
   resolveTarget: now => resolveTarget(monster, now),
+  hasLineOfSight: target => hasLineOfSight(monster, target),
   tryAttack: (target, now) => tryAttack(monster, target, now),
   resolvePendingAttack: now => resolvePendingAttack(monster, now),
 });

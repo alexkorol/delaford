@@ -13,6 +13,7 @@ import { dropMonsterLoot } from '#server/core/combat/loot.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import { processResourceRegeneration, REGEN_INTERVAL_MS } from '#server/core/combat/regeneration.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import { traceProjectilePath } from '#shared/projectile-collision.js';
 
 const DEFAULT_PROJECTILE_RANGE = 5;
 const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
@@ -244,32 +245,45 @@ export const findMeleeTargets = (player, direction) => {
  * Find the first monster on the line projected from the player,
  * stopping at walls.
  */
-export const findProjectileTarget = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => {
+export const findProjectileCollision = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => {
   const delta = directionDelta(direction);
   if (!delta) {
-    return null;
+    return { target: null, impact: { x: player.x, y: player.y }, blocked: false };
   }
 
   const scene = world.getScene(player.sceneId);
   const map = scene && scene.map ? scene.map : world.map;
   const monsters = getAliveSceneMonsters(player.sceneId);
+  const distance = Math.max(1, Math.floor(range));
 
-  for (let step = 1; step <= range; step += 1) {
+  for (let step = 1; step <= distance; step += 1) {
     const x = player.x + (delta.x * step);
     const y = player.y + (delta.y * step);
+    const trace = traceProjectilePath(map, player, { x, y });
+
+    if (!trace.clear) {
+      return { target: null, impact: trace.impact, blocked: true, blockedTile: trace.blockedTile };
+    }
 
     const hit = monsters.find(monster => monsterTileX(monster) === x && monsterTileY(monster) === y);
     if (hit) {
-      return hit;
-    }
-
-    if (tileBlocked(map, x, y)) {
-      return null;
+      return { target: hit, impact: { x, y }, blocked: false };
     }
   }
 
-  return null;
+  return {
+    target: null,
+    impact: {
+      x: player.x + (delta.x * distance),
+      y: player.y + (delta.y * distance),
+    },
+    blocked: false,
+  };
 };
+
+export const findProjectileTarget = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => (
+  findProjectileCollision(player, direction, range).target
+);
 
 /**
  * Roll player damage for a skill from attributes and equipped weapon.
@@ -594,27 +608,22 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
 
   let targets = [];
   if (projectile) {
-    const target = findProjectileTarget(
+    const collision = findProjectileCollision(
       player,
       direction,
       projectile.range || DEFAULT_PROJECTILE_RANGE,
     );
+    const { target } = collision;
     targets = target ? [target] : [];
 
-    // Player projectiles are visible too — fly to the victim, or the full
-    // range on a miss.
-    const delta = directionDelta(direction) || { x: 0, y: 1 };
-    const range = projectile.range || DEFAULT_PROJECTILE_RANGE;
-    const impact = target
-      ? { x: monsterTileX(target), y: monsterTileY(target) }
-      : { x: player.x + (delta.x * range), y: player.y + (delta.y * range) };
     Socket.broadcast('world:projectile', {
       fromX: player.x,
       fromY: player.y,
-      toX: impact.x,
-      toY: impact.y,
+      toX: collision.impact.x,
+      toY: collision.impact.y,
       travelMs: Math.max(120, projectile.travelTimeMs || 280),
       kind: 'player',
+      blocked: collision.blocked,
     }, world.getScenePlayers(player.sceneId));
   } else {
     targets = findMeleeTargets(player, direction);
