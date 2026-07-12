@@ -1,5 +1,21 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Delete verified dead art and font files
+
+- Goal: remove binary assets that no runtime loader, server item, README, or
+  document can resolve.
+- Audit result: two obsolete cursor images, two unloaded fonts, an unused legacy
+  tilesheet, an unsupported edible sheet, four art-selection candidates, and
+  three detached GitHub presentation files had no references. Dynamic item art
+  outside the named candidate files was deliberately retained.
+- Implementation: deleted the thirteen verified dead assets, removing roughly
+  3 MB from the checked-out source tree without changing the DCSS-derived live
+  terrain, object, monster, or item sheets.
+- Evidence: `npm run test:unit` — 83 files and 530 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests.
+- Next target: untrack the archived dependency binaries and prune duplicate root
+  config plus redundant dependencies.
+
 ## 2026-07-12 — Make every retained game pane reachable
 
 - Goal: remove pane registry entries that could not be reached through the live
