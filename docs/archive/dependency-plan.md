@@ -1,3 +1,5 @@
+> Archived: completed or superseded implementation plan retained for historical context.
+
 # Dependency & Tooling Plan
 
 ## Summary
@@ -7,35 +9,35 @@
 
 ## Proposed Phases
 
-### Phase 0 – Inventory (done)
+### Phase 0 â€“ Inventory (done)
 - Captured outdated packages via `npm outdated --json`.
 - Baseline Node/npm versions already tracked through Volta.
 
-### Phase 1 – Low-risk bumps
+### Phase 1 â€“ Low-risk bumps
 - `cross-env` v10 (check Windows compatibility).
 - `uuid` v13 (audit breaking changes, mostly import syntax).
 - `eslint` v8 -> v9 (requires config updates; coordinate with eslint-plugin-vue v10).
 - `eslint-plugin-vue` v10 (update lint config).
 - `vue-tippy` latest (verify Vue 2 compatibility; otherwise hold for Vue 3 migration).
 
-### Phase 2 – Testing & build tooling
+### Phase 2 â€“ Testing & build tooling
 - `jest` 27 -> 30 (requires Babel/Jest config updates, `@vue/vue2-jest` interplay).
 - `babel-jest`, `@vue/test-utils`, `@vue/vue2-jest` upgrade path.
 - Evaluate switching to `vitest` once Vue 3 migration is planned.
 
-### Phase 3 – Core framework migration
+### Phase 3 â€“ Core framework migration
 - Vue 2.7 -> Vue 3.x.
 - Replace Vue CLI with Vite (new build scripts, alias config, env loading).
 - Update component syntax (composition API, global API changes).
 - Replace `vuex` with `pinia` or upgrade to Vuex 4 (compatible with Vue 3).
 - Replace `vue-template-compiler` with `@vue/compiler-sfc`.
 
-### Phase 4 – Server upgrades
+### Phase 4 â€“ Server upgrades
 - Express 4 -> 5 (async middleware, router changes).
 - Review `ws`, `axios` latest versions.
 - Modernise Babel config or consider native ESM.
 
-### Phase 5 – Cleanup & automation
+### Phase 5 â€“ Cleanup & automation
 - Replace npm-run-all with native npm workspaces or `concurrently`.
 - Add lint-staged tasks for docs/markdown.
 - Configure GitHub Actions (lint/test/build).

@@ -1,3 +1,5 @@
+> Archived: completed or superseded implementation plan retained for historical context.
+
 # Smooth Movement Redesign
 
 Last updated: 2025-10-14
@@ -52,36 +54,36 @@ Deliver smooth, interpolated movement for the local player, other players, NPCs,
 
 ## Incremental Implementation Plan
 
-> Each milestone is designed to land cleanly—compile, lint, and run—so we can pause/resume between sessions.
+> Each milestone is designed to land cleanlyâ€”compile, lint, and runâ€”so we can pause/resume between sessions.
 
-### Milestone 0 – Scaffolding (in progress)
-- ✅ Document architecture, goals, and unknowns.
-- ☐ Introduce progress logging (this document).
+### Milestone 0 â€“ Scaffolding (in progress)
+- âœ… Document architecture, goals, and unknowns.
+- â˜ Introduce progress logging (this document).
 
-### Milestone 1 – Client abstractions
+### Milestone 1 â€“ Client abstractions
 1. Create shared movement constants (`src/core/config/movement.js`) capturing tile size, move speed, frame cap.
 2. Add a `MovementController` class managing interpolation state per entity.
 3. Update local player data (`Client.buildMap`) to wrap the raw JSON into the controller without changing rendering (bridge pattern).
 
-### Milestone 2 – Rendering pipeline
+### Milestone 2 â€“ Rendering pipeline
 1. Refactor `Map.drawPlayer/Players/NPCs` to work with `render` coordinates while still falling back to tile centers if interpolation data is missing.
 2. Enhance `Engine.loop` to compute `deltaTime` and forward it to `Map.update(delta)` before drawing.
 3. Add camera smoothing around interpolated positions.
 
-### Milestone 3 – Server timing metadata
+### Milestone 3 â€“ Server timing metadata
 1. Emit movement duration (or timestamps) alongside `player:movement` events.
 2. Mirror the same metadata for NPC/monster updates.
 3. Ensure backward compatibility by defaulting to existing behaviour when metadata is absent.
 
-### Milestone 4 – Local player prediction
+### Milestone 4 â€“ Local player prediction
 1. When issuing movement commands, initialise interpolation immediately and reconcile on server ack.
 2. Handle interruptions (new click, path break) by cancelling active interpolation segments gracefully.
 
-### Milestone 5 – Remote entities & NPCs
+### Milestone 5 â€“ Remote entities & NPCs
 1. Apply interpolation controller to `map.players` array and NPC list.
 2. Implement idle decay so entities stop smoothly when no new updates arrive.
 
-### Milestone 6 – Polish
+### Milestone 6 â€“ Polish
 - Settings toggle, QA instrumentation (debug overlay with `alpha`, `eta`).
 - Regression tests (unit tests for controller math, integration sanity checks).
 - Documentation updates, migration notes.

@@ -1,5 +1,15 @@
 # Verdigris loop journal
 
+## 2026-07-12 — Archive completed plans and historical review notes
+
+- Goal: keep current documentation from presenting superseded implementation
+  plans and pre-migration code review findings as active work.
+- Implementation: moved the July fix plan, movement plan, dependency plan, and
+  February code review into `docs/archive/`, added an explicit historical-status
+  header to each, and updated the live vision document's two plan references.
+- Evidence: `npm run test:unit` — 83 files and 530 tests; `npm run lint` — exit 0.
+- Next target: final audit, clean-tree verification, and a fresh end-to-end gate.
+
 ## 2026-07-12 — Remove archived dependencies and duplicate runtime paths
 
 - Goal: keep one documented production configuration and eliminate dependencies

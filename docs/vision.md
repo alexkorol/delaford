@@ -19,9 +19,9 @@ Chronicles account creator):
   10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
   picker was reverted; the intended identity layer is Chronicles
   **Houses & Scions** (account = House meta, characters = permadeath scions),
-  tracked in `docs/fix-plan-2026-07-04.md` Phase 6.
+  tracked in `docs/archive/fix-plan-2026-07-04.md` Phase 6.
 
-Sprint of 2026-07-04 (`docs/fix-plan-2026-07-04.md`) delivered: combat feel
+Sprint of 2026-07-04 (`docs/archive/fix-plan-2026-07-04.md`) delivered: combat feel
 (hit tint, unarmed retaliation, bottom xp bar, crisp orbs), pane close
 buttons, skill-tree corrections (plain names, correct conduit bias, level-
 scaled points), PoE-style quickbar, inventory slot texture + varied drops,

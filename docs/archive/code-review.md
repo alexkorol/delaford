@@ -1,3 +1,5 @@
+> Archived: completed or superseded review retained for historical context.
+
 # Delaford Codebase Review
 
 **Date:** 2026-02-24
