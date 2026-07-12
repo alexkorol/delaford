@@ -682,6 +682,21 @@
   controls): richer anvil crafting and container inventory. Both remain gated
   from the normal new-scion flow.
 
+## 2026-07-12 — Remove guest credentials from account sign-in
+
+- Goal: stop persisted guest mode from flashing the legacy `dev` username and
+  password while a real account login transitions to the House screen.
+- Removed guest mode from persisted UI state and removed the hardcoded guest
+  password from the client entirely. Guest play now uses an explicit one-click
+  request with blank, disabled account fields; account usernames remain
+  rememberable but passwords are never stored or substituted.
+- Browser smoke starts from the old persisted guest flag, proves account sign-in
+  remains unchecked and password-blank, then samples both fields throughout a
+  successful login and rejects either legacy credential appearing.
+- Evidence: `npm run lint` exited 0; `npm run test:unit` passed 85 files / 533
+  tests; `npm run smoke:browser` rebuilt production and passed 2/2 journeys;
+  `npm run playtest -- quickstart` passed 1/1.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth

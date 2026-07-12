@@ -69,10 +69,17 @@ test.describe('canonical browser smoke', () => {
           username: 'OldSavedAccount',
           password: 'plaintext-legacy-password',
         },
+        guestAccount: true,
         rememberMe: true,
       }));
     });
     await page.goto(`${gameUrl}/?#autologin`);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.locator('#guest_account')).not.toBeChecked();
+    await expect(page.locator('#login-username')).toHaveValue('OldSavedAccount');
+    await expect(page.locator('#login-password')).toHaveValue('');
+    await expect(page.locator('.inputs')).not.toContainText('qwertykeyboard');
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await page.getByRole('button', { name: 'Create account', exact: true }).click();
     await page.getByLabel('Username').fill('SmokeFounder');
     await page.getByLabel('Password', { exact: true }).fill('smoke-passphrase');
@@ -86,6 +93,24 @@ test.describe('canonical browser smoke', () => {
     await expect(page.locator('.error_message')).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.localStorage.getItem('ui')))
       .not.toContain('plaintext-legacy-password');
+
+    await page.locator('#login-password').fill('smoke-passphrase');
+    const loginFieldSamples = await page.evaluate(() => new Promise((resolve) => {
+      const samples = [];
+      const timer = window.setInterval(() => {
+        const username = document.querySelector('#login-username')?.value;
+        const password = document.querySelector('#login-password')?.value;
+        if (username !== undefined || password !== undefined) samples.push([username, password]);
+      }, 5);
+      document.querySelector('button.login')?.click();
+      window.setTimeout(() => {
+        window.clearInterval(timer);
+        resolve(samples);
+      }, 750);
+    }));
+    expect(loginFieldSamples.flat()).not.toContain('dev');
+    expect(loginFieldSamples.flat()).not.toContain('qwertykeyboard');
+    await expect(page.getByRole('heading', { name: 'Found Your House' })).toBeVisible();
   });
 
   test('protects movement, context menus, tree persistence, quests, and zone labels', async ({ page }) => {

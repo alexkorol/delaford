@@ -26,9 +26,10 @@
           id="login-username"
           ref="usernameField"
           v-model="username"
-          placeholder="Username"
+          :placeholder="guestAccount ? 'Guest session' : 'Username'"
           type="text"
           class="username"
+          :disabled="guestAccount"
           autocorrect="off"
           spellcheck="false"
           autocomplete="off"
@@ -37,9 +38,10 @@
         <input
           id="login-password"
           v-model="password"
-          placeholder="Password"
+          :placeholder="guestAccount ? 'No password needed' : 'Password'"
           type="password"
           class="password"
+          :disabled="guestAccount"
           autocomplete="off"
         >
       </form>
@@ -142,26 +144,21 @@ const setLoginProgress = (value) => {
   isLoginInProgress.value = value;
 };
 
-const applyGuestCredentials = (value) => {
-  if (value) {
-    username.value = 'dev';
-    password.value = 'qwertykeyboard';
-  } else {
-    username.value = '';
-    password.value = '';
-  }
-};
-
 watch(
   guestAccount,
   (value) => {
-    applyGuestCredentials(value);
+    if (value) {
+      username.value = '';
+      password.value = '';
+    }
   },
   { immediate: false },
 );
 
 const toggleGuestAccount = () => {
-  uiStore.setGuestAccount(guestAccount.value);
+  if (!guestAccount.value) {
+    nextTick(() => usernameField.value?.focus());
+  }
 };
 
 const toggleRememberMe = () => {
@@ -188,23 +185,23 @@ const login = (quickGuest = false) => {
   invalid.value = false;
   registrationNotice.value = '';
   const data = {
-    username: username.value,
-    password: password.value,
+    username: guestAccount.value ? '' : username.value,
+    password: guestAccount.value ? '' : password.value,
     useGuestAccount: guestAccount.value,
     ...(guestAccount.value ? { guestId: getGuestId() } : {}),
     ...(useQuickGuest ? { quickGuest: true } : {}),
   };
 
-  uiStore.rememberAccountUsername({
-    username: username.value,
-  });
+  if (!guestAccount.value) {
+    uiStore.rememberAccountUsername({
+      username: username.value,
+    });
+  }
   Socket.emit('player:login', data);
 };
 
 const quickPlay = () => {
   guestAccount.value = true;
-  uiStore.setGuestAccount(true);
-  applyGuestCredentials(true);
   login(true);
 };
 
@@ -221,15 +218,10 @@ onMounted(() => {
     : '';
 
   rememberMe.value = uiStore.rememberMe;
-  guestAccount.value = registeredUsername ? false : (tempGuest || uiStore.guestAccount);
-  if (registeredUsername) uiStore.setGuestAccount(false);
+  guestAccount.value = registeredUsername ? false : tempGuest;
 
   bus.on('player:login-error', handleLoginError);
   bus.on('login:done', handleLoginComplete);
-
-  if (guestAccount.value && import.meta.env.DEV) {
-    applyGuestCredentials(true);
-  }
 
   if (new URLSearchParams(window.location.search).has('play')
     && !window.__verdigrisQuickPlayConsumed) {

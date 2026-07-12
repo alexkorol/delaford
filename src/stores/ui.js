@@ -15,7 +15,6 @@ export const useUiStore = defineStore('ui', {
       username: '',
       password: '',
     },
-    guestAccount: false,
     rememberMe: false,
     settings: {
       fps: 60,
@@ -49,9 +48,6 @@ export const useUiStore = defineStore('ui', {
         label: payload.label,
         object: payload.object,
       };
-    },
-    setGuestAccount(payload) {
-      this.guestAccount = payload;
     },
     setRememberMe(payload) {
       this.rememberMe = Boolean(payload);
@@ -126,6 +122,6 @@ export const useUiStore = defineStore('ui', {
     },
   },
   persist: {
-    paths: ['account', 'guestAccount', 'rememberMe', 'settings', 'passives.flowerOfLife'],
+    paths: ['account', 'rememberMe', 'settings', 'passives.flowerOfLife'],
   },
 });
