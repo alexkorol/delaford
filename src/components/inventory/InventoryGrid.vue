@@ -81,7 +81,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 
-import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
+import {
+  CELL_GAP_PX,
+  CELL_SIZE_PX,
+  LEGACY_ITEM_TILE_SIZE_PX,
+} from '@/core/inventory/constants.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
 import { resolveInventoryItemArt } from '@/core/inventory/item-art.js';
@@ -127,7 +131,7 @@ export default {
     } = storeToRefs(inventoryStore);
 
     const gridStyle = computed(() => ({
-      '--cell-size': `${CELL_SIZE_PX}px`,
+      '--cell-size': `clamp(40px, 3.1vw, ${CELL_SIZE_PX}px)`,
       '--cell-gap': `${CELL_GAP_PX}px`,
       gridTemplateColumns: `repeat(${props.columns}, var(--cell-size))`,
       gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`,
@@ -156,7 +160,10 @@ export default {
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
 
-      const cellSize = CELL_SIZE_PX + CELL_GAP_PX;
+      const firstCell = element.querySelector('.inventory-grid__cell');
+      const renderedCellSize = firstCell?.getBoundingClientRect().width || CELL_SIZE_PX;
+      const renderedGap = Number.parseFloat(window.getComputedStyle(element).columnGap) || CELL_GAP_PX;
+      const cellSize = renderedCellSize + renderedGap;
       const x = Math.floor(offsetX / cellSize);
       const y = Math.floor(offsetY / cellSize);
 
@@ -340,7 +347,7 @@ export default {
 
       return {
         backgroundImage: `url(${backgroundSrc(tileset)})`,
-        backgroundPosition: `left -${column * CELL_SIZE_PX}px top -${row * CELL_SIZE_PX}px`,
+        backgroundPosition: `left -${column * LEGACY_ITEM_TILE_SIZE_PX}px top -${row * LEGACY_ITEM_TILE_SIZE_PX}px`,
       };
     };
 
@@ -483,6 +490,8 @@ export default {
 
 <style lang="scss" scoped>
 .inventory-grid {
+  --legacy-sprite-scale: calc(var(--cell-size) / 32px);
+
   position: relative;
   display: grid;
   gap: var(--cell-gap);
@@ -582,9 +591,9 @@ export default {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: var(--cell-size);
-  height: var(--cell-size);
-  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%) scale(var(--legacy-sprite-scale, 1));
   background-repeat: no-repeat;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.85));
   image-rendering: pixelated;

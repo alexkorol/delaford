@@ -180,8 +180,12 @@ export default {
 
 <style lang="scss" scoped>
 .equipment-ragdoll {
-  --eq-cell: clamp(38px, 2.65vw, 50px);
-  --eq-gap: 5px;
+  // WIZARD's paper-doll is authored around a 78px unit. Retain that full
+  // scale on the wide game layout while keeping the pane usable on narrower
+  // viewports; even the minimum is larger than Delaford's old 38-50px cells.
+  --eq-cell: clamp(54px, 4.45vw, 78px);
+  --eq-gap: 6px;
+  --eq-sprite-scale: 2;
 
   position: relative;
   display: flex;

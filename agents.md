@@ -95,12 +95,13 @@ npm run smoke:browser # required after client/UI changes
 Process hygiene (matters for sandboxed/CLI agents):
 
 - Do not start watch-mode or long-lived processes (`npm run dev`,
-  `npm run dev:server`, `npm run dev:client`) and leave them running; if
-  you must probe one, wrap it with a timeout and kill it. Prefer
-  `npm run playtest` (self-terminating) or, when a dev server is already
+  `npm run dev:server`, `npm run dev:client`) merely for an agent-side probe;
+  prefer `npm run playtest` (self-terminating) or, when a dev server is already
   running, `npm run playtest -- --attach`.
-- When the user should try the game themselves, give them the command
-  instead of hosting the server from your session.
+- When the user explicitly asks to run, launch, open, or try the game, start it
+  for them and keep the process attached so it can be stopped cleanly. If a
+  manual command is still useful, provide one copy-paste block that includes
+  the directory change and launch command.
 
 ## Protocol crib sheet (saves you spelunking)
 

@@ -10,8 +10,7 @@
 
       <div class="inventory-pane__grid">
         <div class="inventory-pane__backpack-meta" aria-label="Backpack capacity">
-          <span>Backpack</span>
-          <span>{{ occupiedCells }} / {{ totalCells }}</span>
+          {{ occupiedCells }} / {{ totalCells }}
         </div>
         <InventoryGrid
           :images="resolvedImages"
@@ -265,8 +264,7 @@ export default {
   }
 
   &__backpack-meta {
-    display: flex;
-    justify-content: space-between;
+    align-self: flex-end;
     width: 100%;
     padding: 0 4px;
     box-sizing: border-box;
@@ -274,6 +272,7 @@ export default {
     font-size: 9px;
     letter-spacing: 0.14em;
     line-height: 1.4;
+    text-align: right;
     text-transform: uppercase;
   }
 

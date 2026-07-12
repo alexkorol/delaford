@@ -1,7 +1,10 @@
 export const INVENTORY_COLUMNS = 12;
 export const INVENTORY_ROWS = 7;
-export const CELL_SIZE_PX = 32;
-export const CELL_GAP_PX = 3;
+// Match the authored WIZARD inventory scale. The old 32px value came from
+// Delaford's icon grid and made the footprint-based item art needlessly tiny.
+export const CELL_SIZE_PX = 54;
+export const CELL_GAP_PX = 2;
+export const LEGACY_ITEM_TILE_SIZE_PX = 32;
 
 export const DEFAULT_GRID = Object.freeze({
   columns: INVENTORY_COLUMNS,
