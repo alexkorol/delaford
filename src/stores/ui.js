@@ -17,6 +17,10 @@ export const useUiStore = defineStore('ui', {
     },
     guestAccount: false,
     rememberMe: false,
+    settings: {
+      fps: 60,
+      soundEffects: true,
+    },
     action: {
       label: '',
       object: '',
@@ -50,16 +54,25 @@ export const useUiStore = defineStore('ui', {
       this.guestAccount = payload;
     },
     setRememberMe(payload) {
-      this.rememberMe = payload;
+      this.rememberMe = Boolean(payload);
+      if (!this.rememberMe) {
+        this.account = { username: '', password: '' };
+      }
     },
-    rememberDevAccount(payload = {}) {
+    rememberAccountUsername(payload = {}) {
       if (!this.account || typeof this.account !== 'object') {
         this.account = { username: '', password: '' };
       }
 
       this.account = {
-        username: payload.username || '',
-        password: payload.password || '',
+        username: this.rememberMe ? (payload.username || '') : '',
+        password: '',
+      };
+    },
+    setSettings(payload = {}) {
+      this.settings = {
+        fps: Number(payload.fps) || 60,
+        soundEffects: payload.soundEffects !== false,
       };
     },
     ensureFlowerState() {
@@ -113,6 +126,6 @@ export const useUiStore = defineStore('ui', {
     },
   },
   persist: {
-    paths: ['account', 'guestAccount', 'rememberMe', 'passives.flowerOfLife'],
+    paths: ['account', 'guestAccount', 'rememberMe', 'settings', 'passives.flowerOfLife'],
   },
 });

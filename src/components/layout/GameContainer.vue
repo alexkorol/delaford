@@ -205,7 +205,6 @@
             :quickbar-active-index="quickbarActiveIndex"
             :quickbar-cooldowns="quickbarCooldowns"
             @quick-slot="handleQuickSlot"
-            @request-remap="handleQuickbarRemap"
           />
         </div>
       </div>
@@ -349,7 +348,6 @@ export default {
     'right-click',
     'overlay-close',
     'quick-slot',
-    'request-remap',
     'request-pane',
     'party-create',
     'party-leave',
@@ -397,10 +395,6 @@ export default {
       emit('quick-slot', slot, index);
     };
 
-    const handleQuickbarRemap = (slot, index) => {
-      emit('request-remap', slot, index);
-    };
-
     const triggerSkill = (skillId, options = {}) => {
       if (!skillId) {
         return false;
@@ -413,6 +407,12 @@ export default {
       }
 
       return false;
+    };
+
+    const closeLegacyPane = () => {
+      if (!legacyPaneOpen.value) return false;
+      canvasRef.value?.closePane?.();
+      return true;
     };
 
     const uiHidden = ref(false);
@@ -684,7 +684,14 @@ export default {
       }
     });
 
-    expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill, refocusGame });
+    expose({
+      paneHostRef,
+      chatboxRef,
+      canvasRef,
+      triggerSkill,
+      refocusGame,
+      closeLegacyPane,
+    });
 
     return {
       paneHostRef,
@@ -696,7 +703,6 @@ export default {
       hudRef,
       handleRightClick,
       handleQuickSlot,
-      handleQuickbarRemap,
       triggerSkill,
       uiHidden,
       legacyPaneOpen,

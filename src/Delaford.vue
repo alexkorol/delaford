@@ -121,6 +121,7 @@ import Socket from './core/utilities/socket.js';
 import ConnectionManager from './core/utilities/connection-manager.js';
 import ClientDiagnostics from './core/utilities/client-diagnostics.js';
 import { shouldRootHandleQuickbarHotkey } from './core/hotkeys.js';
+import { useUiStore } from './stores/ui.js';
 
 const createDefaultQuickSlots = () => createQuickbarSlots();
 
@@ -636,7 +637,12 @@ export default {
   },
   mounted() {
     this.soundSystem = new SoundSystem();
+    this.soundSystem.enabled = useUiStore().settings?.soundEffects !== false;
     this.soundSystem.start();
+    this.handleSoundSettings = (enabled) => {
+      if (this.soundSystem) this.soundSystem.enabled = Boolean(enabled);
+    };
+    bus.$on('SETTINGS:SOUND', this.handleSoundSettings);
     this.unlockSounds = () => this.soundSystem?.unlock();
 
     if (typeof window !== 'undefined') {
@@ -712,6 +718,7 @@ export default {
     bus.$off('client:error', this.handleClientError);
     bus.$off('player:logout', this.logout);
     bus.$off('go:main', this.cancelLogin);
+    bus.$off('SETTINGS:SOUND', this.handleSoundSettings);
 
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
       this.game.map.destroy();
@@ -1239,6 +1246,10 @@ export default {
         }
         event.preventDefault();
         event.stopPropagation();
+
+        if (this.$refs.gameContainer?.closeLegacyPane?.()) {
+          return;
+        }
 
         if (this.layout.activePane) {
           this.closePane();

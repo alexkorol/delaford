@@ -27,6 +27,7 @@
         placeholder="Vaelmont"
         required
       >
+      <small>Enter the lineage name only; “House” is added automatically.</small>
       <button type="submit">Found House</button>
     </form>
 

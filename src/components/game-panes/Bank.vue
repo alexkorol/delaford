@@ -85,7 +85,7 @@ $default_color: #383838;
 
   .house-transfer {
     display: grid;
-    grid-template-columns: 1fr 1fr auto auto;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
     align-items: center;
     padding: 10px;

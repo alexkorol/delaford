@@ -1053,9 +1053,6 @@ const actionEvents = {
       return;
     }
 
-    const itemUuidLabel = todo.item.uuid ? `${todo.item.uuid.substr(0, 5)}...` : 'no-uuid';
-    console.log(`Picking up: ${todo.item.id} (${itemUuidLabel})`);
-
     const pickup = commitGroundItemPickup(player, scene, itemToTake);
     if (pickup.added <= 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
@@ -1225,7 +1222,6 @@ const actionEvents = {
     if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
       return;
     }
-    console.log('Accessing trade shop...', data.todo.item.id);
     world.players[data.playerIndex].currentPane = 'shop';
     world.players[data.playerIndex].objectId = data.todo.item.id;
 

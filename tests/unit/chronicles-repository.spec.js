@@ -32,6 +32,13 @@ describe('server-side Chronicles repository', () => {
     expect(repository.getChronicle('account:someone-else').houses).toEqual([]);
   });
 
+  it('normalises a redundant House prefix before storing or presenting a lineage', () => {
+    const founded = repository.foundHouse(accountId, 'House Emberveil');
+
+    expect(founded.ok).toBe(true);
+    expect(repository.getChronicle(accountId).houses[0].name).toBe('Emberveil');
+  });
+
   it('round-trips a scion snapshot and degrades safely on corrupt JSON', () => {
     const { scionId } = createLineage();
     repository.saveScionSnapshot(accountId, scionId, {

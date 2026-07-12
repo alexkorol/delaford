@@ -1,11 +1,11 @@
 <template>
   <div class="settings">
+    <h2>Settings</h2>
     <div class="section">
-      <div class="label">
-        FPS
-      </div>
+      <label class="label" for="frame-rate">Frame rate cap</label>
       <div class="range">
         <input
+          id="frame-rate"
           v-model="selected.fps"
           type="range"
           min="1"
@@ -22,33 +22,70 @@
         <div>50</div>
         <div>60</div>
       </div>
+      <output for="frame-rate">{{ fpsValue }} FPS</output>
+    </div>
+
+    <div class="section">
+      <label class="sound-toggle" for="sound-effects">
+        <input
+          id="sound-effects"
+          v-model="selected.soundEffects"
+          type="checkbox"
+        >
+        Sound effects
+      </label>
     </div>
   </div>
 </template>
 
 <script>
+import { mapStores } from 'pinia';
+
+import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 
 export default {
   data() {
     return {
       selected: {
-        fps: 1,
+        fps: 5,
+        soundEffects: true,
       },
       fps: [null, 20, 30, 40, 50, 60],
     };
   },
   computed: {
+    ...mapStores(useUiStore),
     fpsValue() {
       return this.fps[this.selected.fps];
     },
+  },
+  created() {
+    const storedFpsIndex = this.fps.indexOf(Number(this.uiStore.settings?.fps));
+    this.selected.fps = storedFpsIndex > 0 ? storedFpsIndex : 5;
+    this.selected.soundEffects = this.uiStore.settings?.soundEffects !== false;
   },
   watch: {
     'selected.fps': {
       handler() {
         bus.$emit('SETTINGS:FPS', this.fpsValue);
+        this.persistSettings();
       },
       deep: true,
+    },
+    'selected.soundEffects': {
+      handler(enabled) {
+        bus.$emit('SETTINGS:SOUND', enabled);
+        this.persistSettings();
+      },
+    },
+  },
+  methods: {
+    persistSettings() {
+      this.uiStore.setSettings({
+        fps: this.fpsValue,
+        soundEffects: this.selected.soundEffects,
+      });
     },
   },
 };
@@ -62,7 +99,17 @@ div.settings {
   text-shadow: 1px 1px 0 black;
   font-size: 12px;
 
-  div.label {
+  h2 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+  }
+
+  .section + .section {
+    margin-top: 1.25rem;
+  }
+
+  .label {
+    display: block;
     margin-bottom: 0.5em;
   }
 
@@ -84,6 +131,19 @@ div.settings {
       margin: 0;
       padding: 0;
     }
+  }
+
+  output {
+    display: block;
+    margin-top: 0.5rem;
+    color: #e8cd83;
+  }
+
+  .sound-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
   }
 }
 </style>

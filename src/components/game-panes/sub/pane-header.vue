@@ -4,28 +4,15 @@
       class="text-header"
       v-text="text"
     />
-    <div
-      class="close"
-      @click="close"
-    >
-      X
-    </div>
   </div>
 </template>
 
 <script>
-import bus from '../../../core/utilities/bus.js';
-
 export default {
   props: {
     text: {
       type: String,
       required: true,
-    },
-  },
-  methods: {
-    close() {
-      bus.$emit('screen:close');
     },
   },
 };
@@ -47,18 +34,5 @@ $color: #706559;
     line-height: 27px;
   }
 
-  .close {
-    width: 30px;
-    cursor: pointer;
-    box-sizing: border-box;
-    height: 30px;
-    background-color: color.adjust(red, $lightness: -10%);
-    color: white;
-    font-size: 1em;
-    padding: 5px 2px 5px 5px;
-    position: absolute;
-    top: 0;
-    right: 0;
-  }
 }
 </style>

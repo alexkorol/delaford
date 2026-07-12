@@ -652,6 +652,36 @@
 - Exit: the goal-loop charter criteria are satisfied. No ladder item remains
   in this charter.
 
+## 2026-07-12 — Share-readiness and House treasury journey
+
+- Goal: audit the complete new-account journey for share-blocking legacy UI,
+  make carried-gold House development discoverable and usable, and verify the
+  buying loop rather than relying on old implementation claims.
+- Registration no longer follows a successful account creation with a stale
+  `#autologin` attempt. Remembering an account stores only the opted-in
+  username, scrubs legacy plaintext passwords, and shows an explicit sign-in
+  success notice.
+- House names now normalize redundant `House` prefixes at the repository
+  boundary, so both new and existing lineages render exactly once as
+  `House <name>`.
+- Rhea's bank now fits beside the automatically opened inventory instead of
+  hiding its House transfer buttons underneath it. The bank exposes a real
+  close button, legacy bank/shop-style panes close with Escape, and browser
+  smoke proves a 100-gold scion-to-House transfer updates both balances.
+- Tutorial copy names the Blade Sweep key, sends solo players through Adventure
+  without implying a party is required, and points completed trainees to Rhea
+  for House deposits. The inert quickbar right-click-remap promise was removed.
+- Settings now present an accurate 60 FPS default plus a persistent sound-effects
+  toggle. Removed the last quiver art bundle, an obsolete name-validation
+  identity table/code path, and several leftover debug logs/dead methods.
+- Evidence: `npm run test:unit` passed 85 files / 533 tests; `npm run lint` and
+  `npm run lint:css` exited 0; `npm run playtest` passed 21/21 scenarios,
+  including `house-treasury` and the full buy/appraise `town-amenities` loop;
+  `npm run smoke:browser` rebuilt production and passed 2/2 browser journeys.
+- Next: the remaining visible TODOs are genuine future systems (not misleading
+  controls): richer anvil crafting and container inventory. Both remain gated
+  from the normal new-scion flow.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -742,3 +772,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T07:29:25.614Z | session-arc | 100 | 0.6 | 4.3 | 1.27 | 0.64 | 6 | 1 | 4
 
 2026-07-12T07:33:12.596Z | session-arc | 100 | 0.6 | 3.8 | 0.93 | 0.64 | 6 | 1 | 4
+
+2026-07-12T08:07:32.434Z | session-arc | 100 | 0.6 | 6.42 | 2.22 | 0.32 | 6 | 1 | 4

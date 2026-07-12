@@ -7,13 +7,21 @@
     <div
       v-if="current !== false"
       :style="getPaneDimensions"
-      class="pane"
+      :class="['pane', { 'pane--bank': current === 'bank' }]"
     >
       <component
         :is="current"
         :game="game"
         :data="screenData"
       />
+      <button
+        type="button"
+        class="pane-close"
+        aria-label="Close current pane"
+        @click="closePane"
+      >
+        ×
+      </button>
     </div>
     <canvas
       id="game-map"
@@ -598,6 +606,32 @@ div.game {
     div {
       height: 100%;
       width: 100%;
+    }
+  }
+
+  .pane--bank {
+    left: 25%;
+    width: calc(50% - 16px);
+  }
+
+  .pane-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 30px;
+    height: 30px;
+    padding: 3px;
+    color: #fff;
+    font: 1rem "GameFont", sans-serif;
+    background: #b30000;
+    border: 0;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid #fff2c8;
+      outline-offset: -3px;
     }
   }
 

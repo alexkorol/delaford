@@ -63,7 +63,16 @@ test.describe('canonical browser smoke', () => {
   });
 
   test('creates a local account and returns to sign-in with the username', async ({ page }) => {
-    await page.goto(gameUrl);
+    await page.addInitScript(() => {
+      window.localStorage.setItem('ui', JSON.stringify({
+        account: {
+          username: 'OldSavedAccount',
+          password: 'plaintext-legacy-password',
+        },
+        rememberMe: true,
+      }));
+    });
+    await page.goto(`${gameUrl}/?#autologin`);
     await page.getByRole('button', { name: 'Create account', exact: true }).click();
     await page.getByLabel('Username').fill('SmokeFounder');
     await page.getByLabel('Password', { exact: true }).fill('smoke-passphrase');
@@ -73,6 +82,10 @@ test.describe('canonical browser smoke', () => {
     await expect(page.locator('#login-username')).toHaveValue('SmokeFounder');
     await expect(page.locator('#login-password')).toHaveValue('');
     await expect(page.locator('#guest_account')).not.toBeChecked();
+    await expect(page.getByRole('status')).toContainText('Account created.');
+    await expect(page.locator('.error_message')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem('ui')))
+      .not.toContain('plaintext-legacy-password');
   });
 
   test('protects movement, context menus, tree persistence, quests, and zone labels', async ({ page }) => {
@@ -91,9 +104,17 @@ test.describe('canonical browser smoke', () => {
     await expect(escapeMenu.getByRole('button', { name: 'Resume Esc' })).toBeFocused();
     await escapeMenu.getByRole('button', { name: 'Settings' }).click();
     await expect(page.locator('.settings')).toBeVisible();
+    await expect(page.getByLabel('Frame rate cap')).toHaveValue('5');
+    await expect(page.getByLabel('Sound effects')).toBeChecked();
+    await page.getByLabel('Sound effects').uncheck();
     await expect(escapeMenu).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(page.locator('.settings')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(escapeMenu).toBeVisible();
+    await escapeMenu.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByLabel('Sound effects')).not.toBeChecked();
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(escapeMenu).toBeVisible();
     await escapeMenu.getByRole('button', { name: 'Resume Esc' }).click();
@@ -140,6 +161,38 @@ test.describe('canonical browser smoke', () => {
     await page.keyboard.press('p');
     await expect(tree).toBeVisible();
     await expect.poll(() => activeNodes.count()).toBe(activeAfter);
+    await page.keyboard.press('Escape');
+
+    await page.evaluate(() => {
+      window.ws.send(JSON.stringify({
+        event: 'dev:teleport',
+        data: { x: 31, y: 121, sceneId: 'town:delaford' },
+      }));
+    });
+    await expect(minimapCoords).toContainText('31, 121');
+    await canvas.click({ button: 'right', position: { x: 610, y: 300 } });
+    await page.getByText('Bank Rhea, House Banker', { exact: true }).click();
+    const houseTransfer = page.getByRole('region', { name: 'House treasury transfer' });
+    await expect(houseTransfer).toBeVisible();
+    await expect(houseTransfer.getByRole('button')).toHaveCount(2);
+    await expect(houseTransfer).toContainText('Carried by this scion');
+    const transferBalances = houseTransfer.locator('strong');
+    await expect(transferBalances.nth(0)).toHaveText('100 gold');
+    const treasuryBefore = Number.parseInt(await transferBalances.nth(1).innerText(), 10);
+    await houseTransfer.getByRole('button', { name: 'Deposit 100' }).click();
+    await expect(transferBalances.nth(0)).toHaveText('0 gold');
+    await expect(transferBalances.nth(1)).toHaveText(`${treasuryBefore + 100} gold`);
+    const closeLegacyPane = page.getByRole('button', { name: 'Close current pane' });
+    await expect(closeLegacyPane).toBeVisible();
+    await closeLegacyPane.click();
+    await expect(houseTransfer).toBeHidden();
+    await page.keyboard.press('Escape');
+
+    await canvas.click({ button: 'right', position: { x: 610, y: 300 } });
+    await page.getByText('Bank Rhea, House Banker', { exact: true }).click();
+    await expect(houseTransfer).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(houseTransfer).toBeHidden();
     await page.keyboard.press('Escape');
 
     await adventure.click();

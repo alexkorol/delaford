@@ -167,8 +167,6 @@ export default {
         item: this.uiStore.action.object,
       });
 
-      console.log(this.uiStore.action.object);
-
       // TODO
       // Make 'context-menu' to smelt bars into weapons
       // Do actual smithing from weapons from item click on menu

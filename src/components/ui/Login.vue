@@ -45,6 +45,14 @@
       </form>
 
       <div
+        v-if="registrationNotice"
+        class="success_message"
+        role="status"
+      >
+        {{ registrationNotice }}
+      </div>
+
+      <div
         v-if="invalid"
         class="error_message"
       >
@@ -69,7 +77,7 @@
       <div
         v-if="inDevelopment"
         v-tippy
-        title="Dev account details will be saved and auto-logged in upon code changes."
+        title="Keep this username on this device. Passwords are never stored."
         class="checkbox"
       >
         <label for="rememberMe">
@@ -79,7 +87,7 @@
             type="checkbox"
             @change="toggleRememberMe"
           >
-          Remember me?
+          Remember username?
         </label>
       </div>
       <button
@@ -110,6 +118,7 @@ import Socket from '../../core/utilities/socket.js';
 const uiStore = useUiStore();
 
 const invalid = ref(false);
+const registrationNotice = ref('');
 const username = ref('');
 const password = ref('');
 const guestAccount = ref(false);
@@ -157,10 +166,6 @@ const toggleGuestAccount = () => {
 
 const toggleRememberMe = () => {
   uiStore.setRememberMe(rememberMe.value);
-  const url = rememberMe.value
-    ? `${window.location.origin}/?#autologin`
-    : window.location.origin;
-  window.history.pushState('Page', 'Title', url);
 };
 
 const introduceMusic = () => {
@@ -181,6 +186,7 @@ const login = (quickGuest = false) => {
   if (isLoginInProgress.value) return;
   setLoginProgress(true);
   invalid.value = false;
+  registrationNotice.value = '';
   const data = {
     username: username.value,
     password: password.value,
@@ -189,9 +195,8 @@ const login = (quickGuest = false) => {
     ...(useQuickGuest ? { quickGuest: true } : {}),
   };
 
-  uiStore.rememberDevAccount({
+  uiStore.rememberAccountUsername({
     username: username.value,
-    password: password.value,
   });
   Socket.emit('player:login', data);
 };
@@ -211,6 +216,9 @@ onMounted(() => {
 
   const tempGuest = window.location.href.includes('?useGuestAccount');
   const registeredUsername = window.sessionStorage.getItem('verdigris_registered_username');
+  registrationNotice.value = registeredUsername
+    ? 'Account created. Sign in with your password to found your House.'
+    : '';
 
   rememberMe.value = uiStore.rememberMe;
   guestAccount.value = registeredUsername ? false : (tempGuest || uiStore.guestAccount);
@@ -234,16 +242,15 @@ onMounted(() => {
   }
 
   const storedAccount = uiStore.account;
+  if (storedAccount?.password) {
+    uiStore.rememberAccountUsername({ username: storedAccount.username });
+  }
   if (registeredUsername) {
     username.value = registeredUsername;
     window.sessionStorage.removeItem('verdigris_registered_username');
   }
   if (storedAccount?.username) {
     username.value = registeredUsername || storedAccount.username;
-    password.value = registeredUsername ? '' : storedAccount.password;
-    if (window.location.href.includes('#autologin')) {
-      setTimeout(() => document.querySelector('button.login')?.click(), 250);
-    }
   }
 
   nextTick(() => {
@@ -310,6 +317,16 @@ div.form {
     border: 1px solid rgba(204, 58, 58, 0.7);
     padding: 0.4em 0.6em;
     color: #f0d8d2;
+    font-family: "ChatFont", sans-serif;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  .success_message {
+    margin-top: 1em;
+    padding: 0.55em 0.7em;
+    color: #cdebd4;
+    background: rgba(27, 82, 48, 0.78);
+    border: 1px solid rgba(95, 168, 112, 0.68);
     font-family: "ChatFont", sans-serif;
     text-shadow: 1px 1px 0 #000;
   }

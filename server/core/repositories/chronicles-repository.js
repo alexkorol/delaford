@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { normaliseHouseName } from '#shared/house-name.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DB_FILE = path.resolve(here, '..', '..', 'data', 'verdigris.sqlite');
@@ -42,7 +43,7 @@ const validateName = (name, minimum, maximum, label) => {
   return { valid: true, value };
 };
 
-export const validateHouseName = name => validateName(name, 3, 20, 'House');
+export const validateHouseName = name => validateName(normaliseHouseName(name), 3, 20, 'House');
 export const validateScionName = name => validateName(name, 2, 20, 'Scion');
 
 const rowToScion = row => ({
@@ -193,7 +194,7 @@ export class ChroniclesRepository {
       const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
       return {
       id: row.id,
-      name: row.name,
+      name: normaliseHouseName(row.name),
       renown: row.renown,
       treasury: Math.max(0, Number(row.treasury) || 0),
       upgrades,
@@ -239,7 +240,8 @@ export class ChroniclesRepository {
       WHERE best_depth > 0
       ORDER BY best_depth DESC, renown DESC, founded_at ASC
       LIMIT ?
-    `).all(Math.max(1, Math.min(50, Math.floor(limit || 10))));
+    `).all(Math.max(1, Math.min(50, Math.floor(limit || 10))))
+      .map(entry => ({ ...entry, houseName: normaliseHouseName(entry.houseName) }));
   }
 
   recordDepth(accountId, houseId, scionId, depth) {
@@ -393,7 +395,7 @@ export class ChroniclesRepository {
     return {
       ...rowToScion(row),
       houseId: row.house_id,
-      houseName: row.house_name,
+      houseName: normaliseHouseName(row.house_name),
       snapshot: parseJson(row.snapshot_json, null),
     };
   }

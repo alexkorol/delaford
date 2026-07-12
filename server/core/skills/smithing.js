@@ -156,7 +156,6 @@ export default class Smithing extends Skill {
 
         resolve(resource);
       } else {
-        console.log('Not enough ore.');
         Socket.sendMessageToPlayer(
           this.playerIndex,
           'You do not have enough ore.',

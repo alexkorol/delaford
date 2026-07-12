@@ -22,11 +22,6 @@ export class IdentityRegistry {
       try { this.db.pragma('journal_mode = WAL'); } catch { /* default journal remains safe */ }
     }
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS identity_accounts (
-        account_id TEXT PRIMARY KEY,
-        state_json TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
       CREATE TABLE IF NOT EXISTS login_accounts (
         account_id TEXT PRIMARY KEY,
         username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -40,67 +35,6 @@ export class IdentityRegistry {
 
   close() {
     this.db.close();
-  }
-
-  ensureAccount(accountId) {
-    if (!accountId) return null;
-    const id = String(accountId);
-    const existing = this.getAccount(id);
-    if (existing) return existing;
-    const account = { accountId: id, history: [], boundIdentity: null };
-    this.writeAccount(account);
-    return account;
-  }
-
-  writeAccount(account) {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      INSERT INTO identity_accounts (account_id, state_json, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(account_id) DO UPDATE SET state_json = excluded.state_json, updated_at = excluded.updated_at
-    `).run(account.accountId, JSON.stringify(account), now);
-  }
-
-  async recordValidation(accountId, payload) {
-    if (!accountId) return null;
-    const account = this.ensureAccount(accountId);
-    const entry = {
-      jobId: payload.jobId || null,
-      requestedAt: payload.requestedAt || new Date().toISOString(),
-      completedAt: payload.completedAt || new Date().toISOString(),
-      rawName: payload.rawName,
-      normalizedName: payload.normalizedName,
-      valid: Boolean(payload.valid),
-      reason: payload.reason || null,
-      confidence: typeof payload.confidence === 'number' ? payload.confidence : null,
-      provider: payload.provider || 'local',
-      metadata: payload.metadata || null,
-    };
-    account.history.push(entry);
-    if (entry.valid) {
-      account.boundIdentity = {
-        name: entry.normalizedName,
-        boundAt: entry.completedAt,
-        jobId: entry.jobId,
-        confidence: entry.confidence,
-        provider: entry.provider,
-      };
-    }
-    this.writeAccount(account);
-    return clone(account);
-  }
-
-  getAccount(accountId) {
-    if (!accountId) return null;
-    const row = this.db.prepare('SELECT state_json FROM identity_accounts WHERE account_id = ?')
-      .get(String(accountId));
-    if (!row) return null;
-    try {
-      const parsed = JSON.parse(row.state_json);
-      return parsed && typeof parsed === 'object' ? clone(parsed) : null;
-    } catch {
-      return null;
-    }
   }
 
   createLoginAccount({ username, password }) {
@@ -143,7 +77,6 @@ export class IdentityRegistry {
         JSON.stringify(profile),
         new Date().toISOString(),
       );
-      this.ensureAccount(accountId);
       return { ok: true, accountId, username: cleanUsername };
     } catch (error) {
       if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {

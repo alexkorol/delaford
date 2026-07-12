@@ -326,15 +326,6 @@ class Player {
   }
 
   /**
-   * Player will perform an action
-   *
-   * @param {string} item Action to do
-   */
-  do(item) {
-    console.log(this.x, this.y, `Doing ${item}`);
-  }
-
-  /**
    * Checks if player queue is  empty
    *
    * @returns {boolean}
