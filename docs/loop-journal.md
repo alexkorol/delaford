@@ -775,6 +775,26 @@
   `npm run smoke:browser` rebuilt production and passed 3/3 browser journeys;
   full `npm run playtest` passed 21/21 scenarios with a 100/100 session score.
 
+## 2026-07-12 — Separate account sign-in from browser guest play
+
+- Goal: remove the misleading login-screen choice that presented named-account
+  Login and browser-local “Play Now” as equivalent ways to enter the game.
+- The sign-in screen is now account-only: username, password, Login, optional
+  remembered username, and Cancel. Removed the guest checkbox and “Play Now,”
+  so an account login can no longer silently switch identity modes inside the
+  same form.
+- Browser guest play moved to the landing page as a quieter, explicitly named
+  “Continue as browser guest” path. Adjacent copy states that it opens a
+  separate browser-local Chronicle and is never the signed-in House. Normal
+  guest entry opens that Chronicle first; only the intentional `?play` testing
+  shortcut skips directly into a dungeon.
+- The guest identity and payload now live in one shared client module. Tests
+  prove the browser guest ID remains stable, never carries account credentials,
+  and only marks the dedicated quick-start route for immediate play.
+- Live browser review confirmed the account-only form and the separate guest
+  Wayfarers Chronicle. Browser smoke asserts the warning and rejects both old
+  guest controls from the sign-in screen.
+
 ## Session-arc metric trends
 
 UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5 (s) | Choices | Deaths | Depth
@@ -873,3 +893,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T20:10:28.182Z | session-arc | 100 | 0.6 | 5.29 | 1.56 | 0.63 | 6 | 1 | 4
 
 2026-07-12T20:19:51.475Z | session-arc | 100 | 0.59 | 5.31 | 1.25 | 0.63 | 6 | 1 | 4
+
+2026-07-12T20:34:17.251Z | session-arc | 100 | 0.61 | 4.43 | 1.24 | 0.62 | 6 | 1 | 4

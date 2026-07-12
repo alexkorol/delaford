@@ -74,8 +74,11 @@ test.describe('canonical browser smoke', () => {
       }));
     });
     await page.goto(`${gameUrl}/?#autologin`);
+    await expect(page.getByRole('button', { name: 'Continue as browser guest' })).toBeVisible();
+    await expect(page.getByText('Separate browser-local Chronicle')).toBeVisible();
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.locator('#guest_account')).not.toBeChecked();
+    await expect(page.getByRole('button', { name: 'Play Now' })).toHaveCount(0);
+    await expect(page.getByText('Guest account?')).toHaveCount(0);
     await expect(page.locator('#login-username')).toHaveValue('OldSavedAccount');
     await expect(page.locator('#login-password')).toHaveValue('');
     await expect(page.locator('.inputs')).not.toContainText('qwertykeyboard');
@@ -88,7 +91,6 @@ test.describe('canonical browser smoke', () => {
 
     await expect(page.locator('#login-username')).toHaveValue('SmokeFounder');
     await expect(page.locator('#login-password')).toHaveValue('');
-    await expect(page.locator('#guest_account')).not.toBeChecked();
     await expect(page.getByRole('status')).toContainText('Account created.');
     await expect(page.locator('.error_message')).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.localStorage.getItem('ui')))

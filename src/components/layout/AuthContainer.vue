@@ -96,6 +96,18 @@
               Create account
             </button>
           </div>
+          <div class="auth-container__guest-path">
+            <span>Want to look around without signing in?</span>
+            <button
+              class="auth-container__guest-button"
+              type="button"
+              :disabled="guestLoginInProgress"
+              @click="continueAsGuest"
+            >
+              {{ guestLoginInProgress ? 'Opening guest Chronicle…' : 'Continue as browser guest' }}
+            </button>
+            <small>Separate browser-local Chronicle · never your signed-in House</small>
+          </div>
           <p class="auth-container__credit">
             Verdigris grew from Delaford, created by Dan Jasnowski, and preserves its MIT-licensed foundation.
           </p>
@@ -111,6 +123,7 @@ import LoginBackdrop from '../sub/LoginBackdrop.vue';
 import Login from '../ui/Login.vue';
 import AccountCreate from '../ui/auth/AccountCreate.vue';
 import ChroniclesScreen from '../ui/auth/ChroniclesScreen.vue';
+import { startBrowserGuestSession } from '../../core/auth/guest-session.js';
 
 export default {
   name: 'AuthContainer',
@@ -131,9 +144,19 @@ export default {
     chronicleFall: { type: Object, default: null },
   },
   emits: ['navigate'],
+  data() {
+    return {
+      guestLoginInProgress: false,
+    };
+  },
   methods: {
     emitNavigate(target) {
       this.$emit('navigate', target);
+    },
+    continueAsGuest() {
+      if (this.guestLoginInProgress) return;
+      this.guestLoginInProgress = true;
+      startBrowserGuestSession();
     },
   },
 };
@@ -334,6 +357,44 @@ export default {
   font-size: 0.72rem;
   line-height: 1.45;
   color: rgba(220, 210, 190, 0.48);
+}
+
+.auth-container__guest-path {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  margin-top: var(--space-md);
+  color: var(--color-text-dim);
+  font-size: 0.73rem;
+  text-align: center;
+}
+
+.auth-container__guest-button {
+  padding: 5px 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(183, 146, 79, 0.38);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: 0.76rem 'ChatFont', sans-serif;
+  cursor: pointer;
+}
+
+.auth-container__guest-button:hover,
+.auth-container__guest-button:focus-visible {
+  color: var(--color-accent-strong);
+  border-bottom-color: var(--color-accent-strong);
+  outline: none;
+}
+
+.auth-container__guest-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.auth-container__guest-path small {
+  color: rgba(220, 210, 190, 0.42);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
 }
 
 @media (width <= 620px) {

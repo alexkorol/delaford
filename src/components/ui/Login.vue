@@ -11,21 +11,6 @@
       <span>Your credentials have been sealed. Calling your House&hellip;</span>
     </div>
     <template v-else>
-    <div
-      v-tippy
-      title="Play with a persistent guest House on this browser."
-      class="checkbox guest_account"
-    >
-      <label for="guest_account">
-        <input
-          id="guest_account"
-          v-model="guestAccount"
-          type="checkbox"
-          @change="toggleGuestAccount"
-        >
-        Guest account?
-      </label>
-    </div>
     <div class="inputs">
       <form
         :class="{ hasErrors: invalid }"
@@ -37,10 +22,9 @@
           id="login-username"
           ref="usernameField"
           v-model="username"
-          :placeholder="guestAccount ? 'Guest session' : 'Username'"
+          placeholder="Username"
           type="text"
           class="username"
-          :disabled="guestAccount"
           autocorrect="off"
           spellcheck="false"
           autocomplete="off"
@@ -49,10 +33,9 @@
         <input
           id="login-password"
           v-model="password"
-          :placeholder="guestAccount ? 'No password needed' : 'Password'"
+          placeholder="Password"
           type="password"
           class="password"
-          :disabled="guestAccount"
           autocomplete="off"
         >
       </form>
@@ -74,13 +57,6 @@
     </div>
 
     <div class="action_buttons">
-      <button
-        class="button quick-play"
-        type="button"
-        @click="quickPlay"
-      >
-        Play Now
-      </button>
       <button
         class="button login"
         @click="login"
@@ -116,15 +92,14 @@
 
 <script setup>
 import {
-  computed,
   nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
-  watch,
 } from 'vue';
 
 import { useUiStore } from '@/stores/ui.js';
+import { startBrowserGuestSession } from '@/core/auth/guest-session.js';
 
 import bus from '../../core/utilities/bus.js';
 import Socket from '../../core/utilities/socket.js';
@@ -135,42 +110,14 @@ const invalid = ref(false);
 const registrationNotice = ref('');
 const username = ref('');
 const password = ref('');
-const guestAccount = ref(false);
 const rememberMe = ref(false);
 const isLoginInProgress = ref(false);
 const usernameField = ref(null);
 
-const inDevelopment = computed(() => !import.meta.env.PROD);
-const GUEST_ID_KEY = 'verdigris_guest_id';
-
-const getGuestId = () => {
-  const existing = window.localStorage.getItem(GUEST_ID_KEY);
-  if (existing) return existing;
-  const generated = globalThis.crypto?.randomUUID?.()
-    || `guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  window.localStorage.setItem(GUEST_ID_KEY, generated);
-  return generated;
-};
+const inDevelopment = !import.meta.env.PROD;
 
 const setLoginProgress = (value) => {
   isLoginInProgress.value = value;
-};
-
-watch(
-  guestAccount,
-  (value) => {
-    if (value) {
-      username.value = '';
-      password.value = '';
-    }
-  },
-  { immediate: false },
-);
-
-const toggleGuestAccount = () => {
-  if (!guestAccount.value) {
-    nextTick(() => usernameField.value?.focus());
-  }
 };
 
 const toggleRememberMe = () => {
@@ -190,18 +137,15 @@ const incorrectLogin = () => {
   invalid.value = true;
 };
 
-const login = (quickGuest = false) => {
-  const useQuickGuest = quickGuest === true;
+const login = () => {
   if (isLoginInProgress.value) return;
   setLoginProgress(true);
   invalid.value = false;
   registrationNotice.value = '';
   const data = {
-    username: guestAccount.value ? '' : username.value,
-    password: guestAccount.value ? '' : password.value,
-    useGuestAccount: guestAccount.value,
-    ...(guestAccount.value ? { guestId: getGuestId() } : {}),
-    ...(useQuickGuest ? { quickGuest: true } : {}),
+    username: username.value,
+    password: password.value,
+    useGuestAccount: false,
   };
 
   // Keep credentials in the outbound payload only. Removing the controls on
@@ -209,17 +153,16 @@ const login = (quickGuest = false) => {
   // localhost/dev credential while the authenticated screen is loading.
   password.value = '';
 
-  if (!guestAccount.value) {
-    uiStore.rememberAccountUsername({
-      username: username.value,
-    });
-  }
+  uiStore.rememberAccountUsername({
+    username: username.value,
+  });
   Socket.emit('player:login', data);
 };
 
 const quickPlay = () => {
-  guestAccount.value = true;
-  login(true);
+  if (isLoginInProgress.value) return;
+  setLoginProgress(true);
+  startBrowserGuestSession({ quickStart: true });
 };
 
 const handleLoginError = () => incorrectLogin();
@@ -228,14 +171,12 @@ const handleLoginComplete = () => setLoginProgress(false);
 onMounted(() => {
   invalid.value = false;
 
-  const tempGuest = window.location.href.includes('?useGuestAccount');
   const registeredUsername = window.sessionStorage.getItem('verdigris_registered_username');
   registrationNotice.value = registeredUsername
     ? 'Account created. Sign in with your password to found your House.'
     : '';
 
   rememberMe.value = uiStore.rememberMe;
-  guestAccount.value = registeredUsername ? false : tempGuest;
 
   bus.on('player:login-error', handleLoginError);
   bus.on('login:done', handleLoginComplete);
@@ -446,10 +387,6 @@ div.form {
     input[type='checkbox'] {
       accent-color: var(--color-accent);
     }
-  }
-
-  .guest_account {
-    margin-top: 1em;
   }
 
   .sr-only {
