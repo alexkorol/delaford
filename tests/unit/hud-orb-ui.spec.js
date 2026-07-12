@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -10,6 +10,16 @@ const readSource = relativePath => readFileSync(
 );
 
 describe('WIZARD HUD orbs', () => {
+  it('uses the pane host instead of the retired tab-strip shell', () => {
+    const delaford = readSource('src/Delaford.vue');
+    const retiredSlots = fileURLToPath(new URL('../../src/components/Slots.vue', import.meta.url));
+
+    expect(delaford).toContain('<GameContainer');
+    expect(delaford).toContain(':pane-registry="paneRegistryMap"');
+    expect(delaford).not.toContain("from './components/Slots.vue'");
+    expect(existsSync(retiredSlots)).toBe(false);
+  });
+
   it('renders the orb art without visible redundant text or bar overlays', () => {
     const source = readSource('src/components/hud/HudOrb.vue');
 

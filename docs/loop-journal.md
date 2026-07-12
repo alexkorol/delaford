@@ -1,5 +1,26 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Delete the unreachable legacy pane shell
+
+- Goal: remove another proven-dead UI layer without changing any live pane or
+  preserving an obsolete parallel navigation system.
+- Audit result: `src/components/Slots.vue` implemented the old white/grey
+  seven-tab strip, but no source file imported or rendered it. The live client
+  registers panes in `Delaford.vue` and renders them through
+  `GameContainer -> PaneHost`. Seven tab SVGs were referenced only by the dead
+  component.
+- Implementation: deleted the unused tab-strip component and its private SVG
+  icon set. The active Stats, Inventory, Equipment, Friends, Settings, Logout,
+  and Quests pane components remain registered in the live pane host.
+- Proof added: the HUD unit suite asserts that `Delaford.vue` mounts
+  `GameContainer` with the pane registry and that the retired `Slots.vue` shell
+  does not exist.
+- Evidence: `npm run test:unit` — 83 files and 545 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios with session critic 100/100.
+- Next target: audit the zero-reference legacy item-grid, anvil-grid, and shop
+  components against the current inventory, forge, and shop implementations.
+
 ## 2026-07-11 — Remove the retired quiver slot
 
 - Goal: remove the unexplained quiver-shaped slot from the equipment ragdoll
@@ -508,3 +529,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-12T06:17:24.731Z | session-arc | 80 | 0.61 | 4.29 | 1.25 | 1.32 | 6 | 1 | 4
 
 2026-07-12T06:21:21.443Z | session-arc | 100 | 0.6 | 4.43 | 1.24 | 0.63 | 6 | 1 | 4
+
+2026-07-12T06:24:42.106Z | session-arc | 100 | 0.6 | 5.31 | 1.57 | 0.32 | 6 | 1 | 4
