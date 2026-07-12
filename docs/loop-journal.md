@@ -1,5 +1,27 @@
 # Verdigris loop journal
 
+## 2026-07-11 — Normalize small armor inventory footprints
+
+- Goal: make every helm, glove, and boot occupy a consistent 2×2 inventory
+  footprint, including items loaded from old persisted snapshots.
+- Root cause: the shared equipment defaults still assigned gloves and feet a
+  2×1 footprint. Explicit legacy `size` metadata was accepted before equipment
+  slot rules, so stale records could also preserve the narrow shape on both the
+  server and client.
+- Implementation: head, glove, and foot equipment slots are now authoritative
+  2×2 shapes across item creation, persisted-inventory repacking, and client
+  normalization. Equipment-slot aliases are recognized after an inventory item
+  replaces its catalogue slot with a numeric grid position.
+- Proof added: the inventory unit suite checks every matching wearable catalogue
+  item plus a legacy 2×1 boot record. The live town scenario grants a bronze
+  helm, gloves, and boots through the real inventory pipeline and observes each
+  authoritative 2×2 size.
+- Evidence: `npm run test:unit` — 83 files and 544 tests; `npm run lint` — exit
+  0; `npm run smoke:browser` — production build and 2/2 browser tests; `npm run
+  playtest` — 21/21 scenarios.
+- Next target: continue the legacy cleanup audit, starting with the obsolete
+  quiver presentation and unreachable pane registrations.
+
 ## 2026-07-11 — Connect scion gold to House development and clarify shops
 
 - Goal: let a newly founded House grow from gold found by its active scion, and
@@ -460,3 +482,5 @@ UTC | Scenario | Score | First combat (s) | First drop (s) | TTK L1 (s) | TTK L5
 2026-07-11T07:31:19.297Z | session-arc | 100 | 0.57 | 4.64 | 0.62 | 0.63 | 6 | 1 | 4
 
 2026-07-12T00:36:11.404Z | session-arc | 100 | 0.6 | 3.79 | 0.94 | 0.62 | 6 | 1 | 4
+
+2026-07-12T06:17:24.731Z | session-arc | 80 | 0.61 | 4.29 | 1.25 | 1.32 | 6 | 1 | 4

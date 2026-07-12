@@ -52,6 +52,7 @@ const snapshotItem = item => ({
   uuid: item.uuid,
   qty: item.qty || 1,
   slot: item.slot,
+  size: item.size ? { ...item.size } : null,
   itemLevel: itemLevel(item),
   stats: item.stats ? structuredClone(item.stats) : null,
   vessel: item.vessel ? structuredClone(item.vessel) : null,

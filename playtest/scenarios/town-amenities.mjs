@@ -15,6 +15,19 @@ export default async function townAmenities({ connect, assert }) {
     assert(!state.inventory.some(item => item.id === 'bronze-bar'), 'starter backpack omits bronze ingots');
     assert(state.inventory.some(item => item.id === 'coins' && item.qty >= 100), 'starter gold remains available');
 
+    ['bronze-med-helm', 'bronze-gloves', 'bronze-boots'].forEach(itemId => p.devGive(itemId));
+    state = await p.waitFor(async () => {
+      const current = await p.state();
+      return ['bronze-med-helm', 'bronze-gloves', 'bronze-boots']
+        .every(itemId => current.inventory.some(item => item.id === itemId))
+        ? current
+        : false;
+    }, { label: 'small armor inventory footprints' });
+    ['bronze-med-helm', 'bronze-gloves', 'bronze-boots'].forEach((itemId) => {
+      const item = state.inventory.find(entry => entry.id === itemId);
+      assert(item.size?.width === 2 && item.size?.height === 2, `${itemId} occupies a 2x2 inventory footprint`);
+    });
+
     p.devHurt(5);
     const hurt = await p.waitFor(async () => {
       const current = await p.state();

@@ -9,6 +9,7 @@ import { applyStacking, canStackWith, isStackableItem } from '@/core/inventory/s
 import { canEquipInventoryItemToSlot } from '@/stores/inventory.js';
 import { DEFAULT_GRID, ORIENTATION_DEFAULT, ORIENTATION_ROTATED } from '@/core/inventory/constants.js';
 import { canPlaceInventoryItem, packInventoryItems, resolveItemSize } from '@shared/inventory-footprints.js';
+import { wearableItems } from '@server/core/data/items/index.js';
 
 const mockItem = (overrides = {}) => ({
   id: 'mock-item',
@@ -67,6 +68,46 @@ describe('inventory normalisation', () => {
     expect(resolveItemSize({ id: 'bronze-dagger', slot: 'right_hand', type: 'weapon' })).toEqual({ width: 1, height: 2 });
     expect(resolveItemSize({ id: 'iron-halberd', slot: 'right_hand', type: 'weapon', twoHanded: true })).toEqual({ width: 2, height: 4 });
     expect(resolveItemSize({ id: 'bronze-armor', slot: 'armor', type: 'armor' })).toEqual({ width: 2, height: 3 });
+  });
+
+  it('keeps every helm, glove, and boot at a 2x2 footprint', () => {
+    const squareArmorSlots = new Set(['head', 'gloves', 'feet']);
+    const squareArmor = wearableItems.filter(item => squareArmorSlots.has(item.slot));
+
+    expect(squareArmor.length).toBeGreaterThan(0);
+    squareArmor.forEach((item) => {
+      expect(resolveItemSize(item), item.id).toEqual({ width: 2, height: 2 });
+    });
+
+    expect(resolveItemSize({
+      id: 'legacy-boots',
+      slot: 7,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    })).toEqual({ width: 2, height: 2 });
+
+    const normalisedLegacyBoots = normaliseInventoryItem({
+      id: 'legacy-boots',
+      uuid: 'legacy-boots-1',
+      slot: 7,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    }, DEFAULT_GRID);
+    expect(normalisedLegacyBoots.baseSize).toEqual({ width: 2, height: 2 });
+  });
+
+  it('repacks legacy small armor records as 2x2 items', () => {
+    const [boots] = packInventoryItems([{
+      id: 'legacy-boots',
+      slot: 0,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    }], DEFAULT_GRID);
+
+    expect(boots.size).toEqual({ width: 2, height: 2 });
   });
 
   it('enriches bare server inventory records from the client item catalogue for paperdoll drops', () => {
