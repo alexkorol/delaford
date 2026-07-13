@@ -1589,7 +1589,12 @@ export default {
     },
 
     handleEnterZone(selection) {
-      const { template, layout } = selection || {};
+      const { template, layout, road } = selection || {};
+      // Roads open the Wayfinder's Chart; travel happens from the chart pane.
+      if (road) {
+        Socket.emit('world:road:chart', { roadId: road });
+        return;
+      }
       Socket.emit('instance:enterSolo', { template, layout });
     },
 
@@ -1768,7 +1773,9 @@ export default {
       this.screen = 'game';
       this.resetChatState();
       if (data.quickStart === true) {
-        Socket.emit('instance:enterSolo', { template: 'dungeon', layout: 'warren' });
+        // Quick guests still reach a fight in seconds, but through the world
+        // web: the first stretch of their House's Tin Road (always charted).
+        Socket.emit('world:zone:enter', { nodeId: 'tin:1:0' });
       }
     },
     /**

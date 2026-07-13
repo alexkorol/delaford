@@ -92,23 +92,23 @@
                 class="game-container__party-toggle"
                 @click="adventureOpen = !adventureOpen"
               >
-                Adventure
+                Roads
               </button>
               <div
                 v-if="adventureOpen"
                 class="game-container__zone-menu"
-                aria-label="Choose a zone"
+                aria-label="Choose a road"
               >
-                <p class="game-container__zone-title">Descend into…</p>
+                <p class="game-container__zone-title">Read the chart of…</p>
                 <button
-                  v-for="zone in adventureZones"
-                  :key="zone.id"
+                  v-for="road in roads"
+                  :key="road.id"
                   type="button"
                   class="game-container__zone"
-                  @click="enterZone(zone)"
+                  @click="openRoad(road)"
                 >
-                  <span class="game-container__zone-name">{{ zone.name }}</span>
-                  <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                  <span class="game-container__zone-name">{{ road.name }}</span>
+                  <span class="game-container__zone-level">{{ road.direction }}</span>
                 </button>
               </div>
             </div>
@@ -425,21 +425,18 @@ export default {
       || props.activeOverlayDescriptor?.id,
     ));
 
-    // Zone menu must match the server's ADVENTURE_ZONES; each zone pairs an art
-    // template with a layout shape (warren/clearings/gauntlet). The server
-    // validates both and falls back to sensible defaults if unknown.
-    const adventureZones = [
-      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
-      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
-      { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
-      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
-      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
-      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
+    // The four roads out of the Crossroads (server: world-web.js ROADS).
+    // Each opens that road's Wayfinder's Chart; travel happens from the chart.
+    const roads = [
+      { id: 'tin', name: 'The Tin Road', direction: 'north' },
+      { id: 'salt', name: 'The Salt Road', direction: 'east' },
+      { id: 'chalk', name: 'The Chalk Road', direction: 'south' },
+      { id: 'copper', name: 'The Copper Road', direction: 'west' },
     ];
 
-    const enterZone = (zone) => {
+    const openRoad = (road) => {
       adventureOpen.value = false;
-      emit('enter-zone', { template: zone.template, layout: zone.layout });
+      emit('enter-zone', { road: road.id });
     };
 
     const activeChatDock = () => (props.chatExpanded ? chatOverlayRef.value : chatPeekRef.value);
@@ -709,8 +706,8 @@ export default {
       hasDockedPane,
       partyOpen,
       adventureOpen,
-      adventureZones,
-      enterZone,
+      roads,
+      openRoad,
       beginChatDrag,
       resetChatDock,
       cycleChatDock,

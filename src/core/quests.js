@@ -1,25 +1,25 @@
 const FIRST_GOAL_PRESENTATION = {
   available: {
     status: 'Available',
-    objective: 'Speak with Aldwyn the Guide in Delaford.',
+    objective: 'Speak with Aldwyn the Guide at the Crossroads.',
   },
   'clear-floor': {
     status: 'In progress',
-    objective: 'Clear The Old Barrow · Floor 1.',
+    objective: 'Put down the Warden of any first stretch on your chart.',
   },
   'return-to-town': {
     status: 'Return',
-    objective: 'Return to Aldwyn in Delaford.',
+    objective: 'Return to Aldwyn at the Crossroads.',
   },
   complete: {
     status: 'Complete',
-    objective: 'The Old Barrow has been cleared.',
+    objective: 'Your first Warden is down and the deed is marked.',
     completed: true,
   },
 };
 
 export const presentFirstGoal = (goal = {}) => ({
-  title: 'A Stirring in the Barrow',
+  title: 'No Road Past a Living Warden',
   reward: '1 Verdigris point',
   completed: false,
   ...(FIRST_GOAL_PRESENTATION[goal.stage] || FIRST_GOAL_PRESENTATION.available),
