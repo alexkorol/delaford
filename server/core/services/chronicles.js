@@ -3,6 +3,7 @@ import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import Authentication from '#server/player/authentication.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
+import wagonService from '#server/core/services/wagon-service.js';
 import world from '#server/core/world.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -168,6 +169,12 @@ export const beginScionSession = async (ws, scionId, { resume = false, quickStar
     lifecycle,
     sceneId: world.defaultTownId,
   };
+  // Logging in is the wagon rolling in for the day's market: every scion
+  // enters the world at their House's pitch on the Crossroads plaza. This
+  // also keeps stale saved coordinates from older town layouts harmless.
+  const wagonSpawn = wagonService.spawnPointFor(scion.houseId, scion.houseName);
+  data.x = wagonSpawn.x;
+  data.y = wagonSpawn.y;
   const player = new Player(data, auth.token, ws.id);
   player.accountId = auth.accountId;
   player.houseId = scion.houseId;
@@ -179,6 +186,8 @@ export const beginScionSession = async (ws, scionId, { resume = false, quickStar
     ? chroniclesRepository.getChronicle(auth.accountId).runCount
     : chroniclesRepository.beginRun(auth.accountId, scion.houseId);
   Authentication.addPlayer(player);
+  // First set-out of the day: the road purse goes straight into the ledger.
+  wagonService.claimDailyArrival(player);
   return { ok: true, player };
 };
 

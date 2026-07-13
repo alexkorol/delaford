@@ -2,7 +2,7 @@ export default [
   {
     id: 1,
     name: 'Aldwyn the Guide',
-    examine: 'A weathered guide who watches over Delaford\'s newest scions.',
+    examine: 'A weathered wayfinder who watches over the Crossroads\' newest scions.',
     graphic: {
       row: 0,
       column: 0,
@@ -20,7 +20,7 @@ export default [
   {
     id: 2,
     name: 'Mara, General Trader',
-    examine: 'Sells and buys items in exchange for coins.',
+    examine: 'Keeps the general stall at the Crossroads bazaar. Buys most things, sells the rest.',
     graphic: {
       row: 0,
       column: 1,
@@ -38,7 +38,7 @@ export default [
   {
     id: 3,
     name: 'Ludovicus, Weapons Trader',
-    examine: 'Woodhurst\'s cheerful town shopkeeper.',
+    examine: 'Sells iron for the road. Claims every axe on his boards outlived its first three owners.',
     graphic: {
       row: 0,
       column: 2,
@@ -55,8 +55,8 @@ export default [
   },
   {
     id: 4,
-    name: 'Rhea, House Banker',
-    examine: 'Stores items and transfers a scion\'s carried gold into the House treasury.',
+    name: 'Rhea of the Countinghouse',
+    examine: 'Keeps the countinghouse tent: personal storage, honest scales, no questions.',
     graphic: {
       row: 0,
       column: 3,

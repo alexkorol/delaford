@@ -7,6 +7,7 @@ import {
 } from '#server/core/services/chronicles.js';
 import world from '#server/core/world.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
+import wagonService from '#server/core/services/wagon-service.js';
 
 const carriedGold = player => (player?.inventory?.slots || [])
   .filter(item => item?.id === 'coins')
@@ -89,8 +90,10 @@ export default {
   'chronicles:house:deposit': ({ data }, ws) => {
     const player = world.players.find(entry => entry.socket_id === ws.id);
     if (!player?.accountId || !player.houseId || !player.scionId) return;
-    if (player.currentPane !== 'bank' || player.sceneId !== world.defaultTownId) {
-      sendGameMessage(player, 'Use the House transfer controls at the Delaford bank.');
+    // Gold goes home under the wagon boards — or, for the old habit, through
+    // the countinghouse. Both live at the Crossroads.
+    if (!['bank', 'wagon'].includes(player.currentPane) || player.sceneId !== world.defaultTownId) {
+      sendGameMessage(player, 'Deposit House gold at your wagon or the countinghouse at the Crossroads.');
       return;
     }
 
@@ -121,8 +124,16 @@ export default {
 
     playerPersistence.markDirty(player);
     const house = result.chronicle.houses.find(entry => entry.id === player.houseId);
-    sendBankState(player, house);
-    sendGameMessage(player, `${amount} gold moved from ${player.username} to House ${house.name}.`);
+    if (player.currentPane === 'wagon') {
+      Socket.emit('core:refresh:inventory', {
+        player: { socket_id: player.socket_id },
+        data: player.inventory.slots,
+      });
+      wagonService.sendWagonScreen(player);
+    } else {
+      sendBankState(player, house);
+    }
+    sendGameMessage(player, `${amount} gold nailed under the boards: from ${player.username} to House ${house.name}.`);
   },
 
   'chronicles:scion:set-out': async ({ data }, ws) => {

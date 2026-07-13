@@ -142,6 +142,13 @@ export class ChroniclesRepository {
         FOREIGN KEY(account_id) REFERENCES chronicle_accounts(account_id) ON DELETE CASCADE,
         FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
       );
+      CREATE TABLE IF NOT EXISTS house_world_progress (
+        house_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        cleared_at TEXT NOT NULL,
+        PRIMARY KEY(house_id, node_id),
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
     `);
     const houseColumns = new Set(this.db.pragma('table_info(chronicle_houses)').map(column => column.name));
     if (!houseColumns.has('treasury')) {
@@ -313,6 +320,24 @@ export class ChroniclesRepository {
       treasury: house?.treasury || 0,
       chronicle,
     };
+  }
+
+  /** Spend House gold (wagon outfitting): the House pays, not the scion. */
+  spendHouseTreasury(accountId, houseId, amount) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Nothing to spend.' };
+    const row = this.db.prepare(`
+      SELECT treasury FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    const balance = Math.max(0, Number(row.treasury) || 0);
+    if (balance < value) {
+      return { ok: false, reason: `The House ledger holds only ${balance} gold.` };
+    }
+    this.db.prepare(`
+      UPDATE chronicle_houses SET treasury = treasury - ? WHERE id = ? AND account_id = ?
+    `).run(value, houseId, accountId);
+    return { ok: true, treasury: balance - value };
   }
 
   upgradeHouse(accountId, houseId, upgradeId) {
@@ -511,6 +536,30 @@ export class ChroniclesRepository {
         eligible_run = MIN(eligible_run, excluded.eligible_run)
     `).run(accountId, houseId, eligibleRun);
     return eligibleRun;
+  }
+
+  /**
+   * World-web progress: which zone nodes this House has cleared (Warden
+   * slain). Node identity itself is deterministic (world-web.js), so this is
+   * the only stored world state.
+   */
+  getClearedZoneNodes(houseId) {
+    if (!houseId) return [];
+    return this.db.prepare('SELECT node_id FROM house_world_progress WHERE house_id = ?')
+      .all(houseId)
+      .map(row => row.node_id);
+  }
+
+  markZoneNodeCleared(houseId, nodeIdValue) {
+    if (!houseId || !nodeIdValue) return false;
+    const house = this.db.prepare('SELECT id FROM chronicle_houses WHERE id = ?').get(houseId);
+    if (!house) return false;
+    const result = this.db.prepare(`
+      INSERT INTO house_world_progress (house_id, node_id, cleared_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(house_id, node_id) DO NOTHING
+    `).run(houseId, nodeIdValue, isoNow());
+    return Boolean(result.changes);
   }
 
   claimRelic(relicId, player) {

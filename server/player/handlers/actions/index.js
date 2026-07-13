@@ -35,6 +35,7 @@ import { applyVesselCombatStats, getForge, vesselTooltip } from '#server/core/it
 import { BRAND_COST } from '#server/core/context-menu/strategies/vesselforge-brand.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
+import wagonService, { wagonNpcId } from '#server/core/services/wagon-service.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -1321,6 +1322,31 @@ const actionEvents = {
         );
       }
     }
+  },
+
+  /**
+   * A player opens a House wagon at the Crossroads. Only their own House's
+   * wagon opens the pane; another House's quartermaster waves them off.
+   */
+  'player:screen:wagon': (data, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(entry => entry.socket_id === ws?.id);
+    if (!player) return;
+    const scene = getPlayerScene(player);
+    const reference = data.data?.item || data.item || {};
+    const wagon = scene?.npcs?.find(npc => npc.id === reference.id && String(npc.id).startsWith('wagon-'));
+    const nearby = wagon && Math.max(
+      Math.abs(player.x - wagon.x),
+      Math.abs(player.y - wagon.y),
+    ) <= 2;
+    if (scene?.type !== 'town' || !wagon || !nearby) return;
+
+    if (!player.houseId || wagon.id !== wagonNpcId(player.houseId)) {
+      sendPlayerMessage(player, `The quartermaster of ${wagon.name.replace(/ Wagon$/, '')} waves you off. House business only.`);
+      return;
+    }
+
+    wagonService.sendWagonScreen(player);
   },
 
   /**

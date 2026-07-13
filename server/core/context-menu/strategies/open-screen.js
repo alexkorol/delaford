@@ -4,6 +4,7 @@ import Query from '#server/core/data/query.js';
 const openScreenStrategy = {
   actionIds: [
     'player:screen:bank',
+    'player:screen:wagon',
     'player:screen:npc:trade',
     'player:screen:shop-display',
     'player:shop-display:buy',

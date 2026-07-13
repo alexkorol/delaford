@@ -133,6 +133,15 @@ export default [
     queueable: true,
   },
   {
+    name: 'Wagon',
+    actionId: 'player:screen:wagon',
+    context: ['gameMap'],
+    allow: ['npc'],
+    nearby: 'edge',
+    weight: 1,
+    queueable: false,
+  },
+  {
     name: 'Bank',
     actionId: 'player:screen:bank',
     context: ['gameMap'],
