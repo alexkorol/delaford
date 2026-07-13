@@ -14,7 +14,7 @@ const readSource = relativePath => readFileSync(
 describe('authoritative quest pane', () => {
   it('presents each server stage as a concrete player objective', () => {
     expect(presentFirstGoal({ stage: 'available' }).objective).toMatch(/Speak with Aldwyn/i);
-    expect(presentFirstGoal({ stage: 'clear-floor' }).objective).toMatch(/Old Barrow.*floor 1/i);
+    expect(presentFirstGoal({ stage: 'clear-floor' }).objective).toMatch(/Warden/i);
     expect(presentFirstGoal({ stage: 'return-to-town' }).objective).toMatch(/Return to Aldwyn/i);
     expect(presentFirstGoal({ stage: 'complete' })).toMatchObject({
       completed: true,

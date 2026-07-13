@@ -9,6 +9,7 @@ vi.mock('#server/socket.js', () => ({
 const {
   notifyFirstGoalFloorCleared,
   notifyFirstGoalReturned,
+  notifyFirstGoalWardenDown,
   talkToAldwyn,
 } = await import('#server/core/first-goal.js');
 const { default: Socket } = await import('#server/socket.js');
@@ -38,12 +39,12 @@ const messages = () => Socket.emit.mock.calls
 describe('Aldwyn first goal', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('turns a town conversation into an explicit Old Barrow objective', () => {
+  it('turns a town conversation into an explicit first-Warden objective', () => {
     const player = makePlayer();
 
     expect(talkToAldwyn(player)).toBe(true);
     expect(player.quests.firstGoal.stage).toBe('clear-floor');
-    expect(messages().at(-1)).toMatch(/Old Barrow.*floor 1.*return/i);
+    expect(messages().at(-1)).toMatch(/Warden.*come back/i);
     expect(Socket.emit).toHaveBeenCalledWith('quest:update', expect.objectContaining({
       quests: player.quests,
     }));
@@ -61,6 +62,18 @@ describe('Aldwyn first goal', () => {
     expect(notifyFirstGoalFloorCleared(player, {
       template: 'dungeon', layout: 'warren', depth: 1,
     })).toBe(true);
+    expect(player.quests.firstGoal.stage).toBe('return-to-town');
+    expect(messages().at(-1)).toMatch(/Return to Aldwyn/i);
+  });
+
+  it('advances when a tier-1 world-web Warden goes down, and only tier 1', () => {
+    const player = makePlayer();
+    talkToAldwyn(player);
+
+    expect(notifyFirstGoalWardenDown(player, { tier: 2 })).toBe(false);
+    expect(player.quests.firstGoal.stage).toBe('clear-floor');
+
+    expect(notifyFirstGoalWardenDown(player, { tier: 1 })).toBe(true);
     expect(player.quests.firstGoal.stage).toBe('return-to-town');
     expect(messages().at(-1)).toMatch(/Return to Aldwyn/i);
   });

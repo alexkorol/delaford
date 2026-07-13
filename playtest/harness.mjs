@@ -92,7 +92,9 @@ export class HeadlessPlayer {
         this.scene = data.scene || null;
         this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
         if (data.quickStart === true) {
-          this.emit('instance:enterSolo', { template: 'dungeon', layout: 'warren' });
+          // Mirrors the client: quick guests drop into the first stretch of
+          // their House's Tin Road (tier 1 is always charted).
+          this.emit('world:zone:enter', { nodeId: 'tin:1:0' });
         }
         break;
       case 'chronicles:state': {

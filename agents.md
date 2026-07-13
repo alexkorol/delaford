@@ -118,6 +118,19 @@ Process hygiene (matters for sandboxed/CLI agents):
   `core:refresh:inventory`, `world:scene:transition` /
   `party:scene:transition` (instance→instance keeps the same scene id —
   wait on the transition event, not the id).
+- World web (docs/crossroads-world-web.md): `world:road:chart` (`{roadId}`,
+  roads: tin/salt/chalk/copper) opens the chart pane; `world:zone:enter`
+  (`{nodeId: 'road:tier:index'}`) travels to a charted node. Zones are
+  per-House scenes `zone:<houseId>:<nodeId>` that linger `ZONE_LINGER_MS`
+  (default 15 min) after emptying. The Warden (the floor's elite) bars the
+  onward gates; its death marks the node cleared in SQLite and unlocks the
+  children. Wagon pane events: `player:screen:wagon` (context-menu action —
+  lives in handlers/actions/index.js because the Action dispatcher only
+  routes there), `wagon:outfit:buy`, `wagon:daily:claim`, `wagon:upgrade`,
+  `chronicles:house:deposit` (bank or wagon pane).
+- The town (`town:delaford`, displayed as "The Crossroads") is truce-ground:
+  `metadata.sanctuary` is true, no monsters may exist or deal damage there,
+  and scions log in at their House's wagon pitch.
 - Vue right-click: use `@contextmenu.prevent`, never `@click.right`
   (browsers do not fire `click` for the right button).
 

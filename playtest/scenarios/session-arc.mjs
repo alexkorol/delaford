@@ -90,8 +90,8 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
     await first.waitFor(async () => (await first.state()).quests?.firstGoal?.stage === 'clear-floor', {
       label: 'accepted first goal',
     });
-    assert(first.messages.some(message => /Old Barrow.*floor 1/i.test(message)),
-      'Aldwyn names The Old Barrow floor 1');
+    assert(first.messages.some(message => /No road holds past a living Warden/i.test(message)),
+      'Aldwyn frames the first goal around a Warden');
 
     await first.enterZone('dungeon', 'warren');
     zonePicks += 1;

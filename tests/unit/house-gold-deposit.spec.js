@@ -81,11 +81,11 @@ describe('scion gold to House treasury', () => {
       }),
     }));
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
-      text: '100 gold moved from Coin Bearer to House Deposit One.',
+      text: '100 gold nailed under the boards: from Coin Bearer to House Deposit One.',
     }));
   });
 
-  it('requires the town bank pane and leaves both balances unchanged otherwise', () => {
+  it('requires a town bank or wagon pane and leaves both balances unchanged otherwise', () => {
     const lineage = makeLineage('Two');
     const player = makePlayer(lineage, { currentPane: 'shop' });
     world.addPlayer(player);
@@ -98,7 +98,27 @@ describe('scion gold to House treasury', () => {
     expect(player.inventory.slots.reduce((sum, item) => sum + item.qty, 0)).toBe(150);
     expect(chroniclesRepository.getChronicle(lineage.accountId).houses[0].treasury).toBe(0);
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
-      text: 'Use the House transfer controls at the Delaford bank.',
+      text: 'Deposit House gold at your wagon or the countinghouse at the Crossroads.',
+    }));
+  });
+
+  it('accepts deposits from the wagon pane and reopens the wagon screen', () => {
+    const lineage = makeLineage('Three');
+    const player = makePlayer(lineage, { currentPane: 'wagon' });
+    world.addPlayer(player);
+
+    chronicleEvents['chronicles:house:deposit'](
+      { data: { amount: 'all' } },
+      { id: player.socket_id },
+    );
+
+    expect(player.inventory.slots).toEqual([]);
+    expect(chroniclesRepository.getChronicle(lineage.accountId).houses[0].treasury).toBe(150);
+    expect(Socket.emit).toHaveBeenCalledWith('open:screen', expect.objectContaining({
+      screen: 'wagon',
+      payload: expect.objectContaining({
+        house: expect.objectContaining({ treasury: 150 }),
+      }),
     }));
   });
 });

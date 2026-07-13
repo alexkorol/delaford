@@ -1,6 +1,6 @@
 /**
- * First explicit goal: accept Aldwyn's request in town, clear floor one of
- * The Old Barrow, then return for a permanent Verdigris-tree point.
+ * First explicit goal: accept Aldwyn's request in town, put down a first
+ * Warden, then return for a permanent Verdigris-tree point.
  */
 export default async function firstGoal({ connect, assert }) {
   const p = await connect({
@@ -24,9 +24,9 @@ export default async function firstGoal({ connect, assert }) {
     const messagesBefore = p.messages.length;
     p.choose(talk, { x: 0, y: 0, world: { x: aldwyn.x, y: aldwyn.y } });
     await p.waitFor(() => p.messages.slice(messagesBefore).some(message => (
-      /old barrow/i.test(message) && /floor 1|first floor/i.test(message)
-    )), { label: 'Aldwyn names the destination and floor' });
-    assert(true, 'the accepted goal explicitly names The Old Barrow floor 1');
+      /warden/i.test(message) && /come back|return/i.test(message)
+    )), { label: 'Aldwyn names the first-Warden objective' });
+    assert(true, 'the accepted goal explicitly asks for a first Warden');
 
     let state = await p.state();
     const earnedBefore = state.passiveTree.earned;

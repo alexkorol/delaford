@@ -136,6 +136,11 @@ test.describe('canonical browser smoke', () => {
       window.ws.send(JSON.stringify({ event: 'dev:heal', data: {} }));
     });
 
+    // Login hands focus to the canvas on a 250ms timer; opening the escape
+    // menu before that fires lets the timer steal focus from its Resume
+    // button. Wait for the handoff before testing menu focus.
+    await expect(canvas).toBeFocused({ timeout: 10000 });
+
     await page.keyboard.press('Escape');
     const escapeMenu = page.locator('.escape-menu');
     await expect(escapeMenu).toBeVisible();
@@ -160,17 +165,17 @@ test.describe('canonical browser smoke', () => {
     await expect(escapeMenu).toBeHidden();
 
     await page.keyboard.press('q');
-    await expect(page.locator('.quests')).toContainText('Speak with Aldwyn the Guide in Delaford.');
+    await expect(page.locator('.quests')).toContainText('Speak with Aldwyn the Guide at the Crossroads.');
     await expect(page.locator('.quests')).toContainText('1 Verdigris point');
     await page.keyboard.press('Escape');
 
     const minimapCoords = page.locator('.world-minimap__readout span').last();
-    const adventure = page.getByRole('button', { name: 'Adventure', exact: true });
+    const roadsMenu = page.getByRole('button', { name: 'Roads', exact: true });
     const coordsBefore = await minimapCoords.innerText();
-    await adventure.click();
+    await roadsMenu.click();
     await page.keyboard.press('d');
     await expect.poll(() => minimapCoords.innerText()).not.toBe(coordsBefore);
-    await adventure.click();
+    await roadsMenu.click();
 
     await canvas.click({ button: 'right' });
     await expect(page.locator('#actions')).toBeVisible();
@@ -226,7 +231,7 @@ test.describe('canonical browser smoke', () => {
     });
     await expect(minimapCoords).toContainText('31, 121');
     await canvas.click({ button: 'right', position: { x: 610, y: 300 } });
-    await page.getByText('Bank Rhea, House Banker', { exact: true }).click();
+    await page.getByText('Bank Rhea of the Countinghouse', { exact: true }).click();
     const houseTransfer = page.getByRole('region', { name: 'House treasury transfer' });
     await expect(houseTransfer).toBeVisible();
     await expect(houseTransfer.getByRole('button')).toHaveCount(2);
@@ -244,15 +249,21 @@ test.describe('canonical browser smoke', () => {
     await page.keyboard.press('Escape');
 
     await canvas.click({ button: 'right', position: { x: 610, y: 300 } });
-    await page.getByText('Bank Rhea, House Banker', { exact: true }).click();
+    await page.getByText('Bank Rhea of the Countinghouse', { exact: true }).click();
     await expect(houseTransfer).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(houseTransfer).toBeHidden();
     await page.keyboard.press('Escape');
 
-    await adventure.click();
-    await page.getByRole('button', { name: 'Verdant Grove Lv 1–6', exact: true }).click();
-    await expect(page.locator('.world-minimap__readout')).toContainText('Verdant Grove');
+    // The world web: open a road's chart, travel to its first charted zone,
+    // and confirm the minimap adopts the zone's procedural name.
+    await roadsMenu.click();
+    await page.getByRole('button', { name: /The Salt Road/ }).click();
+    const chartNode = page.locator('.chart-node--open').first();
+    await expect(chartNode).toBeVisible();
+    const zoneName = await chartNode.locator('.chart-node__name').innerText();
+    await chartNode.click();
+    await expect(page.locator('.world-minimap__readout')).toContainText(zoneName);
   });
 
   test('keeps the game menu and inventory contained on a narrow viewport', async ({ page }) => {

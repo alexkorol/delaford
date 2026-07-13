@@ -14,8 +14,8 @@ export default async function houseTreasury({ connect, assert }) {
       .reduce((sum, item) => sum + item.qty, 0);
     assert(coinsBefore >= 100, 'the scion has carried gold available for a House deposit');
 
-    const banker = initial.npcs.find(npc => npc.name === 'Rhea, House Banker');
-    assert(banker, 'Delaford exposes a clearly named House banker');
+    const banker = initial.npcs.find(npc => npc.name === 'Rhea of the Countinghouse');
+    assert(banker, 'the Crossroads exposes a clearly named countinghouse keeper');
     p.devTeleport(banker.x, banker.y + 1);
     await p.waitFor(async () => (await p.state()).y === banker.y + 1, {
       label: 'House banker approach',
@@ -44,7 +44,7 @@ export default async function houseTreasury({ connect, assert }) {
       .filter(item => item.id === 'coins')
       .reduce((sum, item) => sum + item.qty, 0);
     assert(coinsAfter === coinsBefore - 100, 'deposit removes exactly 100 gold from the scion');
-    assert(p.messages.some(message => /100 gold moved.*House Ledger/i.test(message)),
+    assert(p.messages.some(message => /100 gold nailed under the boards.*House Ledger/i.test(message)),
       'deposit reports the exact House transfer');
 
     p.close();
