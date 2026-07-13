@@ -235,6 +235,15 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     return false;
   }
 
+  // Truce-ground: nothing may deal damage in a sanctuary scene (the
+  // Crossroads). No monster should exist there, but the rule holds even if
+  // one wanders in (docs/crossroads-world-web.md).
+  const scene = world.getScene(monster.sceneId);
+  if (scene?.metadata?.sanctuary === true) {
+    monster.state.pendingAttack = null;
+    return false;
+  }
+
   const scenePlayers = world.getScenePlayers(monster.sceneId);
   const target = scenePlayers.find(player => player.uuid === payload.targetId);
   monster.state.pendingAttack = null;

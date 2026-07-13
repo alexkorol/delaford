@@ -48,23 +48,23 @@ export const talkToAldwyn = (player) => {
   if (goal.stage === 'available') {
     goal.stage = 'clear-floor';
     goal.startedAt = Date.now();
-    say(player, 'The dead stir in The Old Barrow. Clear floor 1, then return to me in Delaford.');
+    say(player, 'No road holds past a living Warden. Take any gate out — the first stretch of every road is on your House\'s chart — put its Warden down, and come back to me.');
     pushQuestState(player);
     playerPersistence.markDirty(player);
     return true;
   }
 
   if (goal.stage === 'clear-floor') {
-    say(player, 'Your task remains: clear floor 1 of The Old Barrow, then return to me.');
+    say(player, 'Your task remains: put down the Warden of any first stretch on your chart, then return to me.');
     return true;
   }
 
   if (goal.stage === 'return-to-town') {
-    say(player, 'The barrow is quiet. Return to Delaford and I will mark the deed.');
+    say(player, 'The country lies still. Walk back through the gate and I will mark the deed.');
     return true;
   }
 
-  say(player, 'The Old Barrow remembers your victory. Spend your Verdigris point wisely.');
+  say(player, 'The chart remembers your first Warden. Spend your Verdigris point wisely.');
   return true;
 };
 
@@ -76,7 +76,20 @@ export const notifyFirstGoalFloorCleared = (player, { template, layout, depth } 
     || depth !== 1) return false;
 
   goal.stage = 'return-to-town';
-  say(player, 'The Old Barrow is cleared. Return to Aldwyn in Delaford for your reward.');
+  say(player, 'The floor is cleared. Return to Aldwyn at the Crossroads for your reward.');
+  pushQuestState(player);
+  playerPersistence.markDirty(player);
+  return true;
+};
+
+// World-web variant: any tier-1 Warden put down completes the field half of
+// the first goal.
+export const notifyFirstGoalWardenDown = (player, { tier } = {}) => {
+  const goal = ensureFirstGoal(player);
+  if (goal.stage !== 'clear-floor' || tier !== 1) return false;
+
+  goal.stage = 'return-to-town';
+  say(player, 'Your first Warden is down. Return to Aldwyn at the Crossroads for your reward.');
   pushQuestState(player);
   playerPersistence.markDirty(player);
   return true;
@@ -100,5 +113,6 @@ export default {
   ensureFirstGoal,
   notifyFirstGoalFloorCleared,
   notifyFirstGoalReturned,
+  notifyFirstGoalWardenDown,
   talkToAldwyn,
 };

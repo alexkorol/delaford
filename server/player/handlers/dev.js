@@ -143,6 +143,18 @@ const buildStateSnapshot = (player) => {
       theme: scene.metadata.theme,
       stairsUp: scene.metadata.stairsUp || null,
       stairsDown: scene.metadata.stairsDown || null,
+      spawnPoints: scene.metadata.spawnPoints || null,
+      // Crossroads / world-web state (docs/crossroads-world-web.md)
+      sanctuary: scene.metadata.sanctuary === true,
+      wagonPitches: scene.metadata.wagonPitches || null,
+      nodeId: scene.metadata.nodeId || null,
+      nodeName: scene.metadata.nodeName || null,
+      roadId: scene.metadata.roadId || null,
+      tier: scene.metadata.tier ?? null,
+      wardenName: scene.metadata.wardenName || null,
+      wardenDead: scene.metadata.wardenDead === true,
+      entryGate: scene.metadata.entryGate || null,
+      zoneGates: scene.metadata.zoneGates || null,
     } : {},
   };
 };

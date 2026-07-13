@@ -127,6 +127,19 @@ export const transitionPlayerIfOnPortal = (player) => {
     return false;
   }
 
+  // Road gates: the four ways out of the Crossroads. Stepping onto one opens
+  // that road's Wayfinder's Chart — the player picks a charted zone from it.
+  if (portal.destination && portal.destination.road) {
+    const { road } = portal.destination;
+    if (portal.message) {
+      sendMessage(player, portal.message);
+    }
+    import('#server/core/services/zone-service.js')
+      .then(({ zoneService }) => zoneService.openRoadChart(player, road))
+      .catch((error) => console.error('[world] Road gate failed:', error));
+    return true;
+  }
+
   // Instance gates: physical entrances in the world that drop the player
   // into a generated zone — continuity instead of a dropdown menu. Dynamic
   // import keeps the handler layer out of this module's dependency graph.

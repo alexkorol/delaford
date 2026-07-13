@@ -14,6 +14,8 @@ import { performance } from 'node:perf_hooks';
 import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
+import zoneService from '#server/core/services/zone-service.js';
+import wagonService from '#server/core/services/wagon-service.js';
 import { recordRuntimeEvent } from '#server/core/services/runtime-diagnostics.js';
 
 class Delaford {
@@ -172,6 +174,8 @@ class Delaford {
         world.clients = world.clients.filter(c => c.id !== ws.id);
       }
       partyService.removePlayer(player.uuid);
+      // The wagon leaves the pitch when the House's last scion does.
+      wagonService.releaseWagonIfEmpty(player.houseId);
 
       const scenePlayers = world.getScenePlayers(player.sceneId);
       Socket.broadcast('player:left', ws.id, scenePlayers);
@@ -191,6 +195,8 @@ class Delaford {
     });
     this.addPeriodicTask('party:instances', 1500, () => partyService.evaluateInstances());
     this.addPeriodicTask('party:stairs', 300, () => partyService.checkStairTransitions());
+    this.addPeriodicTask('zones:gates', 300, () => zoneService.checkGateTransitions());
+    this.addPeriodicTask('zones:sweep', 1500, () => zoneService.sweepZones());
     this.addPeriodicTask('player:auto-attack', 150, () => Combat.processAutoAttacks());
     this.addPeriodicTask('player:respawn', 1000, () => Combat.processPlayerRespawns());
     this.addPeriodicTask('player:regen', 2000, () => Combat.processResourceRegeneration());
