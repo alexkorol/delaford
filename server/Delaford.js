@@ -108,17 +108,45 @@ class Delaford {
     }
 
     const payload = data.data || {};
-    if (Delaford.hasForeignPlayerReference(player, payload)
+    // Reject any client-supplied identity that names another player. This must
+    // cover the TOP LEVEL of the message too: a genuine client only ever sends
+    // `{ event, data }`, so top-level identity fields (data.id, data.player,
+    // data.playerIndex, data.todo, ...) are never legitimate on the wire — they
+    // are injected only by the server-side Action dispatcher. Several handlers
+    // resolve the acting player from those fields (player:inventory-drop reads
+    // data.id, the smelt handlers read data.player.uuid, goldenplaque reads
+    // data.playerIndex), so leaving them untrusted let a raw socket act as, or
+    // for, another player.
+    if (Delaford.hasForeignPlayerReference(player, data)
+      || Delaford.hasForeignPlayerReference(player, payload)
       || Delaford.hasForeignPlayerReference(player, payload.data || {})) {
       console.warn(`[socket] Rejected foreign player reference from ${ws.id.substring(0, 5)}... event="${data.event}".`);
       return false;
     }
 
+    const identity = { uuid: player.uuid, socket_id: player.socket_id };
+
+    // Bind identity to the socket's real owner and drop the internal-only
+    // routing fields a client must never provide. After this, every handler —
+    // whether it reads the top level or the nested payload — resolves the same
+    // authenticated player, and internal-dispatch-only handlers reached over
+    // the wire fall back to safe no-ops instead of operating on a spoofed id.
+    data.id = player.uuid;
+    data.uuid = player.uuid;
+    data.socket_id = player.socket_id;
+    data.player = {
+      ...(data.player && typeof data.player === 'object' && !Array.isArray(data.player) ? data.player : {}),
+      ...identity,
+    };
+    delete data.playerIndex;
+    delete data.playerUuid;
+    delete data.socketId;
+    delete data.todo;
+
     if (payload && typeof payload === 'object') {
       payload.player = {
         ...(payload.player || {}),
-        uuid: player.uuid,
-        socket_id: player.socket_id,
+        ...identity,
       };
     }
 

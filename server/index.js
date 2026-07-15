@@ -55,7 +55,12 @@ process.on('unhandledRejection', (reason) => {
 
 const port = process.env.PORT || 6500;
 const env = process.env.NODE_ENV || 'development';
+// Fail closed: dev-only surfaces (debug endpoints, dev CORS) require an explicit
+// NODE_ENV=development; anything else is treated as production.
+const isDevelopment = process.env.NODE_ENV === 'development';
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
 
 const hasClientBundle = () => (
   fs.existsSync(distDir)
@@ -69,12 +74,20 @@ if (env === 'production' && process.env.FORCE_HTTPS === 'true') {
 }
 
 app.use(compression());
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('Cross-Origin-Opener-Policy', 'same-origin');
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
 app.use(express.json({ limit: '32kb' }));
 
 // The Vite client runs on :5173 while the authoritative API/WS server runs on
 // :6500. Permit that same-host development pairing without opening production
 // account endpoints to arbitrary cross-origin requests.
-if (env === 'development') {
+if (isDevelopment) {
   app.use('/api', (req, res, next) => {
     const origin = req.get('origin');
     const permittedOrigin = permittedDevelopmentOrigin(origin, req.hostname);
@@ -95,7 +108,32 @@ if (hasClientBundle()) {
   process.stderr.write('[server] Client bundle not found in dist/. Static assets will be skipped.\n');
 }
 
+// Basic per-IP throttle on the only unauthenticated write endpoint so account
+// creation cannot be scripted to flood the SQLite store. Behind a TLS proxy,
+// set TRUST_PROXY=true so req.ip is the real client and not the proxy loopback.
+const ACCOUNT_WINDOW_MS = 60_000;
+const ACCOUNT_MAX_PER_WINDOW = Number(process.env.ACCOUNT_CREATE_LIMIT) || 10;
+const accountCreationWindows = new Map();
+const accountCreationRateExceeded = (ip) => {
+  const now = Date.now();
+  if (accountCreationWindows.size > 5000) {
+    for (const [key, entry] of accountCreationWindows) {
+      if (now - entry.windowStart > ACCOUNT_WINDOW_MS) accountCreationWindows.delete(key);
+    }
+  }
+  const entry = accountCreationWindows.get(ip);
+  if (!entry || now - entry.windowStart > ACCOUNT_WINDOW_MS) {
+    accountCreationWindows.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > ACCOUNT_MAX_PER_WINDOW;
+};
+
 app.post('/api/accounts', (req, res) => {
+  if (accountCreationRateExceeded(req.ip)) {
+    return res.status(429).json({ message: 'Too many account attempts. Please wait a minute.' });
+  }
   const result = identityRegistry.createLoginAccount(req.body || {});
   if (!result.ok) return res.status(400).json({ message: result.reason });
   return res.status(201).json({ accountId: result.accountId, username: result.username });
@@ -103,7 +141,7 @@ app.post('/api/accounts', (req, res) => {
 
 // World data endpoints — only available in development for debugging.
 // In production these would leak game state (player positions, items, etc.).
-if (env === 'development') {
+if (isDevelopment) {
   app.get('/world/items', (_req, res) => res.json(world.items || []));
   app.get('/world/players', (_req, res) => {
     // Strip sensitive fields before sending

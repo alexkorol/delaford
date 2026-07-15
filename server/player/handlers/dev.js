@@ -18,7 +18,11 @@ import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 import { dropMonsterLoot } from '#server/core/combat/loot.js';
 import ItemFactory from '#server/core/items/factory.js';
 
-const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
+// Fail closed: wiz/dev commands run ONLY under an explicit development env (or a
+// deliberate opt-in flag). An unset/typo'd NODE_ENV must not hand players
+// teleport/give/set-level. The old `!== 'production'` enabled them by default.
+const DEV_MODE = process.env.NODE_ENV === 'development'
+  || process.env.ENABLE_DEV_COMMANDS === 'true';
 
 const getPlayerBySocket = (ws) => {
   if (!ws || !ws.id) {

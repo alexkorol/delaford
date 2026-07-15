@@ -229,12 +229,19 @@ describe('Delaford.connection – message handler validation', () => {
     expect(Handler['player:move']).toHaveBeenCalledOnce();
   });
 
-  it('passes data and ws to the handler', async () => {
+  it('passes data and ws to the handler with identity normalised to the socket owner', async () => {
     const payload = { event: 'player:say', data: { said: 'hello' } };
     await ws._triggerMessage(JSON.stringify(payload));
     expect(Handler['player:say']).toHaveBeenCalledWith(
       {
         event: 'player:say',
+        // The authorization layer stamps the socket owner's identity onto both
+        // the top level and the nested payload so no handler can be fed a
+        // spoofed id, whichever field it happens to read.
+        id: 'abc',
+        uuid: 'abc',
+        socket_id: ws.id,
+        player: { uuid: 'abc', socket_id: ws.id },
         data: {
           said: 'hello',
           player: { uuid: 'abc', socket_id: ws.id },
@@ -260,6 +267,50 @@ describe('Delaford.connection – message handler validation', () => {
     await ws._triggerMessage('null');
     expect(Handler['player:login']).not.toHaveBeenCalled();
     expect(Handler['player:move']).not.toHaveBeenCalled();
+  });
+
+  it('rejects a top-level identity field that names another player', async () => {
+    // A genuine client only sends { event, data }. A raw socket that injects a
+    // top-level `id` belonging to another player must not be dispatched:
+    // player:inventory-drop resolves its victim from data.id.
+    world.players = [
+      { uuid: 'abc', socket_id: ws.id },
+      { uuid: 'victim', socket_id: 'victim-socket' },
+    ];
+    const msg = JSON.stringify({
+      event: 'player:move',
+      data: { direction: 'up' },
+      id: 'victim',
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:move']).not.toHaveBeenCalled();
+  });
+
+  it('overwrites top-level identity with the socket owner and strips internal routing fields', async () => {
+    world.players = [
+      { uuid: 'abc', socket_id: ws.id },
+      { uuid: 'victim', socket_id: 'victim-socket' },
+    ];
+    const msg = JSON.stringify({
+      event: 'player:move',
+      data: { direction: 'up' },
+      playerIndex: 1,
+      todo: { item: { id: 'coins' } },
+      playerUuid: 'victim',
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:move']).toHaveBeenCalledOnce();
+    const [dispatched] = Handler['player:move'].mock.calls[0];
+    expect(dispatched.id).toBe('abc');
+    expect(dispatched.player).toEqual({ uuid: 'abc', socket_id: ws.id });
+    expect(dispatched.data.player).toEqual({ uuid: 'abc', socket_id: ws.id });
+    expect(dispatched).not.toHaveProperty('playerIndex');
+    expect(dispatched).not.toHaveProperty('todo');
+    expect(dispatched).not.toHaveProperty('playerUuid');
   });
 });
 

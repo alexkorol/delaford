@@ -27,6 +27,7 @@
     "test:e2e": "playwright test",
     "format": "eslint . --fix",
     "playtest": "node playtest/run.mjs",
+    "security:audit": "npm audit --omit=dev",
     "smoke:public": "node playtest/public-smoke.mjs",
     "smoke:production-local": "node playtest/local-production-smoke.mjs",
     "smoke:browser": "npm run build && playwright test tests/e2e/browser-smoke.spec.mjs",
@@ -49,7 +50,7 @@
     "uuid": "^13.0.0",
     "vue": "^3.5.12",
     "vue-tippy": "^6.4.1",
-    "ws": "^8.18.3"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
