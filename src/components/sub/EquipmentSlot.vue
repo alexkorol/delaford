@@ -262,11 +262,13 @@ export default {
       switch (this.slotId) {
       case 'necklace':
       case 'ring':
+      case 'ring2':
         return 'jewelryEquipped';
       case 'armor':
       case 'feet':
       case 'left_hand':
       case 'back':
+      case 'belt':
       case 'gloves':
       case 'head':
         return 'armorEquipped';
@@ -465,7 +467,8 @@ export default {
   background-image: url(../../assets/graphics/ui/client/slots/wear/feet.png);
 }
 
-.slot.ring {
+.slot.ring,
+.slot.ring2 {
   background-image: url(../../assets/graphics/ui/client/slots/wear/ring.png);
 }
 

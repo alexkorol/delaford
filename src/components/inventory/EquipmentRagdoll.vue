@@ -70,9 +70,11 @@ const SLOT_LAYOUT = [
   { id: 'right_hand', label: 'Main hand', column: 1, row: 1, width: 2, height: 4 }, // weapon, up to 2x4 two-hander
   { id: 'back', label: 'Cloak', column: 3, row: 1, width: 2, height: 3 },
   { id: 'necklace', label: 'Neck', column: 3, row: 4, width: 2, height: 2 },
+  { id: 'ring2', label: 'Ring', column: 3, row: 6, width: 1, height: 1 },
   { id: 'ring', label: 'Ring', column: 4, row: 6, width: 1, height: 1 },
   { id: 'head', label: 'Head', column: 5, row: 1, width: 2, height: 2 },
   { id: 'armor', label: 'Body', column: 5, row: 3, width: 2, height: 3 },
+  { id: 'belt', label: 'Belt', column: 5, row: 6, width: 2, height: 1 }, // waist, below the body
   { id: 'left_hand', label: 'Off hand', column: 7, row: 1, width: 2, height: 4 }, // offhand/shield
   { id: 'gloves', label: 'Hands', column: 1, row: 5, width: 2, height: 2 },
   { id: 'feet', label: 'Feet', column: 7, row: 5, width: 2, height: 2 },

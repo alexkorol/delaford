@@ -8,6 +8,7 @@ import { buildOccupancyMap, canPlaceItem, clampFootprintWithinGrid, getItemAtCel
 import { canStackWith, applyStacking } from '@/core/inventory/stacking.js';
 import { indexFromCoords } from '@/core/inventory/grid-math.js';
 import { packInventoryItems } from '@shared/inventory-footprints.js';
+import { canItemUseSlot } from '@shared/wear-slots.js';
 
 const cloneItems = (items) => items.map((item) => ({ ...item, position: { ...item.position } }));
 
@@ -21,7 +22,9 @@ export const getItemEquipSlot = item => (
 
 export const canEquipInventoryItemToSlot = (item, slotId) => {
   const equipSlot = getItemEquipSlot(item);
-  return Boolean(equipSlot && slotId && equipSlot === slotId);
+  // Grouped slots (rings have two seats) mean the item's base slot can map to
+  // more than one physical seat, so match on the shared slot rules.
+  return Boolean(equipSlot && slotId && canItemUseSlot(equipSlot, slotId));
 };
 
 export const useInventoryStore = defineStore('inventoryGrid', () => {

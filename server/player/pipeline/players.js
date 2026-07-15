@@ -9,6 +9,7 @@ import {
   findOpenInventorySlot,
   positionFromSlot,
 } from '#shared/inventory-footprints.js';
+import { canItemUseSlot, resolveEquipSlot } from '#shared/wear-slots.js';
 
 const findInventoryItemIndex = (slots = [], reference = {}) => {
   if (reference.uuid) {
@@ -94,7 +95,11 @@ export default {
     wearItem.id = equippingItem.id || baseItem.id;
     wearItem.slotType = baseItem.slot;
 
-    player.wear[baseItem.slot] = wearItem;
+    // Grouped slots (rings) have more than one seat; honour the seat the caller
+    // resolved, else fill the first empty one.
+    const preferredSlot = data.item.targetSlot || data.item.miscData?.targetSlot || null;
+    const wearSlot = resolveEquipSlot(player.wear, baseItem.slot, preferredSlot);
+    player.wear[wearSlot] = wearItem;
 
     if (inventoryIndex > -1) {
       player.inventory.slots.splice(inventoryIndex, 1);
@@ -136,7 +141,14 @@ export default {
         return;
       }
 
-      const equipped = player.wear[baseItem.slot];
+      // Grouped slots (rings) can hold the same item id in more than one seat,
+      // so honour the physical seat the caller named; fall back to the base.
+      const requestedWearSlot = typeof data.item.wearSlot === 'string' ? data.item.wearSlot : null;
+      const wearSlot = requestedWearSlot && canItemUseSlot(baseItem.slot, requestedWearSlot)
+        ? requestedWearSlot
+        : baseItem.slot;
+
+      const equipped = player.wear[wearSlot];
       if (!equipped) {
         resolve(400);
         return;
@@ -199,7 +211,7 @@ export default {
 
       player.inventory.slots.push(inventoryItem);
 
-      player.wear[baseItem.slot] = null;
+      player.wear[wearSlot] = null;
 
       const combatStats = Wear.updateCombat(playerIndex);
       player.combat = {

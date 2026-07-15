@@ -53,6 +53,13 @@ export const GEAR_DROP_POOL = [
   'bronze-war-helm',
   'hide-sandals',
   'bronze-roundshield',
+  // belts (waist slot)
+  'hide-girdle',
+  'quilted-girdle',
+  'girded-sash',
+  'copper-girdle',
+  'bronzeplate-girdle',
+  'skymetal-girdle',
   // jewelry
   'ring',
   'gold-ring',

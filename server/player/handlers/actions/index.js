@@ -24,6 +24,7 @@ import {
   positionFromSlot,
   slotFromPosition,
 } from '#shared/inventory-footprints.js';
+import { canItemUseSlot, resolveEquipSlot } from '#shared/wear-slots.js';
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
@@ -293,7 +294,7 @@ const dropEquippedItem = (player, slotId) => {
 
   const equipped = player.wear[slotId];
   const baseItem = wearableItems.find(i => i.id === equipped.id);
-  if (!baseItem || baseItem.slot !== slotId) {
+  if (!baseItem || !canItemUseSlot(baseItem.slot, slotId)) {
     return null;
   }
 
@@ -615,7 +616,7 @@ const actionEvents = {
       return;
     }
     const targetSlot = itemPayload.targetSlot || miscData.targetSlot || null;
-    if (targetSlot && targetSlot !== getItem.slot) {
+    if (targetSlot && !canItemUseSlot(getItem.slot, targetSlot)) {
       sendInventoryError(player, 'That item cannot be equipped there.');
       return;
     }
@@ -638,15 +639,19 @@ const actionEvents = {
       : Number.isInteger(itemPayload.slot)
         ? itemPayload.slot
         : inventoryItem?.slot;
+    // Resolve which physical seat this item takes (rings have two) so the
+    // swap-first and the equip target the same seat.
+    const wearSlot = resolveEquipSlot(player.wear, getItem.slot, targetSlot);
     // Normalise to the flat shape equippedAnItem/unequipItem expect.
-    const equipData = { id: player.uuid, item: itemPayload };
-    const alreadyWearing = player.wear[getItem.slot];
+    const equipData = { id: player.uuid, item: { ...itemPayload, targetSlot: wearSlot } };
+    const alreadyWearing = player.wear[wearSlot];
     if (alreadyWearing) {
       const status = await pipe.player.unequipItem({
         item: {
           uuid: alreadyWearing.uuid,
           id: alreadyWearing.id,
           slot: sourceSlot,
+          wearSlot,
         },
         replacingItem: {
           uuid: itemPayload.uuid,
@@ -700,6 +705,9 @@ const actionEvents = {
         id: itemUnequipping.id,
         uuid: itemUnequipping.uuid,
         slot: slotId,
+        // The physical seat to clear (e.g. ring vs ring2); slot alone is
+        // ambiguous for grouped slots.
+        wearSlot: slotId,
         miscData: {
           ...miscData,
           slot: slotId,
