@@ -12,7 +12,7 @@ const readSource = relativePath => readFileSync(
 );
 
 const makeStack = (uuid, slot, qty, maxStack = 99) => ({
-  id: 'coins',
+  id: 'potion',
   uuid,
   slot,
   position: positionFromSlot(slot),
@@ -28,6 +28,19 @@ afterEach(() => {
 describe('inventory drag store stacking commits', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+  });
+
+  it('extracts carried gold from backpack items into a dedicated balance', () => {
+    const store = useInventoryStore();
+    store.setInventoryItems([
+      { id: 'coins', uuid: 'coins-a', slot: 0, qty: 1200 },
+      { id: 'coins', uuid: 'coins-b', slot: 1, qty: 35 },
+      { id: 'bronze-sword', uuid: 'sword-a', slot: 2 },
+    ]);
+
+    expect(store.gold).toBe(1235);
+    expect(store.items.map(item => item.id)).toEqual(['bronze-sword']);
+    expect(store.items[0].slot).toBe(2);
   });
 
   it('cancels stack drops when the target disappeared before commit', () => {

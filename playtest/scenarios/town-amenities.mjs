@@ -61,7 +61,7 @@ export default async function townAmenities({ connect, assert }) {
         .reduce((sum, item) => sum + item.qty, 0);
       return total > coinsBefore && !current.groundItems.some(item => item.id === 'coins');
     }, { label: 'automatic gold pickup' });
-    assert(true, 'nearby gold enters the backpack without a Take action');
+    assert(true, 'nearby gold enters the carried-gold balance without a Take action');
 
     p.devTeleport(45, 102);
     await p.waitFor(async () => (await p.state()).y === 102, { label: 'General Store approach' });

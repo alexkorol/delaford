@@ -2,6 +2,9 @@ export const INVENTORY_COLUMNS = 12;
 export const INVENTORY_ROWS = 7;
 export const INVENTORY_SLOT_COUNT = INVENTORY_COLUMNS * INVENTORY_ROWS;
 export const MAX_ITEM_CELLS = 8;
+export const INVENTORY_CURRENCY_ID = 'coins';
+
+export const isInventoryCurrency = item => item?.id === INVENTORY_CURRENCY_ID;
 
 const SLOT_SIZE_BY_EQUIPMENT_SLOT = Object.freeze({
   ring: { width: 1, height: 1 },
@@ -209,7 +212,7 @@ export const findOpenInventorySlot = (inventory = [], item = {}, options = {}) =
   const occupied = new Set();
 
   inventory.forEach((entry) => {
-    if (!entry) {
+    if (!entry || isInventoryCurrency(entry)) {
       return;
     }
     const position = entry.position || positionFromSlot(entry.slot, grid.columns);
@@ -244,7 +247,7 @@ export const canPlaceInventoryItem = (inventory = [], item = {}, position = null
   }
 
   inventory.forEach((entry) => {
-    if (!entry) {
+    if (!entry || isInventoryCurrency(entry)) {
       return;
     }
 
@@ -301,6 +304,19 @@ export const packInventoryItems = (items = [], options = {}) => {
       ...item,
       size: resolveItemSize(item),
     };
+
+    // Carried gold is an account balance represented by a legacy stack for
+    // transaction compatibility. It has no backpack position and consumes
+    // no grid cells.
+    if (isInventoryCurrency(candidate)) {
+      packed.push({
+        ...candidate,
+        slot: null,
+        position: null,
+      });
+      return;
+    }
+
     const desiredPosition = item.position || positionFromSlot(item.slot, grid.columns);
     const openSlot = canPlace(occupied, desiredPosition, candidate, grid, candidate.orientation)
       ? slotFromPosition(desiredPosition, grid.columns)

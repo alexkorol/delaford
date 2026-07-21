@@ -49,6 +49,17 @@ const sendInventoryMessage = (player, text) => {
   });
 };
 
+const refreshPlayerInventory = (player) => {
+  if (!player || !player.socket_id) {
+    return;
+  }
+
+  Socket.emit('core:refresh:inventory', {
+    player: { socket_id: player.socket_id },
+    data: player.inventory.slots,
+  });
+};
+
 const isNumericSlot = slot => Number.isInteger(slot) && slot >= 0;
 
 const resolveRequestedInventorySlot = (data = {}) => {
@@ -120,6 +131,10 @@ export default {
       publicPlayerProjection(player),
       world.getScenePlayers(player.sceneId),
     );
+    // The public scene projection intentionally excludes private inventory.
+    // Send the owner a separate authoritative backpack snapshot so a swap
+    // replaces the incoming item's tile with the item that was taken off.
+    refreshPlayerInventory(player);
   },
 
   /**
@@ -230,6 +245,12 @@ export default {
         publicPlayerProjection(player),
         world.getScenePlayers(player.sceneId),
       );
+      // Replacement equips immediately follow this operation and emit the
+      // final backpack state themselves. Avoid sending an overlapping,
+      // intermediate inventory where both items occupy the source footprint.
+      if (!data.replacing) {
+        refreshPlayerInventory(player);
+      }
       resolve(200);
     });
   },

@@ -196,5 +196,9 @@ describe('public player projection (cand-007)', () => {
     expect(data.wear).toEqual(player.wear);
     expect(Object.values(data.wear).some(item => item && item.id === 'bronze-sword')).toBe(true);
     SENSITIVE_FIELDS.forEach(field => expect(data).not.toHaveProperty(field));
+    expect(Socket.emit).toHaveBeenCalledWith('core:refresh:inventory', {
+      player: { socket_id: player.socket_id },
+      data: player.inventory.slots,
+    });
   });
 });

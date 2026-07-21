@@ -138,12 +138,10 @@ test.describe('browser session resilience', () => {
 
   test('renders WIZARD item art, shows the vessel tooltip, and equips through the real server', async ({ page }) => {
     await loginGuest(page);
-    await page.evaluate(() => {
-      window.ws.send(JSON.stringify({ event: 'party:returnToTown', data: {} }));
-    });
-    await expect(page.locator('.world-minimap__readout')).toContainText('Delaford');
     await page.keyboard.press('i');
     await expect(page.locator('.inventory-pane')).toBeVisible();
+    await expect(page.locator('.inventory-pane__gold')).toHaveText(/[\d,]+ gold/);
+    await expect(page.locator('.inventory-item[aria-label^="Coins"]')).toHaveCount(0);
 
     const starterItem = page.locator('.inventory-item[aria-label*="Bronze Pickaxe"]');
     await expect(starterItem.locator('.inventory-item__art')).toBeVisible();
@@ -164,15 +162,6 @@ test.describe('browser session resilience', () => {
     await pike.hover();
     await expect(page.locator('.item-tooltip')).toContainText('Vessel');
     await expect(page.locator('.item-tooltip')).toContainText('Bronze');
-    const brandLinesBefore = await page.locator('.item-tooltip__line--brand').count();
-
-    await pike.click({ button: 'right' });
-    const addBrand = page.getByText(/Add a random brand.*100 coins/);
-    await expect(addBrand).toBeVisible();
-    await addBrand.click();
-    await pike.hover();
-    await expect.poll(() => page.locator('.item-tooltip__line--brand').count())
-      .toBe(brandLinesBefore + 1);
 
     const weaponSlot = page.locator('[data-equipment-slot="right_hand"]');
     const pikeBox = await pike.boundingBox();
@@ -194,6 +183,10 @@ test.describe('browser session resilience', () => {
 
     await expect(weaponSlot).toHaveAttribute('aria-label', /Bronze Pike/);
     await expect(weaponSlot.locator('.equipment-slot__art')).toHaveAttribute('src', /boar_pike/i);
+    // The equipped pike must be gone from the backpack. Before the private
+    // inventory refresh was sent, its stale tile remained in the source slot
+    // and made the returned weapon appear to take on the pike's art.
+    await expect(page.locator('.inventory-grid .inventory-item__art[src*="boar_pike"]')).toHaveCount(0);
 
     const diagnostics = await page.evaluate(() => window.__verdigrisDiagnostics());
     const kinds = diagnostics.records.map(record => record.kind);

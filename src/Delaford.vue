@@ -1352,6 +1352,13 @@ export default {
       };
 
       if (isLocalPlayer) {
+        // A player:joined snapshot may arrive before movement. Keep this
+        // defensive scrub so older/stale snapshots can never leave the local
+        // actor in the remote render list as a stationary "ghost".
+        this.game.map.players = this.game.map.players.filter(
+          remotePlayer => remotePlayer.uuid !== player.uuid,
+        );
+
         if (!player.movement) {
           player.movement = new MovementController().initialise(player.x, player.y);
         }

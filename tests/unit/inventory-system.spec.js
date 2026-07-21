@@ -155,15 +155,20 @@ describe('inventory normalisation', () => {
     expect(canEquipInventoryItemToSlot(normalised, 'right_hand')).toBe(true);
   });
 
-  it('packs legacy slot-only items around larger footprints', () => {
+  it('keeps carried gold outside backpack footprints', () => {
     const packed = packInventoryItems([
       { id: 'iron-halberd', slot: 0, type: 'weapon', twoHanded: true },
       { id: 'coins', slot: 1, stackable: true, qty: 10 },
     ], DEFAULT_GRID);
 
     expect(packed[0].position).toEqual({ x: 0, y: 0 });
-    expect(packed[1].slot).toBe(2);
-    expect(packed[1].position).toEqual({ x: 2, y: 0 });
+    expect(packed[1].slot).toBeNull();
+    expect(packed[1].position).toBeNull();
+    expect(canPlaceInventoryItem(packed, {
+      id: 'small-item',
+      uuid: 'small-item',
+      size: { width: 1, height: 1 },
+    }, { x: 2, y: 0 }).valid).toBe(true);
   });
 });
 

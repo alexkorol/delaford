@@ -2,7 +2,11 @@ import Query from '#server/core/data/query.js';
 import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import ItemFactory from '#server/core/items/factory.js';
-import { packInventoryItems, positionFromSlot } from '#shared/inventory-footprints.js';
+import {
+  isInventoryCurrency,
+  packInventoryItems,
+  positionFromSlot,
+} from '#shared/inventory-footprints.js';
 
 const hydrateInventoryItem = (item = {}) => {
   if (!item || typeof item !== 'object' || typeof item.id !== 'string') {
@@ -84,6 +88,32 @@ export default class Inventory {
           item.qty = currentQty + transfer;
           remainder -= transfer;
         });
+    }
+
+    // Currency is a carried balance, not a backpack object. A new purse can
+    // therefore be created even when every grid cell is occupied.
+    if (isInventoryCurrency(baseItem) && remainder > 0) {
+      const instance = existingItem
+        ? ItemFactory.adoptExisting(existingItem, {
+          uuid: incomingUuid,
+          quantity: remainder,
+          bindTo: playerUuid,
+          baseItem,
+        })
+        : ItemFactory.createById(itemId, {
+          uuid: incomingUuid,
+          quantity: remainder,
+          bindTo: playerUuid,
+        });
+
+      if (instance) {
+        instance.slot = null;
+        instance.position = null;
+        instance.context = 'currency';
+        instance.qty = remainder;
+        this.slots.push(instance);
+        remainder = 0;
+      }
     }
 
     while (remainder > 0) {

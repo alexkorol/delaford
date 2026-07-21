@@ -9,8 +9,12 @@
       />
 
       <div class="inventory-pane__grid">
-        <div class="inventory-pane__backpack-meta" aria-label="Backpack capacity">
-          {{ occupiedCells }} / {{ totalCells }}
+        <div class="inventory-pane__backpack-meta">
+          <span class="inventory-pane__gold" :aria-label="`Gold: ${formattedGold}`">
+            <span class="inventory-pane__gold-mark" aria-hidden="true">&#9670;</span>
+            {{ formattedGold }} gold
+          </span>
+          <span aria-label="Backpack capacity">{{ occupiedCells }} / {{ totalCells }}</span>
         </div>
         <InventoryGrid
           :images="resolvedImages"
@@ -88,6 +92,10 @@ export default {
     },
     inventoryItems() {
       return Array.isArray(this.inventoryStore.items) ? this.inventoryStore.items : [];
+    },
+    formattedGold() {
+      const amount = Number(this.inventoryStore.gold) || 0;
+      return Math.max(0, amount).toLocaleString();
     },
     occupiedCells() {
       return this.inventoryItems.reduce((total, item) => {
@@ -265,6 +273,10 @@ export default {
 
   &__backpack-meta {
     align-self: flex-end;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
     width: 100%;
     padding: 0 4px;
     box-sizing: border-box;
@@ -274,6 +286,17 @@ export default {
     line-height: 1.4;
     text-align: right;
     text-transform: uppercase;
+  }
+
+  &__gold {
+    color: #e4c36a;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-shadow: 0 1px 2px #000;
+  }
+
+  &__gold-mark {
+    color: #f5d77b;
   }
 
   &__utility-row {

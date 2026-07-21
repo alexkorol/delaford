@@ -127,7 +127,7 @@ export default {
     },
     otherPlayers() {
       return this.game.players.filter(
-        (p) => p.socket_id !== this.game.player.socket_id,
+        (p) => p.uuid !== this.game.player.uuid,
       );
     },
   },

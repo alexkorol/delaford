@@ -459,7 +459,7 @@ describe('pane action authorization', () => {
     }));
   });
 
-  it('rejects partial stack sales when full inventory has no coin slot for payment', async () => {
+  it('allows sales into the carried-gold balance when the backpack grid is full', async () => {
     withStackableCopperOre();
     attachInventory(player, [
       { id: 'copper-ore', qty: 10, slot: 0 },
@@ -482,15 +482,19 @@ describe('pane action authorization', () => {
     });
 
     expect(player.inventory.slots.find(item => item.id === 'copper-ore')).toMatchObject({
-      qty: 10,
+      qty: 5,
     });
-    expect(player.inventory.slots.some(item => item.id === 'coins')).toBe(false);
+    expect(player.inventory.slots.find(item => item.id === 'coins')).toMatchObject({
+      qty: 45,
+      slot: null,
+      position: null,
+    });
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
-      qty: 1,
+      qty: 6,
     });
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
       player: { socket_id: player.socket_id },
-      text: 'Not enough space in inventory.',
+      text: 'Sold 5 Copper Ore for 45 coins.',
     }));
   });
 });

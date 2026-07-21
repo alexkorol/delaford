@@ -4,6 +4,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import { shops } from '#server/core/data/foreground/index.js';
 import world from '#server/core/world.js';
+import { isInventoryCurrency } from '#shared/inventory-footprints.js';
 
 const { player } = config;
 
@@ -37,7 +38,8 @@ class Shop {
     this.inventory = world.players[this.playerIndex].inventory;
 
     // How many spaces available in the player's inventory?
-    this.slotsAvailable = player.slots.inventory - this.inventory.slots.length;
+    this.slotsAvailable = player.slots.inventory
+      - this.inventory.slots.filter(item => !isInventoryCurrency(item)).length;
 
     // What item we are buying/selling?
     this.itemId = itemId;
@@ -481,9 +483,9 @@ class Shop {
    * @return {boolean}
    */
   spaceInInventory() {
-    return this.hasCoinsInInventory()
-      || this.slotsAvailable > 0
-      || this.saleFreesInventorySlot();
+    // Sale proceeds go into the carried-gold balance, which never consumes a
+    // backpack cell. Inventory fullness cannot prevent a sale on that basis.
+    return true;
   }
 
   /**

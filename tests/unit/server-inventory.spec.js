@@ -32,14 +32,14 @@ describe('server inventory additions', () => {
   });
 
   it('merges currency into an existing stack even when every slot is occupied', () => {
-    const fillers = Array.from({ length: 83 }, (_, index) => ({
+    const fillers = Array.from({ length: 84 }, (_, index) => ({
       id: `filler-${index}`,
       uuid: `filler-${index}`,
-      slot: index + 1,
+      slot: index,
       size: { width: 1, height: 1 },
     }));
     const inventory = new Inventory([
-      { id: 'coins', uuid: 'coin-stack', slot: 0, qty: 100 },
+      { id: 'coins', uuid: 'coin-stack', slot: null, qty: 100 },
       ...fillers,
     ], 'inventory-socket', 'inventory-player');
     attachInventory(inventory);
@@ -47,8 +47,27 @@ describe('server inventory additions', () => {
     const result = inventory.add('coins', 37);
 
     expect(result).toEqual({ ok: true, added: 37, remainder: 0 });
-    expect(inventory.slots).toHaveLength(84);
+    expect(inventory.slots).toHaveLength(85);
     expect(inventory.slots.find(item => item.uuid === 'coin-stack').qty).toBe(137);
+  });
+
+  it('creates a carried-gold balance without requiring a free backpack cell', () => {
+    const fillers = Array.from({ length: 84 }, (_, index) => ({
+      id: `filler-${index}`,
+      uuid: `filler-${index}`,
+      slot: index,
+      size: { width: 1, height: 1 },
+    }));
+    const inventory = new Inventory(fillers, 'inventory-socket', 'inventory-player');
+    attachInventory(inventory);
+
+    expect(inventory.add('coins', 37)).toEqual({ ok: true, added: 37, remainder: 0 });
+    expect(inventory.slots.find(item => item.id === 'coins')).toMatchObject({
+      qty: 37,
+      slot: null,
+      position: null,
+      context: 'currency',
+    });
   });
 
   it('returns the unadded remainder instead of silently losing a full-bag item', () => {
