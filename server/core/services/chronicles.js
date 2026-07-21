@@ -5,6 +5,7 @@ import Authentication from '#server/player/authentication.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 import wagonService from '#server/core/services/wagon-service.js';
 import world from '#server/core/world.js';
+import { sanitiseChronicleName } from '#shared/html.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -243,6 +244,10 @@ export const entombFallenScion = (player, { cause = 'Fell in battle' } = {}) => 
 export const drawCirculatingRelic = (players = []) => {
   const record = chroniclesRepository.drawEligibleRelic(players.map(player => player?.accountId));
   if (!record?.item) return null;
+  // Legacy chronicles can predate scion-name validation; neutralise any
+  // markup metacharacters before the origin name is composed into relic
+  // titles that flow into v-html context-menu labels.
+  record.originScionName = sanitiseChronicleName(record.originScionName, 'a nameless scion');
   const item = clone(record.item);
   delete item.boundTo;
   item.legacyRelicId = record.id;

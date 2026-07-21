@@ -1,5 +1,6 @@
 import Socket from '#server/socket.js';
 import world from './world.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
 
 const clone = value => JSON.parse(JSON.stringify(value || {}));
 
@@ -53,7 +54,7 @@ const broadcastJoinedPlayers = (scene) => {
     })),
   };
 
-  Socket.broadcast('player:joined', recipients, recipients, { meta });
+  Socket.broadcast('player:joined', recipients.map(publicPlayerProjection), recipients, { meta });
 };
 
 export const transitionPlayerToPortalDestination = (player, portal) => {

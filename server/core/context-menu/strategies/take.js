@@ -1,5 +1,6 @@
 import UI from '#shared/ui.js';
 import Query from '#server/core/data/query.js';
+import { escapeHtml } from '#shared/html.js';
 
 const takeStrategy = {
   actionIds: ['player:take'],
@@ -24,7 +25,7 @@ const takeStrategy = {
 
       const color = UI.getContextSubjectColor(item.context);
       accumulator.push({
-        label: `${action.name} <span style='color:${color}'>${name}</span>`,
+        label: `${action.name} <span style='color:${color}'>${escapeHtml(name)}</span>`,
         action,
         type: 'item',
         at: { x, y },

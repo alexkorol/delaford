@@ -1,6 +1,7 @@
 import Socket from '#server/socket.js';
 import { wearableItems } from '#server/core/data/items/index.js';
 import world from '#server/core/world.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
 import Wear from '#server/core/utilities/wear.js';
 import ItemFactory from '#server/core/items/factory.js';
 import {
@@ -116,7 +117,7 @@ export default {
     }
     Socket.broadcast(
       'player:equippedAnItem',
-      player,
+      publicPlayerProjection(player),
       world.getScenePlayers(player.sceneId),
     );
   },
@@ -226,7 +227,7 @@ export default {
 
       Socket.broadcast(
         'player:unequippedAnItem',
-        player,
+        publicPlayerProjection(player),
         world.getScenePlayers(player.sceneId),
       );
       resolve(200);

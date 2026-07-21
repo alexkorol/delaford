@@ -53,19 +53,36 @@ export default {
       .find(entry => entry.id === itemId);
     const price = stockItem?.price || 0;
 
-    const spend = chroniclesRepository.spendHouseTreasury(player.accountId, player.houseId, Math.max(1, price));
+    const cost = Math.max(1, price);
+    const spend = chroniclesRepository.spendHouseTreasury(player.accountId, player.houseId, cost);
     if (!spend.ok) {
       sendMessage(player, spend.reason);
       return;
     }
 
-    await player.inventory.add(itemId, 1);
+    // Delivery must succeed before the debit stands. Inventory.add fails
+    // silently ({ ok: false }) on a full backpack, so check the result and
+    // refund the ledger on every failure path, including a thrown error
+    // (cand-009). Never emit success for undelivered goods.
+    let delivered = null;
+    try {
+      delivered = await player.inventory.add(itemId, 1);
+    } catch (error) {
+      delivered = { ok: false, error };
+    }
+    if (!delivered || delivered.ok !== true) {
+      chroniclesRepository.creditHouseTreasury(player.accountId, player.houseId, cost);
+      sendMessage(player, 'Your backpack cannot hold that; the quartermaster leaves the ledger untouched.');
+      wagonService.sendWagonScreen(player);
+      return;
+    }
+
     playerPersistence.markDirty(player);
     Socket.emit('core:refresh:inventory', {
       player: { socket_id: player.socket_id },
       data: player.inventory.slots,
     });
-    sendMessage(player, `The quartermaster hands over ${stockItem?.name || itemId} and marks ${Math.max(1, price)} gold off the ledger.`);
+    sendMessage(player, `The quartermaster hands over ${stockItem?.name || itemId} and marks ${cost} gold off the ledger.`);
     wagonService.sendWagonScreen(player);
   },
 

@@ -32,6 +32,11 @@ const parseJson = (value, fallback) => {
   }
 };
 
+// Names flow into server-built HTML context-menu labels (relic titles and
+// the shared wagon NPC), so markup metacharacters stay out of the alphabet
+// as defence in depth behind the label-level HTML escaping.
+const NAME_PATTERN = /^[A-Za-z0-9 '\-]+$/;
+
 const validateName = (name, minimum, maximum, label) => {
   const value = String(name || '').trim();
   if (value.length < minimum) {
@@ -39,6 +44,9 @@ const validateName = (name, minimum, maximum, label) => {
   }
   if (value.length > maximum) {
     return { valid: false, reason: `${label} name must be ${maximum} characters or fewer.` };
+  }
+  if (!NAME_PATTERN.test(value)) {
+    return { valid: false, reason: `${label} name may only use letters, numbers, spaces, apostrophes and hyphens.` };
   }
   return { valid: true, value };
 };
@@ -338,6 +346,16 @@ export class ChroniclesRepository {
       UPDATE chronicle_houses SET treasury = treasury - ? WHERE id = ? AND account_id = ?
     `).run(value, houseId, accountId);
     return { ok: true, treasury: balance - value };
+  }
+
+  /** Compensating credit reversing a spend when goods could not be delivered. */
+  creditHouseTreasury(accountId, houseId, amount) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Nothing to refund.' };
+    const result = this.db.prepare(`
+      UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ? AND account_id = ?
+    `).run(value, houseId, accountId);
+    return result.changes ? { ok: true } : { ok: false, reason: 'House not found.' };
   }
 
   upgradeHouse(accountId, houseId, upgradeId) {

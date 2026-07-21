@@ -1,5 +1,6 @@
 import UI from '#shared/ui.js';
 import Query from '#server/core/data/query.js';
+import { escapeHtml } from '#shared/html.js';
 
 const openScreenStrategy = {
   actionIds: [
@@ -27,7 +28,7 @@ const openScreenStrategy = {
     if (foregroundData && menu.canDoAction(foregroundData.actions, action)) {
       const fgColor = UI.getContextSubjectColor(foregroundData.context);
       results.push({
-        label: `${action.name} <span style='color:${fgColor}'>${foregroundData.name}</span>`,
+        label: `${action.name} <span style='color:${fgColor}'>${escapeHtml(foregroundData.name)}</span>`,
         action,
         examine: foregroundData.examine,
         type: 'foreground',
@@ -42,7 +43,7 @@ const openScreenStrategy = {
         }
         const color = UI.getContextSubjectColor(npc.context);
         results.push({
-          label: `${action.name} <span style='color:${color}'>${npc.name}</span>`,
+          label: `${action.name} <span style='color:${color}'>${escapeHtml(npc.name)}</span>`,
           action,
           examine: npc.examine,
           type: 'npc',

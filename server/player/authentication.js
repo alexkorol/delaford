@@ -4,6 +4,7 @@ import { maybeStartTutorial } from '#server/core/tutorial.js';
 import { publicSceneMetadata } from '#server/core/world-transitions.js';
 import identityRegistry from '#server/core/services/identity-registry.js';
 import playerTemplate from '#server/core/data/helpers/player.json' with { type: 'json' };
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
 
 class Authentication {
   /**
@@ -61,7 +62,7 @@ class Authentication {
     };
 
     const recipients = world.getScenePlayers(scene.id);
-    Socket.broadcast('player:joined', recipients, recipients, { meta });
+    Socket.broadcast('player:joined', recipients.map(publicPlayerProjection), recipients, { meta });
 
     // Give the client a moment to mount the chat before the guide speaks
     setTimeout(() => maybeStartTutorial(player), 2500);

@@ -82,6 +82,18 @@ const makeGeneralStore = (player, inventory = []) => {
   }];
   player.objectId = 2;
   player.currentPane = 'shop';
+  // Trade actions re-verify current presence: place one of the shop's
+  // market displays beside the player (the shopkeeper is behind the stall).
+  player.sceneId = world.defaultTownId;
+  player.x = 45;
+  player.y = 102;
+  world.getDefaultTown().items = [{
+    id: 'general-store-stall',
+    x: 45,
+    y: 101,
+    shopDisplay: true,
+    shopNpcId: 2,
+  }];
 };
 
 describe('pane action authorization', () => {
@@ -91,6 +103,14 @@ describe('pane action authorization', () => {
     vi.spyOn(Socket, 'emit').mockImplementation(() => {});
     resetWorld();
     player = makePlayer();
+    // Bank transfers now verify current presence: seat the player beside the
+    // countinghouse banker, exactly where a real client that just opened the
+    // pane would be standing.
+    player.sceneId = world.defaultTownId;
+    player.x = 31;
+    player.y = 122;
+    world.getDefaultTown().type = 'town';
+    world.getDefaultTown().npcs = [{ id: 4, x: 31, y: 121 }];
     world.addPlayer(player);
   });
 

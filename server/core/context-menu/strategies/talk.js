@@ -1,4 +1,5 @@
 import UI from '#shared/ui.js';
+import { escapeHtml } from '#shared/html.js';
 
 const talkStrategy = {
   actionIds: ['player:npc:talk'],
@@ -7,7 +8,7 @@ const talkStrategy = {
   execute: ({ action, menu, npcs }) => (npcs || [])
     .filter(npc => menu.canDoAction(npc.actions, action))
     .map(npc => ({
-      label: `${action.name} <span style='color:${UI.getContextSubjectColor(npc.context)}'>${npc.name}</span>`,
+      label: `${action.name} <span style='color:${UI.getContextSubjectColor(npc.context)}'>${escapeHtml(npc.name)}</span>`,
       action,
       type: 'npc',
       id: npc.id,

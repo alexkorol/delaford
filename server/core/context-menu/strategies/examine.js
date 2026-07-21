@@ -1,5 +1,6 @@
 import UI from '#shared/ui.js';
 import Query from '#server/core/data/query.js';
+import { escapeHtml } from '#shared/html.js';
 
 const examineStrategy = {
   actionIds: ['player:examine', 'player:screen:npc:trade:action:value'],
@@ -20,7 +21,7 @@ const examineStrategy = {
       if (foregroundData && menu.canDoAction(foregroundData.actions, action)) {
         const fgColor = UI.getContextSubjectColor(foregroundData.context);
         results.push({
-          label: `${action.name} <span style='color:${fgColor}'>${foregroundData.name}</span>`,
+          label: `${action.name} <span style='color:${fgColor}'>${escapeHtml(foregroundData.name)}</span>`,
           action,
           examine: foregroundData.examine,
           type: 'foreground',
@@ -35,7 +36,7 @@ const examineStrategy = {
           }
           const color = UI.getContextSubjectColor(npc.context);
           results.push({
-            label: `${action.name} <span style='color:${color}'>${npc.name}</span>`,
+            label: `${action.name} <span style='color:${color}'>${escapeHtml(npc.name)}</span>`,
             action,
             examine: npc.examine,
             type: 'npc',
@@ -57,7 +58,7 @@ const examineStrategy = {
 
           const color = UI.getContextSubjectColor(item.context);
           results.push({
-            label: `Examine <span style='color:${color}'>${name}</span>`,
+            label: `Examine <span style='color:${color}'>${escapeHtml(name)}</span>`,
             action,
             examine,
             type: 'item',
@@ -76,7 +77,7 @@ const examineStrategy = {
 
       if (menu.canDoAction(selectedItemData.actions, action)) {
         results.push({
-          label: `${action.name} <span style='color:${color}'>${displayName}</span>`,
+          label: `${action.name} <span style='color:${color}'>${escapeHtml(displayName)}</span>`,
           action,
           examine: displayExamine,
           type: 'item',

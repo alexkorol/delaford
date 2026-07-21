@@ -12,6 +12,7 @@ import Query from '#server/core/data/query.js';
 import Socket from '#server/socket.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 import world from '#server/core/world.js';
+import { sanitiseChronicleName } from '#shared/html.js';
 
 const WAGON_NPC_COLUMN = 7; // the robed traveller on the npc sheet
 
@@ -92,10 +93,13 @@ class WagonService {
     if (existing) return existing;
 
     const pitch = this.assignPitch(houseId);
+    // Legacy House names can predate markup validation; the wagon NPC name
+    // is spliced into v-html context-menu labels, so render a safe form.
+    const displayName = sanitiseChronicleName(houseName, 'Wayfarer');
     const npc = new NPC({
       id: wagonNpcId(houseId),
-      name: `House ${houseName || 'Wayfarer'} Wagon`,
-      examine: `The ${houseName || 'Wayfarer'} tilt-canvas, the ledger-chest under the bench, and a quartermaster who knows exactly what you are owed.`,
+      name: `House ${displayName} Wagon`,
+      examine: `The ${displayName} tilt-canvas, the ledger-chest under the bench, and a quartermaster who knows exactly what you are owed.`,
       graphic: { row: 0, column: WAGON_NPC_COLUMN },
       actions: ['wagon', 'examine'],
       spawn: { x: pitch.x, y: pitch.y, range: 0 },

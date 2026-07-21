@@ -836,6 +836,11 @@ class PartyService {
     }
 
     party.invites.delete(player.uuid);
+    // Single-party invariant: accepting abandons any seat taken while the
+    // invite was in flight. Otherwise the stale membership persists in the
+    // other party's roster and instance rewards pay the ghost member twice
+    // (cand-006). Mirrors createParty's own removePlayer call.
+    this.removePlayer(player.uuid);
     this.addMember(party, player);
     return true;
   }

@@ -10,7 +10,7 @@ import config from '#server/config.js';
 import Action from '#server/player/action.js';
 import ContextMenu from '#server/core/context-menu.js';
 import Item from '#server/core/item.js';
-import Map from '#server/core/map.js';
+import GameMap from '#server/core/map.js';
 import Player from '#server/core/player.js';
 import Wear from '#server/core/utilities/wear.js';
 import Mining from '#server/core/skills/mining.js';
@@ -37,6 +37,7 @@ import { BRAND_COST } from '#server/core/context-menu/strategies/vesselforge-bra
 import playerPersistence from '#server/core/services/player-persistence.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 import wagonService, { wagonNpcId } from '#server/core/services/wagon-service.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -92,6 +93,97 @@ const getReachableShopDisplay = (player, reference = {}) => {
   return Math.max(Math.abs(player.x - display.x), Math.abs(player.y - display.y)) <= 1
     ? display
     : null;
+};
+
+const SHOPKEEPER_REACH = 2;
+
+const chebyshevWithin = (x1, y1, x2, y2, radius) => (
+  Number.isFinite(x1) && Number.isFinite(y1) && Number.isFinite(x2) && Number.isFinite(y2)
+  && Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2)) <= radius
+);
+
+// A legacy-lane shop trade is only meaningful next to the shopkeeper or one
+// of the shop's market displays; a client-echoed npcId is not proof of
+// presence (cand-004). The shop-display path keeps its tighter 1-tile rule.
+const isShopReachable = (player, shopNpcId) => {
+  if (!player || shopNpcId === undefined || shopNpcId === null) {
+    return false;
+  }
+  const scene = getPlayerScene(player);
+  if (!scene) {
+    return false;
+  }
+  const nearKeeper = (scene.npcs || []).some(npc => npc
+    && npc.id === shopNpcId
+    && chebyshevWithin(player.x, player.y, npc.x, npc.y, SHOPKEEPER_REACH));
+  if (nearKeeper) {
+    return true;
+  }
+  return (scene.items || []).some(item => item
+    && item.shopDisplay
+    && item.shopNpcId === shopNpcId
+    && chebyshevWithin(player.x, player.y, item.x, item.y, 1));
+};
+
+// The countinghouse banker is NPC id 4 in a town scene, within one tile -
+// the same rule the bank-open handler enforces (cand-005).
+const isBankerReachable = (player) => {
+  const scene = player ? getPlayerScene(player) : null;
+  if (!player || !scene || scene.type !== 'town') {
+    return false;
+  }
+  const banker = (scene.npcs || []).find(npc => npc && npc.id === 4);
+  return Boolean(banker) && chebyshevWithin(player.x, player.y, banker.x, banker.y, 1);
+};
+
+// The context-menu protocol is echo-based: the client sends back the menu
+// entry it clicked. Keep the last menu this server built per socket and only
+// execute entries it actually offered (cand-003).
+const CONTEXT_MENU_OFFER_TTL_MS = 30 * 1000;
+const lastOfferedMenus = new Map();
+
+const rememberOfferedMenu = (socketId, items) => {
+  if (!socketId || !Array.isArray(items)) {
+    return;
+  }
+  lastOfferedMenus.set(socketId, { items, offeredAt: Date.now() });
+};
+
+const menuEntryMatches = (entry, echo) => {
+  if (!entry || !echo || !entry.action || !echo.action) {
+    return false;
+  }
+  if (entry.action.actionId !== echo.action.actionId
+    || entry.action.name !== echo.action.name) {
+    return false;
+  }
+  if (entry.type && echo.type && entry.type !== echo.type) {
+    return false;
+  }
+  if (entry.id !== undefined && entry.id !== echo.id) {
+    return false;
+  }
+  if (entry.uuid !== undefined && entry.uuid !== echo.uuid) {
+    return false;
+  }
+  if (entry.shopItemId !== undefined && entry.shopItemId !== echo.shopItemId) {
+    return false;
+  }
+  if (entry.params) {
+    const echoedQuantity = echo.params ? echo.params.quantity : undefined;
+    if (entry.params.quantity !== echoedQuantity) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const findOfferedMenuEntry = (socketId, echo) => {
+  const record = lastOfferedMenus.get(socketId);
+  if (!record || (Date.now() - record.offeredAt) > CONTEXT_MENU_OFFER_TTL_MS) {
+    return null;
+  }
+  return record.items.find(entry => menuEntryMatches(entry, echo)) || null;
 };
 
 const refreshShopPurchase = (shop, response) => {
@@ -313,7 +405,7 @@ const dropEquippedItem = (player, slotId) => {
   world.addItem(dropped, scene.id);
   broadcastSceneItems(scene, 'world:itemDropped');
   broadcastSceneItems(scene, 'item:change');
-  Socket.broadcast('player:unequippedAnItem', player, getSceneRecipients(scene));
+  Socket.broadcast('player:unequippedAnItem', publicPlayerProjection(player), getSceneRecipients(scene));
 
   return dropped;
 };
@@ -422,7 +514,7 @@ const actionEvents = {
       y: Math.max(baseViewport.y, desiredCenter.y + offsets.down),
     };
 
-    const matrix = await Map.getMatrix(player, {
+    const matrix = await GameMap.getMatrix(player, {
       viewport: desiredViewport,
       center: desiredCenter,
     });
@@ -468,7 +560,7 @@ const actionEvents = {
 
     const location = movingData.location || null;
 
-    Map.findPath(movingData.id, relativeTarget.x, relativeTarget.y, location);
+    GameMap.findPath(movingData.id, relativeTarget.x, relativeTarget.y, location);
   },
   'player:examine': (data) => {
     Socket.emit('item:examine', {
@@ -815,6 +907,8 @@ const actionEvents = {
 
     const items = await contextMenu.build();
 
+    rememberOfferedMenu(incomingData.data.player.socket_id, items);
+
     if (incomingData.data.miscData.firstOnly) {
       Socket.emit('game:context-menu:first-only', {
         data: items,
@@ -836,13 +930,27 @@ const actionEvents = {
     if (!socketId
       || !actionData?.tile
       || !selectedAction
-      || typeof selectedAction.name !== 'string') {
+      || typeof selectedAction.name !== 'string'
+      || typeof selectedAction.actionId !== 'string'
+      || !selectedAction.actionId) {
+      return;
+    }
+
+    // Never trust the echoed action: the client may only SELECT among the
+    // entries this server offered for its current menu. Forged actionIds or
+    // tampered item identities are dropped here instead of reaching the
+    // dynamic dispatcher in Action.do (cand-003).
+    const offeredItem = findOfferedMenuEntry(socketId, item);
+    if (!offeredItem) {
       return;
     }
 
     const action = new Action(socketId, item.miscData || false);
     if (!action.player) return;
-    action.do(actionData, payload.queueItem);
+    action.do({
+      tile: actionData.tile,
+      item: { ...offeredItem, miscData: item.miscData },
+    }, payload.queueItem);
   },
 
   'player:resource:smelt:anvil:action': (data) => {
@@ -1231,19 +1339,30 @@ const actionEvents = {
     if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
       return;
     }
-    world.players[data.playerIndex].currentPane = 'shop';
-    world.players[data.playerIndex].objectId = data.todo.item.id;
+    const trader = world.players[data.playerIndex];
+    const shopNpcId = data.todo.item?.id;
+    // A trade pane may only open beside the shopkeeper or one of the shop's
+    // market displays; an echoed npcId is not proof of presence (cand-004).
+    if (!isShopReachable(trader, shopNpcId)) {
+      return;
+    }
+    trader.currentPane = 'shop';
+    trader.objectId = shopNpcId;
 
     Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
+      player: { socket_id: trader.socket_id },
       screen: 'shop',
-      payload: world.shops.find(e => e.npcId === data.todo.item.id),
+      payload: world.shops.find(e => e.npcId === shopNpcId),
     });
   },
 
   'player:screen:npc:trade:action:value': (data) => {
     const player = getPlayerFromPayload(data);
     if (!player || !player.objectId || !data.item?.id) {
+      return;
+    }
+
+    if (player.currentPane !== 'shop' || !isShopReachable(player, player.objectId)) {
       return;
     }
 
@@ -1278,6 +1397,12 @@ const actionEvents = {
     // Validate action type before constructing the shop operation.
     const allowedShopActions = ['buy', 'sell', 'value'];
     if (!allowedShopActions.includes(payload.doing)) {
+      return;
+    }
+
+    // Trading also requires the shop pane to be open and current adjacency
+    // to the shopkeeper or one of its market displays (cand-004).
+    if (player.currentPane !== 'shop' || !isShopReachable(player, player.objectId)) {
       return;
     }
 
@@ -1391,6 +1516,13 @@ const actionEvents = {
 
     const player = getPlayerFromPayload(data);
     if (!player || !data.item?.id) {
+      return;
+    }
+
+    // Transfers only run with the bank pane open and the countinghouse
+    // banker still adjacent - the same gate the bank-open handler enforces
+    // (cand-005).
+    if (player.currentPane !== 'bank' || !isBankerReachable(player)) {
       return;
     }
 
