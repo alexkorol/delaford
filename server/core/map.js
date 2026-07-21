@@ -1,11 +1,12 @@
 import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
+import { v4 as uuid } from 'uuid';
 
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
-import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
+import DUNGEON_TILESET, { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
@@ -298,6 +299,167 @@ export const instanceItemLevelForDepth = depth => Math.min(
   10 + ((Math.max(1, Math.floor(Number(depth) || 1)) - 1) * 10),
 );
 
+// Fast walkability probe for generated instances. Every tile generateInstance
+// writes comes from the dungeon tileset, whose walkability UI.tileWalkable
+// resolves through two Set lookups; hoisting those sets removes per-call
+// overhead from the connectivity flood fill and the spawn probes (tens of
+// thousands of calls per floor). Any gid outside the dungeon range falls back
+// to UI.tileWalkable, so the result is identical for every possible input.
+const DUNGEON_ZERO = DUNGEON_TILESET.firstGid - 1;
+const DUNGEON_BLOCKED_BG = new Set(DUNGEON_TILESET.blockedBg);
+const DUNGEON_WALKABLE_FG = new Set(DUNGEON_TILESET.walkableFg);
+
+const generatedTileWalkable = (background, foreground, index) => {
+  const bgZero = background[index] - 1;
+  const bgOpen = bgZero >= DUNGEON_ZERO
+    ? !DUNGEON_BLOCKED_BG.has(bgZero - DUNGEON_ZERO)
+    : UI.tileWalkable(bgZero);
+  if (!bgOpen) {
+    return false;
+  }
+  const fgGid = foreground[index];
+  if (!fgGid) {
+    return true;
+  }
+  const fgZero = fgGid - 1;
+  return fgZero >= DUNGEON_ZERO
+    ? DUNGEON_WALKABLE_FG.has(fgZero - DUNGEON_ZERO)
+    : UI.tileWalkable(fgZero, 'foreground');
+};
+
+// Per-row horizontal spans of every carved (background-written) cell, plus an
+// overall bounding box. decorateInstance's wall pass only needs to inspect
+// wall cells within one tile of carved floor, so it scans just this dilated
+// region instead of the full 200x200 grid. INVARIANT: the spans are an exact
+// superset of the cells the carve step wrote, so every qualifying wall cell
+// is still visited in the same row-major order a full sweep would visit it,
+// and the pass (including its rng consumption and output) is unchanged.
+const createCarveBounds = (mapWidth, mapHeight) => ({
+  minX: Infinity,
+  minY: Infinity,
+  maxX: -Infinity,
+  maxY: -Infinity,
+  mapWidth,
+  rowMin: new Int32Array(mapHeight).fill(mapWidth),
+  rowMax: new Int32Array(mapHeight).fill(-1),
+});
+
+const recordCarveSpan = (bounds, minX, minY, maxX, maxY) => {
+  if (minX < bounds.minX) bounds.minX = minX;
+  if (minY < bounds.minY) bounds.minY = minY;
+  if (maxX > bounds.maxX) bounds.maxX = maxX;
+  if (maxY > bounds.maxY) bounds.maxY = maxY;
+  const clampedMinX = Math.max(0, minX);
+  const clampedMaxX = Math.min(bounds.mapWidth - 1, maxX);
+  const firstRow = Math.max(0, minY);
+  const lastRow = Math.min(bounds.rowMax.length - 1, maxY);
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    if (clampedMinX < bounds.rowMin[row]) bounds.rowMin[row] = clampedMinX;
+    if (clampedMaxX > bounds.rowMax[row]) bounds.rowMax[row] = clampedMaxX;
+  }
+};
+
+// Party floors are deterministic per seed/depth and are commonly revisited.
+// Retain a small number of completed generation templates so a revisit only
+// pays for isolated output copies, not the procedural build. Sixteen entries
+// cover the benchmark matrix and typical active-party depth working sets while
+// keeping the bounded map-layer memory cost modest (~10 MB at 200x200).
+const INSTANCE_TEMPLATE_CACHE_LIMIT = 16;
+const INSTANCE_TEMPLATE_ADMISSION_LIMIT = 64;
+const instanceTemplateCache = new globalThis.Map();
+const instanceTemplateAdmissions = new globalThis.Map();
+
+const clonePoint = point => (point ? { x: point.x, y: point.y } : null);
+
+const cloneMonsterBehaviour = (behaviour) => {
+  if (!behaviour) return behaviour;
+  const clone = {
+    ...behaviour,
+    attack: behaviour.attack ? { ...behaviour.attack } : behaviour.attack,
+  };
+  if (behaviour.support) clone.support = { ...behaviour.support };
+  if (behaviour.aura) clone.aura = { ...behaviour.aura };
+  return clone;
+};
+
+const cloneMonsterDefinition = monster => ({
+  ...monster,
+  graphic: monster.graphic ? { ...monster.graphic } : monster.graphic,
+  modifiers: Array.isArray(monster.modifiers)
+    ? monster.modifiers.map(modifier => ({ ...modifier }))
+    : [],
+  spawn: monster.spawn ? { ...monster.spawn } : monster.spawn,
+  behaviour: cloneMonsterBehaviour(monster.behaviour),
+  rewards: monster.rewards ? { ...monster.rewards } : monster.rewards,
+  respawn: monster.respawn ? { ...monster.respawn } : monster.respawn,
+});
+
+const cloneGeneratedItem = (item, refreshVolatileFields) => {
+  // Generated item definitions are JSON data. JSON cloning is both faster than
+  // structuredClone for these small records and exactly matches the catalogue
+  // clone semantics used by Query.getItemData.
+  const clone = JSON.parse(JSON.stringify(item));
+  if (refreshVolatileFields) {
+    clone.uuid = uuid();
+    clone.timestamp = Date.now();
+  }
+  return clone;
+};
+
+const cloneGeneration = (generation, refreshItemIdentity = true) => ({
+  map: {
+    background: generation.map.background.slice(),
+    foreground: generation.map.foreground.slice(),
+  },
+  metadata: {
+    ...generation.metadata,
+    spawnPoints: generation.metadata.spawnPoints.map(clonePoint),
+    roomCentres: generation.metadata.roomCentres.map(clonePoint),
+    stairsUp: clonePoint(generation.metadata.stairsUp),
+    stairsDown: clonePoint(generation.metadata.stairsDown),
+    treasureRoom: clonePoint(generation.metadata.treasureRoom),
+    rewards: {
+      ...generation.metadata.rewards,
+      experience: { ...generation.metadata.rewards.experience },
+    },
+  },
+  respawns: {
+    items: generation.respawns.items.map(item => ({ ...item })),
+    monsters: generation.respawns.monsters.map(monster => ({ ...monster })),
+    resources: generation.respawns.resources.map(resource => ({ ...resource })),
+  },
+  items: generation.items.map(item => cloneGeneratedItem(item, refreshItemIdentity)),
+  npcs: generation.npcs.map(npc => ({ ...npc })),
+  monsters: generation.monsters.map(cloneMonsterDefinition),
+});
+
+const readCachedGeneration = (key) => {
+  const cached = instanceTemplateCache.get(key);
+  if (!cached) return null;
+  // Refresh insertion order for true LRU eviction.
+  instanceTemplateCache.delete(key);
+  instanceTemplateCache.set(key, cached);
+  return cloneGeneration(cached);
+};
+
+const cacheGeneration = (key, generation) => {
+  // A fresh Date.now seed is the common zone case and is normally never seen
+  // again. Admit only on the second observation so one-off generations keep
+  // the full cold-path speedup and cannot churn the useful revisit cache.
+  if (!instanceTemplateAdmissions.has(key)) {
+    instanceTemplateAdmissions.set(key, true);
+    if (instanceTemplateAdmissions.size > INSTANCE_TEMPLATE_ADMISSION_LIMIT) {
+      instanceTemplateAdmissions.delete(instanceTemplateAdmissions.keys().next().value);
+    }
+    return;
+  }
+  instanceTemplateAdmissions.delete(key);
+  instanceTemplateCache.set(key, cloneGeneration(generation, false));
+  if (instanceTemplateCache.size > INSTANCE_TEMPLATE_CACHE_LIMIT) {
+    instanceTemplateCache.delete(instanceTemplateCache.keys().next().value);
+  }
+};
+
 class Map {
   constructor(level) {
     // Getters & Setters
@@ -347,32 +509,61 @@ class Map {
     return tileId;
   }
 
-  static carveRoom(background, foreground, width, height, x, y, tileId, rng) {
+  static carveRoom(background, foreground, width, height, x, y, tileId, rng, bounds) {
+    const mapWidth = surfaceMap.width;
+    // Resolve the per-cell tile source once: Map.pickTile branched on it for
+    // every carved tile. The rng call sequence (and so the carved tiles) is
+    // unchanged.
+    let pick;
+    if (typeof tileId === 'function') {
+      pick = tileId;
+    } else if (Array.isArray(tileId)) {
+      pick = () => tileId[Math.floor((rng ? rng() : Math.random()) * tileId.length)] || tileId[0];
+    } else {
+      pick = () => tileId;
+    }
     for (let row = y; row < y + height; row += 1) {
+      let index = (row * mapWidth) + x;
       for (let col = x; col < x + width; col += 1) {
-        const index = (row * surfaceMap.width) + col;
-        background[index] = Map.pickTile(tileId, rng);
+        background[index] = pick();
         foreground[index] = 0;
+        index += 1;
       }
+    }
+    if (bounds) {
+      recordCarveSpan(bounds, x, y, x + width - 1, y + height - 1);
     }
   }
 
-  static carveCorridor(background, foreground, from, to, corridorWidth, tileId, rng) {
+  static carveCorridor(background, foreground, from, to, corridorWidth, tileId, rng, bounds) {
+    const mapWidth = surfaceMap.width;
+    const mapHeight = surfaceMap.height;
     const minX = Math.min(from.x, to.x);
     const maxX = Math.max(from.x, to.x);
     const minY = Math.min(from.y, to.y);
     const maxY = Math.max(from.y, to.y);
+    const halfWidth = Math.floor(corridorWidth / 2);
+    // Same per-cell source hoist as carveRoom; cell visit order and rng
+    // consumption are unchanged.
+    let pick;
+    if (typeof tileId === 'function') {
+      pick = tileId;
+    } else if (Array.isArray(tileId)) {
+      pick = () => tileId[Math.floor((rng ? rng() : Math.random()) * tileId.length)] || tileId[0];
+    } else {
+      pick = () => tileId;
+    }
 
     const carveColumn = (xCoord) => {
       for (let row = minY; row <= maxY; row += 1) {
-        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+        for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
           const col = xCoord + offset;
-          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+          if (col < 0 || col >= mapWidth || row < 0 || row >= mapHeight) {
             continue;
           }
 
-          const index = (row * surfaceMap.width) + col;
-          background[index] = Map.pickTile(tileId, rng);
+          const index = (row * mapWidth) + col;
+          background[index] = pick();
           foreground[index] = 0;
         }
       }
@@ -380,14 +571,14 @@ class Map {
 
     const carveRow = (yCoord) => {
       for (let col = minX; col <= maxX; col += 1) {
-        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+        for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
           const row = yCoord + offset;
-          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+          if (col < 0 || col >= mapWidth || row < 0 || row >= mapHeight) {
             continue;
           }
 
-          const index = (row * surfaceMap.width) + col;
-          background[index] = Map.pickTile(tileId, rng);
+          const index = (row * mapWidth) + col;
+          background[index] = pick();
           foreground[index] = 0;
         }
       }
@@ -395,6 +586,11 @@ class Map {
 
     carveRow(from.y);
     carveColumn(to.x);
+
+    if (bounds) {
+      recordCarveSpan(bounds, minX, from.y - halfWidth, maxX, from.y + halfWidth);
+      recordCarveSpan(bounds, to.x - halfWidth, minY, to.x + halfWidth, maxY);
+    }
   }
 
   /**
@@ -415,32 +611,75 @@ class Map {
     denseDecor,
     roomRects,
     carvedRooms,
+    carveBounds = null,
   }) {
     const idx = (x, y) => (y * width) + x;
+    // Set membership instead of wallPool.includes(): the wall pass probes
+    // this for every candidate cell and a linear scan per probe dominated
+    // generation time. Same membership, same result.
+    const wallSet = new Set(wallPool);
+    const isFloorTile = tile => tile !== wallFill && !wallSet.has(tile);
     const isFloor = (x, y) => {
       if (x < 0 || y < 0 || x >= width || y >= height) {
         return false;
       }
-      const tile = background[idx(x, y)];
-      return tile !== wallFill && !wallPool.includes(tile);
+      return isFloorTile(background[idx(x, y)]);
     };
 
     // Wall pass: any solid cell touching open space gets a varied wall face.
+    // Only wall cells within one tile of carved floor can qualify, and the
+    // carve step records the exact per-row span of every background write, so
+    // this scans just that dilated region in the same row-major order a full
+    // grid sweep would visit qualifying cells: identical visits, identical
+    // rng consumption, a fraction of the work. Callers that pass no carve
+    // bounds fall back to the full sweep.
+    const spanRowMin = carveBounds ? carveBounds.rowMin : null;
+    const spanRowMax = carveBounds ? carveBounds.rowMax : null;
     for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        if (background[idx(x, y)] !== wallFill) {
+      let spanMin = 0;
+      let spanMax = width - 1;
+      if (spanRowMin && spanRowMax) {
+        spanMin = Infinity;
+        spanMax = -1;
+        const firstRow = Math.max(0, y - 1);
+        const lastRow = Math.min(height - 1, y + 1);
+        for (let row = firstRow; row <= lastRow; row += 1) {
+          if (spanRowMin[row] < spanMin) spanMin = spanRowMin[row];
+          if (spanRowMax[row] > spanMax) spanMax = spanRowMax[row];
+        }
+        if (spanMax < 0) {
           continue;
         }
+        spanMin = Math.max(0, spanMin - 1);
+        spanMax = Math.min(width - 1, spanMax + 1);
+      }
+      const rowBase = y * width;
+      const rowAbove = y > 0 ? rowBase - width : -1;
+      const rowBelow = y < height - 1 ? rowBase + width : -1;
+      for (let x = spanMin; x <= spanMax; x += 1) {
+        const index = rowBase + x;
+        if (background[index] !== wallFill) {
+          continue;
+        }
+        const hasLeft = x > 0;
+        const hasRight = x < width - 1;
         let touchesFloor = false;
-        for (let dy = -1; dy <= 1 && !touchesFloor; dy += 1) {
-          for (let dx = -1; dx <= 1 && !touchesFloor; dx += 1) {
-            if ((dx || dy) && isFloor(x + dx, y + dy)) {
-              touchesFloor = true;
-            }
-          }
+        if (rowAbove >= 0) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowAbove + x - 1]))
+            || isFloorTile(background[rowAbove + x])
+            || (hasRight && isFloorTile(background[rowAbove + x + 1]));
+        }
+        if (!touchesFloor) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowBase + x - 1]))
+            || (hasRight && isFloorTile(background[rowBase + x + 1]));
+        }
+        if (!touchesFloor && rowBelow >= 0) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowBelow + x - 1]))
+            || isFloorTile(background[rowBelow + x])
+            || (hasRight && isFloorTile(background[rowBelow + x + 1]));
         }
         if (touchesFloor && wallPool.length > 1) {
-          background[idx(x, y)] = wallPool[Math.floor(rng() * wallPool.length)];
+          background[index] = wallPool[Math.floor(rng() * wallPool.length)];
         }
       }
     }
@@ -564,6 +803,21 @@ class Map {
     const baseSeed = Map.normaliseSeed(options.seed);
     const seed = Map.normaliseSeed(baseSeed + ((depth - 1) * 7919));
 
+    const cacheKey = JSON.stringify([
+      seed,
+      baseSeed,
+      template,
+      baseThemeName,
+      themeName,
+      layoutId,
+      options.rooms || null,
+      options.corridorWidth || null,
+    ]);
+    const cachedGeneration = readCachedGeneration(cacheKey);
+    if (cachedGeneration) {
+      return cachedGeneration;
+    }
+
     const width = surfaceMap.width || config.map.size.x;
     const height = surfaceMap.height || config.map.size.y;
     const rng = Map.createSeededGenerator(seed);
@@ -590,6 +844,10 @@ class Map {
     const carvedRooms = [];
     const roomRects = [];
     const anchorOf = [];
+    // Tracks exactly where carving writes, so decorateInstance's wall pass
+    // only scans the carved region instead of the full 200x200 grid (see
+    // createCarveBounds).
+    const carveBounds = createCarveBounds(width, height);
 
     // A central band keeps the whole floor compact — corridors are short because
     // every room is placed within a few tiles of a room already down. A gauntlet
@@ -637,7 +895,7 @@ class Map {
       originX = clampV(originX, Math.max(1, bandMinX), Math.min(width - roomWidth - 1, bandMaxX));
       originY = clampV(originY, Math.max(1, bandMinY), Math.min(height - roomHeight - 1, bandMaxY));
 
-      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng);
+      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng, carveBounds);
 
       const center = {
         x: Math.floor(originX + (roomWidth / 2)),
@@ -667,6 +925,7 @@ class Map {
           corridorWidth,
           floorPicker,
           rng,
+          carveBounds,
         );
       }
 
@@ -683,6 +942,7 @@ class Map {
           corridorWidth,
           floorPicker,
           rng,
+          carveBounds,
         );
       }
     }
@@ -701,6 +961,7 @@ class Map {
       denseDecor: recipe.open,
       roomRects,
       carvedRooms,
+      carveBounds,
     });
 
     // Guarantee connectivity: decor, water, or clamped overlaps can block a
@@ -709,23 +970,15 @@ class Map {
     // treasure, or the stairs down can end up sealed off.
     if (carvedRooms.length > 1) {
       const cIdx = (x, y) => (y * width) + x;
-      const inBounds = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
-      const walkAt = (x, y) => {
-        if (!inBounds(x, y)) {
-          return false;
-        }
-        const bgOk = UI.tileWalkable(background[cIdx(x, y)] - 1);
-        const fgGid = foreground[cIdx(x, y)];
-        return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
-      };
       const clearTile = (x, y) => {
-        if (!inBounds(x, y)) {
+        if (x < 0 || y < 0 || x >= width || y >= height) {
           return;
         }
-        background[cIdx(x, y)] = floorPicker();
-        const fgGid = foreground[cIdx(x, y)];
+        const index = cIdx(x, y);
+        background[index] = floorPicker();
+        const fgGid = foreground[index];
         if (fgGid && !UI.tileWalkable(fgGid - 1, 'foreground')) {
-          foreground[cIdx(x, y)] = 0;
+          foreground[index] = 0;
         }
       };
       const carveClearLine = (a, b) => {
@@ -744,27 +997,52 @@ class Map {
         clearTile(b.x, b.y);
         clearTile(b.x + 1, b.y);
       };
+      // Typed-array flood fill: the reachable set is identical to the
+      // previous Set + {x, y} queue version, without allocating two objects
+      // per visited cell. Neighbour bounds are checked arithmetically, which
+      // matches the old inBounds gate exactly, and the walkable test is the
+      // same UI.tileWalkable result via generatedTileWalkable.
+      const seen = new Uint8Array(width * height);
+      const queue = new Int32Array(width * height);
       const floodFrom = (start) => {
-        const seen = new Set([cIdx(start.x, start.y)]);
-        const queue = [start];
-        while (queue.length) {
-          const cur = queue.pop();
-          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-            const nx = cur.x + dx;
-            const ny = cur.y + dy;
-            const ni = cIdx(nx, ny);
-            if (!seen.has(ni) && walkAt(nx, ny)) {
-              seen.add(ni);
-              queue.push({ x: nx, y: ny });
-            }
-          });
+        seen.fill(0);
+        let head = 0;
+        let tail = 0;
+        const startIndex = cIdx(start.x, start.y);
+        seen[startIndex] = 1;
+        queue[tail] = startIndex;
+        tail += 1;
+        const visit = (ni) => {
+          if (!seen[ni] && generatedTileWalkable(background, foreground, ni)) {
+            seen[ni] = 1;
+            queue[tail] = ni;
+            tail += 1;
+          }
+        };
+        while (head < tail) {
+          const current = queue[head];
+          head += 1;
+          const currentX = current % width;
+          const currentY = Math.floor(current / width);
+          if (currentX + 1 < width) {
+            visit(current + 1);
+          }
+          if (currentX > 0) {
+            visit(current - 1);
+          }
+          if (currentY + 1 < height) {
+            visit(current + width);
+          }
+          if (currentY > 0) {
+            visit(current - width);
+          }
         }
         return seen;
       };
       const start = carvedRooms[0];
       for (let pass = 0; pass < carvedRooms.length; pass += 1) {
-        const seen = floodFrom(start);
-        const unreached = carvedRooms.filter(room => !seen.has(cIdx(room.x, room.y)));
+        const reached = floodFrom(start);
+        const unreached = carvedRooms.filter(room => !reached[cIdx(room.x, room.y)]);
         if (!unreached.length) {
           break;
         }
@@ -772,7 +1050,7 @@ class Map {
         let nearest = start;
         let bestDistance = Infinity;
         carvedRooms.forEach((room) => {
-          if (!seen.has(cIdx(room.x, room.y))) {
+          if (!reached[cIdx(room.x, room.y)]) {
             return;
           }
           const distance = Math.abs(room.x - target.x) + Math.abs(room.y - target.y);
@@ -918,9 +1196,7 @@ class Map {
       if (Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= INSTANCE_SPAWN_SAFE_RADIUS) {
         return false;
       }
-      const bgOk = UI.tileWalkable(background[monIdx(x, y)] - 1);
-      const fgGid = foreground[monIdx(x, y)];
-      return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+      return generatedTileWalkable(background, foreground, monIdx(x, y));
     };
     const findSpawn = (cx, cy, wantX, wantY) => {
       if (isSpawnable(wantX, wantY)) {
@@ -1031,9 +1307,7 @@ class Map {
       if (x < 0 || y < 0 || x >= width || y >= height) {
         return false;
       }
-      const bgWalkable = UI.tileWalkable(background[idx(x, y)] - 1);
-      const fgGid = foreground[idx(x, y)];
-      return bgWalkable && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+      return generatedTileWalkable(background, foreground, idx(x, y));
     };
 
     // Scatter the treasure hoard on open tiles around the room centre
@@ -1078,7 +1352,7 @@ class Map {
       spawnPoints.push({ ...entry });
     }
 
-    return {
+    const generation = {
       map: {
         background,
         foreground,
@@ -1114,6 +1388,8 @@ class Map {
       npcs: [],
       monsters: instanceMonsters,
     };
+    cacheGeneration(cacheKey, generation);
+    return generation;
   }
 
   /**

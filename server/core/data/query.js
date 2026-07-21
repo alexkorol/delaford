@@ -2,6 +2,22 @@ import { general, wearableItems, smithing } from '#server/core/data/items/index.
 
 import { foregroundObjects } from '#server/core/data/foreground/index.js';
 
+const firstById = (items) => {
+  const index = new globalThis.Map();
+  items.forEach((item) => {
+    // Array.find returned the first duplicate. Preserve that behavior rather
+    // than letting Map's normal last-write-wins semantics change catalogue
+    // resolution.
+    if (!index.has(item.id)) {
+      index.set(item.id, item);
+    }
+  });
+  return index;
+};
+
+const foregroundById = firstById(foregroundObjects);
+const itemById = firstById([...wearableItems, ...general, ...smithing]);
+
 class Query {
   /**
    * Obtains the full information of a foreground object by its ID
@@ -10,7 +26,7 @@ class Query {
    * @returns {object}
    */
   static getForegroundData(id) {
-    const item = foregroundObjects.find(t => t.id === id);
+    const item = foregroundById.get(id);
     if (!item) return undefined;
     return { ...item, context: 'action' };
   }
@@ -22,14 +38,11 @@ class Query {
    * @returns {object}
    */
   static getItemData(id) {
-    const allItems = [...wearableItems, ...general, ...smithing];
-    return allItems
-      .map((t) => {
-        const clone = JSON.parse(JSON.stringify(t));
-        clone.context = 'item';
-        return clone;
-      })
-      .find(item => item.id === id);
+    const item = itemById.get(id);
+    if (!item) return undefined;
+    const clone = JSON.parse(JSON.stringify(item));
+    clone.context = 'item';
+    return clone;
   }
 }
 

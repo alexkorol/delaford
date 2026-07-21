@@ -27,6 +27,7 @@
     "test:e2e": "playwright test",
     "format": "eslint . --fix",
     "playtest": "node playtest/run.mjs",
+    "bench:instance": "node bench/instance-generation.mjs",
     "security:audit": "npm audit --omit=dev",
     "smoke:public": "node playtest/public-smoke.mjs",
     "smoke:production-local": "node playtest/local-production-smoke.mjs",
