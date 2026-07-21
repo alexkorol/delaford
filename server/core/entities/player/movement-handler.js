@@ -11,8 +11,16 @@ import {
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
 } from '#shared/combat.js';
+import {
+  PLAYER_MOVE_SAMPLE_MS,
+  PLAYER_TILE_TRAVEL_MS,
+  directionVector,
+  occupiedTile,
+  playerMovementDelta,
+  roundPosition,
+} from '#shared/movement.js';
 
-export const BASE_MOVE_DURATION = 150;
+export const BASE_MOVE_DURATION = PLAYER_TILE_TRAVEL_MS;
 
 export const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DURATION) => {
   const diagonal = Math.abs(deltaX) === 1 && Math.abs(deltaY) === 1;
@@ -21,18 +29,7 @@ export const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DUR
 };
 
 export const directionDelta = (direction) => {
-  const mapping = {
-    right: { x: 1, y: 0 },
-    left: { x: -1, y: 0 },
-    up: { x: 0, y: -1 },
-    down: { x: 0, y: 1 },
-    'up-right': { x: 1, y: -1 },
-    'down-right': { x: 1, y: 1 },
-    'up-left': { x: -1, y: -1 },
-    'down-left': { x: -1, y: 1 },
-  };
-
-  return mapping[direction] || null;
+  return directionVector(direction);
 };
 
 const resolveFacing = (direction, fallback = DEFAULT_FACING_DIRECTION) => {
@@ -230,15 +227,18 @@ const hasLivingMonsterAt = (player, tileX, tileY) => {
 const canMoveTo = (player, tileX, tileY) => {
   const { size } = config.map;
 
-  if (tileX < 0 || tileY < 0 || tileX >= size.x || tileY >= size.y) {
+  if (tileX < 0 || tileY < 0 || tileX > size.x - 1 || tileY > size.y - 1) {
     return false;
   }
 
-  if (hasLivingMonsterAt(player, tileX, tileY)) {
+  const occupiedX = Math.round(tileX);
+  const occupiedY = Math.round(tileY);
+
+  if (hasLivingMonsterAt(player, occupiedX, occupiedY)) {
     return false;
   }
 
-  const tileIndex = (tileY * size.x) + tileX;
+  const tileIndex = (occupiedY * size.x) + occupiedX;
   const scene = world.getSceneForPlayer(player);
   const mapLayers = scene && scene.map ? scene.map : world.map;
   const steppedOn = {
@@ -254,23 +254,23 @@ const canMoveTo = (player, tileX, tileY) => {
   return MapUtils.gridWalkable(tiles, player, tileIndex, 0, 0, mapLayers) === 0;
 };
 
-const isBlocked = (player, direction, delta = null) => {
+const isBlocked = (player, direction, delta = null, origin = player) => {
   const vector = delta || directionDelta(direction);
 
   if (!vector) {
     return true;
   }
 
-  const targetX = player.x + vector.x;
-  const targetY = player.y + vector.y;
+  const targetX = origin.x + vector.x;
+  const targetY = origin.y + vector.y;
 
   if (!canMoveTo(player, targetX, targetY)) {
     return true;
   }
 
   if (vector.x !== 0 && vector.y !== 0) {
-    const horizontal = canMoveTo(player, player.x + vector.x, player.y);
-    const vertical = canMoveTo(player, player.x, player.y + vector.y);
+    const horizontal = canMoveTo(player, origin.x + vector.x, origin.y);
+    const vertical = canMoveTo(player, origin.x, origin.y + vector.y);
 
     if (!horizontal && !vertical) {
       return true;
@@ -331,7 +331,7 @@ const move = (player, direction, options = {}) => {
     player.moving = true;
   }
 
-  const delta = directionDelta(direction);
+  const delta = pathfind ? directionDelta(direction) : playerMovementDelta(direction);
   const facing = setFacing(player, direction);
 
   if (!delta) {
@@ -341,9 +341,10 @@ const move = (player, direction, options = {}) => {
   const attemptedWalkId = pathfind ? walkId : null;
   const duration = typeof durationOverride === 'number'
     ? durationOverride
-    : computeStepDuration(delta.x, delta.y);
+    : (pathfind ? computeStepDuration(delta.x, delta.y) : PLAYER_MOVE_SAMPLE_MS);
+  const origin = pathfind ? occupiedTile(player) : { x: player.x, y: player.y };
 
-  if (isBlocked(player, direction, delta)) {
+  if (isBlocked(player, direction, delta, origin)) {
     registerMovementStep(player, {
       duration: 0,
       walkId: attemptedWalkId,
@@ -357,8 +358,9 @@ const move = (player, direction, options = {}) => {
     return false;
   }
 
-  player.x += delta.x;
-  player.y += delta.y;
+  const previousTile = occupiedTile(player);
+  player.x = roundPosition(origin.x + delta.x);
+  player.y = roundPosition(origin.y + delta.y);
 
   registerMovementStep(player, {
     duration,
@@ -370,7 +372,10 @@ const move = (player, direction, options = {}) => {
     blocked: false,
   });
   setAnimationState(player, 'run', { direction: facing, duration });
-  transitionPlayerIfOnPortal(player);
+  const currentTile = occupiedTile(player);
+  if (currentTile.x !== previousTile.x || currentTile.y !== previousTile.y) {
+    transitionPlayerIfOnPortal(player);
+  }
   autoPickupCurrency(player);
 
   return true;
@@ -508,7 +513,7 @@ const createPlayerMovementHandler = (player) => ({
   registerMovementStep: step => registerMovementStep(player, step),
   cancelPathfinding: () => cancelPathfinding(player),
   canMoveTo: (tileX, tileY) => canMoveTo(player, tileX, tileY),
-  isBlocked: (direction, delta) => isBlocked(player, direction, delta),
+  isBlocked: (direction, delta, origin) => isBlocked(player, direction, delta, origin),
   backgroundBlocked: () => backgroundBlocked(player),
   foregroundBlocked: () => foregroundBlocked(player),
   stopMovement: data => stopMovement(player, data),

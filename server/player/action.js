@@ -106,9 +106,11 @@ class Action {
   getTileNumber(clickedOn) {
     const { size } = config.map;
     const center = this.getViewportCenter();
+    const playerX = Math.round(this.player.x);
+    const playerY = Math.round(this.player.y);
     const tileCrop = {
-      x: this.player.x - center.x,
-      y: this.player.y - center.y,
+      x: playerX - center.x,
+      y: playerY - center.y,
     };
 
     if (clickedOn.world && typeof clickedOn.world.x === 'number' && typeof clickedOn.world.y === 'number') {
@@ -139,8 +141,8 @@ class Action {
       && typeof clickedTile.world.y === 'number')
       ? clickedTile.world
       : {
-        x: this.player.x - center.x + clickedTile.x,
-        y: this.player.y - center.y + clickedTile.y,
+        x: Math.round(this.player.x) - center.x + clickedTile.x,
+        y: Math.round(this.player.y) - center.y + clickedTile.y,
       };
     const viewportState = (clickedTile.viewport
       && typeof clickedTile.viewport.x === 'number'

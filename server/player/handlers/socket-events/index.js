@@ -236,7 +236,7 @@ export default {
   },
 
   /**
-   * A player moves to a new tile via keyboard
+   * A player starts, samples, or stops continuous keyboard movement.
    */
   'player:move': (data, ws) => {
     const payload = data.data || {};
@@ -244,6 +244,12 @@ export default {
     if (!player || isSpoofedPlayerPayload(player, payload) || !Combat.isPlayerAlive(player)) {
       return;
     }
+
+    if (payload.stopped === true) {
+      player.stopMovement({ player: { socket_id: player.socket_id } });
+      return;
+    }
+
     const startedAt = Date.now();
 
     if (Combat.findStepTarget(player, payload.direction)) {

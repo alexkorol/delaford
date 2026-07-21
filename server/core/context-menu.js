@@ -74,8 +74,8 @@ class ContextMenu {
     const worldCoordinates = hasWorldCoordinates
       ? tile.world
       : {
-        x: this.player.x - this.viewportCenter.x + tile.x,
-        y: this.player.y - this.viewportCenter.y + tile.y,
+        x: Math.round(this.player.x) - this.viewportCenter.x + tile.x,
+        y: Math.round(this.player.y) - this.viewportCenter.y + tile.y,
       };
 
     // Coordinates of mouse-click and player

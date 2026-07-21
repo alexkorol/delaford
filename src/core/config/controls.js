@@ -1,3 +1,5 @@
+import { PLAYER_MOVE_SAMPLE_MS } from '@shared/movement.js';
+
 export const MOVEMENT_BINDINGS = {
   up: ['w', 'arrowup'],
   down: ['s', 'arrowdown'],
@@ -46,8 +48,8 @@ export const SKILL_BINDINGS = [
 ];
 
 export const MOVEMENT_REPEAT = {
-  initialDelayMs: 150,
-  repeatDelayMs: 110,
+  initialDelayMs: PLAYER_MOVE_SAMPLE_MS,
+  repeatDelayMs: PLAYER_MOVE_SAMPLE_MS,
 };
 
 export default {

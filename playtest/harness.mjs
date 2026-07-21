@@ -19,6 +19,10 @@
  */
 
 import WebSocket from 'ws';
+import {
+  PLAYER_MOVE_DISTANCE,
+  PLAYER_MOVE_SAMPLE_MS,
+} from '#shared/movement.js';
 
 const DEFAULT_URL = process.env.PLAYTEST_WS_URL || 'ws://localhost:6500';
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -223,15 +227,16 @@ export class HeadlessPlayer {
 
   // ── Player verbs ──────────────────────────────────────────────────────
 
-  /** Take one movement step ('up'/'down'/'left'/'right'/diagonals). */
+  /** Send one continuous movement sample ('up'/'down'/'left'/'right'/diagonals). */
   step(direction) {
     this.emit('player:move', { id: this.player.uuid, direction });
   }
 
-  /** Walk N steps in a direction, pacing like a held key. */
-  async move(direction, steps = 1, { stepMs = 180 } = {}) {
-     
-    for (let i = 0; i < steps; i += 1) {
+  /** Move N tile-lengths in a direction, pacing samples like a held key. */
+  async move(direction, steps = 1, { stepMs = PLAYER_MOVE_SAMPLE_MS } = {}) {
+    const samples = Math.max(1, Math.ceil(steps / PLAYER_MOVE_DISTANCE));
+
+    for (let i = 0; i < samples; i += 1) {
       this.step(direction);
       await sleep(stepMs);
     }

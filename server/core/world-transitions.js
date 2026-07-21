@@ -1,6 +1,7 @@
 import Socket from '#server/socket.js';
 import world from './world.js';
 import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const clone = value => JSON.parse(JSON.stringify(value || {}));
 
@@ -123,7 +124,8 @@ export const transitionPlayerIfOnPortal = (player) => {
     ? scene.metadata.portals
     : [];
 
-  const portal = portals.find(entry => entry.x === player.x && entry.y === player.y);
+  const playerTile = occupiedTile(player);
+  const portal = portals.find(entry => entry.x === playerTile.x && entry.y === playerTile.y);
   if (!portal) {
     return false;
   }

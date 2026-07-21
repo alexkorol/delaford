@@ -176,8 +176,8 @@ const adoptExisting = (existingItem, options = {}) => {
 const toWorldInstance = (item, location, options = {}) => {
   const clone = structuredCloneSafe(item);
   clone.uuid = options.uuid || clone.uuid || uuid();
-  clone.x = location.x;
-  clone.y = location.y;
+  clone.x = Math.round(location.x);
+  clone.y = Math.round(location.y);
   clone.timestamp = options.timestamp || Date.now();
   delete clone.slot;
   delete clone.isLocked;

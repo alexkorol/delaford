@@ -220,7 +220,9 @@ export default {
       this.dispatchMovement(direction);
     },
     onMoveStop() {
-      if (this.game && typeof this.game.setLocalIdle === 'function') {
+      if (this.game && typeof this.game.stopMoving === 'function') {
+        this.game.stopMoving();
+      } else if (this.game && typeof this.game.setLocalIdle === 'function') {
         this.game.setLocalIdle();
       }
     },
@@ -289,8 +291,8 @@ export default {
 
       if (this.game && this.game.player) {
         return {
-          x: this.game.player.x - snapshot.center.x + local.x,
-          y: this.game.player.y - snapshot.center.y + local.y,
+          x: Math.round(this.game.player.x) - snapshot.center.x + local.x,
+          y: Math.round(this.game.player.y) - snapshot.center.y + local.y,
         };
       }
 

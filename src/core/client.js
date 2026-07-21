@@ -19,20 +19,16 @@ import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '@shared/combat.js';
 import { getSkillExecutionProfile } from '@shared/skills/index.js';
 import { createCharacterState, syncShortcuts } from '@shared/stats/index.js';
-import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
+import {
+  PLAYER_MOVE_SAMPLE_MS,
+  directionVector,
+  occupiedTile,
+  playerMovementDelta,
+  roundPosition,
+} from '@shared/movement.js';
+import { now } from './config/movement.js';
 
 import Map from './map.js';
-
-const directionDeltas = {
-  right: { x: 1, y: 0 },
-  left: { x: -1, y: 0 },
-  up: { x: 0, y: -1 },
-  down: { x: 0, y: 1 },
-  'up-right': { x: 1, y: -1 },
-  'down-right': { x: 1, y: 1 },
-  'up-left': { x: -1, y: -1 },
-  'down-left': { x: -1, y: 1 },
-};
 
 const resolveFacingDirection = (direction, fallback = DEFAULT_FACING_DIRECTION) => {
   if (!direction) {
@@ -52,19 +48,6 @@ const resolveFacingDirection = (direction, fallback = DEFAULT_FACING_DIRECTION) 
   }
 
   return fallback;
-};
-
-const computeDurationFromDelta = (deltaX, deltaY) => {
-  const absX = Math.abs(deltaX);
-  const absY = Math.abs(deltaY);
-
-  if (absX === 0 && absY === 0) {
-    return 0;
-  }
-
-  const diagonal = absX === 1 && absY === 1;
-  const multiplier = diagonal ? Math.SQRT2 : 1;
-  return Math.round(DEFAULT_MOVE_DURATION_MS * multiplier);
 };
 
 class Client {
@@ -452,8 +435,20 @@ class Client {
     this.applyOptimisticMovement(direction);
   }
 
+  stopMoving() {
+    if (!this.player) {
+      return;
+    }
+
+    Socket.emit('player:move', {
+      id: this.player.uuid,
+      stopped: true,
+    });
+    this.setLocalIdle();
+  }
+
   findLivingMonsterAtStep(direction) {
-    const delta = directionDeltas[direction];
+    const delta = directionVector(direction);
     const actor = this.getOptimisticActor();
     if (!delta || !actor || !Array.isArray(this.monsters)) {
       return null;
@@ -463,8 +458,9 @@ class Client {
       ? actor.optimisticQueue[actor.optimisticQueue.length - 1]
       : actor.optimisticPosition || { x: actor.x, y: actor.y };
 
-    const targetX = (typeof basePosition.x === 'number' ? basePosition.x : actor.x) + delta.x;
-    const targetY = (typeof basePosition.y === 'number' ? basePosition.y : actor.y) + delta.y;
+    const baseTile = occupiedTile(basePosition);
+    const targetX = baseTile.x + delta.x;
+    const targetY = baseTile.y + delta.y;
 
     return this.monsters.find((monster) => {
       // Monsters glide at float positions; they occupy the tile they round
@@ -485,7 +481,7 @@ class Client {
   }
 
   applyOptimisticMovement(direction) {
-    const delta = directionDeltas[direction];
+    const delta = playerMovementDelta(direction);
     if (!delta) {
       return;
     }
@@ -513,8 +509,8 @@ class Client {
     const baseX = typeof basePosition.x === 'number' ? basePosition.x : actor.x;
     const baseY = typeof basePosition.y === 'number' ? basePosition.y : actor.y;
 
-    const targetX = baseX + delta.x;
-    const targetY = baseY + delta.y;
+    const targetX = roundPosition(baseX + delta.x);
+    const targetY = roundPosition(baseY + delta.y);
 
     const facing = this.resolveFacing(direction, this.getFacingDirection(actor));
 
@@ -522,7 +518,7 @@ class Client {
       x: targetX,
       y: targetY,
       direction,
-      duration: computeDurationFromDelta(delta.x, delta.y),
+      duration: PLAYER_MOVE_SAMPLE_MS,
       issuedAt: now(),
       started: false,
     };

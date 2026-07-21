@@ -38,6 +38,7 @@ import playerPersistence from '#server/core/services/player-persistence.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 import wagonService, { wagonNpcId } from '#server/core/services/wagon-service.js';
 import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const sendInventoryError = (player, text) => {
   if (!player || !player.socket_id) {
@@ -90,7 +91,8 @@ const getReachableShopDisplay = (player, reference = {}) => {
     && item.id === reference.shopItemId
   ));
   if (!player || !display) return null;
-  return Math.max(Math.abs(player.x - display.x), Math.abs(player.y - display.y)) <= 1
+  const playerTile = occupiedTile(player);
+  return Math.max(Math.abs(playerTile.x - display.x), Math.abs(playerTile.y - display.y)) <= 1
     ? display
     : null;
 };
@@ -113,16 +115,17 @@ const isShopReachable = (player, shopNpcId) => {
   if (!scene) {
     return false;
   }
+  const playerTile = occupiedTile(player);
   const nearKeeper = (scene.npcs || []).some(npc => npc
     && npc.id === shopNpcId
-    && chebyshevWithin(player.x, player.y, npc.x, npc.y, SHOPKEEPER_REACH));
+    && chebyshevWithin(playerTile.x, playerTile.y, npc.x, npc.y, SHOPKEEPER_REACH));
   if (nearKeeper) {
     return true;
   }
   return (scene.items || []).some(item => item
     && item.shopDisplay
     && item.shopNpcId === shopNpcId
-    && chebyshevWithin(player.x, player.y, item.x, item.y, 1));
+    && chebyshevWithin(playerTile.x, playerTile.y, item.x, item.y, 1));
 };
 
 // The countinghouse banker is NPC id 4 in a town scene, within one tile -
@@ -133,7 +136,8 @@ const isBankerReachable = (player) => {
     return false;
   }
   const banker = (scene.npcs || []).find(npc => npc && npc.id === 4);
-  return Boolean(banker) && chebyshevWithin(player.x, player.y, banker.x, banker.y, 1);
+  const playerTile = occupiedTile(player);
+  return Boolean(banker) && chebyshevWithin(playerTile.x, playerTile.y, banker.x, banker.y, 1);
 };
 
 // The context-menu protocol is echo-based: the client sends back the menu
@@ -447,6 +451,7 @@ const actionEvents = {
     }
 
     const player = world.players[playerIndexMoveTo];
+    const playerTile = occupiedTile(player);
 
     // A dead player must not queue click-to-move; otherwise the path set while
     // awaiting respawn walks the character across the map once they revive.
@@ -493,15 +498,15 @@ const actionEvents = {
       && typeof providedWorld.y === 'number')
       ? providedWorld
       : {
-        x: player.x - baseCenter.x + localX,
-        y: player.y - baseCenter.y + localY,
+        x: playerTile.x - baseCenter.x + localX,
+        y: playerTile.y - baseCenter.y + localY,
       };
 
     const offsets = {
-      left: Math.max(0, player.x - targetWorld.x),
-      right: Math.max(0, targetWorld.x - player.x),
-      up: Math.max(0, player.y - targetWorld.y),
-      down: Math.max(0, targetWorld.y - player.y),
+      left: Math.max(0, playerTile.x - targetWorld.x),
+      right: Math.max(0, targetWorld.x - playerTile.x),
+      up: Math.max(0, playerTile.y - targetWorld.y),
+      down: Math.max(0, targetWorld.y - playerTile.y),
     };
 
     const desiredCenter = {
@@ -522,11 +527,11 @@ const actionEvents = {
     const clampCoordinate = (value, max) => Math.max(0, Math.min(value, max));
     const relativeTarget = {
       x: clampCoordinate(
-        targetWorld.x - (player.x - matrix.center.x),
+        targetWorld.x - (playerTile.x - matrix.center.x),
         matrix.viewport.x,
       ),
       y: clampCoordinate(
-        targetWorld.y - (player.y - matrix.center.y),
+        targetWorld.y - (playerTile.y - matrix.center.y),
         matrix.viewport.y,
       ),
     };
@@ -574,7 +579,11 @@ const actionEvents = {
     const player = getPlayerFromPayload(data);
     const scene = player && getPlayerScene(player);
     const npc = scene?.npcs?.find(entry => entry.id === data.item?.id);
-    const nearby = npc && Math.max(Math.abs(player.x - npc.x), Math.abs(player.y - npc.y)) <= 1;
+    const playerTile = player ? occupiedTile(player) : null;
+    const nearby = npc && Math.max(
+      Math.abs(playerTile.x - npc.x),
+      Math.abs(playerTile.y - npc.y),
+    ) <= 1;
     if (!player || scene?.type !== 'town' || !npc || npc.id !== 1 || !nearby) return;
     talkToAldwyn(player);
   },
@@ -1161,9 +1170,10 @@ const actionEvents = {
       return;
     }
 
+    const playerTile = occupiedTile(player);
     const withinReach = Math.max(
-      Math.abs(player.x - worldItem.x),
-      Math.abs(player.y - worldItem.y),
+      Math.abs(playerTile.x - worldItem.x),
+      Math.abs(playerTile.y - worldItem.y),
     ) <= 1;
     if (!withinReach) {
       sendInventoryError(player, 'That item is too far away.');
@@ -1207,12 +1217,13 @@ const actionEvents = {
     const sceneItems = getSceneItems(scene);
 
     // Own tile first, then the four cardinal neighbours.
+    const playerTile = occupiedTile(player);
     const spots = [
-      { x: player.x, y: player.y },
-      { x: player.x + 1, y: player.y },
-      { x: player.x - 1, y: player.y },
-      { x: player.x, y: player.y + 1 },
-      { x: player.x, y: player.y - 1 },
+      playerTile,
+      { x: playerTile.x + 1, y: playerTile.y },
+      { x: playerTile.x - 1, y: playerTile.y },
+      { x: playerTile.x, y: playerTile.y + 1 },
+      { x: playerTile.x, y: playerTile.y - 1 },
     ];
     let itemIndex = -1;
     for (const spot of spots) {
@@ -1257,9 +1268,10 @@ const actionEvents = {
     const scene = player ? getPlayerScene(player) : null;
     if (!player || scene?.type !== 'town') return;
 
+    const playerTile = occupiedTile(player);
     const distance = Math.max(
-      Math.abs(player.x - MAIN_TOWN_FOUNTAIN.x),
-      Math.abs(player.y - MAIN_TOWN_FOUNTAIN.y),
+      Math.abs(playerTile.x - MAIN_TOWN_FOUNTAIN.x),
+      Math.abs(playerTile.y - MAIN_TOWN_FOUNTAIN.y),
     );
     if (distance > 1) return;
 
@@ -1468,9 +1480,10 @@ const actionEvents = {
     const scene = getPlayerScene(player);
     const reference = data.data?.item || data.item || {};
     const wagon = scene?.npcs?.find(npc => npc.id === reference.id && String(npc.id).startsWith('wagon-'));
+    const playerTile = occupiedTile(player);
     const nearby = wagon && Math.max(
-      Math.abs(player.x - wagon.x),
-      Math.abs(player.y - wagon.y),
+      Math.abs(playerTile.x - wagon.x),
+      Math.abs(playerTile.y - wagon.y),
     ) <= 2;
     if (scene?.type !== 'town' || !wagon || !nearby) return;
 
@@ -1491,9 +1504,10 @@ const actionEvents = {
     const scene = player ? getPlayerScene(player) : null;
     const reference = data.data?.item || data.item || {};
     const banker = scene?.npcs?.find(npc => npc.id === reference.id && npc.id === 4);
+    const playerTile = player ? occupiedTile(player) : null;
     const nearby = banker && Math.max(
-      Math.abs(player.x - banker.x),
-      Math.abs(player.y - banker.y),
+      Math.abs(playerTile.x - banker.x),
+      Math.abs(playerTile.y - banker.y),
     ) <= 1;
     if (!player || scene?.type !== 'town' || !banker || !nearby) return;
     player.currentPane = 'bank';

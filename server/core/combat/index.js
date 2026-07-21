@@ -6,6 +6,7 @@ import Monster from '#server/core/monster.js';
 import Player from '#server/core/player.js';
 import { getSkillExecutionProfile } from '#shared/skills/index.js';
 import { DEFAULT_SKILL_IDS } from '#shared/combat.js';
+import { occupiedTile } from '#shared/movement.js';
 import { directionDelta } from '#server/core/entities/player/movement-handler.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
@@ -68,13 +69,14 @@ export const getMeleeArcTiles = (player, direction) => {
     return [];
   }
 
-  const front = { x: player.x + delta.x, y: player.y + delta.y };
+  const origin = occupiedTile(player);
+  const front = { x: origin.x + delta.x, y: origin.y + delta.y };
   const tiles = [front];
 
   if (delta.x !== 0 && delta.y !== 0) {
     // Diagonal swing covers the two cardinal neighbours of the front tile
-    tiles.push({ x: player.x + delta.x, y: player.y });
-    tiles.push({ x: player.x, y: player.y + delta.y });
+    tiles.push({ x: origin.x + delta.x, y: origin.y });
+    tiles.push({ x: origin.x, y: origin.y + delta.y });
   } else if (delta.x !== 0) {
     tiles.push({ x: front.x, y: front.y - 1 });
     tiles.push({ x: front.x, y: front.y + 1 });
@@ -116,8 +118,8 @@ const directionToward = (from, to, fallback = 'down') => {
     return fallback;
   }
 
-  const dx = Math.max(-1, Math.min(1, (to.x || 0) - (from.x || 0)));
-  const dy = Math.max(-1, Math.min(1, (to.y || 0) - (from.y || 0)));
+  const dx = Math.sign((to.x || 0) - (from.x || 0));
+  const dy = Math.sign((to.y || 0) - (from.y || 0));
   const key = `${dx}:${dy}`;
   const directions = {
     '1:0': 'right',
@@ -163,16 +165,17 @@ const canMoveToTile = (player, x, y) => {
 };
 
 const canDashStep = (player, delta) => {
-  const targetX = player.x + delta.x;
-  const targetY = player.y + delta.y;
+  const origin = occupiedTile(player);
+  const targetX = origin.x + delta.x;
+  const targetY = origin.y + delta.y;
 
   if (!canMoveToTile(player, targetX, targetY)) {
     return false;
   }
 
   if (delta.x !== 0 && delta.y !== 0) {
-    const horizontalOpen = canMoveToTile(player, player.x + delta.x, player.y);
-    const verticalOpen = canMoveToTile(player, player.x, player.y + delta.y);
+    const horizontalOpen = canMoveToTile(player, origin.x + delta.x, origin.y);
+    const verticalOpen = canMoveToTile(player, origin.x, origin.y + delta.y);
     if (!horizontalOpen && !verticalOpen) {
       return false;
     }
@@ -221,8 +224,9 @@ export const findStepTarget = (player, direction) => {
     return null;
   }
 
-  const targetX = player.x + delta.x;
-  const targetY = player.y + delta.y;
+  const origin = occupiedTile(player);
+  const targetX = origin.x + delta.x;
+  const targetY = origin.y + delta.y;
   return getAliveSceneMonsters(player.sceneId)
     .find(monster => monsterTileX(monster) === targetX && monsterTileY(monster) === targetY) || null;
 };
@@ -255,10 +259,11 @@ export const findProjectileCollision = (player, direction, range = DEFAULT_PROJE
   const map = scene && scene.map ? scene.map : world.map;
   const monsters = getAliveSceneMonsters(player.sceneId);
   const distance = Math.max(1, Math.floor(range));
+  const origin = occupiedTile(player);
 
   for (let step = 1; step <= distance; step += 1) {
-    const x = player.x + (delta.x * step);
-    const y = player.y + (delta.y * step);
+    const x = origin.x + (delta.x * step);
+    const y = origin.y + (delta.y * step);
     const trace = traceProjectilePath(map, player, { x, y });
 
     if (!trace.clear) {
@@ -274,8 +279,8 @@ export const findProjectileCollision = (player, direction, range = DEFAULT_PROJE
   return {
     target: null,
     impact: {
-      x: player.x + (delta.x * distance),
-      y: player.y + (delta.y * distance),
+      x: origin.x + (delta.x * distance),
+      y: origin.y + (delta.y * distance),
     },
     blocked: false,
   };
@@ -480,8 +485,9 @@ const applyMovementEffect = (player, skill, profile, payload, now, outcome) => {
     if (!canDashStep(player, delta)) {
       break;
     }
-    player.x += delta.x;
-    player.y += delta.y;
+    const origin = occupiedTile(player);
+    player.x = origin.x + delta.x;
+    player.y = origin.y + delta.y;
     path.push({ x: player.x, y: player.y });
   }
 

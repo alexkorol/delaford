@@ -325,7 +325,7 @@ class Delaford {
     ws.authenticated = false;
 
     // Per-connection rate limiting: latency-critical gameplay input gets its
-    // own bucket so held-key movement (~9 msg/s) plus skills can NEVER be
+    // own bucket so held-key movement (~20 msg/s) plus skills can NEVER be
     // starved by chatty UI traffic (hover context-menu builds were draining
     // the shared bucket and eating player:move — felt like random input loss).
     const CRITICAL_EVENTS = new Set(['player:move', 'player:skill:trigger', 'player:take:underfoot']);

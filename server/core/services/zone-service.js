@@ -20,6 +20,7 @@ import Monster from '#server/core/monster.js';
 import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
 import { buildScenePayload } from '#server/core/world-transitions.js';
 import { dungeonGid } from '#shared/dungeon-tiles.js';
+import { occupiedTile } from '#shared/movement.js';
 import {
   buildChart,
   getNode,
@@ -335,15 +336,16 @@ class ZoneService {
 
       players.forEach((player) => {
         if (!player || this.transitioning.has(player.uuid)) return;
+        const playerTile = occupiedTile(player);
 
         const entry = metadata.entryGate;
-        if (entry && player.x === entry.x && player.y === entry.y) {
+        if (entry && playerTile.x === entry.x && playerTile.y === entry.y) {
           this.returnToCrossroads(player);
           return;
         }
 
         const gate = (metadata.zoneGates || [])
-          .find(candidate => candidate.x === player.x && candidate.y === player.y);
+          .find(candidate => candidate.x === playerTile.x && candidate.y === playerTile.y);
         if (!gate) return;
 
         const wardenHolds = !metadata.wardenDead

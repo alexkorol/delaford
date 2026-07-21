@@ -4,8 +4,8 @@ class Engine {
   constructor(game) {
     this.game = game;
 
-    // A 150ms player step only received three frames at 20fps, which made the
-    // locally-predicted actor read as tile-locked beside smoothly moving AI.
+    // Continuous player samples are short; 60fps keeps local prediction and
+    // authoritative corrections visually fluid beside smoothly moving AI.
     this.maxFps = 60;
     this.fps = {
       current: 0,

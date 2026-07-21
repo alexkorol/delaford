@@ -76,7 +76,10 @@ class UI {
       y: Math.floor(viewport.y / 2),
     };
 
-    const tile = (((mouseY + (playerY - center.y)) * map.size.x) + mouseX) + (playerX - center.x);
+    const playerTileX = Math.round(playerX);
+    const playerTileY = Math.round(playerY);
+    const tile = (((mouseY + (playerTileY - center.y)) * map.size.x) + mouseX)
+      + (playerTileX - center.x);
 
     if (board !== undefined) {
       // Zero-based global tile id (gid - 1), regardless of layer.

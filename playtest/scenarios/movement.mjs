@@ -8,6 +8,13 @@ export default async function movement({ connect, assert }) {
   try {
     const start = await p.state();
 
+    p.step('down');
+    const afterSample = await p.waitFor(async () => {
+      const state = await p.state();
+      return state.y > start.y ? state : false;
+    }, { label: 'continuous movement sample' });
+    assert(!Number.isInteger(afterSample.y), `stopped between tiles (${afterSample.y})`);
+
     await p.move('down', 3);
     const afterDown = await p.state();
     assert(afterDown.y > start.y, `moved down (${start.y} -> ${afterDown.y})`);

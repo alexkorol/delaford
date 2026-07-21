@@ -59,6 +59,7 @@ const createPlayer = (overrides = {}) => ({
   animation: { state: 'idle' },
   stats: { resources: { health: { current: 10, max: 10 }, mana: { current: 10, max: 10 } } },
   move: vi.fn(),
+  stopMovement: vi.fn(),
   recordSkillInput: vi.fn(() => true),
   ...overrides,
 });
@@ -102,6 +103,18 @@ describe('socket event authorization', () => {
     expect(alice.move).not.toHaveBeenCalled();
     expect(bob.move).not.toHaveBeenCalled();
     expect(Player.broadcastMovement).not.toHaveBeenCalled();
+  });
+
+  it('stops held movement for the socket-bound player', () => {
+    socketEvents['player:move'](
+      { data: { id: 'player-a', stopped: true } },
+      { id: 'socket-a' },
+    );
+
+    expect(alice.stopMovement).toHaveBeenCalledWith({
+      player: { socket_id: 'socket-a' },
+    });
+    expect(alice.move).not.toHaveBeenCalled();
   });
 
   it('uses the socket-bound player as the chat speaker instead of the client-supplied id', () => {

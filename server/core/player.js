@@ -236,10 +236,10 @@ class Player {
   }
 
   /**
-   * Move the player in a direction per a tile
+   * Move the player continuously in a direction (or one tile for pathfinding).
    *
    * @param {string} direction The direction which the player is moving
-   * @param {boolean} pathfind Whether pathfinding is being used to move player
+   * @param {object} options Movement timing and pathfinding metadata
    */
   move(direction, options = {}) {
     return this.movement.move(direction, options);

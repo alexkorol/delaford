@@ -8,6 +8,7 @@ import chroniclesRepository from '#server/core/repositories/chronicles-repositor
 import playerPersistence from '#server/core/services/player-persistence.js';
 import wagonService, { wagonNpcId, OUTFIT_TIERS } from '#server/core/services/wagon-service.js';
 import world from '#server/core/world.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const getPlayerBySocket = ws => world.players.find(player => player.socket_id === ws.id);
 
@@ -21,7 +22,8 @@ const nearOwnWagon = (player) => {
   if (!scene || scene.type !== 'town') return false;
   const npc = (scene.npcs || []).find(entry => entry.id === wagonNpcId(player.houseId));
   if (!npc) return false;
-  return Math.max(Math.abs(player.x - npc.x), Math.abs(player.y - npc.y)) <= 2;
+  const playerTile = occupiedTile(player);
+  return Math.max(Math.abs(playerTile.x - npc.x), Math.abs(playerTile.y - npc.y)) <= 2;
 };
 
 // NOTE: the context-menu action 'player:screen:wagon' lives in

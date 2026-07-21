@@ -1610,7 +1610,8 @@ class Map {
    * @param {object} player The player asking
    */
   static getMatrix(player, options = {}) {
-    const { x, y } = player;
+    const x = Math.round(player.x);
+    const y = Math.round(player.y);
     const { size } = config.map;
     const defaultViewport = player.path && player.path.viewport
       ? player.path.viewport
@@ -1622,14 +1623,14 @@ class Map {
         x: Math.max(
           0,
           Math.min(
-            typeof requestedViewport.x === 'number' ? requestedViewport.x : defaultViewport.x,
+            Math.round(typeof requestedViewport.x === 'number' ? requestedViewport.x : defaultViewport.x),
             size.x - 1,
           ),
         ),
         y: Math.max(
           0,
           Math.min(
-            typeof requestedViewport.y === 'number' ? requestedViewport.y : defaultViewport.y,
+            Math.round(typeof requestedViewport.y === 'number' ? requestedViewport.y : defaultViewport.y),
             size.y - 1,
           ),
         ),
@@ -1638,10 +1639,10 @@ class Map {
       const requestedCenter = options.center || null;
       const center = {
         x: requestedCenter && typeof requestedCenter.x === 'number'
-          ? requestedCenter.x
+          ? Math.round(requestedCenter.x)
           : Math.floor(viewport.x / 2),
         y: requestedCenter && typeof requestedCenter.y === 'number'
-          ? requestedCenter.y
+          ? Math.round(requestedCenter.y)
           : Math.floor(viewport.y / 2),
       };
 

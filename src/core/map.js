@@ -122,12 +122,14 @@ class Map {
 
   getViewportMetrics() {
     const { viewport, tileset } = this.config.map;
+    const playerTileX = Math.round(this.player.x);
+    const playerTileY = Math.round(this.player.y);
     return {
       viewport,
       tileSize: tileset.tile.width,
       tileCrop: {
-        x: this.player.x - Math.floor(0.5 * viewport.x),
-        y: this.player.y - Math.floor(0.5 * viewport.y),
+        x: playerTileX - Math.floor(0.5 * viewport.x),
+        y: playerTileY - Math.floor(0.5 * viewport.y),
       },
     };
   }
@@ -168,7 +170,11 @@ class Map {
 
     if (this.player && this.player.movement) {
       const renderPosition = this.player.movement.update({ deltaSeconds });
-      const tileCenter = centerOfTile(this.player.x, this.player.y, tileSize);
+      const tileCenter = centerOfTile(
+        Math.round(this.player.x),
+        Math.round(this.player.y),
+        tileSize,
+      );
 
       const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
       const offsetX = clamp(renderPosition.x - tileCenter.x, -tileSize, tileSize);

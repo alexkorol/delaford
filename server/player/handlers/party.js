@@ -10,6 +10,7 @@ import {
   notifyFirstGoalFloorCleared,
   notifyFirstGoalReturned,
 } from '#server/core/first-goal.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -573,13 +574,14 @@ class PartyService {
           return;
         }
 
-        if (stairsDown && player.x === stairsDown.x && player.y === stairsDown.y) {
+        const playerTile = occupiedTile(player);
+        if (stairsDown && playerTile.x === stairsDown.x && playerTile.y === stairsDown.y) {
           triggered = true;
           this.transitionFloor(party, depth + 1);
           return;
         }
 
-        if (stairsUp && player.x === stairsUp.x && player.y === stairsUp.y) {
+        if (stairsUp && playerTile.x === stairsUp.x && playerTile.y === stairsUp.y) {
           triggered = true;
           if (depth <= 1) {
             this.sendMessageToParty(party, 'The party returns to the surface.');
