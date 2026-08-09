@@ -3,6 +3,7 @@ import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import playerEvent from '#server/player/handlers/actions/index.js';
+import { isAllowedActionId } from '#server/core/data/action-list.js';
 import world from '#server/core/world.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 import {
@@ -362,6 +363,21 @@ const move = (player, direction, options = {}) => {
   return true;
 };
 
+// Queued actions carry a client-supplied actionId; dispatch only catalogue
+// actions and drop anything else before it reaches a handler.
+const runQueuedAction = (player, playerIndex, todo) => {
+  const actionId = todo && todo.action ? todo.action.actionId : null;
+  if (!isAllowedActionId(actionId) || typeof playerEvent[actionId] !== 'function') {
+    console.warn(`[queue] Dropped queued action with unknown actionId "${actionId}" for ${player.username || player.uuid}.`);
+    return;
+  }
+
+  playerEvent[actionId]({
+    todo,
+    playerIndex,
+  });
+};
+
 const walkPath = (player, playerIndex) => {
   const { path } = player;
   const baseSpeed = BASE_MOVE_DURATION;
@@ -374,10 +390,7 @@ const walkPath = (player, playerIndex) => {
     if (!queueEmpty(playerIndex)) {
       const todo = world.players[playerIndex].queue[0];
 
-      playerEvent[todo.action.actionId]({
-        todo,
-        playerIndex,
-      });
+      runQueuedAction(player, playerIndex, todo);
 
       player.queue.shift();
     }
@@ -399,10 +412,7 @@ const walkPath = (player, playerIndex) => {
       if (!queueEmpty(playerIndex)) {
         const todo = world.players[playerIndex].queue[0];
 
-        playerEvent[todo.action.actionId]({
-          todo,
-          playerIndex,
-        });
+        runQueuedAction(player, playerIndex, todo);
 
         player.queue.shift();
       }

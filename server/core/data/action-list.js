@@ -1,4 +1,4 @@
-export default [
+const actionList = [
   {
     name: 'Walk here',
     actionId: 'player:walk-here',
@@ -170,3 +170,18 @@ export default [
     onPane: ['shop'],
   },
 ];
+
+/**
+ * The complete set of actionIds the server will ever dispatch from a client
+ * message. Anything off this list is rejected: context-menu actions and queued
+ * actions carry a client-supplied actionId, and without this whitelist a
+ * crafted client could invoke ANY actionEvents handler directly (including
+ * debug-style handlers such as the golden plaque).
+ */
+export const ALLOWED_ACTION_IDS = new Set(actionList.map(action => action.actionId));
+
+export const isAllowedActionId = actionId => (
+  typeof actionId === 'string' && ALLOWED_ACTION_IDS.has(actionId)
+);
+
+export default actionList;

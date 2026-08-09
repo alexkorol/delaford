@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 import identityRegistry from './identity-registry.js';
 
 const DEFAULT_CACHE_TTL = Number(process.env.NAME_VALIDATION_CACHE_TTL || 1000 * 60 * 15);
+const JOB_TTL_MS = Number(process.env.NAME_VALIDATION_JOB_TTL_MS || 1000 * 60 * 60);
+const MAX_JOBS = Number(process.env.NAME_VALIDATION_MAX_JOBS || 1000);
 const MAX_NAME_LENGTH = Number(process.env.NAME_VALIDATION_MAX_LENGTH || 24);
 const MIN_NAME_LENGTH = Number(process.env.NAME_VALIDATION_MIN_LENGTH || 3);
 const PROVIDER = process.env.NAME_VALIDATION_PROVIDER || 'local';
@@ -64,7 +66,31 @@ class NameValidationService {
     });
   }
 
+  // Jobs used to live forever: every POST allocated a permanent Map entry.
+  // Prune expired jobs (and oldest-first when over the cap) on each insert so
+  // the endpoint cannot be used as a memory-exhaustion vector.
+  pruneJobs() {
+    const now = Date.now();
+    for (const [id, job] of this.jobs) {
+      const age = now - new Date(job.requestedAt).getTime();
+      if (age > JOB_TTL_MS) {
+        this.jobs.delete(id);
+      }
+    }
+
+    if (this.jobs.size > MAX_JOBS) {
+      const overflow = this.jobs.size - MAX_JOBS;
+      const oldestFirst = [...this.jobs.entries()]
+        .sort((a, b) => new Date(a[1].requestedAt) - new Date(b[1].requestedAt));
+      for (let i = 0; i < overflow; i += 1) {
+        this.jobs.delete(oldestFirst[i][0]);
+      }
+    }
+  }
+
   createJob({ name, accountId }) {
+    this.pruneJobs();
+
     const normalizedName = this.normalizeName(name);
     const cacheKey = normalizedName.toLowerCase();
     const cached = this.getCacheEntry(cacheKey);

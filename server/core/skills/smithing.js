@@ -60,7 +60,30 @@ export default class Smithing extends Skill {
   }
 
   forge(inventory) {
+    if (!this.resourceId || !this.resourceId.id) {
+      Socket.sendMessageToPlayer(this.playerIndex, 'There is nothing to forge.');
+      return false;
+    }
+
     const itemToForge = Smithing.getItemsToSmith(this.resourceId.id).find(item => this.resourceId.id === item.id);
+    if (!itemToForge) {
+      Socket.sendMessageToPlayer(this.playerIndex, 'You cannot smith that item.');
+      return false;
+    }
+
+    // Enforce the level requirement server-side — the pane lists every bronze
+    // recipe, and a crafted client could otherwise forge gear above its level.
+    const smithingLevel = this.player.skills && this.player.skills.smithing
+      ? this.player.skills.smithing.level
+      : 1;
+    if (smithingLevel < itemToForge.level) {
+      Socket.sendMessageToPlayer(
+        this.playerIndex,
+        `You need a smithing level of ${itemToForge.level} to forge that.`,
+      );
+      return false;
+    }
+
     const barToTakeAway = itemToForge.item.split('-')[0];
 
     const inventoryHasThisManyBars = inventory.filter(inv => inv.id === `${barToTakeAway}-bar`).length;
@@ -101,6 +124,10 @@ export default class Smithing extends Skill {
 
   smelt(inventory) {
     const barToSmelt = Smithing.ores()[this.resourceId];
+    if (!barToSmelt) {
+      Socket.sendMessageToPlayer(this.playerIndex, 'You cannot smelt that.');
+      return Promise.resolve(null);
+    }
 
     const hasEnoughOre = () => {
       for (const ore of Object.keys(barToSmelt.requires)) {

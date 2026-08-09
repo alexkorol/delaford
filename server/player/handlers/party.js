@@ -7,6 +7,23 @@ import { awardSkillExperience } from '#server/core/combat/experience.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
+const INSTANCE_START_COOLDOWN_MS = Number(process.env.INSTANCE_START_COOLDOWN_MS) || 3000;
+
+// Instance generation is the most expensive thing a client can request (full
+// dungeon map + monsters). Enforce a per-player cooldown at the untrusted
+// socket boundary so a crafted or double-clicking client cannot burn the CPU
+// with regeneration spam. Internal flows (floor transitions, stale-party
+// self-heal) stay uncooled.
+const instanceStartTimestamps = new Map();
+const isInstanceStartThrottled = (playerUuid) => {
+  const now = Date.now();
+  const last = instanceStartTimestamps.get(playerUuid) || 0;
+  if (now - last < INSTANCE_START_COOLDOWN_MS) {
+    return true;
+  }
+  instanceStartTimestamps.set(playerUuid, now);
+  return false;
+};
 
 // Where a player lands when leaving an instance with no recorded entry point
 // (e.g. they joined the party mid-instance). Matches the town login spawn.
@@ -971,6 +988,11 @@ const PartyHandlers = {
       return;
     }
 
+    if (isInstanceStartThrottled(player.uuid)) {
+      partyService.sendError(player, 'The way is not yet open. Give it a moment.');
+      return;
+    }
+
     await partyService.startInstance(party, player);
   },
   'party:returnToTown': (_payload, ws) => {
@@ -994,6 +1016,11 @@ const PartyHandlers = {
   'instance:enterSolo': async (message, ws) => {
     const player = getPlayerBySocket(ws.id);
     if (!player) {
+      return;
+    }
+
+    if (isInstanceStartThrottled(player.uuid)) {
+      partyService.sendError(player, 'The way is not yet open. Give it a moment.');
       return;
     }
 

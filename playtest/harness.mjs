@@ -111,6 +111,10 @@ export class HeadlessPlayer {
       case 'player:session-replaced':
         this.sessionReplaced = true;
         break;
+      case 'party:error':
+        this.partyErrors = this.partyErrors || [];
+        this.partyErrors.push(data && data.error && data.error.message ? data.error.message : '');
+        break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
         if (resolver) {
@@ -203,14 +207,36 @@ export class HeadlessPlayer {
 
   /** Enter a solo Adventure zone (template + optional layout). */
   async enterZone(template, layout = null, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-    // Instance -> instance keeps the same scene id (same party), so wait on
-    // the transition event, not on the id changing.
-    const transitionsBefore = this.sceneTransitions || 0;
-    this.emit('instance:enterSolo', { template, layout });
-    await this.waitFor(() => (this.sceneTransitions || 0) > transitionsBefore, {
-      timeoutMs,
-      label: `zone transition to ${template}`,
-    });
+    // The server throttles instance starts per player (anti-spam). If we hit
+    // the cooldown, wait it out and retry instead of failing the scenario.
+    const maxAttempts = 4;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      // Instance -> instance keeps the same scene id (same party), so wait on
+      // the transition event, not on the id changing.
+      const transitionsBefore = this.sceneTransitions || 0;
+      const errorsBefore = (this.partyErrors || []).length;
+      this.emit('instance:enterSolo', { template, layout });
+      await this.waitFor(() => (
+        (this.sceneTransitions || 0) > transitionsBefore
+        || (this.partyErrors || []).length > errorsBefore
+      ), {
+        timeoutMs,
+        label: `zone transition to ${template}`,
+      });
+
+      if ((this.sceneTransitions || 0) > transitionsBefore) {
+        return this.scene;
+      }
+
+      const latestError = (this.partyErrors || [])[errorsBefore] || '';
+      if (/not yet open/i.test(latestError) && attempt < maxAttempts) {
+        await sleep(3200); // ride out the server's instance-start cooldown
+        continue;
+      }
+
+      throw new Error(`enterZone(${template}/${layout}) rejected: ${latestError || 'unknown error'}`);
+    }
+
     return this.scene;
   }
 

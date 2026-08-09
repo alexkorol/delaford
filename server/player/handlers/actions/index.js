@@ -63,6 +63,26 @@ const getPlayerFromPayload = (incoming) => {
   ));
 };
 
+/**
+ * Chebyshev distance guard for world interactions. Legit clients walk to a
+ * target before the queued action fires, so the player is always adjacent;
+ * anything beyond this margin is a crafted packet (e.g. remote-looting or
+ * remote-mining from across the map).
+ */
+const ACTION_REACH_TILES = 10;
+const isWithinReach = (player, coords, reach = ACTION_REACH_TILES) => {
+  if (!player || !coords || !Number.isFinite(coords.x) || !Number.isFinite(coords.y)) {
+    return false;
+  }
+
+  return Math.max(Math.abs(player.x - coords.x), Math.abs(player.y - coords.y)) <= reach;
+};
+
+// Golden plaque shrine: one free item per player per minute.
+// NB: `Map` here is the imported game-map class — use globalThis.Map.
+const GOLDEN_PLAQUE_COOLDOWN_MS = 60 * 1000;
+const goldenPlaqueCooldowns = new globalThis.Map();
+
 const getPlayerScene = player => (
   world.getSceneForPlayer(player) || world.getDefaultTown()
 );
@@ -684,7 +704,11 @@ const actionEvents = {
     if (playerIndex === -1) {
       return;
     }
-    const itemClickedOn = data.player.currentPaneData[data.data.miscData.slot];
+    const paneItems = Array.isArray(data.player.currentPaneData) ? data.player.currentPaneData : [];
+    const itemClickedOn = paneItems[data.data.miscData.slot];
+    if (!itemClickedOn) {
+      return;
+    }
 
     const smith = new Smithing(playerIndex, itemClickedOn, 'forge');
     const { player } = data;
@@ -700,7 +724,11 @@ const actionEvents = {
     });
   },
   'player:resource:smelt:furnace:action': async (data) => {
-    const itemClickedOn = data.player.currentPaneData[data.data.miscData.slot];
+    const paneItems = Array.isArray(data.player.currentPaneData) ? data.player.currentPaneData : [];
+    const itemClickedOn = paneItems[data.data.miscData.slot];
+    if (!itemClickedOn) {
+      return;
+    }
     const playerIndex = world.players.findIndex(
       player => player.uuid === data.player.uuid,
     );
@@ -817,6 +845,26 @@ const actionEvents = {
       return;
     }
 
+    const player = world.players[playerIndex];
+
+    // The plaque is a rare boon, not a slot machine: one push per player per
+    // minute, and only when actually standing at the shrine. Without this the
+    // handler was a free-item fountain reachable via crafted packets.
+    const now = Date.now();
+    const lastPush = goldenPlaqueCooldowns.get(player.uuid) || 0;
+    if (now - lastPush < GOLDEN_PLAQUE_COOLDOWN_MS) {
+      Socket.sendMessageToPlayer(playerIndex, 'The plaque is dormant. Its magic needs time to gather.');
+      return;
+    }
+
+    const clickedWorld = data.todo && data.todo.actionToQueue && data.todo.actionToQueue.world;
+    if (clickedWorld && !isWithinReach(player, clickedWorld)) {
+      console.warn(`[actions] goldenplaque:push rejected: ${player.username} is too far from the plaque.`);
+      return;
+    }
+
+    goldenPlaqueCooldowns.set(player.uuid, now);
+
     const { id } = UI.randomElementFromArray(wearableItems);
 
     const spawned = ItemFactory.toWorldInstance(
@@ -825,7 +873,6 @@ const actionEvents = {
       { timestamp: Date.now() },
     );
 
-    const player = world.players[playerIndex];
     const scene = getPlayerScene(player);
 
     world.addItem(spawned, scene.id);
@@ -860,6 +907,11 @@ const actionEvents = {
         player: player.username,
         payload: todo,
       });
+      return;
+    }
+
+    if (!isWithinReach(player, todo.at)) {
+      console.warn(`[actions] player:take rejected: ${player.username} is too far from (${todo.at.x}, ${todo.at.y}).`);
       return;
     }
 
@@ -1195,6 +1247,20 @@ const actionEvents = {
    * A player is going to attempt to mine a rock
    */
   'player:resource:mining:rock': async (data) => {
+    const player = world.players[data.playerIndex];
+    if (!player || !data.todo || !data.todo.item || !data.todo.actionToQueue) {
+      return;
+    }
+
+    const { onTile, world: clickedWorld } = data.todo.actionToQueue;
+
+    // Reject crafted packets: the tile index is client-supplied and must be a
+    // real in-bounds map index, and the player must actually be at the rock.
+    if (clickedWorld && !isWithinReach(player, clickedWorld)) {
+      console.warn(`[actions] mining rejected: ${player.username} is too far from the rock.`);
+      return;
+    }
+
     const mining = new Mining(data.playerIndex, data.todo.item.id);
 
     try {
@@ -1209,14 +1275,12 @@ const actionEvents = {
       // Extract resource and either add to inventory or drop it
       mining.extractResource(rockMined);
 
-      const player = world.players[data.playerIndex];
-      const activeScene = player
-        ? world.getSceneForPlayer(player)
-        : world.getDefaultTown();
+      const activeScene = world.getSceneForPlayer(player);
       const scene = activeScene || world.getDefaultTown();
       const mapLayers = scene && scene.map ? scene.map : world.map;
-      if (mapLayers && Array.isArray(mapLayers.foreground)) {
-        mapLayers.foreground[data.todo.actionToQueue.onTile] = 532;
+      if (mapLayers && Array.isArray(mapLayers.foreground)
+        && Number.isInteger(onTile) && onTile >= 0 && onTile < mapLayers.foreground.length) {
+        mapLayers.foreground[onTile] = 532;
       }
 
       // Update the experience

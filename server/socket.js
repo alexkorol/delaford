@@ -6,13 +6,53 @@ import world from '#server/core/world.js';
  * one for server and one for player???
  */
 
+// Inbound messages are tiny JSON envelopes ({event, data}); anything bigger
+// is abuse. ws defaults to 100 MiB per message, which is a memory-DoS vector
+// on a 24/7 server.
+const MAX_PAYLOAD_BYTES = Number(process.env.WS_MAX_PAYLOAD_BYTES) || 16 * 1024;
+// Reap half-open connections (NAT drops, crashed tabs) so they cannot pile up
+// on a long-running server.
+const HEARTBEAT_INTERVAL_MS = Number(process.env.WS_HEARTBEAT_INTERVAL_MS) || 30000;
+
 class Socket {
   constructor(server) {
-    this.ws = new WebSocketServer({ server });
+    this.ws = new WebSocketServer({ server, maxPayload: MAX_PAYLOAD_BYTES });
     this.clients = world.clients;
+    this.heartbeatHandle = null;
+  }
+
+  startHeartbeat() {
+    if (this.heartbeatHandle || !this.ws) {
+      return;
+    }
+
+    this.heartbeatHandle = setInterval(() => {
+      if (!this.ws) {
+        return;
+      }
+
+      for (const client of this.ws.clients) {
+        if (client.isAlive === false) {
+          client.terminate();
+          continue;
+        }
+        client.isAlive = false;
+        try {
+          client.ping();
+        } catch (error) {
+          process.stderr.write(`[socket] Failed to ping client. ${error}\n`);
+        }
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+    this.heartbeatHandle.unref();
   }
 
   close() {
+    if (this.heartbeatHandle) {
+      clearInterval(this.heartbeatHandle);
+      this.heartbeatHandle = null;
+    }
+
     if (!this.ws) {
       return;
     }

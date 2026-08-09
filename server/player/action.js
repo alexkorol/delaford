@@ -4,6 +4,7 @@ import config from '#server/config.js';
 import merge from 'lodash/merge.js';
 import socketEvents from './handlers/socket-events/index.js';
 import playerEvent from './handlers/actions/index.js';
+import { isAllowedActionId } from '#server/core/data/action-list.js';
 
 class Action {
   constructor(player, miscData) {
@@ -216,6 +217,16 @@ class Action {
 
     // No action? Do nothing. (eg: Cancel)
     if (!iminimentAction) return;
+
+    // Never dispatch a client-supplied actionId that isn't in the action
+    // catalogue — a crafted payload could otherwise reach arbitrary handlers.
+    // 'player:mouseTo' is the server's own walk-first prelude for queueable
+    // actions, not a client choice, so it is always permitted here.
+    const dispatchAllowed = iminimentAction === 'player:mouseTo' || isAllowedActionId(iminimentAction);
+    if (!dispatchAllowed || typeof playerEvent[iminimentAction] !== 'function') {
+      console.warn(`[action] Rejected unknown actionId "${iminimentAction}" from ${this.player.username || this.player.uuid}.`);
+      return;
+    }
 
     playerEvent[iminimentAction](dataObject);
   }

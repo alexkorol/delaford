@@ -6,6 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import secure from 'ssl-express-www';
+import pkg from '../package.json' with { type: 'json' };
 
 import Delaford from './Delaford.js';
 import world from './core/world.js';
@@ -90,11 +91,59 @@ const serializeJob = (job) => {
   return payload;
 };
 
+// Minimal per-IP sliding-window rate limit for the HTTP API. The WebSocket
+// layer has its own token buckets; without this, the REST endpoints (which
+// allocate jobs and touch disk) are an unbounded memory/disk sink.
+const HTTP_API_WINDOW_MS = 60 * 1000;
+const HTTP_API_MAX_REQUESTS = Number(process.env.HTTP_API_MAX_REQUESTS_PER_MINUTE) || 30;
+const httpApiHits = new Map();
+
+const httpApiRateLimit = (req, res, next) => {
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowStart = now - HTTP_API_WINDOW_MS;
+  const hits = (httpApiHits.get(key) || []).filter(ts => ts > windowStart);
+
+  if (hits.length >= HTTP_API_MAX_REQUESTS) {
+    res.set('Retry-After', '60');
+    return res.status(429).json({ message: 'Too many requests. Try again shortly.' });
+  }
+
+  hits.push(now);
+  httpApiHits.set(key, hits);
+
+  // Bound the map so a spray of spoofed IPs cannot grow it forever.
+  if (httpApiHits.size > 5000) {
+    for (const [ip, timestamps] of httpApiHits) {
+      if (!timestamps.length || timestamps[timestamps.length - 1] <= windowStart) {
+        httpApiHits.delete(ip);
+      }
+    }
+  }
+
+  return next();
+};
+
+app.use('/api', httpApiRateLimit);
+
+const MAX_NAME_BYTES = 64;
+const isValidAccountId = value => (
+  typeof value === 'string' && value.length > 0 && value.length <= 64 && /^[\w-]+$/.test(value)
+);
+
 app.post('/api/identity/name-validations', (req, res) => {
   const { name, accountId } = req.body || {};
 
   if (!name || typeof name !== 'string') {
     return res.status(400).json({ message: 'Name is required.' });
+  }
+
+  if (name.length > MAX_NAME_BYTES) {
+    return res.status(400).json({ message: `Name must be ${MAX_NAME_BYTES} characters or fewer.` });
+  }
+
+  if (accountId !== undefined && accountId !== null && !isValidAccountId(accountId)) {
+    return res.status(400).json({ message: 'Invalid account id.' });
   }
 
   const job = nameValidationService.createJob({ name, accountId });
@@ -114,6 +163,10 @@ app.get('/api/identity/name-validations/:jobId', (req, res) => {
 });
 
 app.get('/api/identity/accounts/:accountId', (req, res) => {
+  if (!isValidAccountId(req.params.accountId)) {
+    return res.status(400).json({ message: 'Invalid account id.' });
+  }
+
   const account = nameValidationService.getAccountIdentity(req.params.accountId);
 
   if (!account) {
@@ -121,6 +174,31 @@ app.get('/api/identity/accounts/:accountId', (req, res) => {
   }
 
   return res.json(account);
+});
+
+// Public server status — the community website reads this for its live
+// stats panel. Sanitized: no player positions, inventories, or tokens.
+const serverStartedAt = Date.now();
+app.get('/api/stats', (_req, res) => {
+  const instanceCount = [...world.scenes.values()].filter(scene => scene.type === 'instance').length;
+
+  res.json({
+    name: 'Verdigris',
+    version: pkg.version || null,
+    uptimeSeconds: Math.floor((Date.now() - serverStartedAt) / 1000),
+    startedAt: new Date(serverStartedAt).toISOString(),
+    playersOnline: world.players.length,
+    players: world.players.map(p => ({
+      username: p.username,
+      level: p.level,
+      scene: (world.getScene(p.sceneId) || {}).name || null,
+    })),
+    scenes: {
+      total: world.scenes.size,
+      activeInstances: instanceCount,
+    },
+    generatedAt: new Date().toISOString(),
+  });
 });
 
 // World data endpoints — only available in development for debugging.

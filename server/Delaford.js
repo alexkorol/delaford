@@ -127,6 +127,9 @@ class Delaford {
       if (typeof world.socket.ws.on === 'function') {
         world.socket.ws.on('connection', this.handleConnection);
       }
+      if (typeof world.socket.startHeartbeat === 'function') {
+        world.socket.startHeartbeat();
+      }
     }
   }
 
@@ -285,6 +288,10 @@ class Delaford {
     // Assign UUID to every connection
     ws.id = uuid();
     ws.authenticated = false;
+    ws.isAlive = true;
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
 
     // Per-connection rate limiting: latency-critical gameplay input gets its
     // own bucket so held-key movement (~9 msg/s) plus skills can NEVER be
