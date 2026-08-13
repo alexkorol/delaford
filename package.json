@@ -20,13 +20,16 @@
     "lint": "eslint .",
     "lint:css": "stylelint \"src/**/*.{scss,vue}\" --custom-syntax postcss-html --allow-empty-input",
     "start": "cross-env NODE_ENV=production node server/index.js",
+    "start:e2e": "cross-env NODE_ENV=development node --enable-source-maps server/index.js",
     "start:dev": "npm run dev",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:e2e": "start-server-and-test preview http://127.0.0.1:4173 \"playwright test\"",
+    "test:e2e": "npm run build && npm run test:e2e:built",
+    "test:e2e:built": "start-server-and-test start:e2e http://127.0.0.1:6500 \"playwright test\"",
     "format": "eslint . --fix",
-    "playtest": "node playtest/run.mjs"
+    "playtest": "node playtest/run.mjs",
+    "verify": "npm run lint && npm run lint:css && npm run test:unit && npm run build && npm run playtest && npm run test:e2e:built"
   },
   "dependencies": {
     "axios": "^1.7.7",

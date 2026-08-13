@@ -18,6 +18,13 @@ Need to focus on a single process? Use `npm run dev:client` for the Vite UI or `
 
 Make changes.
 
+Before opening a pull request, run the same release gate as CI:
+
+    npm run verify
+
+This includes lint and style checks, unit tests, a production build, the
+headless core-loop playtest, and a real Chromium smoke test.
+
 Push to your fork and [submit a pull request][pr].
 
 [pr]: https://github.com/Delaford/game/compare/

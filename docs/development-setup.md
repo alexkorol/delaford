@@ -40,7 +40,7 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
   npm run dev
   ```
   This runs the Vite dev server and the Express/WebSocket backend in parallel via `concurrently`. Both processes hot-reload on file changes.
-- Visit `http://localhost:5173` to interact with the game client. The Express API wrapper responds on `http://localhost:6500`, and the WebSocket server listens on `ws://localhost:9000`.
+- Visit `http://localhost:5173` to interact with the game client. The Express API and WebSocket game server share `http://localhost:6500`.
 - Want to debug the backend only? Use `npm run dev:server`. For client-only work use `npm run dev:client`.
 
 ## Optional environment variables
@@ -56,7 +56,9 @@ The backend now snapshots connected players in the background. Raising the inter
 ## Useful commands
 
 - `npm run test:unit` - Vitest-powered unit tests.
-- `npm run test:e2e` - Playwright smoke tests against a preview build.
+- `npm run playtest` - Boot a disposable game server and play the full core loop over the real WebSocket protocol.
+- `npm run test:e2e` - Build the client, boot the real game server, and exercise browser-critical guest play in Chromium.
+- `npm run verify` - Run lint, stylelint, unit tests, the production build, the goal harness, and the browser smoke test.
 - `npm run lint` / `npm run lint:css` - JS/Vue and stylesheet checks.
 - `npm run build` - Production client bundle.
 - `npm run preview` - Serve the production build locally for smoke testing.

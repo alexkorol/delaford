@@ -30,14 +30,17 @@ npm install
 npm run dev           # spins up Vite + the game server in parallel
 ```
 
-The Vite dev server runs at `http://localhost:5173`, the websocket server on `9000`, and the Express wrapper on `6500`.
+The Vite dev server runs at `http://localhost:5173`. The game server and its
+WebSocket protocol share `http://localhost:6500`.
 
 Common scripts:
 
 ```bash
 npm run build        # bundle the client via Vite
 npm run test:unit    # execute Vitest-powered unit tests
-npm run test:e2e     # run Playwright end-to-end smoke tests against a preview build
+npm run playtest     # play the core loop over the real WebSocket protocol
+npm run test:e2e     # build, boot the game server, and run the Chromium smoke test
+npm run verify       # run every release gate above, plus lint and style checks
 ```
 
 Troubleshooting tips and platform-specific notes live in [`docs/development-setup.md`](docs/development-setup.md).

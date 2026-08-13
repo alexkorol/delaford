@@ -28,6 +28,23 @@ describe('MovementController', () => {
     expect(position.x).toBeCloseTo(expected, 3);
   });
 
+  it('reaches the authoritative destination after the movement ETA', () => {
+    const controller = new MovementController();
+    controller.initialise(0, 0, 0);
+
+    const step = {
+      startedAt: 0,
+      duration: 150,
+      sequence: 1,
+    };
+
+    controller.applyServerStep(1, 0, step, { sentAt: 0, receivedAt: 0 });
+
+    const endPosition = controller.update(step.duration + 10);
+    expect(endPosition.x).toBeCloseTo(1.5 * TILE_SIZE, 5);
+    expect(endPosition.y).toBeCloseTo(0.5 * TILE_SIZE, 5);
+  });
+
   it('ignores stale sequences', () => {
     const controller = new MovementController();
     controller.initialise(0, 0, 0);
