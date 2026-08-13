@@ -109,38 +109,46 @@ class Engine {
       this.game.map.update(deltaSeconds);
     }
 
-    // Draw the tile map
-    this.game.map.drawMap();
+    if (
+      typeof this.game.map.isPerspectiveMode === 'function'
+      && this.game.map.isPerspectiveMode()
+      && typeof this.game.map.drawPerspectiveFrame === 'function'
+    ) {
+      this.game.map.drawPerspectiveFrame();
+    } else {
+      // Draw the tile map
+      this.game.map.drawMap();
 
-    // Draw dropped items
-    this.game.map.drawItems();
+      // Draw dropped items
+      this.game.map.drawItems();
 
-    // Draw monsters
-    if (typeof this.game.map.drawMonsters === 'function') {
-      this.game.map.drawMonsters();
+      // Draw monsters
+      if (typeof this.game.map.drawMonsters === 'function') {
+        this.game.map.drawMonsters();
+      }
+
+      // Draw the NPCs
+      this.game.map.drawNPCs();
+
+      // Draw other players
+      this.game.map.drawPlayers();
+
+      // Draw the player
+      this.game.map.drawPlayer();
+
+      // Draw in-flight projectiles above actors
+      if (typeof this.game.map.drawProjectiles === 'function') {
+        this.game.map.drawProjectiles();
+      }
+
+      // Draw floating combat feedback above actors
+      if (typeof this.game.map.drawCombatFeedback === 'function') {
+        this.game.map.drawCombatFeedback();
+      }
+
+      // Draw the mouse selection
+      this.game.map.drawMouse();
     }
-
-    // Draw the NPCs
-    this.game.map.drawNPCs();
-
-    // Draw other players
-    this.game.map.drawPlayers();
-
-    // Draw the player
-    this.game.map.drawPlayer();
-
-    // Draw in-flight projectiles above actors
-    if (typeof this.game.map.drawProjectiles === 'function') {
-      this.game.map.drawProjectiles();
-    }
-
-    // Draw floating combat feedback above actors
-    if (typeof this.game.map.drawCombatFeedback === 'function') {
-      this.game.map.drawCombatFeedback();
-    }
-
-    // Draw the mouse selection
-    this.game.map.drawMouse();
 
     const mainCtx = this.game.map.context;
     const { bufferCanvas } = this.game.map;

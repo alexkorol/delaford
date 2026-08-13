@@ -65,6 +65,7 @@ export default {
       tileY: 0,
       event: false,
       inputController: null,
+      rendererMode: 'perspective',
     };
   },
   computed: {
@@ -137,6 +138,7 @@ export default {
     bus.$on('screen:close', this.closePane);
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
     bus.$on('canvas:reset-context-menu', () => this.mouseSelection());
+    bus.$on('game:renderer:mode', this.onRendererModeChanged);
   },
   mounted() {
     this.initialiseInputController();
@@ -150,6 +152,7 @@ export default {
   beforeUnmount() {
     window.removeEventListener('keydown', this.handleGlobalKeyDown);
     window.removeEventListener('keyup', this.handleGlobalKeyUp);
+    bus.$off('game:renderer:mode', this.onRendererModeChanged);
     if (this.inputController) {
       this.inputController.destroy();
       this.inputController = null;
@@ -441,6 +444,27 @@ export default {
       const canvasX = position.x * scaleX;
       const canvasY = position.y * scaleY;
 
+      if (
+        this.game
+        && this.game.map
+        && typeof this.game.map.isPerspectiveMode === 'function'
+        && this.game.map.isPerspectiveMode()
+        && typeof this.game.map.screenToWorld === 'function'
+      ) {
+        const world = this.game.map.screenToWorld(canvasX, canvasY);
+        const metrics = typeof this.game.map.getViewportMetrics === 'function'
+          ? this.game.map.getViewportMetrics()
+          : null;
+        if (world && metrics && metrics.tileCrop) {
+          const worldTileX = Math.floor(world.x / tile.width);
+          const worldTileY = Math.floor(world.y / tile.height);
+          return {
+            x: clamp(worldTileX - metrics.tileCrop.x, 0, Math.max(viewport.x - 1, 0)),
+            y: clamp(worldTileY - metrics.tileCrop.y, 0, Math.max(viewport.y - 1, 0)),
+          };
+        }
+      }
+
       const tileX = Math.floor((canvasX + camera.offsetX) / tile.width);
       const tileY = Math.floor((canvasY + camera.offsetY) / tile.height);
 
@@ -475,6 +499,14 @@ export default {
       if (this.isTypingTarget(event)) {
         return;
       }
+      if (event.key === 'F6' && !event.repeat) {
+        const map = this.game && this.game.map;
+        if (map && typeof map.toggleRenderer === 'function') {
+          this.rendererMode = map.toggleRenderer();
+          event.preventDefault();
+          return;
+        }
+      }
       // Grab key: pick up the item under (or beside) your feet.
       const key = String(event.key || '').toLowerCase();
       if ((key === 'z' || key === 'g') && !event.repeat) {
@@ -483,6 +515,9 @@ export default {
         return;
       }
       this.handleKeyDown(event);
+    },
+    onRendererModeChanged(mode) {
+      this.rendererMode = mode;
     },
     handleGlobalKeyUp(event) {
       if (this.isTypingTarget(event)) {

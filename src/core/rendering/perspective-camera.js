@@ -1,0 +1,105 @@
+const MIN_VIEWPORT_SIZE = 10;
+const MIN_ZOOM = 0.05;
+const MIN_DEPTH = 40;
+
+const defaultHeightAt = () => 0;
+
+class PerspectiveCamera {
+  constructor(options = {}) {
+    this.heightAt = typeof options.heightAt === 'function'
+      ? options.heightAt
+      : defaultHeightAt;
+    this.userZoom = Number.isFinite(options.userZoom) ? options.userZoom : 1;
+    this.valid = false;
+    this.width = 0;
+    this.height = 0;
+    this.x = 0;
+    this.y = 0;
+    this.horizon = 0;
+    this.focus = 0;
+    this.zoom = MIN_ZOOM;
+    this.depthToFocus = 1;
+    this.projectionArea = 1;
+    this.cameraFootY = 0;
+  }
+
+  update({
+    width,
+    height,
+    x,
+    y,
+    userZoom = this.userZoom,
+  } = {}) {
+    this.width = Number.isFinite(width) ? width : 0;
+    this.height = Number.isFinite(height) ? height : 0;
+    this.x = Number.isFinite(x) ? x : 0;
+    this.y = Number.isFinite(y) ? y : 0;
+    this.userZoom = Number.isFinite(userZoom) ? userZoom : 1;
+
+    if (this.width < MIN_VIEWPORT_SIZE || this.height < MIN_VIEWPORT_SIZE) {
+      this.valid = false;
+      return false;
+    }
+
+    this.horizon = -0.45 * this.height;
+    this.focus = 0.65 * this.height;
+    this.zoom = Math.max(
+      MIN_ZOOM,
+      Math.max(this.width / 1150, this.height / 1500) * this.userZoom,
+    );
+    this.depthToFocus = (this.focus - this.horizon) / this.zoom;
+    this.projectionArea = (this.focus - this.horizon) * this.depthToFocus;
+    this.cameraFootY = this.y + this.depthToFocus;
+    this.valid = Number.isFinite(this.cameraFootY)
+      && Number.isFinite(this.projectionArea)
+      && this.depthToFocus > 0;
+    return this.valid;
+  }
+
+  depthAt(worldY) {
+    return Math.max(MIN_DEPTH, this.cameraFootY - worldY);
+  }
+
+  project(worldX, worldY, elevation = 0) {
+    if (!this.valid) {
+      return null;
+    }
+
+    const depth = this.depthAt(worldY);
+    const scale = (this.zoom * this.depthToFocus) / depth;
+
+    return {
+      x: (this.width / 2) + ((worldX - this.x) * scale),
+      y: this.horizon + (this.projectionArea / depth) - (elevation * scale),
+      scale,
+      depth,
+    };
+  }
+
+  projectTerrain(worldX, worldY) {
+    return this.project(worldX, worldY, this.heightAt(worldX, worldY));
+  }
+
+  unproject(screenX, screenY) {
+    if (!this.valid) {
+      return null;
+    }
+
+    const denominator = Math.max(1, screenY - this.horizon);
+    const depth = this.projectionArea / denominator;
+    const projectionScale = this.zoom * this.depthToFocus;
+
+    return {
+      x: this.x + (((screenX - (this.width / 2)) * depth) / projectionScale),
+      y: this.cameraFootY - depth,
+    };
+  }
+}
+
+export {
+  MIN_DEPTH,
+  MIN_VIEWPORT_SIZE,
+  MIN_ZOOM,
+  defaultHeightAt,
+};
+export default PerspectiveCamera;

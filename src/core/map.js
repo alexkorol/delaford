@@ -8,6 +8,14 @@ import MovementController, { centerOfTile } from './utilities/movement-controlle
 import SpriteAnimator from './utilities/sprite-animator.js';
 import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { now } from './config/movement.js';
+import PerspectiveRenderer from './rendering/perspective-renderer.js';
+import {
+  LEGACY_MODE,
+  PERSPECTIVE_MODE,
+  getInitialRendererMode,
+  normalizeRendererMode,
+  saveRendererMode,
+} from './rendering/renderer-mode.js';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
@@ -84,6 +92,9 @@ class Map {
       offsetY: 0,
     };
 
+    this.rendererMode = getInitialRendererMode();
+    this.perspectiveRenderer = new PerspectiveRenderer(this);
+
     // Setup map
     this.setImages(images);
     this.setPlayer(data.player);
@@ -138,6 +149,36 @@ class Map {
       x: Math.round(position.x - (tileCrop.x * tileSize) - this.camera.offsetX),
       y: Math.round(position.y - (tileCrop.y * tileSize) - this.camera.offsetY),
     };
+  }
+
+  isPerspectiveMode() {
+    return this.rendererMode === PERSPECTIVE_MODE;
+  }
+
+  setRendererMode(mode) {
+    this.rendererMode = normalizeRendererMode(mode);
+    saveRendererMode(this.rendererMode);
+    bus.$emit('game:renderer:mode', this.rendererMode);
+    return this.rendererMode;
+  }
+
+  toggleRenderer() {
+    return this.setRendererMode(
+      this.rendererMode === PERSPECTIVE_MODE ? LEGACY_MODE : PERSPECTIVE_MODE,
+    );
+  }
+
+  screenToWorld(screenX, screenY) {
+    if (!this.isPerspectiveMode() || !this.perspectiveRenderer) {
+      return null;
+    }
+    return this.perspectiveRenderer.screenToWorld(screenX, screenY);
+  }
+
+  drawPerspectiveFrame() {
+    if (this.perspectiveRenderer) {
+      this.perspectiveRenderer.render();
+    }
   }
 
   isWithinViewport(entity, metrics = null, padding = 1) {
@@ -695,6 +736,9 @@ class Map {
         container.style.removeProperty('--map-display-height');
         container.style.removeProperty('--map-aspect-ratio');
       }
+    }
+    if (this.perspectiveRenderer) {
+      this.perspectiveRenderer.destroy();
     }
     this.viewportOverride = null;
     this.config.map.viewport.x = this.defaultViewport.x;
