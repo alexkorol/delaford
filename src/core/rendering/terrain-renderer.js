@@ -40,10 +40,21 @@ class TerrainRenderer {
     this.buffers = [];
     this.texture = null;
     this.indexCount = 0;
+    this.contextLost = false;
+    this.destroyed = false;
+    this.stats = {
+      anisotropy: 1,
+      drawCalls: 0,
+      textureSize: 0,
+    };
+    this.handleContextLost = this.handleContextLost.bind(this);
+    this.handleContextRestored = this.handleContextRestored.bind(this);
+    this.canvas.addEventListener('webglcontextlost', this.handleContextLost, false);
+    this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored, false);
   }
 
   initialize() {
-    if (this.ready || this.failed) {
+    if (this.ready || this.failed || this.contextLost || this.destroyed) {
       return this.ready;
     }
 
@@ -231,6 +242,7 @@ class TerrainRenderer {
     const requestedSize = nextPowerOfTwo(Math.max(ground.width, ground.height));
     const maximumSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const textureSize = Math.min(requestedSize, maximumSize);
+    this.stats.textureSize = textureSize;
     const uploadCanvas = document.createElement('canvas');
     uploadCanvas.width = textureSize;
     uploadCanvas.height = textureSize;
@@ -259,10 +271,11 @@ class TerrainRenderer {
       || gl.getExtension('MOZ_EXT_texture_filter_anisotropic');
     if (anisotropy) {
       const available = gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+      this.stats.anisotropy = Math.min(8, available);
       gl.texParameterf(
         gl.TEXTURE_2D,
         anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,
-        Math.min(8, available),
+        this.stats.anisotropy,
       );
     }
 
@@ -318,11 +331,34 @@ class TerrainRenderer {
       skyColour[2] / 255,
     );
     gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
+    this.stats.drawCalls = 1;
     return true;
   }
 
+  handleContextLost(event) {
+    event.preventDefault();
+    this.contextLost = true;
+    this.ready = false;
+    this.failed = false;
+    this.buffers = [];
+    this.texture = null;
+    this.program = null;
+    this.locations = {};
+    this.stats.drawCalls = 0;
+  }
+
+  handleContextRestored() {
+    if (this.destroyed) {
+      return;
+    }
+    this.contextLost = false;
+    this.failed = false;
+    this.ready = false;
+    this.initialize();
+  }
+
   destroyResources() {
-    if (!this.gl) {
+    if (!this.gl || this.contextLost) {
       return;
     }
     this.buffers.forEach(buffer => this.gl.deleteBuffer(buffer));
@@ -339,6 +375,9 @@ class TerrainRenderer {
   }
 
   destroy() {
+    this.destroyed = true;
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost, false);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored, false);
     this.destroyResources();
     const extension = this.gl && this.gl.getExtension('WEBGL_lose_context');
     if (extension) {

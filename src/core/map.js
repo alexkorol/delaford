@@ -158,6 +158,8 @@ class Map {
   setRendererMode(mode) {
     this.rendererMode = normalizeRendererMode(mode);
     saveRendererMode(this.rendererMode);
+    this.configureCanvas();
+    console.info(`[renderer] Switched to ${this.rendererMode} mode.`);
     bus.$emit('game:renderer:mode', this.rendererMode);
     return this.rendererMode;
   }
@@ -680,8 +682,9 @@ class Map {
     const displayWidth = nativeWidth * scale;
     const displayHeight = nativeHeight * scale;
 
-    this.bufferCanvas.width = nativeWidth;
-    this.bufferCanvas.height = nativeHeight;
+    const perspective = this.isPerspectiveMode();
+    this.bufferCanvas.width = perspective ? displayWidth : nativeWidth;
+    this.bufferCanvas.height = perspective ? displayHeight : nativeHeight;
 
     this.canvas.width = displayWidth;
     this.canvas.height = displayHeight;
