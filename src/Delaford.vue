@@ -24,7 +24,9 @@
     <AuthContainer
       v-if="showAuthScreen"
       :screen="screen"
+      :chronicles-context="chroniclesContext"
       @navigate="handleAuthNavigate"
+      @set-out="handleChroniclesSetOut"
     />
 
     <GameContainer
@@ -176,6 +178,7 @@ export default {
       loaded: false,
       game: { exit: true },
       screen: 'login',
+      chroniclesContext: null,
       connectionLost: false,
       reconnectAttempts: 0,
       intentionalDisconnect: false,
@@ -644,6 +647,22 @@ export default {
     handleAuthNavigate(target) {
       this.screen = target;
     },
+    openChronicles(context = {}) {
+      this.chroniclesContext = context;
+      this.screen = 'chronicles';
+      bus.$emit('login:done');
+    },
+    handleChroniclesSetOut(scion = {}) {
+      const scionName = typeof scion === 'string' ? scion : scion.name;
+      if (!scionName || !Socket.rememberScion(scionName)) {
+        bus.$emit('player:chronicles:error', {
+          message: 'Your authenticated session expired. Please log in again.',
+        });
+        return;
+      }
+
+      Socket.emit('player:chronicles:select', { scionName });
+    },
     getGameContainerRef() {
       return this.$refs.gameContainer || null;
     },
@@ -687,6 +706,7 @@ export default {
         this.game.map.destroy();
       }
       this.screen = 'login';
+      this.chroniclesContext = null;
       this.game = { exit: true };
       this.layout.activePane = null;
       this.layout.leftPane = defaultPaneAssignments.left;
@@ -1615,6 +1635,7 @@ export default {
       // Clear login procedure
       bus.$emit('login:done');
       this.screen = 'game';
+      this.chroniclesContext = null;
       this.resetChatState();
     },
     /**

@@ -13,6 +13,7 @@ const resetSocketState = () => {
   Socket.queue.length = 0;
   Socket.waitForOpen = false;
   Socket.socketsWithListeners = new WeakSet();
+  Socket.lastLoginPayload = null;
 };
 
 const setWebSocketEnvironment = (WebSocketImpl, socketInstance) => {
@@ -101,5 +102,33 @@ describe('client Socket helper', () => {
 
     expect(socket.messages).toHaveLength(1);
     expect(Socket.queue).toHaveLength(0);
+  });
+
+  it('routes browser logins through Chronicles and remembers the selected Scion', () => {
+    class FakeWebSocket {
+      constructor() {
+        this.readyState = FakeWebSocket.OPEN;
+        this.messages = [];
+      }
+
+      addEventListener() {}
+
+      send(message) {
+        this.messages.push(JSON.parse(message));
+      }
+    }
+    FakeWebSocket.OPEN = 1;
+
+    const socket = new FakeWebSocket();
+    setWebSocketEnvironment(FakeWebSocket, socket);
+
+    Socket.emit('player:login', { useGuestAccount: true });
+    expect(socket.messages[0].data).toEqual({
+      useGuestAccount: true,
+      awaitChronicles: true,
+    });
+
+    expect(Socket.rememberScion('Vesper')).toBe(true);
+    expect(Socket.lastLoginPayload.scionName).toBe('Vesper');
   });
 });

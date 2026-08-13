@@ -33,9 +33,16 @@
       <div
         v-else
         class="auth-container__panel"
+        :class="{ 'auth-container__panel--chronicles': screen === 'chronicles' }"
       >
+        <ChroniclesScreen
+          v-if="screen === 'chronicles'"
+          :account-name="chroniclesContext && chroniclesContext.accountName"
+          @set-out="$emit('set-out', $event)"
+        />
+
         <div
-          v-if="screen === 'register'"
+          v-else-if="screen === 'register'"
           class="auth-container__register"
         >
           <p class="auth-container__register-intro">
@@ -90,6 +97,7 @@ import AudioMainMenu from '../sub/AudioMainMenu.vue';
 import LoginBackdrop from '../sub/LoginBackdrop.vue';
 import Login from '../ui/Login.vue';
 import CharacterCreate from '../ui/auth/CharacterCreate.vue';
+import ChroniclesScreen from '../ui/auth/ChroniclesScreen.vue';
 
 export default {
   name: 'AuthContainer',
@@ -98,14 +106,19 @@ export default {
     LoginBackdrop,
     Login,
     CharacterCreate,
+    ChroniclesScreen,
   },
   props: {
     screen: {
       type: String,
       default: 'login',
     },
+    chroniclesContext: {
+      type: Object,
+      default: null,
+    },
   },
-  emits: ['navigate'],
+  emits: ['navigate', 'set-out'],
   methods: {
     emitNavigate(target) {
       this.$emit('navigate', target);
@@ -244,6 +257,10 @@ export default {
   text-align: center;
   font-family: 'ChatFont', sans-serif;
   color: var(--color-text-secondary);
+}
+
+.auth-container__panel--chronicles {
+  justify-content: flex-start;
 }
 
 .auth-container__register-intro {

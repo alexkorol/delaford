@@ -25,6 +25,15 @@ class Player {
 
     // Main statistics
     this.username = data.username;
+    // The live username may become a Chronicles scion name. Keep the
+    // authenticated account identity separate so profile saves never rename
+    // the underlying account.
+    Object.defineProperty(this, 'accountUsername', {
+      value: data.username,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
     this.x = data.x;
     this.y = data.y;
     this.level = data.level;

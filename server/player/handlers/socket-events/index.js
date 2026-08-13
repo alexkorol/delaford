@@ -12,6 +12,7 @@ import playerGuest from '#server/core/data/helpers/player.json' with { type: 'js
 import playerPersistence from '#server/core/services/player-persistence.js';
 import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
+import { validateScionName } from '#shared/chronicles.js';
 
 // One character, one session. When the same account logs in again (second
 // tab, another machine, an automated playtest), the OLD session used to be
@@ -84,6 +85,23 @@ const getPlayerBySocket = (ws) => {
   return world.players.find(player => player.socket_id === ws.id) || null;
 };
 
+const applyScionIdentity = (player, name) => {
+  const validation = validateScionName(name);
+  if (!validation.valid) {
+    return validation;
+  }
+
+  player.username = validation.value;
+  return validation;
+};
+
+const emitChroniclesError = (ws, message) => {
+  Socket.emit('player:chronicles:error', {
+    player: { socket_id: ws.id },
+    message,
+  });
+};
+
 const isSpoofedPlayerPayload = (player, payload = {}) => (
   Boolean(payload.id && payload.id !== player.uuid)
   || Boolean(payload.uuid && payload.uuid !== player.uuid)
@@ -126,10 +144,11 @@ export default {
     const payload = data.data || {};
 
     try {
+      let player;
       if (!payload.useGuestAccount) {
-        const { player, token } = await Authentication.login({ ...data, data: payload });
-        replaceExistingSession(player.uuid, ws.id);
-        Authentication.addPlayer(new Player(player, token, ws.id));
+        const authenticated = await Authentication.login({ ...data, data: payload });
+        replaceExistingSession(authenticated.player.uuid, ws.id);
+        player = new Player(authenticated.player, authenticated.token, ws.id);
       } else {
         // Flush + kick any existing session for this guest FIRST, so the
         // snapshot loaded below carries its up-to-the-second loot.
@@ -140,15 +159,38 @@ export default {
         // saved snapshot over the template before constructing the player.
         const saved = loadGuest(playerGuest.uuid);
         const guestData = saved ? { ...playerGuest, ...saved } : playerGuest;
-        const guest = new Player(guestData, 'none', ws.id);
+        player = new Player(guestData, 'none', ws.id);
         // In-process fallback for the skill tree (covers saves made moments
         // before a crash, ahead of the next file flush).
-        if (!guest.passiveTree && guestPassiveTrees.has(guest.uuid)) {
-          guest.passiveTree = guestPassiveTrees.get(guest.uuid);
+        if (!player.passiveTree && guestPassiveTrees.has(player.uuid)) {
+          player.passiveTree = guestPassiveTrees.get(player.uuid);
         }
-        Authentication.addPlayer(guest);
       }
+
       ws.authenticated = true;
+
+      const scionValidation = payload.scionName
+        ? applyScionIdentity(player, payload.scionName)
+        : null;
+
+      if (payload.scionName && !scionValidation.valid) {
+        emitChroniclesError(ws, scionValidation.reason);
+        ws.pendingPlayer = player;
+        return;
+      }
+
+      if (payload.awaitChronicles && !payload.scionName) {
+        ws.pendingPlayer = player;
+        Socket.emit('player:chronicles:ready', {
+          player: { socket_id: ws.id },
+          accountName: player.accountUsername || player.username,
+          level: player.level,
+        });
+        return;
+      }
+
+      ws.pendingPlayer = null;
+      Authentication.addPlayer(player);
     } catch (error) {
       console.log(error);
       const username = typeof payload.username === 'string' ? payload.username : 'unknown user';
@@ -159,6 +201,28 @@ export default {
         player: { socket_id: ws.id },
       });
     }
+  },
+
+  /**
+   * Admit an authenticated browser session to the world under its selected
+   * Chronicles scion. Headless/API clients can continue using player:login
+   * directly and never enter this pending state.
+   */
+  'player:chronicles:select': ({ data }, ws) => {
+    const player = ws && ws.pendingPlayer;
+    if (!player) {
+      emitChroniclesError(ws, 'This Chronicles session is no longer awaiting a scion.');
+      return;
+    }
+
+    const validation = applyScionIdentity(player, data && data.scionName);
+    if (!validation.valid) {
+      emitChroniclesError(ws, validation.reason);
+      return;
+    }
+
+    ws.pendingPlayer = null;
+    Authentication.addPlayer(player);
   },
 
   /**

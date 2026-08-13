@@ -10,13 +10,15 @@
  * Pure data + localStorage; safe to unit-test with a mocked storage.
  */
 
-export const STORAGE_KEY = 'verdigris_houses';
-const SCHEMA_VERSION = 1;
+import {
+  validateHouseName,
+  validateScionName,
+} from '@shared/chronicles.js';
 
-const HOUSE_NAME_MIN = 3;
-const HOUSE_NAME_MAX = 20;
-const SCION_NAME_MIN = 2;
-const SCION_NAME_MAX = 20;
+export { validateHouseName, validateScionName };
+
+export const STORAGE_KEY = 'verdigris_houses';
+const SCHEMA_VERSION = 2;
 
 const now = () => new Date().toISOString();
 
@@ -27,28 +29,6 @@ const getStorage = () => {
     return window.localStorage;
   }
   return null;
-};
-
-export const validateHouseName = (name) => {
-  const trimmed = String(name || '').trim();
-  if (trimmed.length < HOUSE_NAME_MIN) {
-    return { valid: false, reason: `House name must be at least ${HOUSE_NAME_MIN} characters.` };
-  }
-  if (trimmed.length > HOUSE_NAME_MAX) {
-    return { valid: false, reason: `House name must be ${HOUSE_NAME_MAX} characters or fewer.` };
-  }
-  return { valid: true, value: trimmed };
-};
-
-export const validateScionName = (name) => {
-  const trimmed = String(name || '').trim();
-  if (trimmed.length < SCION_NAME_MIN) {
-    return { valid: false, reason: `Scion name must be at least ${SCION_NAME_MIN} characters.` };
-  }
-  if (trimmed.length > SCION_NAME_MAX) {
-    return { valid: false, reason: `Scion name must be ${SCION_NAME_MAX} characters or fewer.` };
-  }
-  return { valid: true, value: trimmed };
 };
 
 const migrateHouse = (house = {}) => ({
@@ -69,7 +49,12 @@ const migrateScion = (scion = {}) => ({
   deeds: Array.isArray(scion.deeds) ? scion.deeds : [],
 });
 
-const emptyState = () => ({ version: SCHEMA_VERSION, houses: [], activeHouseId: null });
+const emptyState = () => ({
+  version: SCHEMA_VERSION,
+  houses: [],
+  activeHouseId: null,
+  activeScionId: null,
+});
 
 /**
  * Load and migrate the saved Chronicles state. Never throws — corrupt or
@@ -90,7 +75,16 @@ export const loadHouses = () => {
     const activeHouseId = houses.some(house => house.id === parsed.activeHouseId)
       ? parsed.activeHouseId
       : (houses[0] ? houses[0].id : null);
-    return { version: SCHEMA_VERSION, houses, activeHouseId };
+    const activeHouse = houses.find(house => house.id === activeHouseId) || null;
+    const activeScionId = activeHouse && activeHouse.scions.some(scion => scion.id === parsed.activeScionId)
+      ? parsed.activeScionId
+      : (activeHouse && activeHouse.scions[0] ? activeHouse.scions[0].id : null);
+    return {
+      version: SCHEMA_VERSION,
+      houses,
+      activeHouseId,
+      activeScionId,
+    };
   } catch (error) {
     console.warn('[chronicles] Failed to load houses; starting fresh.', error);
     return emptyState();
@@ -107,6 +101,7 @@ export const saveHouses = (state) => {
       version: SCHEMA_VERSION,
       houses: Array.isArray(state.houses) ? state.houses : [],
       activeHouseId: state.activeHouseId || null,
+      activeScionId: state.activeScionId || null,
     }));
     return true;
   } catch (error) {
@@ -120,11 +115,18 @@ export const foundHouse = (state, name) => {
   if (!validation.valid) {
     return { ok: false, reason: validation.reason, state };
   }
+  const duplicate = state.houses.some(house => (
+    house.name.toLocaleLowerCase() === validation.value.toLocaleLowerCase()
+  ));
+  if (duplicate) {
+    return { ok: false, reason: 'A House with that name is already recorded.', state };
+  }
   const house = migrateHouse({ name: validation.value });
   const next = {
     ...state,
     houses: [...state.houses, house],
     activeHouseId: house.id,
+    activeScionId: null,
   };
   return { ok: true, state: next, house };
 };
@@ -138,13 +140,52 @@ export const addScion = (state, houseId, name) => {
   if (!house) {
     return { ok: false, reason: 'House not found.', state };
   }
+  const duplicate = house.scions.some(scion => (
+    scion.name.toLocaleLowerCase() === validation.value.toLocaleLowerCase()
+  ));
+  if (duplicate) {
+    return { ok: false, reason: 'That name already belongs to a living Scion.', state };
+  }
   const scion = migrateScion({ name: validation.value });
   const nextHouse = { ...house, scions: [...house.scions, scion] };
   const next = {
     ...state,
     houses: state.houses.map(entry => (entry.id === houseId ? nextHouse : entry)),
+    activeHouseId: houseId,
+    activeScionId: scion.id,
   };
   return { ok: true, state: next, scion };
+};
+
+export const selectHouse = (state, houseId) => {
+  const house = state.houses.find(entry => entry.id === houseId);
+  if (!house) {
+    return { ok: false, reason: 'House not found.', state };
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      activeHouseId: house.id,
+      activeScionId: house.scions[0] ? house.scions[0].id : null,
+    },
+    house,
+  };
+};
+
+export const selectScion = (state, scionId) => {
+  const house = state.houses.find(entry => entry.id === state.activeHouseId);
+  const scion = house && house.scions.find(entry => entry.id === scionId);
+  if (!scion) {
+    return { ok: false, reason: 'Living scion not found.', state };
+  }
+
+  return {
+    ok: true,
+    state: { ...state, activeScionId: scion.id },
+    scion,
+  };
 };
 
 /**
@@ -174,6 +215,9 @@ export const entombScion = (state, houseId, scionId, details = {}) => {
   const next = {
     ...state,
     houses: state.houses.map(entry => (entry.id === houseId ? nextHouse : entry)),
+    activeScionId: state.activeScionId === scionId
+      ? (nextHouse.scions[0] ? nextHouse.scions[0].id : null)
+      : state.activeScionId,
   };
   return { ok: true, state: next, fallen };
 };
@@ -182,14 +226,22 @@ export const getActiveHouse = state => (
   state.houses.find(house => house.id === state.activeHouseId) || null
 );
 
+export const getActiveScion = (state) => {
+  const house = getActiveHouse(state);
+  return (house && house.scions.find(scion => scion.id === state.activeScionId)) || null;
+};
+
 export default {
   STORAGE_KEY,
   loadHouses,
   saveHouses,
   foundHouse,
   addScion,
+  selectHouse,
+  selectScion,
   entombScion,
   getActiveHouse,
+  getActiveScion,
   validateHouseName,
   validateScionName,
 };

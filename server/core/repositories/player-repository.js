@@ -61,7 +61,7 @@ export class PlayerRepository {
     return {
       x: player.x,
       y: player.y,
-      username: player.username,
+      username: player.accountUsername || player.username,
       hp_current: player.hp?.current,
       hp_max: player.hp?.max,
     };

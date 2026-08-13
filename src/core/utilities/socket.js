@@ -68,12 +68,29 @@ class Socket {
    */
   static lastLoginPayload = null;
 
+  static rememberScion(scionName) {
+    if (!Socket.lastLoginPayload) {
+      return false;
+    }
+
+    Socket.lastLoginPayload = {
+      ...Socket.lastLoginPayload,
+      awaitChronicles: true,
+      scionName,
+    };
+    return true;
+  }
+
   static emit(event, data) {
     // Remember the credentials so a reconnect can log straight back in
     // after a server restart instead of dumping the player at the login
     // screen.
     if (event === 'player:login') {
-      Socket.lastLoginPayload = data;
+      Socket.lastLoginPayload = {
+        ...data,
+        awaitChronicles: true,
+      };
+      data = Socket.lastLoginPayload;
     }
 
     const payload = JSON.stringify({

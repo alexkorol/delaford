@@ -24,8 +24,11 @@ const {
   saveHouses,
   foundHouse,
   addScion,
+  selectHouse,
+  selectScion,
   entombScion,
   getActiveHouse,
+  getActiveScion,
   validateHouseName,
   validateScionName,
   STORAGE_KEY,
@@ -40,6 +43,7 @@ describe('Chronicles houses persistence', () => {
     const state = loadHouses();
     expect(state.houses).toEqual([]);
     expect(state.activeHouseId).toBeNull();
+    expect(state.activeScionId).toBeNull();
   });
 
   it('validates house and scion names', () => {
@@ -70,6 +74,31 @@ describe('Chronicles houses persistence', () => {
     expect(withScion.ok).toBe(true);
     expect(getActiveHouse(withScion.state).scions).toHaveLength(1);
     expect(withScion.scion.name).toBe('Orun');
+    expect(getActiveScion(withScion.state).name).toBe('Orun');
+  });
+
+  it('selects a House and living Scion', () => {
+    const first = foundHouse(loadHouses(), 'Morvayne');
+    const firstScion = addScion(first.state, first.house.id, 'Orun');
+    const second = foundHouse(firstScion.state, 'Vaelmont');
+    const secondScion = addScion(second.state, second.house.id, 'Bryn');
+
+    const chosenHouse = selectHouse(secondScion.state, first.house.id);
+    expect(chosenHouse.ok).toBe(true);
+    expect(getActiveHouse(chosenHouse.state).name).toBe('Morvayne');
+    expect(getActiveScion(chosenHouse.state).name).toBe('Orun');
+
+    const chosenScion = selectScion(chosenHouse.state, firstScion.scion.id);
+    expect(chosenScion.ok).toBe(true);
+    expect(getActiveScion(chosenScion.state).name).toBe('Orun');
+  });
+
+  it('rejects duplicate House and living Scion names without regard to case', () => {
+    const founded = foundHouse(loadHouses(), 'Ashford');
+    expect(foundHouse(founded.state, 'ashford').ok).toBe(false);
+
+    const withScion = addScion(founded.state, founded.house.id, 'Vesper');
+    expect(addScion(withScion.state, founded.house.id, 'vesper').ok).toBe(false);
   });
 
   it('entombs a dead scion into the crypt', () => {
@@ -96,6 +125,7 @@ describe('Chronicles houses persistence', () => {
     expect(reloaded.houses[0].name).toBe('Thornholt');
     expect(reloaded.houses[0].scions[0].name).toBe('Vesper');
     expect(reloaded.activeHouseId).toBe(founded.house.id);
+    expect(reloaded.activeScionId).toBe(withScion.scion.id);
   });
 
   it('recovers from corrupt storage', () => {
@@ -115,5 +145,6 @@ describe('Chronicles houses persistence', () => {
     expect(Array.isArray(state.houses[0].crypt)).toBe(true);
     // active id fell back to the only house
     expect(state.activeHouseId).toBe(state.houses[0].id);
+    expect(state.activeScionId).toBeNull();
   });
 });

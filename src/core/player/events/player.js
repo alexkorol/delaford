@@ -73,6 +73,14 @@ export default {
     context.startGame(data.data);
   },
 
+  'player:chronicles:ready': (data, context) => {
+    context.openChronicles(data.data);
+  },
+
+  'player:chronicles:error': (data) => {
+    bus.$emit('player:chronicles:error', data.data);
+  },
+
   /**
    * A player logins into the game
    */
