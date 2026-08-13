@@ -78,7 +78,7 @@ const pack = {
       name: 'Atlatl', kind: 'weapon', kindLabel: 'Dart-thrower', w: 1, h: 3, icon: 'atlatl', weapon: { dmg: [8, 18], aps: 1.1 }, tags: ['reach', 'swift'], weights: { swift: 1.4 }, materials: ['bone', 'copper', 'bronze'], implicit: { label: '+20% Projectile Range', stat: null },
     },
     khopesh: {
-      name: 'Khopesh', kind: 'weapon', kindLabel: 'Sickle-sword', w: 1, h: 3, icon: 'khopesh', weapon: { dmg: [11, 20], aps: 1.2 }, tags: ['blade'], weights: { blade: 1.2, fortune: 1.2 }, materials: ['copper', 'bronze', 'skymetal'], implicit: { label: '+10% Attack Speed', stat: { id: 'atk_speed', v: 10 } },
+      name: 'Khopesh', kind: 'weapon', kindLabel: 'Sickle-sword', w: 1, h: 3, icon: 'khopesh', weapon: { dmg: [11, 20], aps: 1.2 }, tags: ['blade'], weights: { blade: 1.2, fortune: 1.2 }, materials: ['flint', 'copper', 'bronze', 'skymetal'], implicit: { label: '+10% Attack Speed', stat: { id: 'atk_speed', v: 10 } },
     },
     sling: {
       name: 'Sling', kind: 'weapon', kindLabel: 'Sling', w: 1, h: 2, icon: 'sling', weapon: { dmg: [5, 16], aps: 1.15 }, tags: ['reach', 'swift'], weights: { swift: 1.3 }, materials: ['hide', 'quilted'], implicit: { label: 'Ignores half of Ward', stat: null },

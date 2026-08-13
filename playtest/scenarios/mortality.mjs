@@ -17,6 +17,7 @@ export default async function mortality({ connect, assert }) {
     affixes: item.affixes,
     vessel: item.vessel,
     stats: item.stats,
+    attributes: item.attributes,
   });
   let heirloomIdentity;
   let heirloomUuid;
@@ -69,10 +70,10 @@ export default async function mortality({ connect, assert }) {
     assert(mortal.chronicles && mortal.chronicles.scionId === fallenScionId,
       'server binds the selected Scion identity');
 
-    p.devGive('bronze-sword', 1);
+    p.devGive('vessel-khopesh', 1);
     const generatedHeirloom = await p.waitFor(async () => {
       const s = await p.state();
-      return s.inventoryDetails.find(item => item.id === 'bronze-sword') || false;
+      return s.inventoryDetails.find(item => item.id === 'vessel-khopesh') || false;
     }, { label: 'mortal Scion heirloom generated' });
     p.equipItem(generatedHeirloom, 'right_hand');
     const equippedMortal = await p.waitFor(async () => {

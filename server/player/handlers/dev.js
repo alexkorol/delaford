@@ -45,6 +45,7 @@ const itemIdentity = item => (item ? {
   affixes: item.affixes,
   vessel: item.vessel,
   stats: item.stats,
+  attributes: item.attributes,
   size: item.size,
 } : null);
 

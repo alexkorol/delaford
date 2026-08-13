@@ -177,10 +177,30 @@ const consumeExpiredPlayerBuffs = (target, now) => {
   }, []);
 };
 
-const getArmourMitigation = (target, now) => (
-  consumeExpiredPlayerBuffs(target, now)
-    .reduce((total, buff) => total + Math.max(0, Math.floor(buff.armourBonus || 0)), 0)
-);
+const equipmentDefenseRating = (target, attackRange) => {
+  const defense = target?.combat?.defense || {};
+  if (attackRange > 1) {
+    return Math.max(0, Number(defense.range) || 0);
+  }
+  return Math.max(
+    0,
+    Number(defense.stab) || 0,
+    Number(defense.slash) || 0,
+    Number(defense.crush) || 0,
+  );
+};
+
+const getArmourMitigation = (target, now, rawDamage, attackRange) => {
+  const buffMitigation = consumeExpiredPlayerBuffs(target, now)
+    .reduce((total, buff) => total + Math.max(0, Math.floor(buff.armourBonus || 0)), 0);
+  const rating = equipmentDefenseRating(target, attackRange);
+  // Equipment is deliberately diminishing rather than flat subtraction: one
+  // good shield matters against a heavy blow without making low-level packs
+  // incapable of damaging a geared character.
+  const equipmentFraction = Math.min(0.35, (rating / (rating + 100)) * 0.5);
+  const equipmentMitigation = Math.floor(Math.max(0, rawDamage) * equipmentFraction);
+  return buffMitigation + equipmentMitigation;
+};
 
 const resolvePendingAttack = (monster, now = Date.now()) => {
   const payload = monster.state.pendingAttack;
@@ -204,7 +224,7 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   }
 
   const nowTs = now;
-  const mitigation = getArmourMitigation(target, nowTs);
+  const mitigation = getArmourMitigation(target, nowTs, payload.damage, range);
   const damage = Math.max(0, Math.floor(payload.damage - mitigation));
   target.combat = target.combat || {};
   target.combat.lastCombatAt = nowTs;

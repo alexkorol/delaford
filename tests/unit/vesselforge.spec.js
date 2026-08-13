@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import VesselForge, { createForge, validatePack } from '#server/core/items/vesselforge/engine.js';
 import pack from '#server/core/items/vesselforge/verdigris-pack.js';
-import { createVesselBlock, vesselEligible } from '#server/core/items/vesselforge/adapter.js';
+import {
+  createVesselBlock,
+  deriveVesselCombat,
+  vesselEligible,
+} from '#server/core/items/vesselforge/adapter.js';
 import ItemFactory from '#server/core/items/factory.js';
 
 const forge = createForge(pack, { seed: 12345 });
@@ -255,13 +259,22 @@ describe('Vesselforge trophies and aggregation', () => {
 
 describe('Vesselforge game integration', () => {
   it('marks catalogue gear as vessel-eligible and stackables not', () => {
-    expect(vesselEligible({ type: 'weapon', slot: 'right_hand' })).toBe(true);
-    expect(vesselEligible({ type: 'armor', slot: 'head' })).toBe(true);
-    expect(vesselEligible({ type: 'weapon', slot: 'right_hand', stackable: true })).toBe(false);
-    expect(vesselEligible({ type: 'general', slot: 'right_hand' })).toBe(false);
+    expect(vesselEligible({
+      type: 'weapon',
+      slot: 'right_hand',
+      vesselforge: { formId: 'khopesh' },
+    })).toBe(true);
+    expect(vesselEligible({ type: 'weapon', slot: 'right_hand' })).toBe(false);
+    expect(vesselEligible({
+      type: 'weapon',
+      slot: 'right_hand',
+      stackable: true,
+      vesselforge: { formId: 'khopesh' },
+    })).toBe(false);
+    expect(vesselEligible({ vesselforge: { formId: 'missing-form' } })).toBe(false);
   });
 
-  it('attaches a vessel block to factory-created gear', () => {
+  it('creates one coherent generated identity for native catalogue gear', () => {
     const rng = (() => {
       let state = 42;
       return () => {
@@ -269,15 +282,47 @@ describe('Vesselforge game integration', () => {
         return (state - 1) / 2147483646;
       };
     })();
-    const instance = ItemFactory.createById('bronze-sword', { rng, itemLevel: 24 });
+    const instance = ItemFactory.createById('vessel-khopesh', { rng, itemLevel: 24 });
 
     expect(instance.vessel).toBeTruthy();
     expect(instance.vessel.packId).toBe('verdigris-1');
+    expect(instance.vessel.item.formId).toBe('khopesh');
     expect(instance.vessel.item.kind).toBe('weapon');
     expect(instance.vessel.item.ilvl).toBe(24);
+    expect(instance.name).toBe(`${instance.vessel.material} Khopesh`);
+    expect(instance.displayName).toBe(instance.name);
+    expect(instance.size).toEqual({ width: 1, height: 3 });
+    expect(instance.stats.attack.slash).toBe(instance.vessel.combat.damage.rating);
+    expect(instance.vessel.combat.damage.dps).toBeGreaterThan(0);
     expect(Array.isArray(instance.vessel.lines)).toBe(true);
     expect(instance.vessel.lines.some(line => line.section === 'kind')).toBe(true);
     expect(JSON.parse(JSON.stringify(instance.vessel))).toEqual(instance.vessel);
+  });
+
+  it('derives ward and legacy defense ratings from the same vessel roll', () => {
+    const item = forge.generateItem({
+      ilvl: 30,
+      formId: 'hideshield',
+      materialId: 'bronze',
+      brands: 0,
+    });
+    const combat = deriveVesselCombat(item);
+
+    expect(combat.ward).toBe(72);
+    expect(combat.ratings.defense).toEqual({
+      stab: 9,
+      slash: 9,
+      crush: 9,
+      range: 9,
+    });
+  });
+
+  it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {
+    const legacy = ItemFactory.createById('bronze-sword', { rng: () => 0.5 });
+
+    expect(legacy.vessel).toBeUndefined();
+    expect(legacy.baseName).toBe('Bronze Sword');
+    expect(legacy.name).toContain('Bronze Sword');
   });
 
   it('skips vessel blocks for stackables and plain items', () => {

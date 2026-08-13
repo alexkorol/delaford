@@ -11,39 +11,24 @@ export const GEAR_DROP_CHANCES = {
   elite: 0.5,
 };
 
-// A spread across weapon types, every armour slot, and jewelry so drops feel
-// varied rather than the same handful of swords.
+// Vesselforge-native catalogue entries declare one exact form. Their material,
+// name, footprint and combat profile are rolled together, avoiding the old
+// split identity where (for example) a Bronze Sword advertised itself as a
+// Flint Handaxe.
 export const GEAR_DROP_POOL = [
-  // weapons — different families
-  'bronze-sword',
-  'bronze-dagger',
-  'bronze-mace',
-  'bronze-battleaxe',
-  'bronze-spear',
-  'iron-sword',
-  'iron-dagger',
-  'iron-warhammer',
-  'shortbow',
-  'longbow',
-  // armour — head/body/hands/feet/back/offhand
-  'bronze-helm',
-  'bronze-med-helm',
-  'bronze-armor',
-  'bronze-chainmail',
-  'bronze-gloves',
-  'bronze-boots',
-  'bronze-shield',
-  'iron-helm',
-  'iron-armor',
-  'iron-gloves',
-  'iron-boots',
-  'iron-shield',
-  'leather-cowl',
-  'cape',
-  // jewelry
-  'ring',
-  'gold-ring',
-  'garnet-amulet',
+  'vessel-handaxe',
+  'vessel-spear',
+  'vessel-macuahuitl',
+  'vessel-atlatl',
+  'vessel-khopesh',
+  'vessel-sling',
+  'vessel-shield',
+  'vessel-wrap',
+  'vessel-crest',
+  'vessel-grips',
+  'vessel-sandals',
+  'vessel-gorget',
+  'vessel-ring',
 ];
 
 /**

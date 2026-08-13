@@ -16,15 +16,16 @@ export default async function persistence({ connect, assert }) {
     affixes: item.affixes,
     vessel: item.vessel,
     stats: item.stats,
+    attributes: item.attributes,
   });
   try {
-    first.devGive('gold-ring', 1);
-    first.devGive('bronze-sword', 1);
+    first.devGive('vessel-ring', 1);
+    first.devGive('vessel-khopesh', 1);
     first.devSetLevel(4);
     const generated = await first.waitFor(async () => {
       const s = await first.state();
-      const ring = s.inventoryDetails.find(item => item.id === 'gold-ring');
-      const sword = s.inventoryDetails.find(item => item.id === 'bronze-sword');
+      const ring = s.inventoryDetails.find(item => item.id === 'vessel-ring');
+      const sword = s.inventoryDetails.find(item => item.id === 'vessel-khopesh');
       return s.level === 4 && ring && sword ? { s, ring, sword } : false;
     }, { label: 'item granted + level set' });
     assert(generated.ring.vessel && generated.ring.affixes,
@@ -36,7 +37,8 @@ export default async function persistence({ connect, assert }) {
       const s = await first.state();
       return s.wearDetails.right_hand?.uuid === generated.sword.uuid ? s : false;
     }, { label: 'generated sword equipped' });
-    assert(equipped.combat.attack.slash > 0, 'equipped rolled weapon contributes combat stats');
+    assert(equipped.combat.attack.slash > 0,
+      'equipped Vesselforge weapon contributes its derived combat rating');
     swordIdentity = identityOf(equipped.wearDetails.right_hand);
     levelBefore = 4;
   } finally {
@@ -49,12 +51,12 @@ export default async function persistence({ connect, assert }) {
   try {
     const s = await second.state();
     assert(s.level === levelBefore, `level survived the relogin (${s.level})`);
-    assert(s.inventory.some(item => item.id === 'gold-ring'), 'granted item survived the relogin');
-    const ring = s.inventoryDetails.find(item => item.id === 'gold-ring');
+    assert(s.inventory.some(item => item.id === 'vessel-ring'), 'granted item survived the relogin');
+    const ring = s.inventoryDetails.find(item => item.id === 'vessel-ring');
     assert(identityOf(ring) === ringIdentity, 'inventory affixes and vessel survived the relogin exactly');
     assert(identityOf(s.wearDetails.right_hand) === swordIdentity,
       'equipped item identity survived the relogin exactly');
-    assert(s.combat.attack.slash > 0, 'equipped combat stats were restored on login');
+    assert(s.combat.attack.slash > 0, 'derived Vesselforge combat stats were restored on login');
   } finally {
     second.close();
   }

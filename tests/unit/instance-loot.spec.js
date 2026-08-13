@@ -38,6 +38,7 @@ const { default: world } = await import('#server/core/world.js');
 const { default: Socket } = await import('#server/socket.js');
 const { default: UI } = await import('#shared/ui.js');
 const { default: chroniclesStore } = await import('#server/core/services/chronicles-store.js');
+const { default: Query } = await import('#server/core/data/query.js');
 
 const makeRngQueue = (values) => {
   const queue = [...values];
@@ -137,6 +138,9 @@ describe('monster loot drops', () => {
     expect(drops).toHaveLength(2);
     expect(GEAR_DROP_POOL).toContain(drops[1].id);
     expect(drops[1].uuid).toBeTruthy();
+    expect(drops[1].vessel.item.formId).toBe(Query.getItemData(drops[1].id).vesselforge.formId);
+    expect(drops[1].name).toBe(drops[1].vessel.displayName);
+    expect(drops[1].stats).toEqual(drops[1].vessel.combat.ratings);
   });
 
   it('returns a queued House heirloom from an elite with exact identity', () => {

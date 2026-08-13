@@ -32,7 +32,7 @@
       </div>
 
       <section v-if="model.statLines.length" class="item-tooltip__stats">
-        <span>Base profile</span>
+        <span>Equipped ratings</span>
         <p v-for="line in model.statLines" :key="line">{{ line }}</p>
       </section>
 

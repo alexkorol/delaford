@@ -101,10 +101,19 @@ const createFromBase = (baseItem, options = {}) => {
     const vessel = createVesselBlock(baseItem, { rng, ilvl: itemLevel });
     if (vessel) {
       instance.vessel = vessel;
+      instance.name = vessel.displayName || instance.name;
+      instance.displayName = instance.name;
+      instance.stats = structuredCloneSafe(vessel.combat?.ratings || instance.stats);
+      if (vessel.combat?.attributes) {
+        instance.attributes = structuredCloneSafe(vessel.combat.attributes);
+      }
+      if (Number.isFinite(vessel.item?.w) && Number.isFinite(vessel.item?.h)) {
+        instance.size = { width: vessel.item.w, height: vessel.item.h };
+      }
     }
   }
 
-  instance.displayName = instance.name;
+  instance.displayName = instance.displayName || instance.name;
   instance.size = resolveItemSize(instance);
 
   if (typeof baseItem.slot === 'string') {
