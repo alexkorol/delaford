@@ -14,7 +14,9 @@ Chronicles account creator):
   `server/core/items/vesselforge/`: vessel slots, Brands ✦ / Bonds ◈ /
   Trophies ✧ / Scars ✕, patience crafting, material firing, attunement and
   awakening. Dropped gear now carries a vessel block (ilvl scales with the
-  slain monster) surfaced in inventory tooltips.
+  slain monster) surfaced in rarity-colored, keyboard-reachable inventory
+  cards. Inventory and equipment context actions preserve the generated item
+  UUID through real server-backed Equip/Unequip flows.
 - **Character identity** — no classes. Every character is a blank with
   10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
   picker was reverted; the intended identity layer is Chronicles
@@ -88,6 +90,9 @@ Scion deed.
 - Localization scaffolding.
 - Expand the authoritative quest journal beyond Aldwyn's onboarding commission
   toward the 23-point quest budget reserved by the passive tree.
+- Reconcile legacy catalogue names and combat stats with the independently
+  rolled Vesselforge material/form identity before exposing crafting and
+  awakening as player-facing progression.
 
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?
