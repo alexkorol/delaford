@@ -288,6 +288,8 @@ export default {
         return this.images.jewelryImage.src;
       case 'armor':
         return this.images.armorImage.src;
+      case 'vessels':
+        return this.images.vesselsImage.src;
       default:
       case 'weapons':
         return this.images.weaponsImage.src;

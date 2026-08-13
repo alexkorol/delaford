@@ -337,6 +337,8 @@ export default {
         return props.images.jewelryImage ? props.images.jewelryImage.src : '';
       case 'armor':
         return props.images.armorImage ? props.images.armorImage.src : '';
+      case 'vessels':
+        return props.images.vesselsImage ? props.images.vesselsImage.src : '';
       default:
         return props.images.weaponsImage ? props.images.weaponsImage.src : '';
       }

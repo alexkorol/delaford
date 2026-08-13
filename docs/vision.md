@@ -19,7 +19,9 @@ Chronicles account creator):
   damage, ward, attributes, life, spirit, and selected Brands affect live
   combat stats; future mechanics are labelled Dormant instead of promising an
   effect that is not wired yet. Existing catalogue items remain legacy gear.
-  Equip/Unequip preserves the generated UUID through the server-backed flow.
+  Each native form also has distinct reference-driven item art in its own
+  reproducible atlas. Equip/Unequip preserves the generated UUID through the
+  server-backed flow.
 - **Character identity** — no classes. Every character is a blank with
   10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
   picker was reverted; the intended identity layer is Chronicles
@@ -34,10 +36,11 @@ solo zone/instance entry (Adventure menu), and the Chronicles Houses & Scions
 persistence model (`src/core/chronicles/houses.js`).
 
 Chronicles creation, authoritative persistence, mortal Scion entombment, and
-fallen-heirloom circulation are now playable end to end. The first real quest,
-**Aldwyn's Charge**, turns movement → combat → loot → Adventure entry into a
-server-owned progression loop that grants a passive point, House renown, and a
-Scion deed.
+fallen-heirloom circulation are now playable end to end. The first two real
+quests form a server-owned progression chain. **Aldwyn's Charge** turns
+movement → combat → loot → Adventure entry into onboarding; **Proof of
+Temper** follows with an elite hunt, guaranteed native Vessel, equipment
+objective, second passive point, House renown, and Scion deed.
 
 ## Pillars
 

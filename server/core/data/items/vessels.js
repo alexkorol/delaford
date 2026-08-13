@@ -42,7 +42,7 @@ export default [
     formId: 'handaxe',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 1 },
+    graphics: { tileset: 'vessels', row: 0, column: 0 },
   }),
   makeVesselItem({
     id: 'vessel-spear',
@@ -51,7 +51,7 @@ export default [
     formId: 'spear',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 8 },
+    graphics: { tileset: 'vessels', row: 0, column: 1 },
     twoHanded: true,
   }),
   makeVesselItem({
@@ -61,7 +61,7 @@ export default [
     formId: 'macuahuitl',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 4 },
+    graphics: { tileset: 'vessels', row: 0, column: 2 },
     twoHanded: true,
   }),
   makeVesselItem({
@@ -71,7 +71,7 @@ export default [
     formId: 'atlatl',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 18 },
+    graphics: { tileset: 'vessels', row: 0, column: 3 },
     twoHanded: true,
   }),
   makeVesselItem({
@@ -81,7 +81,7 @@ export default [
     formId: 'khopesh',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 0 },
+    graphics: { tileset: 'vessels', row: 0, column: 4 },
   }),
   makeVesselItem({
     id: 'vessel-sling',
@@ -90,7 +90,7 @@ export default [
     formId: 'sling',
     slot: 'right_hand',
     type: 'weapon',
-    graphics: { tileset: 'weapons', row: 0, column: 18 },
+    graphics: { tileset: 'vessels', row: 0, column: 5 },
   }),
   makeVesselItem({
     id: 'vessel-shield',
@@ -99,7 +99,7 @@ export default [
     formId: 'hideshield',
     slot: 'left_hand',
     type: 'armor',
-    graphics: { tileset: 'armor', row: 6, column: 0 },
+    graphics: { tileset: 'vessels', row: 0, column: 6 },
   }),
   makeVesselItem({
     id: 'vessel-wrap',
@@ -108,7 +108,7 @@ export default [
     formId: 'wrap',
     slot: 'armor',
     type: 'armor',
-    graphics: { tileset: 'armor', row: 4, column: 7 },
+    graphics: { tileset: 'vessels', row: 0, column: 7 },
   }),
   makeVesselItem({
     id: 'vessel-crest',
@@ -117,7 +117,7 @@ export default [
     formId: 'crest',
     slot: 'head',
     type: 'armor',
-    graphics: { tileset: 'armor', row: 8, column: 0 },
+    graphics: { tileset: 'vessels', row: 0, column: 8 },
   }),
   makeVesselItem({
     id: 'vessel-grips',
@@ -126,7 +126,7 @@ export default [
     formId: 'grips',
     slot: 'gloves',
     type: 'armor',
-    graphics: { tileset: 'armor', row: 3, column: 7 },
+    graphics: { tileset: 'vessels', row: 0, column: 9 },
   }),
   makeVesselItem({
     id: 'vessel-sandals',
@@ -135,7 +135,7 @@ export default [
     formId: 'sandals',
     slot: 'feet',
     type: 'armor',
-    graphics: { tileset: 'armor', row: 2, column: 7 },
+    graphics: { tileset: 'vessels', row: 0, column: 10 },
   }),
   makeVesselItem({
     id: 'vessel-gorget',
@@ -144,7 +144,7 @@ export default [
     formId: 'gorget',
     slot: 'necklace',
     type: 'jewelry',
-    graphics: { tileset: 'jewelry', row: 0, column: 0 },
+    graphics: { tileset: 'vessels', row: 0, column: 11 },
   }),
   makeVesselItem({
     id: 'vessel-ring',
@@ -153,6 +153,6 @@ export default [
     formId: 'ring',
     slot: 'ring',
     type: 'jewelry',
-    graphics: { tileset: 'jewelry', row: 5, column: 0 },
+    graphics: { tileset: 'vessels', row: 0, column: 12 },
   }),
 ];

@@ -564,6 +564,7 @@ class Map {
     const generalImage = fallback(7);
     const dungeonImage = fallback(8);
     const monstersImage = normalized[9] || npcsImage;
+    const vesselsImage = normalized[10] || weaponsImage;
 
     // Image and data
     this.images = {
@@ -576,6 +577,7 @@ class Map {
       armorImage,
       jewelryImage,
       generalImage,
+      vesselsImage,
       dungeonImage,
     };
 
@@ -924,6 +926,8 @@ class Map {
           return this.images.jewelryImage;
         case 'armor':
           return this.images.armorImage;
+        case 'vessels':
+          return this.images.vesselsImage;
         default:
         case 'weapons':
           return this.images.weaponsImage;

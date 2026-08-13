@@ -350,6 +350,7 @@ class PerspectiveRenderer {
       armor: this.map.images.armorImage,
       general: this.map.images.generalImage,
       jewelry: this.map.images.jewelryImage,
+      vessels: this.map.images.vesselsImage,
       weapons: this.map.images.weaponsImage,
     };
     const image = sheets[info.graphics.tileset] || sheets.weapons;

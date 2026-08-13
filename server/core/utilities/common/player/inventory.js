@@ -23,7 +23,9 @@ const hydrateInventoryItem = (item = {}) => {
     ...item,
     name: item.name || item.displayName || baseItem.name,
     displayName: item.displayName || item.name || baseItem.name,
-    graphics: item.graphics || baseItem.graphics,
+    graphics: baseItem.graphics?.tileset === 'vessels'
+      ? baseItem.graphics
+      : item.graphics || baseItem.graphics,
     stats: item.stats || baseItem.stats,
     actions: item.actions || baseItem.actions,
     ...(equipSlot ? { equipSlot, slotType: equipSlot } : {}),

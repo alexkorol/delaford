@@ -177,6 +177,13 @@ const adoptExisting = (existingItem, options = {}) => {
     clone.slotType = equipSlot;
   }
 
+  // Art is presentation, not rolled identity. Native Vessels should adopt the
+  // current dedicated frame when an older save still carries its legacy atlas
+  // reference; the UUID, material, rolls, stats, and provenance stay exact.
+  if (baseItem?.graphics?.tileset === 'vessels') {
+    clone.graphics = structuredCloneSafe(baseItem.graphics);
+  }
+
   if (!clone.affixes && eligibleForAffixes(bindingReference)) {
     clone.affixes = { brand: null, bond: null };
   }

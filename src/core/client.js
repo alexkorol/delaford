@@ -9,6 +9,7 @@ import weaponsImage from '../assets/graphics/items/weapons.png';
 import armorImage from '../assets/graphics/items/armor.png';
 import jewelryImage from '../assets/graphics/items/jewelry.png';
 import generalImage from '../assets/graphics/items/general.png';
+import vesselsImage from '../assets/graphics/items/vessels.png';
 
 import bus from './utilities/bus.js';
 
@@ -257,6 +258,7 @@ class Client {
       generalImage,
       dungeonTileset,
       monsterImage,
+      vesselsImage,
     ];
 
     const images = Object.values(assets).map((asset) => this.constructor.uploadImage(asset));
