@@ -13,6 +13,26 @@ const closeContextMenu = async (page) => {
   await expect(page.locator('#actions')).toBeHidden();
 };
 
+const pointerDrag = async (page, source, target) => {
+  const sourceBounds = await source.boundingBox();
+  const targetBounds = await target.boundingBox();
+  if (!sourceBounds || !targetBounds) {
+    throw new Error('Pointer drag source or target has no visible bounds.');
+  }
+
+  await page.mouse.move(
+    sourceBounds.x + sourceBounds.width / 2,
+    sourceBounds.y + sourceBounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    targetBounds.x + targetBounds.width / 2,
+    targetBounds.y + targetBounds.height / 2,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+};
+
 const completeChroniclesOnboarding = async (page) => {
   const chronicles = page.getByRole('heading', { name: 'Chronicles' });
   await expect.poll(async () => (
@@ -84,8 +104,20 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   await page.keyboard.press('KeyI');
   const inventory = page.getByLabel('Inventory panel');
   await expect(inventory).toBeVisible();
-  const inventoryItem = inventory.locator('.inventory-item[aria-label]').first();
+  const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Pickaxe"]');
   await expect(inventoryItem).toBeVisible();
+
+  // Pointer drag must use the same authoritative equip/unequip flow as the
+  // context menu, including the reverse trip back into an empty grid cell.
+  const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
+  await pointerDrag(page, inventoryItem, rightHand);
+  await expect(rightHand.locator('.wearSlot')).toBeVisible();
+
+  const emptyInventoryCell = inventory.locator('.inventory-grid__cell').last();
+  await pointerDrag(page, rightHand, emptyInventoryCell);
+  await expect(rightHand.locator('.wearSlot')).toBeHidden();
+  await expect(inventoryItem).toBeVisible();
+
   await inventoryItem.click({ button: 'right' });
   await expect(page.locator('#actions')).toBeVisible();
   await closeContextMenu(page);
