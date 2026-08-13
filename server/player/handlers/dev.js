@@ -77,6 +77,9 @@ const buildStateSnapshot = (player) => {
     hp: player.stats && player.stats.resources ? { ...player.stats.resources.health } : null,
     mana: player.stats && player.stats.resources ? { ...player.stats.resources.mana } : null,
     lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle.state : null,
+    lifecycleDetails: player.stats && player.stats.lifecycle
+      ? structuredClone(player.stats.lifecycle)
+      : null,
     lifecycleMode: player.stats && player.stats.lifecycle ? player.stats.lifecycle.mode : null,
     chronicles: player.chronicles ? { ...player.chronicles } : null,
     chroniclesRecord: chroniclesStore.snapshot(player.uuid),
@@ -104,6 +107,7 @@ const buildStateSnapshot = (player) => {
       criticalChance: player.combat.criticalChance || 0,
       goodsFound: player.combat.goodsFound || 0,
       damageAgainstBeasts: player.combat.damageAgainstBeasts || 0,
+      respawnProtectionUntil: player.combat.respawnProtectionUntil || 0,
     } : null,
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
@@ -136,6 +140,9 @@ const buildStateSnapshot = (player) => {
       theme: scene.metadata.theme,
       stairsUp: scene.metadata.stairsUp || null,
       stairsDown: scene.metadata.stairsDown || null,
+      spawnPoints: Array.isArray(scene.metadata.spawnPoints)
+        ? structuredClone(scene.metadata.spawnPoints)
+        : [],
     } : {},
   };
 };

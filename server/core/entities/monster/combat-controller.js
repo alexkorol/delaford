@@ -9,6 +9,18 @@ import UI from '#shared/ui.js';
 // (never on its tile), so reach checks are radii with diagonal headroom.
 const REACH_TOLERANCE = 0.6;
 
+const isTargetablePlayer = (player, now = Date.now()) => {
+  const health = player?.stats?.resources?.health;
+  const lifecycleState = player?.stats?.lifecycle?.state || 'alive';
+  const protectedUntil = Number(player?.combat?.respawnProtectionUntil) || 0;
+  return Boolean(
+    health
+    && health.current > 0
+    && (lifecycleState === 'alive' || lifecycleState === 'cheat-death')
+    && protectedUntil <= now,
+  );
+};
+
 const rollDamage = (monster) => {
   const archetype = monster.archetype || {};
   const rarity = monster.rarity || {};
@@ -67,7 +79,7 @@ const resolveTarget = (monster, now = Date.now()) => {
     ? scenePlayers.find(player => player && player.uuid === monster.state.targetId)
     : null;
 
-  if (currentTarget && currentTarget.stats && currentTarget.stats.resources.health.current > 0) {
+  if (currentTarget && isTargetablePlayer(currentTarget, now)) {
     const distance = manhattanDistance(monster, currentTarget);
     if (distance <= pursuitRange) {
       return currentTarget;
@@ -76,10 +88,7 @@ const resolveTarget = (monster, now = Date.now()) => {
 
   const viable = scenePlayers
     .filter((player) => {
-      if (!player || !player.stats || !player.stats.resources) {
-        return false;
-      }
-      if (player.stats.resources.health.current <= 0) {
+      if (!isTargetablePlayer(player, now)) {
         return false;
       }
       const distance = manhattanDistance(monster, player);
@@ -98,7 +107,7 @@ const resolveTarget = (monster, now = Date.now()) => {
 };
 
 const tryAttack = (monster, target, now = Date.now()) => {
-  if (!target || !monster.isAlive) {
+  if (!target || !monster.isAlive || !isTargetablePlayer(target, now)) {
     return false;
   }
 
@@ -218,6 +227,10 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   monster.state.pendingAttack = null;
 
   if (!target) {
+    return false;
+  }
+
+  if (!isTargetablePlayer(target, now)) {
     return false;
   }
 

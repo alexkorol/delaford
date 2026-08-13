@@ -21,6 +21,7 @@ const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
 const AUTO_ATTACK_RANGE = 1.9;
 const DEFAULT_DASH_DISTANCE = 3;
 const CRITICAL_DAMAGE_MULTIPLIER = 1.5;
+export const RESPAWN_PROTECTION_MS = 5000;
 
 // Continuous monster positions still fight over the tile grid: melee arcs and
 // tile lookups act on the tile a monster is standing on.
@@ -610,6 +611,10 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
     return null;
   }
 
+  if (Number(combat.respawnProtectionUntil) > now) {
+    delete combat.respawnProtectionUntil;
+  }
+
   if (manaCost > 0) {
     player.stats.resources.mana.current -= manaCost;
     player.mana = player.stats.resources.mana;
@@ -804,6 +809,10 @@ export const processPlayerRespawns = (now = Date.now()) => {
       return;
     }
 
+    const combat = ensureCombatState(player);
+    clearAutoAttack(player, 'player-respawned');
+    combat.respawnProtectionUntil = now + RESPAWN_PROTECTION_MS;
+
     const scene = world.getScene(player.sceneId);
     const spawnPoint = scene
       && scene.metadata
@@ -818,7 +827,7 @@ export const processPlayerRespawns = (now = Date.now()) => {
       }
     }
 
-    sendMessage(player, 'You awaken, battered but alive.');
+    sendMessage(player, 'You awaken, battered but alive. A ward protects you for 5 seconds or until you act.');
     Player.broadcastMovement(player);
     broadcastStats(player);
   });

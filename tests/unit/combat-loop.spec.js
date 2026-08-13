@@ -44,7 +44,10 @@ vi.mock('#server/core/entities/player/stats-manager.js', () => ({
   default: vi.fn(),
 }));
 
-const { default: Combat } = await import('#server/core/combat/index.js');
+const {
+  default: Combat,
+  RESPAWN_PROTECTION_MS,
+} = await import('#server/core/combat/index.js');
 const { default: Socket } = await import('#server/socket.js');
 const { default: Player } = await import('#server/core/player.js');
 const { default: world } = await import('#server/core/world.js');
@@ -419,6 +422,21 @@ describe('tryUseSkill', () => {
     expect(player.combat.cooldowns['ability-1']).toBeGreaterThan(Date.now());
   });
 
+  it('ends respawn protection when the player uses a skill', () => {
+    const player = makePlayer({ facing: 'right' });
+    player.combat.respawnProtectionUntil = 10_000;
+    setupScene(player, []);
+
+    const outcome = Combat.tryUseSkill(
+      player,
+      { skillId: 'primary-attack', direction: 'right' },
+      { now: 5_000 },
+    );
+
+    expect(outcome.triggered).toBe(true);
+    expect(player.combat.respawnProtectionUntil).toBeUndefined();
+  });
+
   it('moves dash skills across open tiles and stops before blocked collision', () => {
     const player = makePlayer({
       facing: 'right',
@@ -643,11 +661,12 @@ describe('player respawns', () => {
   });
 
   it('respawns players at the instance entry once the timer elapses', () => {
+    const now = Date.now();
     const player = makePlayer();
     player.stats.resources.health.current = 0;
     player.stats.lifecycle = {
       state: 'awaiting-respawn',
-      respawn: { pending: true, at: Date.now() - 1000 },
+      respawn: { pending: true, at: now - 1000 },
     };
     player.tryRespawn = vi.fn(() => {
       player.stats.resources.health.current = 25;
@@ -666,12 +685,13 @@ describe('player respawns', () => {
     });
     world.players.push(player);
 
-    Combat.processPlayerRespawns(Date.now());
+    Combat.processPlayerRespawns(now);
 
     expect(player.tryRespawn).toHaveBeenCalled();
     expect(player.x).toBe(3);
     expect(player.y).toBe(4);
     expect(player.path.grid).toBeNull();
+    expect(player.combat.respawnProtectionUntil).toBe(now + RESPAWN_PROTECTION_MS);
   });
 
   it('leaves players alone before their respawn timer', () => {

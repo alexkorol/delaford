@@ -31,7 +31,8 @@ const makeNakedPlayer = (overrides = {}) => ({
   combat: { attack: { stab: 0, slash: 0, crush: 0, range: 0 } },
   stats: {
     attributes: { total: { strength: 10, dexterity: 10, intelligence: 10 } },
-    resources: { health: { current: 50, max: 50 }, lifecycle: { state: 'alive' } },
+    resources: { health: { current: 50, max: 50 } },
+    lifecycle: { state: 'alive' },
   },
   setAnimationState: vi.fn(),
   applyDamage: vi.fn(function applyDamage(amount) {
@@ -127,5 +128,19 @@ describe('auto-retaliation', () => {
     monster.combatController.resolvePendingAttack(1000);
 
     expect(player.combat.autoAttack).toBeUndefined();
+  });
+
+  it('discards a pending monster hit while respawn protection is active', () => {
+    const player = makeNakedPlayer({ x: 10, y: 10 });
+    player.combat.respawnProtectionUntil = 2_000;
+    scenePlayers.length = 0;
+    scenePlayers.push(player);
+
+    const monster = makeMonster(player, { x: 10, y: 10 });
+    const result = monster.combatController.resolvePendingAttack(1_000);
+
+    expect(result).toBe(false);
+    expect(player.applyDamage).not.toHaveBeenCalled();
+    expect(monster.state.pendingAttack).toBeNull();
   });
 });

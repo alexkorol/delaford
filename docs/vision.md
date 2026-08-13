@@ -73,7 +73,8 @@ deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
 ### Gameplay Core
 - ~~Implement Str/Dex/Int, health/mana, and scaling rules.~~ ✅ shared stat
   pipeline + archetype attribute spreads.
-- Create permadeath/cheat-death mechanics.
+- ~~Create permadeath/cheat-death mechanics.~~ ✅ mortal Chronicles,
+  cheat-death, duplicate-hit-safe soft death, and protected instance respawns.
 - Add LLM-backed RP naming enforcement.
 - ~~Design the skill tree with a Flower-of-Life-inspired layout.~~ ✅
   nine-ring geometric lattice with Signs, masteries, and gateway annexes.

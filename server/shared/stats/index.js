@@ -357,6 +357,13 @@ function applyDamage(state, amount, options = {}) {
     return null;
   }
 
+  const lifecycleState = state.lifecycle && state.lifecycle.state;
+  if (state.resources.health.current <= 0
+    || lifecycleState === 'awaiting-respawn'
+    || lifecycleState === 'permadead') {
+    return null;
+  }
+
   const timestamp = options.now || Date.now();
   const damage = Math.max(0, Math.floor(amount));
 

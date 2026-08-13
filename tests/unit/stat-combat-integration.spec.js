@@ -84,6 +84,21 @@ describe('stat pipeline → combat integration', () => {
     expect(state.lifecycle.state).toBe('awaiting-respawn');
   });
 
+  it('ignores further damage after death without extending the respawn timer', () => {
+    const state = makePlayerState();
+    state.lifecycle.cheatDeath.charges = 0;
+
+    const death = applyDamage(state, 9999, { now: 1_000 });
+    const readyAt = state.lifecycle.respawn.at;
+    const deaths = state.lifecycle.deaths;
+    const duplicate = applyDamage(state, 25, { now: 2_000 });
+
+    expect(death.type).toBe('death');
+    expect(duplicate).toBeNull();
+    expect(state.lifecycle.deaths).toBe(deaths);
+    expect(state.lifecycle.respawn.at).toBe(readyAt);
+  });
+
   it('triggers cheat-death when available', () => {
     const state = makePlayerState();
     expect(state.lifecycle.cheatDeath.charges).toBe(1);
