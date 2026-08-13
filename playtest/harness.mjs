@@ -296,8 +296,14 @@ export class HeadlessPlayer {
   async takeItem(groundItem, { timeoutMs = 15000 } = {}) {
     const menu = await this.rightClick(groundItem.x, groundItem.y);
     const plain = entry => String(entry.label || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
-    const take = menu.find(entry => plain(entry).startsWith('take')
-      || (entry.action && String(entry.action.name || '').toLowerCase() === 'take'));
+    const isTake = entry => plain(entry).startsWith('take')
+      || (entry.action && String(entry.action.name || '').toLowerCase() === 'take');
+    // More than one stack can occupy the same tile after an area attack. The
+    // menu sorts newest-first, while state() preserves scene insertion order;
+    // choosing the first generic Take entry can therefore pick up a different
+    // stack and leave the requested UUID on the floor until timeout.
+    const take = menu.find(entry => isTake(entry) && entry.uuid === groundItem.uuid)
+      || menu.find(isTake);
     if (!take) {
       throw new Error(`No Take entry at ${groundItem.x},${groundItem.y}: ${menu.map(m => m.label).join(' | ')}`);
     }
