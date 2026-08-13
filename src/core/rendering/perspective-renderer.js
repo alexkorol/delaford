@@ -3,6 +3,7 @@ import { now } from '../config/movement.js';
 import { centerOfTile } from '../utilities/movement-controller.js';
 import PerspectiveCamera from './perspective-camera.js';
 import TerrainRenderer from './terrain-renderer.js';
+import LightingRenderer, { sampleAmbient } from './lighting-renderer.js';
 
 const ACTOR_SCALE = 1.45;
 const ITEM_SCALE = 0.92;
@@ -20,6 +21,7 @@ class PerspectiveRenderer {
     this.terrainRenderer = new TerrainRenderer(map, {
       heightAt: (worldX, worldY) => this.terrainHeight(worldX, worldY),
     });
+    this.lightingRenderer = new LightingRenderer();
   }
 
   terrainHeight() {
@@ -62,7 +64,12 @@ class PerspectiveRenderer {
       return;
     }
 
-    const skyColour = [116, 132, 126];
+    const timestamp = now();
+    const elapsedSeconds = timestamp / 1000;
+    const ambient = sampleAmbient(elapsedSeconds);
+    const skyColour = ambient.map((channel, index) => (
+      channel * [0.62, 0.60, 0.58][index]
+    ));
     this.drawSky(ctx, canvas, skyColour);
     if (this.terrainRenderer.render(this.camera, skyColour)) {
       ctx.imageSmoothingEnabled = true;
@@ -79,6 +86,13 @@ class PerspectiveRenderer {
     this.drawProjectiles(ctx);
     this.drawCombatFeedback(ctx);
     this.drawMouse(ctx);
+    this.lightingRenderer.apply(ctx, {
+      width: canvas.width,
+      height: canvas.height,
+      elapsedSeconds,
+      ambient,
+      lights: this.collectDynamicLights(timestamp),
+    });
   }
 
   alignLegacyGround(ctx, canvas) {
@@ -526,8 +540,59 @@ class PerspectiveRenderer {
     ctx.restore();
   }
 
+  collectDynamicLights(timestamp) {
+    const tileSize = this.map.config.map.tileset.tile.width;
+    const lights = [];
+    const colours = {
+      player: [255, 208, 118],
+      monster: [255, 92, 66],
+      support: [122, 255, 176],
+    };
+
+    (this.map.projectiles || []).forEach((projectile) => {
+      const progress = (timestamp - projectile.startedAt) / projectile.travelMs;
+      if (progress < 0 || progress >= 1) {
+        return;
+      }
+      const from = centerOfTile(projectile.fromX, projectile.fromY, tileSize);
+      const to = centerOfTile(projectile.toX, projectile.toY, tileSize);
+      const worldX = from.x + ((to.x - from.x) * progress);
+      const worldY = from.y + ((to.y - from.y) * progress);
+      const point = this.camera.projectTerrain(worldX, worldY);
+      if (!point) {
+        return;
+      }
+      lights.push({
+        x: point.x,
+        y: point.y - (tileSize * 0.45 * point.scale),
+        radius: Math.max(32, 120 * point.scale),
+        colour: colours[projectile.kind] || colours.monster,
+        intensity: 0.95,
+      });
+    });
+
+    const player = this.map.player;
+    const animation = player && player.animation;
+    if (animation && ['attack', 'dash'].includes(animation.state)) {
+      const foot = this.getPlayerFoot(tileSize);
+      const point = this.camera.projectTerrain(foot.x, foot.y);
+      if (point) {
+        lights.push({
+          x: point.x,
+          y: point.y - (tileSize * 0.35 * point.scale),
+          radius: Math.max(38, 96 * point.scale),
+          colour: colours.player,
+          intensity: 0.58,
+        });
+      }
+    }
+
+    return lights;
+  }
+
   destroy() {
     this.terrainRenderer.destroy();
+    this.lightingRenderer.destroy();
     this.legacyGroundCanvas.width = 1;
     this.legacyGroundCanvas.height = 1;
   }
