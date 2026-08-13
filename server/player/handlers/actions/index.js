@@ -200,6 +200,17 @@ const canStackItems = (source, target) => (
   && isStackable(target)
 );
 
+const hasStackCapacity = (slots = [], candidate = {}) => (
+  isStackable(candidate)
+  && slots.some((target) => {
+    if (!target || target.id !== candidate.id || !isStackable(target)) {
+      return false;
+    }
+    const maxStack = target.maxStack || candidate.maxStack || Infinity;
+    return (Number(target.qty) || 1) < maxStack;
+  })
+);
+
 const dropInventoryItem = (player, itemIndex) => {
   if (!player || itemIndex < 0 || !player.inventory.slots[itemIndex]) {
     return null;
@@ -979,7 +990,8 @@ const actionEvents = {
     const candidateInventoryItem = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
       || { ...baseData, ...worldItem };
     const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidateInventoryItem);
-    if (openSlot === false && openSlot !== 0) {
+    if (!hasStackCapacity(player.inventory.slots, baseData)
+      && openSlot === false && openSlot !== 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
       return;
     }
@@ -1084,7 +1096,8 @@ const actionEvents = {
     const candidate = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
       || { ...baseData, ...worldItem };
     const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidate);
-    if (openSlot === false && openSlot !== 0) {
+    if (!hasStackCapacity(player.inventory.slots, baseData)
+      && openSlot === false && openSlot !== 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
       return;
     }

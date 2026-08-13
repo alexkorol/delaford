@@ -8,7 +8,8 @@ export default async function vesselforge({ connect, assert }) {
   const p = await connect();
   try {
     let state = await p.state();
-    if (state.wearDetails.ring?.combatBonuses?.goodsFound !== 10) {
+    if (state.wearDetails.ring?.combatBonuses?.goodsFound !== 10
+      || state.combat.goodsFound !== 10) {
       p.devGive('vessel-ring', 1, { seed: 4, itemLevel: 40 });
       const ring = await p.waitFor(async () => {
         const next = await p.state();

@@ -21,7 +21,9 @@ Chronicles account creator):
   effect that is not wired yet. Existing catalogue items remain legacy gear.
   Each native form also has distinct reference-driven item art in its own
   reproducible atlas. Equip/Unequip preserves the generated UUID through the
-  server-backed flow.
+  server-backed flow. Generated rewards bind after real world admission, merge
+  fungible currency into its existing stack, and fall at the player's feet
+  without losing identity when the spatial backpack is full.
 - **Character identity** — no classes. Every character is a blank with
   10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
   picker was reverted; the intended identity layer is Chronicles

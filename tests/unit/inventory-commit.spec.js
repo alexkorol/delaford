@@ -385,4 +385,43 @@ describe('inventory commit identity validation', () => {
     }));
     expect(Socket.broadcast).not.toHaveBeenCalledWith('item:change', expect.anything(), expect.anything());
   });
+
+  it('picks up currency into an existing stack when every grid cell is occupied', () => {
+    const scene = world.ensureScene('zone:inventory-full-stack-test', {
+      map: { foreground: [], background: [] },
+      items: [],
+      respawns: { items: [], monsters: [], resources: [] },
+    });
+    const coins = {
+      id: 'coins',
+      uuid: 'full-pickup-coins',
+      x: player.x,
+      y: player.y,
+      qty: 7,
+    };
+    scene.items = [coins];
+    player.inventory.slots = [
+      makeStack('existing-coins', 0, 5),
+      ...Array.from({ length: 83 }, (_, index) => makeFiller(index + 1)),
+    ];
+    player.inventory.add = vi.fn();
+    world.assignPlayerToScene(player, scene.id);
+
+    actionEvents['player:take']({
+      playerIndex: 0,
+      todo: {
+        item: { id: coins.id, uuid: coins.uuid },
+        at: { x: player.x, y: player.y },
+      },
+    });
+
+    expect(scene.items).toEqual([]);
+    expect(player.inventory.add).toHaveBeenCalledWith('coins', 7, {
+      uuid: coins.uuid,
+      existingItem: coins,
+    });
+    expect(Socket.emit).not.toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: 'There is no room in your backpack.',
+    }));
+  });
 });

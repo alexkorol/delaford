@@ -128,6 +128,7 @@ const buildStateSnapshot = (player) => {
         id: item.id,
         uuid: item.uuid,
         name: item.name,
+        boundTo: item.boundTo,
         x: item.x,
         y: item.y,
         qty: item.qty || 1,

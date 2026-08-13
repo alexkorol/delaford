@@ -70,8 +70,9 @@ different host than the page.
 | `VITE_WS_URL` | same-origin | Build-time client override for the WebSocket URL |
 | `SITE_URL` | unset | Auth/persistence API for non-guest accounts (not yet self-hostable) |
 
-## Known limitation
+## Persistence
 
-Player progress is only persisted for accounts backed by the `SITE_URL`
-auth API. Guest sessions reset on logout/restart — local persistence is the
-next planned piece of work.
+Guest progress is stored locally under `server/data/guest-saves/` and survives
+logout and process restarts. Back up that directory with the server if guest
+characters matter. Non-guest accounts still require the external `SITE_URL`
+auth/persistence API; that account service is not yet bundled for self-hosting.
