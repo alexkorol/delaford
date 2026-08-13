@@ -63,6 +63,39 @@ generated floor silently showing monster frame zero. Baynard, both merchants,
 and the bank gnome likewise retain their own server-selected frames. The
 deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
 
+Party play is now exercised as a real two-client protocol loop: distinct guests
+create a party, invite and ready together, enter the same generated instance,
+split safely when one member leaves, and return to town. Admission snapshots
+also clear readiness before they reach either client. The built-browser smoke
+test separately proves canvas and inventory context menus, UI-focus-safe WASD,
+skill-tree reopening, zone labels, and physical pointer equip/unequip.
+
+## Release runway toward 1.0
+
+The release gate is `npm run verify`: lint and style checks, the complete unit
+suite, production build, every real-server playtest scenario, and the built-game
+browser loop. The remaining product work is intentionally narrower than the
+original prototype roadmap:
+
+1. **Campaign breadth:** extend the authoritative three-commission campaign
+   toward the 23 quest points reserved by the passive tree, with named zones,
+   bosses, rewards, persistence, and playtest coverage for each arc.
+2. **Vesselforge progression:** wire the remaining visibly Dormant effects into
+   authoritative combat before exposing player-facing crafting, attunement, or
+   awakening loops.
+3. **Inventory depth and access:** implement real nested containers and finish
+   keyboard-first grid/equipment navigation; pointer equip/unequip, rotation,
+   spatial placement, overflow, and tooltips are already live.
+4. **Production ownership:** choose a guest-only launch or bundle the non-guest
+   account service, then document and test backup/restore for guest saves and
+   Chronicles data.
+5. **Operations:** add structured balance telemetry and the minimum safe GM,
+   rollback, and recovery tools needed to run a persistent world.
+
+LLM-backed naming remains optional until its hosting, privacy, failure mode,
+and offline fallback are decided; deterministic local validation remains the
+release-safe baseline.
+
 ## Pillars
 
 - **WASD-first ARPG**: keyboard movement/combat with optional mouse context menus.

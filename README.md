@@ -81,12 +81,21 @@ Each stream will break into issues/PRs with detailed implementation notes.
 
 ## Roadmap
 
-- [x] Foundation & Tooling — Vite/Volta dev stack, linting rules, and testing harnesses are in place.
-- [ ] Gameplay Core — Str/Dex/Int stats, permadeath/cheat-death loops, and RP name validation.
-- [ ] Inventory & Items — 127-slot backpack, nested containers, and brands/bonds affixes.
-- [ ] UI/UX — PoE-inspired panes, chat overlay, and pixel-perfect rendering that degrades gracefully.
-- [ ] Monsters & Combat — Shared stat pipeline, AI behaviours, and interpolated movement during fights.
-- [ ] Networking & World — Party instances, persistent towns, and semi-random map generation.
+- [x] Foundation & Tooling — one-command release verification now covers lint,
+  unit tests, production build, real-protocol playtests, and a built-browser loop.
+- [x] Gameplay Core — shared Str/Dex/Int stats, soft and mortal death loops,
+  authoritative quests, cheat death, combat, and passive-tree persistence.
+- [ ] Inventory & Items — the 12×7 spatial backpack, equipment, Vesselforge
+  affixes, tooltips, and pointer drag are live; nested containers remain.
+- [x] UI/UX — PoE-inspired panes, closable chat, responsive 2.5D rendering,
+  context menus, minimap, HUD orbs, and quickbar are browser-proven.
+- [x] Monsters & Combat — shared stat scaling, role AI, support healing,
+  generated bosses, feedback, loot, and interpolated movement are playable.
+- [x] Networking & World — persistent town, solo and party instances,
+  procedural layouts, depth transitions, and two-client party flow are live.
+
+The focused path from the current playable build to 1.0 is maintained in
+[`docs/vision.md`](docs/vision.md#release-runway-toward-10).
 
 ## Contribution Guide (WIP)
 
