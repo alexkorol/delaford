@@ -45,6 +45,10 @@ export class HeadlessPlayer {
     this.chroniclesUpdate = null;
     this.partyUpdateCount = 0;
     this.party = null;
+    this.partyInvites = [];
+    this.partyLoading = null;
+    this.partyCompleteCount = 0;
+    this.partyCompletion = null;
     this.screenOpenCount = 0;
     this.currentScreen = null;
     this.currentScreenPayload = null;
@@ -148,6 +152,18 @@ export class HeadlessPlayer {
       case 'party:update':
         this.partyUpdateCount += 1;
         this.party = data ? data.party : null;
+        break;
+      case 'party:invited':
+        if (data && data.invite) {
+          this.partyInvites.push(data.invite);
+        }
+        break;
+      case 'party:loading':
+        this.partyLoading = data ? data.state : null;
+        break;
+      case 'party:instance:complete':
+        this.partyCompleteCount += 1;
+        this.partyCompletion = data || null;
         break;
       case 'open:screen':
         this.screenOpenCount += 1;

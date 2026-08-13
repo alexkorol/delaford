@@ -67,6 +67,7 @@ WS client or the browser console:
 | `movement` | steps move the player; entering a zone mid-walk doesn't bounce |
 | `combat` | a pack **with a healer** can actually be killed, and you survive |
 | `loot` | kill → drop → real context menu → Take → in inventory |
+| `party` | two logins → invite/accept → ready → shared instance → leave/return cleanup |
 | `zones` | every Adventure zone: right layout, stairs, populated, named; stairs-up returns you to your pre-entry tile |
 | `skilltree` | a saved build survives a full relog |
 

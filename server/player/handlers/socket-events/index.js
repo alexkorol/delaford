@@ -17,6 +17,7 @@ import {
   selectScionRelic,
 } from '#server/core/services/scion-relics.js';
 import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
+import { resolveGuestProfile } from '#server/player/playtest-guest.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
 import { validateScionName } from '#shared/chronicles.js';
@@ -263,15 +264,16 @@ export default {
         replaceExistingSession(authenticated.player.uuid, ws.id);
         player = new Player(authenticated.player, authenticated.token, ws.id);
       } else {
+        const guestProfile = resolveGuestProfile(playerGuest, payload);
         // Flush + kick any existing session for this guest FIRST, so the
         // snapshot loaded below carries its up-to-the-second loot.
-        replaceExistingSession(playerGuest.uuid, ws.id);
+        replaceExistingSession(guestProfile.uuid, ws.id);
 
         // Guests persist to a local file (same shape as the template), so
         // loot, levels, bank, and the skill tree survive relogins — merge the
         // saved snapshot over the template before constructing the player.
-        const saved = loadGuest(playerGuest.uuid);
-        const guestData = saved ? { ...playerGuest, ...saved } : playerGuest;
+        const saved = loadGuest(guestProfile.uuid);
+        const guestData = saved ? { ...guestProfile, ...saved } : guestProfile;
         player = new Player(guestData, 'none', ws.id);
         // In-process fallback for the skill tree (covers saves made moments
         // before a crash, ahead of the next file flush).
