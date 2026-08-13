@@ -33,7 +33,12 @@ vi.mock('#server/socket.js', () => ({
 }));
 
 const { default: GameMap } = await import('#server/core/map.js');
-const { dropMonsterLoot, GEAR_DROP_POOL } = await import('#server/core/combat/loot.js');
+const {
+  applyGoodsFoundToCoins,
+  applyGoodsFoundToGearChance,
+  dropMonsterLoot,
+  GEAR_DROP_POOL,
+} = await import('#server/core/combat/loot.js');
 const { default: world } = await import('#server/core/world.js');
 const { default: Socket } = await import('#server/socket.js');
 const { default: UI } = await import('#shared/ui.js');
@@ -125,6 +130,26 @@ describe('monster loot drops', () => {
     expect(drops[0].y).toBe(14);
     expect(scene.items).toContain(drops[0]);
     expect(Socket.broadcast).toHaveBeenCalledWith('world:itemDropped', scene.items, []);
+  });
+
+  it('applies capped Goods Found to both coin quantity and gear chance', () => {
+    expect(applyGoodsFoundToCoins(45, { combat: { goodsFound: 20 } })).toBe(54);
+    expect(applyGoodsFoundToCoins(45, { combat: { goodsFound: 999 } })).toBe(90);
+    expect(applyGoodsFoundToGearChance(0.5, { combat: { goodsFound: 20 } })).toBe(0.6);
+    expect(applyGoodsFoundToGearChance(0.5, { combat: { goodsFound: 999 } })).toBe(0.75);
+
+    const sceneId = 'scene-loot-wealthy';
+    const scene = { id: sceneId, items: [], players: [] };
+    world.scenes.set(sceneId, scene);
+    const player = { combat: { goodsFound: 20 } };
+    // 0.055 misses the common 5% base chance but succeeds at its 6% boosted chance.
+    const drops = dropMonsterLoot(makeSlainMonster(sceneId), {
+      player,
+      rng: makeRngQueue([0.055, 0]),
+    });
+
+    expect(drops[0]).toMatchObject({ id: 'coins', qty: 54 });
+    expect(drops[1].vessel).toBeTruthy();
   });
 
   it('drops gear when the rarity-gated roll succeeds', () => {

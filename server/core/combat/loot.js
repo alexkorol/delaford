@@ -35,6 +35,21 @@ export const GEAR_DROP_POOL = [
   'vessel-ring',
 ];
 
+const goodsFoundPercent = player => Math.max(
+  0,
+  Math.min(100, Number(player?.combat?.goodsFound) || 0),
+);
+
+export const applyGoodsFoundToCoins = (coins, player) => Math.max(
+  0,
+  Math.floor(Math.max(0, Number(coins) || 0) * (1 + (goodsFoundPercent(player) / 100))),
+);
+
+export const applyGoodsFoundToGearChance = (chance, player) => Math.min(
+  0.75,
+  Math.max(0, Number(chance) || 0) * (1 + (goodsFoundPercent(player) / 100)),
+);
+
 /**
  * Drop a slain monster's rewards onto its tile: its coin bounty always,
  * plus a rarity-gated chance of a piece of gear. Drops land in the
@@ -62,9 +77,11 @@ export const dropMonsterLoot = (monster, options = {}) => {
   const rng = typeof options.rng === 'function' ? options.rng : Math.random;
   const drops = [];
 
-  const coins = monster.rewards && Number.isFinite(monster.rewards.coins)
+  const baseCoins = monster.rewards && Number.isFinite(monster.rewards.coins)
     ? Math.max(0, Math.floor(monster.rewards.coins))
     : 0;
+  const player = options.player;
+  const coins = applyGoodsFoundToCoins(baseCoins, player);
   if (coins > 0) {
     const coinItem = ItemFactory.createById('coins', { quantity: coins });
     if (coinItem) {
@@ -73,7 +90,6 @@ export const dropMonsterLoot = (monster, options = {}) => {
   }
 
   const rarityId = monster.rarityId || 'common';
-  const player = options.player;
   if (rarityId === 'elite' && player && player.uuid && player.chronicles) {
     const released = chroniclesStore.beginRelicDrop(player.uuid, player.chronicles);
     if (released.ok && released.relic && released.relic.item) {
@@ -88,9 +104,10 @@ export const dropMonsterLoot = (monster, options = {}) => {
     }
   }
 
-  const gearChance = GEAR_DROP_CHANCES[rarityId] !== undefined
+  const baseGearChance = GEAR_DROP_CHANCES[rarityId] !== undefined
     ? GEAR_DROP_CHANCES[rarityId]
     : GEAR_DROP_CHANCES.common;
+  const gearChance = applyGoodsFoundToGearChance(baseGearChance, player);
   // Proof of Temper must remain completable without farming a 50% elite roll.
   // The guardian still chooses a random native form; only the first drop is
   // guaranteed while that exact objective is current.
@@ -126,4 +143,6 @@ export default {
   dropMonsterLoot,
   GEAR_DROP_CHANCES,
   GEAR_DROP_POOL,
+  applyGoodsFoundToCoins,
+  applyGoodsFoundToGearChance,
 };

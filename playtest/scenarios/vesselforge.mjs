@@ -1,13 +1,29 @@
 /**
- * Vesselforge effects: equip a deterministic Keen Eye weapon, then prove the
- * chance reaches the live combat event as an exact 1.5x critical hit. The dev
- * force only removes random flakiness; generation, equip, damage, and the
- * WebSocket `combat:hit` payload all use their production paths.
+ * Vesselforge effects: equip deterministic Keen Eye and Wealthy gear, then
+ * prove both modifiers reach live combat rewards. The dev force only removes
+ * critical-roll flakiness; generation, equip, damage, loot, and WebSocket
+ * payloads all use their production paths.
  */
 export default async function vesselforge({ connect, assert }) {
   const p = await connect();
   try {
     let state = await p.state();
+    if (!state.wearDetails.ring?.combatBonuses?.goodsFound) {
+      p.devGive('vessel-ring', 1, { seed: 4, itemLevel: 40 });
+      const ring = await p.waitFor(async () => {
+        const next = await p.state();
+        return next.inventoryDetails.find(item => (
+          item.id === 'vessel-ring'
+          && item.combatBonuses?.goodsFound === 10
+        )) || false;
+      }, { label: 'deterministic Wealthy ring' });
+      p.equipItem(ring, 'ring');
+      state = await p.waitFor(async () => {
+        const next = await p.state();
+        return next.wearDetails.ring?.uuid === ring.uuid ? next : false;
+      }, { label: 'equip Wealthy ring' });
+    }
+
     if (!state.wearDetails.right_hand?.combatBonuses?.criticalChance) {
       p.devGive('vessel-khopesh', 1, { seed: 539, itemLevel: 40 });
       const weapon = await p.waitFor(async () => {
@@ -29,16 +45,22 @@ export default async function vesselforge({ connect, assert }) {
     assert(state.wearDetails.right_hand.vessel.lines.some(line => (
       line.section === 'brand' && /Critical Chance/.test(line.text)
     )), 'Keen Eye is presented as a live Brand');
+    assert(state.combat.goodsFound === 10, 'Wealthy reaches combat state (10%)');
+    assert(state.wearDetails.ring.vessel.lines.some(line => (
+      line.section === 'brand' && /Goods Found/.test(line.text)
+    )), 'Wealthy is presented as a live Brand');
 
     await p.enterZone('dungeon', 'warren');
-    p.devSetLevel(5);
+    p.devSetLevel(50);
     p.devHeal();
     const scene = await p.state();
+    const groundBefore = new Set(scene.groundItems.map(item => item.uuid));
     const target = scene.monsters
       .filter(monster => monster.rarity !== 'elite')
       .sort((a, b) => (Math.abs(a.x - scene.x) + Math.abs(a.y - scene.y))
         - (Math.abs(b.x - scene.x) + Math.abs(b.y - scene.y)))[0];
     assert(target, 'found a target for the critical strike');
+    assert(target.coins > 0, 'target carries a measurable coin bounty');
 
     p.devTeleport(target.x + 1, target.y);
     p.devForceCritical();
@@ -51,6 +73,25 @@ export default async function vesselforge({ connect, assert }) {
     const expected = Math.max(hit.baseAmount + 1, Math.round(hit.baseAmount * 1.5));
     assert(hit.amount === expected,
       `critical hit deals the measured 1.5x result (${hit.baseAmount} -> ${hit.amount})`);
+
+    const boostedCoins = Math.floor(target.coins * 1.1);
+    const coin = await p.waitFor(async () => {
+      const next = await p.state();
+      const fresh = next.groundItems.find(item => (
+        item.id === 'coins'
+        && item.qty === boostedCoins
+        && !groundBefore.has(item.uuid)
+      ));
+      if (fresh) return fresh;
+      const stillAlive = next.monsters.find(monster => monster.uuid === target.uuid);
+      if (stillAlive) {
+        p.devTeleport(Math.round(stillAlive.x) + 1, Math.round(stillAlive.y));
+        await p.attack(stillAlive);
+      }
+      return false;
+    }, { timeoutMs: 10000, intervalMs: 250, label: 'Wealthy coin drop' });
+    assert(coin.qty === boostedCoins,
+      `Wealthy boosts the real coin bounty by 10% (${target.coins} -> ${coin.qty})`);
   } finally {
     p.close();
   }

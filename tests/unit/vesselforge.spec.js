@@ -351,6 +351,24 @@ describe('Vesselforge game integration', () => {
     expect(refreshed.lines.some(line => /Dormant.*Critical Chance/.test(line.text))).toBe(false);
   });
 
+  it('makes Wealthy a capped live Goods Found modifier', () => {
+    const item = forge.generateItem({
+      ilvl: 40,
+      formId: 'ring',
+      materialId: 'bone',
+      brands: 0,
+    });
+    item.brands.push({
+      id: 'wealthy-test', modId: 'wealthy', tier: 2, value: 20,
+    });
+    const refreshed = refreshVesselBlock({ item });
+
+    expect(refreshed.combat.modifiers.goodsFound).toBe(20);
+    expect(refreshed.lines.some(line => line.section === 'brand'
+      && /Goods Found/.test(line.text))).toBe(true);
+    expect(refreshed.lines.some(line => /Dormant.*Goods Found/.test(line.text))).toBe(false);
+  });
+
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {
     const legacy = ItemFactory.createById('bronze-sword', { rng: () => 0.5 });
 
