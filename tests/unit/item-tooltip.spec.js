@@ -70,6 +70,7 @@ describe('inventory item tooltip', () => {
 
     expect(gridSource).toContain('<ItemTooltip');
     expect(gridSource).toContain(':aria-label="itemAriaLabel(item)"');
+    expect(gridSource).toContain('@focus="showTooltip($event, item)"');
     expect(gridSource).not.toContain(':title="itemTooltip(item)"');
     expect(tooltipSource).toContain('role="tooltip"');
     expect(tooltipSource).toContain('item-tooltip__line--tone-');

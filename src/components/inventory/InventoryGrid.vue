@@ -19,9 +19,12 @@
         :class="itemClasses(item)"
         :style="itemStyle(item)"
         :aria-label="itemAriaLabel(item)"
+        tabindex="0"
         @pointerenter="showTooltip($event, item)"
         @pointermove="moveTooltip"
         @pointerleave="hideTooltip"
+        @focus="showTooltip($event, item)"
+        @blur="hideTooltip"
         @pointerdown.left.prevent="beginPointerDrag($event, item)"
         @dblclick.prevent="handleDoubleClick(item)"
         @contextmenu.stop.prevent="showContextMenu($event, item)"
@@ -152,20 +155,29 @@ export default {
         return;
       }
 
+      const anchor = event.currentTarget && typeof event.currentTarget.getBoundingClientRect === 'function'
+        ? event.currentTarget.getBoundingClientRect()
+        : null;
+      const pointerX = Number.isFinite(event.clientX) && event.clientX > 0
+        ? event.clientX
+        : (anchor?.right || 12);
+      const pointerY = Number.isFinite(event.clientY) && event.clientY > 0
+        ? event.clientY
+        : (anchor ? anchor.top + anchor.height / 2 : 12);
       const width = Math.min(326, Math.max(220, window.innerWidth - 24));
       const gap = 16;
-      const left = event.clientX + gap + width <= window.innerWidth - 12
-        ? event.clientX + gap
-        : Math.max(12, event.clientX - width - gap);
-      const above = event.clientY > window.innerHeight / 2;
+      const left = pointerX + gap + width <= window.innerWidth - 12
+        ? pointerX + gap
+        : Math.max(12, pointerX - width - gap);
+      const above = pointerY > window.innerHeight / 2;
 
       tooltipPosition.value = {
         left,
-        top: above ? null : event.clientY + gap,
-        bottom: above ? window.innerHeight - event.clientY + gap : null,
+        top: above ? null : pointerY + gap,
+        bottom: above ? window.innerHeight - pointerY + gap : null,
         maxHeight: Math.max(140, above
-          ? event.clientY - gap - 12
-          : window.innerHeight - event.clientY - gap - 12),
+          ? pointerY - gap - 12
+          : window.innerHeight - pointerY - gap - 12),
       };
     };
 
