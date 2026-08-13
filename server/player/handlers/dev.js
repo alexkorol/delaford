@@ -31,6 +31,22 @@ const sendDevMessage = (player, text) => {
   });
 };
 
+const itemIdentity = item => (item ? {
+  id: item.id,
+  uuid: item.uuid,
+  name: item.name,
+  displayName: item.displayName,
+  qty: item.qty || 1,
+  slot: item.slot,
+  position: item.position,
+  orientation: item.orientation,
+  boundTo: item.boundTo,
+  affixes: item.affixes,
+  vessel: item.vessel,
+  stats: item.stats,
+  size: item.size,
+} : null);
+
 // Snapshot of everything a playtest needs to assert on, in one request.
 const buildStateSnapshot = (player) => {
   const scene = world.getSceneForPlayer(player);
@@ -53,10 +69,21 @@ const buildStateSnapshot = (player) => {
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
       }))
       : [],
+    inventoryDetails: Array.isArray(player.inventory && player.inventory.slots)
+      ? player.inventory.slots.map(itemIdentity)
+      : [],
     wear: player.wear
       ? Object.fromEntries(Object.entries(player.wear)
         .map(([slot, item]) => [slot, item ? item.id : null]))
       : {},
+    wearDetails: player.wear
+      ? Object.fromEntries(Object.entries(player.wear)
+        .map(([slot, item]) => [slot, itemIdentity(item)]))
+      : {},
+    combat: player.combat ? {
+      attack: { ...player.combat.attack },
+      defense: { ...player.combat.defense },
+    } : null,
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
       ? scene.monsters.filter(m => m && m.isAlive).map(m => ({

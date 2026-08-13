@@ -3,7 +3,10 @@
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { PlayerPersistenceService } from '#server/core/services/player-persistence.js';
-import { buildGuestSnapshot } from '#server/core/repositories/guest-save-store.js';
+import {
+  buildDurableItemSnapshot,
+  buildGuestSnapshot,
+} from '#server/core/repositories/guest-save-store.js';
 
 // A real account player carries a JWT; guests carry token 'none' and are
 // skipped by the network save entirely.
@@ -98,6 +101,70 @@ describe('PlayerPersistenceService', () => {
     });
     expect(snapshot.lifecycle).toEqual({ mode: 'hard', state: 'permadead' });
     expect(snapshot.resources.health.current).toBe(0);
+  });
+
+  it('keeps rolled inventory and equipped-item identity while stripping world state', () => {
+    const rolledItem = {
+      id: 'bronze-sword',
+      uuid: 'rolled-sword-1',
+      name: 'Gleaming Bronze Sword of Sparks',
+      displayName: 'Gleaming Bronze Sword of Sparks',
+      slot: 13,
+      position: { x: 1, y: 1 },
+      orientation: 'rotated',
+      boundTo: 'guest-rich-items',
+      stats: { attack: { slash: 17 } },
+      affixes: {
+        brand: { id: 'gleaming', value: 4 },
+        bond: { id: 'sparks', value: 3 },
+      },
+      vessel: {
+        material: 'Bronze',
+        item: { id: 'vessel-1', patience: 5, brands: [{ id: 'brand-1' }] },
+        lines: [{ section: 'vessel', text: 'Vessel 3' }],
+      },
+      x: 44,
+      y: 52,
+      timestamp: 1234,
+      context: 'item',
+      isLocked: true,
+    };
+    const equipped = {
+      ...rolledItem,
+      uuid: 'equipped-sword-1',
+      slot: 'right_hand',
+    };
+    const snapshot = buildGuestSnapshot({
+      uuid: 'guest-rich-items',
+      level: 5,
+      x: 38,
+      y: 115,
+      inventory: { slots: [rolledItem] },
+      wear: { right_hand: equipped, armor: null, arrows: null },
+      skills: {},
+      bank: [],
+      stats: { resources: {}, lifecycle: {} },
+    });
+
+    expect(snapshot.inventory[0]).toEqual(expect.objectContaining({
+      uuid: 'rolled-sword-1',
+      name: 'Gleaming Bronze Sword of Sparks',
+      orientation: 'rotated',
+      boundTo: 'guest-rich-items',
+      affixes: rolledItem.affixes,
+      vessel: rolledItem.vessel,
+      stats: rolledItem.stats,
+    }));
+    expect(snapshot.wear.right_hand).toEqual(expect.objectContaining({
+      uuid: 'equipped-sword-1',
+      vessel: rolledItem.vessel,
+    }));
+    expect(snapshot.wear.armor).toBeNull();
+    expect(snapshot.wear).not.toHaveProperty('arrows');
+    expect(snapshot.inventory[0]).not.toHaveProperty('x');
+    expect(snapshot.inventory[0]).not.toHaveProperty('timestamp');
+    expect(snapshot.inventory[0]).not.toHaveProperty('isLocked');
+    expect(buildDurableItemSnapshot(null)).toBeNull();
   });
 
   describe('shouldThrottleSave', () => {

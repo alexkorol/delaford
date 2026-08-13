@@ -393,6 +393,20 @@ export class HeadlessPlayer {
     this.emit('dev:give', { itemId, qty });
   }
 
+  equipItem(item, targetSlot) {
+    this.emit('item:equip', {
+      item: {
+        id: item.id,
+        uuid: item.uuid,
+        targetSlot,
+        miscData: {
+          slot: item.slot,
+          targetSlot,
+        },
+      },
+    });
+  }
+
   devSetLevel(level) {
     this.emit('dev:setlevel', { level });
   }

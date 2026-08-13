@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { structuredCloneSafe } from '#server/core/items/affix-engine.js';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 // GUEST_SAVE_DIR override keeps automated playtests hermetic — they must
 // never inherit (or clobber) the developer's own character save.
@@ -20,20 +22,37 @@ const SAVE_DIR = process.env.GUEST_SAVE_DIR
 
 const savePath = uuid => path.join(SAVE_DIR, `${String(uuid).replace(/[^a-zA-Z0-9-]/g, '')}.json`);
 
-const wearIds = (wear = {}) => Object.fromEntries(
+export const buildDurableItemSnapshot = (item) => {
+  if (!item || typeof item !== 'object' || !item.id) {
+    return item || null;
+  }
+
+  const snapshot = structuredCloneSafe(item);
+  // World placement and interaction locks are session state, not item
+  // identity. Everything else (UUID, rolled stats, affixes, vessel, layout,
+  // binding) must survive exactly.
+  delete snapshot.x;
+  delete snapshot.y;
+  delete snapshot.timestamp;
+  delete snapshot.context;
+  delete snapshot.respawn;
+  delete snapshot.respawnIn;
+  delete snapshot.willRespawnIn;
+  delete snapshot.isLocked;
+  return snapshot;
+};
+
+const wearInstances = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
     .filter(([slot]) => slot !== 'arrows')
-    .map(([slot, item]) => [slot, item && typeof item === 'object' ? item.id : item]),
+    .map(([slot, item]) => [slot, item && typeof item === 'object'
+      ? buildDurableItemSnapshot(item)
+      : item]),
 );
 
-const slimInventory = (slots = []) => slots
+const durableInventory = (slots = []) => slots
   .filter(item => item && item.id)
-  .map(item => ({
-    id: item.id,
-    slot: item.slot,
-    uuid: item.uuid,
-    ...(Number.isFinite(item.qty) ? { qty: item.qty } : {}),
-  }));
+  .map(buildDurableItemSnapshot);
 
 // Never persist instance coordinates: guests always reload into town, and
 // raw dungeon x/y would strand them at meaningless surface tiles.
@@ -54,8 +73,8 @@ export const buildGuestSnapshot = (player) => ({
   ...surfacePosition(player),
   level: player.level,
   skills: player.skills || {},
-  wear: wearIds(player.wear),
-  inventory: slimInventory(player.inventory && player.inventory.slots),
+  wear: wearInstances(player.wear),
+  inventory: durableInventory(player.inventory && player.inventory.slots),
   bank: Array.isArray(player.bank) ? player.bank : [],
   passiveTree: player.passiveTree || null,
   chronicles: player.chronicles || null,

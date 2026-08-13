@@ -46,6 +46,10 @@ class Wear {
    * Update a player's combat attack and defense
    */
   static updateCombat(playerIndex) {
+    return this.calculateCombat(world.players[playerIndex] && world.players[playerIndex].wear);
+  }
+
+  static calculateCombat(wear = {}) {
     const stats = {
       attack: {
         stab: 0,
@@ -62,8 +66,8 @@ class Wear {
     };
 
     // Go through each wear item and add up its value
-    Object.keys(world.players[playerIndex].wear).forEach((key) => {
-      const val = world.players[playerIndex].wear[key];
+    Object.keys(wear || {}).forEach((key) => {
+      const val = wear[key];
       if (val !== null && val.uuid && val.id) {
         const attack = this.getAttack(val);
         const defense = this.getDefense(val);

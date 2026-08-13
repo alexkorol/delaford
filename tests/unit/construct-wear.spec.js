@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { constructWear } from '#server/core/entities/player/inventory-manager.js';
+import Wear from '#server/core/utilities/wear.js';
 
 // Regression: constructWear runs inside the Player constructor on every login.
 // A saved character can carry a worn item id that no longer exists in the item
@@ -36,6 +37,39 @@ describe('constructWear', () => {
     expect(wear.right_hand).toBeNull();
     // valid siblings are still hydrated
     expect(wear.armor).toEqual(expect.objectContaining({ id: 'bronze-sword' }));
+  });
+
+  it('preserves a rich equipped instance and immediately restores its rolled combat stats', () => {
+    const saved = {
+      id: 'bronze-sword',
+      uuid: 'rolled-sword-1',
+      name: 'Gleaming Bronze Sword of Sparks',
+      displayName: 'Gleaming Bronze Sword of Sparks',
+      slot: 13,
+      boundTo: 'account-1',
+      stats: {
+        attack: { stab: 3, slash: 19, crush: 0, range: 0 },
+        defense: { stab: 1, slash: 2, crush: 0, range: 0 },
+      },
+      affixes: { brand: { id: 'gleaming' }, bond: { id: 'sparks' } },
+      vessel: { material: 'Bronze', item: { id: 'vessel-1' } },
+    };
+    const wear = constructWear({ right_hand: saved, armor: null });
+    const combat = Wear.calculateCombat(wear);
+
+    expect(wear.right_hand).toEqual(expect.objectContaining({
+      id: 'bronze-sword',
+      uuid: 'rolled-sword-1',
+      name: 'Gleaming Bronze Sword of Sparks',
+      boundTo: 'account-1',
+      affixes: saved.affixes,
+      vessel: saved.vessel,
+      equipSlot: 'right_hand',
+      slotType: 'right_hand',
+    }));
+    expect(wear.right_hand).not.toHaveProperty('slot');
+    expect(combat.attack.slash).toBe(19);
+    expect(combat.defense.slash).toBe(2);
   });
 
   it('drops the arrows key and preserves explicit nulls', () => {

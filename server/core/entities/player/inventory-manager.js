@@ -1,6 +1,6 @@
 import Inventory from '#server/core/utilities/common/player/inventory.js';
 import { wearableItems } from '#server/core/data/items/index.js';
-import { v4 as uuid } from 'uuid';
+import ItemFactory from '#server/core/items/factory.js';
 
 export const constructWear = (data) => {
   const wearData = { ...data };
@@ -12,7 +12,8 @@ export const constructWear = (data) => {
     }
 
     if (wearData[property] !== null) {
-      const id = wearData[property];
+      const saved = wearData[property];
+      const id = typeof saved === 'object' ? saved.id : saved;
       const definition = wearableItems.find(db => db.id === id);
       // A saved character can reference an item id that no longer exists in the
       // database (e.g. after an item-pack rename). Clear the slot instead of
@@ -21,13 +22,18 @@ export const constructWear = (data) => {
         wearData[property] = null;
         return;
       }
-      const { name, graphics } = definition;
-      wearData[property] = {
-        uuid: uuid(),
-        graphics,
-        name,
-        id,
-      };
+      const hydrated = typeof saved === 'object'
+        ? ItemFactory.adoptExisting({ ...definition, ...saved }, { baseItem: definition })
+        : ItemFactory.createById(id, { includeAffixes: false });
+      if (!hydrated) {
+        wearData[property] = null;
+        return;
+      }
+      delete hydrated.context;
+      delete hydrated.slot;
+      hydrated.equipSlot = definition.slot;
+      hydrated.slotType = definition.slot;
+      wearData[property] = hydrated;
     }
   });
 

@@ -4,6 +4,7 @@ import config from '#server/config.js';
 import * as emoji from 'node-emoji';
 import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from './world.js';
+import Wear from './utilities/wear.js';
 import createPlayerCombatController from '#server/core/entities/player/combat-controller.js';
 import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
 import createPlayerMovementHandler, {
@@ -75,6 +76,9 @@ class Player {
     // Tabs
     this.friend_list = data.friend_list;
     this.wear = Player.constructWear(data.wear);
+    const equippedCombat = Wear.calculateCombat(this.wear);
+    this.combat.attack = equippedCombat.attack;
+    this.combat.defense = equippedCombat.defense;
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).
