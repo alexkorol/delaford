@@ -106,6 +106,7 @@ import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
 import { shouldRootHandleQuickbarHotkey } from './core/hotkeys.js';
+import { resetPartyClientState } from './core/party-state.js';
 import {
   entombScion,
   getActiveHouse,
@@ -665,6 +666,7 @@ export default {
       }
       this.game = { exit: true };
       this.loaded = false;
+      this.resetPartyState();
       this.chroniclesContext = context;
       this.screen = 'chronicles';
       bus.$emit('login:done');
@@ -772,14 +774,7 @@ export default {
       this.layout.rightPane = defaultPaneAssignments.right;
       this.resetChatState();
       this.handleMapDimensions();
-      this.party = null;
-      this.partyInvites = [];
-      this.partyLoading = { active: false, state: null };
-      this.partyStatusMessage = '';
-      if (this.partyStatusTimeout) {
-        clearTimeout(this.partyStatusTimeout);
-        this.partyStatusTimeout = null;
-      }
+      this.resetPartyState();
     },
 
     /**
@@ -801,6 +796,10 @@ export default {
       this.layout.chat.isPinned = false;
       this.layout.chat.unreadCount = 0;
       this.layout.chat.preview = DEFAULT_CHAT_PREVIEW;
+    },
+
+    resetPartyState() {
+      resetPartyClientState(this);
     },
 
     onViewportResize() {
@@ -1508,10 +1507,7 @@ export default {
 
     handlePartyLeave() {
       Socket.emit('party:leave');
-      this.party = null;
-      this.partyLoading = { active: false, state: null };
-      this.partyInvites = [];
-      this.setPartyStatusMessage('');
+      this.resetPartyState();
     },
 
     handlePartyReadyToggle() {
