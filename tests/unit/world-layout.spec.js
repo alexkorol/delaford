@@ -4,7 +4,7 @@ import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import Monster from '#server/core/monster.js';
 import { SURFACE_MONSTER_COLUMNS } from '#shared/actor-graphics.js';
-import DUNGEON_TILESET, { DUNGEON_FIRST_GID } from '#shared/dungeon-tiles.js';
+import DUNGEON_TILESET, { DUNGEON_FIRST_GID, dungeonGid } from '#shared/dungeon-tiles.js';
 import { createWorldLayout } from '#server/core/world-layout.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 
@@ -159,10 +159,11 @@ describe('DCSS world layout', () => {
   it('places reachable furnace and anvil interactions in the rebuilt village', () => {
     const layout = createWorldLayout();
     const interactions = layout.town.metadata.interactions || [];
-    const stationIds = new Set(interactions.map(interaction => interaction.objectId));
+    const stations = interactions.filter(interaction => [217, 287].includes(interaction.objectId));
+    const stationIds = new Set(stations.map(interaction => interaction.objectId));
 
     expect(stationIds).toEqual(new Set([217, 287]));
-    interactions.forEach((interaction) => {
+    stations.forEach((interaction) => {
       const stationIndex = (interaction.y * 200) + interaction.x;
       expect(layout.town.map.foreground[stationIndex]).toBeGreaterThanOrEqual(DUNGEON_FIRST_GID);
       expect([
@@ -170,6 +171,31 @@ describe('DCSS world layout', () => {
         { x: interaction.x + 1, y: interaction.y },
         { x: interaction.x, y: interaction.y - 1 },
         { x: interaction.x, y: interaction.y + 1 },
+      ].some(point => (
+        isWalkable(layout.town, point.x, point.y)
+        && hasWalkablePath(layout.town, layout.town.metadata.spawnPoints[0], point)
+      ))).toBe(true);
+    });
+  });
+
+  it('places reachable copper and tin rocks beside the rebuilt smithy', () => {
+    const layout = createWorldLayout();
+    const resources = (layout.town.metadata.interactions || [])
+      .filter(interaction => [280, 281].includes(interaction.objectId));
+
+    expect(new Set(resources.map(resource => resource.objectId))).toEqual(new Set([280, 281]));
+    resources.forEach((resource) => {
+      const resourceIndex = (resource.y * 200) + resource.x;
+      const expectedGid = resource.objectId === 280
+        ? dungeonGid('rock_copper')
+        : dungeonGid('rock_tin');
+      expect(layout.town.map.foreground[resourceIndex]).toBe(expectedGid);
+      expect(resource.depletedGid).toBe(dungeonGid('rock_depleted'));
+      expect([
+        { x: resource.x - 1, y: resource.y },
+        { x: resource.x + 1, y: resource.y },
+        { x: resource.x, y: resource.y - 1 },
+        { x: resource.x, y: resource.y + 1 },
       ].some(point => (
         isWalkable(layout.town, point.x, point.y)
         && hasWalkablePath(layout.town, layout.town.metadata.spawnPoints[0], point)

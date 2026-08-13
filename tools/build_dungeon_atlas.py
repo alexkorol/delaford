@@ -42,6 +42,14 @@ def first(*cands):
         if exists(rel): return [rel]
     return []
 
+def project(*paths):
+    """Resolve checked-in Verdigris additions without requiring them upstream."""
+    return [
+        os.path.join(OUT_REPO, path)
+        for path in paths
+        if os.path.exists(os.path.join(OUT_REPO, path))
+    ]
+
 floors = {
     "stone":    seq("floor/pebble_brown{}.png", 0, 8),
     "grey":     seq("floor/grey_dirt{}.png", 0, 7),
@@ -113,6 +121,11 @@ decor_walkable = {
     "flowers": seq("decor/flower_patch_{}.png", 0, 3),
     "floor_decorative": first("decor/decorative_floor.png"),
 }
+resources = {
+    "rock_depleted": project("src/assets/tiles/sources/mining/rock-depleted.png"),
+    "rock_copper": project("src/assets/tiles/sources/mining/rock-copper.png"),
+    "rock_tin": project("src/assets/tiles/sources/mining/rock-tin.png"),
+}
 
 altdir = os.path.join(RL, "altars")
 if os.path.isdir(altdir):
@@ -128,6 +141,7 @@ categories = [
     ("tree", trees, "fg", False),
     ("decor", decor_blocked, "fg", False),
     ("decor_walk", decor_walkable, "fg", True),
+    ("resource", resources, "fg", False),
 ]
 
 tiles = []

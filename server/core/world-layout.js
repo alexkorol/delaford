@@ -53,6 +53,9 @@ const tile = {
   statueArcher: dungeonGid('statue_archer'),
   statueDragon: dungeonGid('statue_dragon'),
   sarcophagus: dungeonGid('sarcophagus'),
+  rockDepleted: dungeonGid('rock_depleted'),
+  rockCopper: dungeonGid('rock_copper'),
+  rockTin: dungeonGid('rock_tin'),
 };
 
 const idx = (x, y) => (y * WIDTH) + x;
@@ -378,6 +381,29 @@ const createTownScene = () => {
   scene.metadata.interactions.push(
     { id: 'delaford-furnace', objectId: 217, x: 52, y: 121 },
     { id: 'delaford-anvil', objectId: 287, x: 55, y: 121 },
+  );
+  // A small quarry beside the smithy closes the gather -> smelt -> forge
+  // loop inside the rebuilt village. Resource identity stays in metadata so
+  // the generated rock artwork is independent from the legacy objects atlas.
+  fillEllipse(map, 62, 129, 3, 3, tile.stoneFloor, 'background', 59);
+  carveHorizontal(map, 58, 62, 127, 0, tile.dirtFloor, 59);
+  setFg(map, 61, 129, tile.rockCopper);
+  setFg(map, 63, 129, tile.rockTin);
+  scene.metadata.interactions.push(
+    {
+      id: 'delaford-copper-rock',
+      objectId: 280,
+      x: 61,
+      y: 129,
+      depletedGid: tile.rockDepleted,
+    },
+    {
+      id: 'delaford-tin-rock',
+      objectId: 281,
+      x: 63,
+      y: 129,
+      depletedGid: tile.rockDepleted,
+    },
   );
   setFg(map, 42, 132, tile.statueAngel);
   addFlowers(map, 31, 111, 15, 9, 2, 60);

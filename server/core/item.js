@@ -64,6 +64,17 @@ class Item {
           foreground[resource.onTile] = resource.setToTile;
         }
 
+        if (resource.interactionId
+          && Number.isInteger(resource.setToObjectId)
+          && Array.isArray(scene.metadata?.interactions)) {
+          const interaction = scene.metadata.interactions.find(candidate => (
+            candidate?.id === resource.interactionId
+          ));
+          if (interaction) {
+            interaction.objectId = resource.setToObjectId;
+          }
+        }
+
         Socket.broadcast('world:foreground:update', foreground, world.getScenePlayers(scene.id));
         world.removeResourceRespawn(resource, scene.id);
       }

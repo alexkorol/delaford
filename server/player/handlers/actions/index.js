@@ -1357,11 +1357,46 @@ const actionEvents = {
     }
 
     const { onTile, world: clickedWorld } = data.todo.actionToQueue;
+    const scene = getPlayerScene(player);
+    const mapLayers = scene && scene.map ? scene.map : world.map;
+    const foreground = mapLayers && Array.isArray(mapLayers.foreground)
+      ? mapLayers.foreground
+      : null;
+    const mapWidth = Number.isInteger(mapLayers?.width)
+      ? mapLayers.width
+      : config.map.size.x;
+    const expectedTile = clickedWorld
+      && Number.isInteger(clickedWorld.x)
+      && Number.isInteger(clickedWorld.y)
+      ? (clickedWorld.y * mapWidth) + clickedWorld.x
+      : -1;
 
-    // Reject crafted packets: the tile index is client-supplied and must be a
-    // real in-bounds map index, and the player must actually be at the rock.
-    if (clickedWorld && !isWithinReach(player, clickedWorld)) {
-      console.warn(`[actions] mining rejected: ${player.username} is too far from the rock.`);
+    // Reject crafted packets: coordinates and tile index must identify the
+    // same nearby map cell. Queued world actions finish adjacent to the rock.
+    if (!foreground
+      || !Number.isInteger(onTile)
+      || onTile < 0
+      || onTile >= foreground.length
+      || onTile !== expectedTile
+      || !isWithinReach(player, clickedWorld, 2)) {
+      console.warn(`[actions] mining rejected: ${player.username} supplied an invalid rock target.`);
+      return;
+    }
+
+    const interaction = Array.isArray(scene?.metadata?.interactions)
+      ? scene.metadata.interactions.find(candidate => (
+        candidate
+        && candidate.x === clickedWorld.x
+        && candidate.y === clickedWorld.y
+      ))
+      : null;
+    const initialTile = foreground[onTile];
+    const activeObjectId = interaction?.objectId ?? initialTile - 253;
+    const requestedObjectId = data.todo.item.id;
+    const resourceData = Query.getForegroundData(activeObjectId);
+
+    if (activeObjectId !== requestedObjectId || resourceData?.type !== 'mine') {
+      console.warn(`[actions] mining rejected: ${player.username} targeted a stale or non-resource tile.`);
       return;
     }
 
@@ -1369,6 +1404,43 @@ const actionEvents = {
 
     try {
       const rockMined = await mining.pickAtRock();
+
+      // Mining is delayed, so another player may have exhausted this exact
+      // node while the pickaxe animation was in flight. Claim depletion
+      // atomically before granting ore or XP.
+      const currentInteractionObjectId = interaction?.objectId ?? foreground[onTile] - 253;
+      if (getPlayerScene(player)?.id !== scene.id
+        || !isWithinReach(player, clickedWorld, 2)) {
+        throw new Error('Mining interrupted.');
+      }
+      if (currentInteractionObjectId !== rockMined.id
+        || (!interaction && foreground[onTile] !== initialTile)) {
+        throw new Error('That rock is no longer available.');
+      }
+
+      foreground[onTile] = interaction?.depletedGid ?? (279 + 253);
+      if (interaction) {
+        interaction.objectId = 279;
+      }
+
+      if (!scene.respawns) {
+        scene.respawns = {
+          items: [],
+          monsters: [],
+          resources: [],
+        };
+      } else if (!Array.isArray(scene.respawns.resources)) {
+        scene.respawns.resources = [];
+      }
+
+      scene.respawns.resources.push({
+        sceneId: scene.id,
+        interactionId: interaction?.id,
+        setToObjectId: rockMined.id,
+        setToTile: initialTile,
+        onTile,
+        willRespawnIn: Item.calculateRespawnTime(rockMined.respawnIn),
+      });
 
       // Tell user of successful resource gathering
       Socket.sendMessageToPlayer(
@@ -1378,14 +1450,6 @@ const actionEvents = {
 
       // Extract resource and either add to inventory or drop it
       mining.extractResource(rockMined);
-
-      const activeScene = world.getSceneForPlayer(player);
-      const scene = activeScene || world.getDefaultTown();
-      const mapLayers = scene && scene.map ? scene.map : world.map;
-      if (mapLayers && Array.isArray(mapLayers.foreground)
-        && Number.isInteger(onTile) && onTile >= 0 && onTile < mapLayers.foreground.length) {
-        mapLayers.foreground[onTile] = 532;
-      }
 
       // Update the experience
       mining.updateExperience(rockMined.experience);
@@ -1399,29 +1463,9 @@ const actionEvents = {
       // Update client of dead rock
       Socket.broadcast(
         'world:foreground:update',
-        mapLayers && Array.isArray(mapLayers.foreground)
-          ? mapLayers.foreground
-          : world.map.foreground,
+        foreground,
         world.getScenePlayers(scene.id),
       );
-
-      // Add this resource to respawn clock
-      if (!scene.respawns) {
-        scene.respawns = {
-          items: [],
-          monsters: [],
-          resources: [],
-        };
-      } else if (!Array.isArray(scene.respawns.resources)) {
-        scene.respawns.resources = [];
-      }
-
-      scene.respawns.resources.push({
-        sceneId: scene.id,
-        setToTile: rockMined.id + 253,
-        onTile: data.todo.actionToQueue.onTile,
-        willRespawnIn: Item.calculateRespawnTime(rockMined.respawnIn),
-      });
     } catch (err) {
       // Tell player of their error
       // either no pickaxe or no rock available

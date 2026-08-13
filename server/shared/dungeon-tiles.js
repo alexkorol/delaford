@@ -2,7 +2,7 @@
 // Local ids are 0-based within dungeon.png; global gid = firstGid + localId.
 const DUNGEON_TILESET = {
   "firstGid": 541,
-  "tileCount": 182,
+  "tileCount": 185,
   "columns": 16,
   "names": {
     "floor_stone_0": 0,
@@ -186,7 +186,10 @@ const DUNGEON_TILESET = {
     "flowers_1": 178,
     "flowers_2": 179,
     "flowers_3": 180,
-    "floor_decorative": 181
+    "floor_decorative": 181,
+    "rock_depleted": 182,
+    "rock_copper": 183,
+    "rock_tin": 184
   },
   "groups": {
     "floor": {
@@ -491,6 +494,17 @@ const DUNGEON_TILESET = {
       ],
       "floor_decorative": [
         181
+      ]
+    },
+    "resource": {
+      "rock_depleted": [
+        182
+      ],
+      "rock_copper": [
+        183
+      ],
+      "rock_tin": [
+        184
       ]
     }
   },
