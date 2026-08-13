@@ -80,6 +80,13 @@ class Player {
     // persisted via player:skilltree:save).
     this.passiveTree = data.passiveTree || null;
 
+    // Chronicles identity is distinct from the authenticated account name.
+    // Guest saves persist this so reconnecting cannot reset a mortal Scion's
+    // hard lifecycle simply by opening a new socket.
+    this.chronicles = data.chronicles && typeof data.chronicles === 'object'
+      ? { ...data.chronicles }
+      : null;
+
     this.refreshDerivedStats();
 
     // Pathfinding

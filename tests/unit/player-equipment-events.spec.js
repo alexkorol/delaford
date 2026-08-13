@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import playerEvents from '@/core/player/events/player.js';
 
@@ -104,5 +109,33 @@ describe('player equipment event handlers', () => {
     expect(context.game.player.level).toBe(4);
     expect(context.game.player.hp).toEqual({ current: 112, max: 112 });
     expect(context.game.player.mana).toEqual({ current: 54, max: 54 });
+  });
+
+  it('hands a local final death to the Chronicles boundary', () => {
+    const context = makeContext();
+    context.handlePermadeath = vi.fn();
+    const lifecycle = {
+      state: 'permadead',
+      mode: 'hard',
+      lastEvent: { type: 'permadeath', occurredAt: 1234 },
+    };
+
+    playerEvents['player:stats:update']({
+      data: {
+        playerId: 'player-1',
+        level: 7,
+        lifecycle,
+        resources: {
+          health: { current: 0, max: 120 },
+          mana: { current: 40, max: 40 },
+        },
+      },
+    }, context);
+
+    expect(context.handlePermadeath).toHaveBeenCalledOnce();
+    expect(context.handlePermadeath).toHaveBeenCalledWith(expect.objectContaining({
+      level: 7,
+      lifecycle,
+    }));
   });
 });

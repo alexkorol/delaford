@@ -113,7 +113,7 @@ const main = async () => {
     await waitForSocket(url);
     log(`Playing against ${url}\n`);
 
-    const connect = () => HeadlessPlayer.connect({ url });
+    const connect = options => HeadlessPlayer.connect({ ...(options || {}), url });
     const results = [];
 
      

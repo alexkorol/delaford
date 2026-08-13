@@ -95,7 +95,9 @@
             <span class="chronicles__portrait" :style="portraitStyle" aria-hidden="true"></span>
             <span class="chronicles__scion-copy">
               <strong>{{ scion.name }}</strong>
-              <small>Level {{ scion.level }} · Ready to set out</small>
+              <small>
+                Level {{ scion.level }} · {{ scion.mortal ? 'Mortal oath' : 'Soft return' }}
+              </small>
             </span>
             <span class="chronicles__selection" aria-hidden="true">
               {{ scion.id === activeScion?.id ? '◆' : '◇' }}
@@ -117,6 +119,13 @@
             >
             <button type="submit">Add Scion</button>
           </div>
+          <label class="chronicles__mortal-option">
+            <input v-model="mortalScion" class="chronicles__mortal-checkbox" type="checkbox">
+            <span>
+              <strong>Swear the mortal oath</strong>
+              <small>Final death moves this Scion to the crypt. Off by default while balance is still being tuned.</small>
+            </span>
+          </label>
         </form>
 
         <details v-if="activeHouse.crypt.length" class="chronicles__crypt">
@@ -171,6 +180,7 @@ export default {
       state: loadHouses(),
       houseName: '',
       scionName: '',
+      mortalScion: false,
       foundingHouse: false,
       submitting: false,
       error: '',
@@ -227,13 +237,16 @@ export default {
     },
     createScion() {
       this.error = '';
-      const result = addScion(this.state, this.activeHouse?.id, this.scionName);
+      const result = addScion(this.state, this.activeHouse?.id, this.scionName, {
+        mortal: this.mortalScion,
+      });
       if (!result.ok) {
         this.error = result.reason;
         return;
       }
       this.persist(result.state);
       this.scionName = '';
+      this.mortalScion = false;
     },
     chooseScion(scionId) {
       this.error = '';
@@ -531,6 +544,37 @@ export default {
     font: 0.67rem 'ChatFont', sans-serif;
     text-transform: uppercase;
   }
+}
+
+.chronicles__mortal-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  color: rgba(233, 221, 197, 0.7);
+  font: 0.66rem/1.35 'ChatFont', sans-serif;
+  cursor: pointer;
+
+  span {
+    display: grid;
+    gap: 2px;
+  }
+
+  strong {
+    color: #d99b83;
+    font-weight: normal;
+    text-transform: uppercase;
+  }
+
+  small {
+    color: rgba(233, 221, 197, 0.48);
+    font: inherit;
+  }
+}
+
+.chronicles__mortal-checkbox {
+  margin-top: 2px;
+  accent-color: #9f5544;
 }
 
 .chronicles__crypt {

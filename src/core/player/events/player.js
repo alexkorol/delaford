@@ -339,6 +339,10 @@ export default {
 
     if (context.game.player.uuid === playerId) {
       applyToActor(context.game.player);
+      if (lifecycle && lifecycle.state === 'permadead'
+        && typeof context.handlePermadeath === 'function') {
+        context.handlePermadeath(payload);
+      }
       return;
     }
 

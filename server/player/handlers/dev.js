@@ -46,6 +46,8 @@ const buildStateSnapshot = (player) => {
     hp: player.stats && player.stats.resources ? { ...player.stats.resources.health } : null,
     mana: player.stats && player.stats.resources ? { ...player.stats.resources.mana } : null,
     lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle.state : null,
+    lifecycleMode: player.stats && player.stats.lifecycle ? player.stats.lifecycle.mode : null,
+    chronicles: player.chronicles ? { ...player.chronicles } : null,
     inventory: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(item => ({
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
@@ -190,6 +192,31 @@ const devEvents = {
     }
     broadcastStats(player);
     sendDevMessage(player, 'Fully healed.');
+  },
+
+  /**
+   * Apply an immediately lethal hit through the real stat/lifecycle pipeline.
+   * Cheat death is disabled by default so mortality playtests can reach the
+   * final-death boundary deterministically; pass allowCheatDeath=true when
+   * explicitly testing that safeguard instead.
+   */
+  'dev:kill': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    const health = player && player.stats && player.stats.resources
+      ? player.stats.resources.health
+      : null;
+    if (!DEV_MODE || !player || !health) {
+      return;
+    }
+
+    const result = player.applyDamage(health.current + health.max, {
+      allowCheatDeath: payload.allowCheatDeath === true,
+    });
+    broadcastStats(player);
+    sendDevMessage(player, result && result.permadeath === true
+      ? 'Mortal lifecycle advanced to final death.'
+      : `Lifecycle damage result: ${result ? result.type : 'none'}.`);
   },
 };
 

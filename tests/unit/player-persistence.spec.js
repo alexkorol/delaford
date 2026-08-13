@@ -3,6 +3,7 @@
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { PlayerPersistenceService } from '#server/core/services/player-persistence.js';
+import { buildGuestSnapshot } from '#server/core/repositories/guest-save-store.js';
 
 // A real account player carries a JWT; guests carry token 'none' and are
 // skipped by the network save entirely.
@@ -68,6 +69,35 @@ describe('PlayerPersistenceService', () => {
       await expect(service.savePlayer(player)).rejects.toThrow('DB error');
       expect(service.logger.error).toHaveBeenCalled();
     });
+  });
+
+  it('keeps Chronicles identity and hard lifecycle in guest snapshots', () => {
+    const snapshot = buildGuestSnapshot({
+      uuid: 'guest-mortal',
+      x: 38,
+      y: 115,
+      level: 7,
+      stats: {
+        resources: {
+          health: { current: 0, max: 150 },
+          mana: { current: 60, max: 60 },
+        },
+        lifecycle: { mode: 'hard', state: 'permadead' },
+      },
+      chronicles: { houseId: 'house-1', scionId: 'scion-1', mortal: true },
+      inventory: { slots: [] },
+      wear: {},
+      skills: {},
+      bank: [],
+    });
+
+    expect(snapshot.chronicles).toEqual({
+      houseId: 'house-1',
+      scionId: 'scion-1',
+      mortal: true,
+    });
+    expect(snapshot.lifecycle).toEqual({ mode: 'hard', state: 'permadead' });
+    expect(snapshot.resources.health.current).toBe(0);
   });
 
   describe('shouldThrottleSave', () => {

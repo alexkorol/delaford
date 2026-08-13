@@ -68,15 +68,23 @@ class Socket {
    */
   static lastLoginPayload = null;
 
-  static rememberScion(scionName) {
+  static rememberScion(identity) {
     if (!Socket.lastLoginPayload) {
+      return false;
+    }
+
+    const scion = typeof identity === 'string' ? { name: identity } : identity;
+    if (!scion || !scion.name) {
       return false;
     }
 
     Socket.lastLoginPayload = {
       ...Socket.lastLoginPayload,
       awaitChronicles: true,
-      scionName,
+      scionName: scion.name,
+      scionId: scion.id || scion.scionId || null,
+      houseId: scion.houseId || null,
+      mortal: Boolean(scion.mortal),
     };
     return true;
   }

@@ -128,7 +128,15 @@ describe('client Socket helper', () => {
       awaitChronicles: true,
     });
 
-    expect(Socket.rememberScion('Vesper')).toBe(true);
+    expect(Socket.rememberScion({
+      id: 'scion-vesper',
+      name: 'Vesper',
+      houseId: 'house-vaelmont',
+      mortal: true,
+    })).toBe(true);
     expect(Socket.lastLoginPayload.scionName).toBe('Vesper');
+    expect(Socket.lastLoginPayload.scionId).toBe('scion-vesper');
+    expect(Socket.lastLoginPayload.houseId).toBe('house-vaelmont');
+    expect(Socket.lastLoginPayload.mortal).toBe(true);
   });
 });

@@ -106,6 +106,13 @@ import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
 import { shouldRootHandleQuickbarHotkey } from './core/hotkeys.js';
+import {
+  entombScion,
+  getActiveHouse,
+  getActiveScion,
+  loadHouses,
+  saveHouses,
+} from './core/chronicles/houses.js';
 
 const createDefaultQuickSlots = () => createQuickbarSlots();
 
@@ -179,6 +186,7 @@ export default {
       game: { exit: true },
       screen: 'login',
       chroniclesContext: null,
+      permadeathHandled: false,
       connectionLost: false,
       reconnectAttempts: 0,
       intentionalDisconnect: false,
@@ -648,20 +656,70 @@ export default {
       this.screen = target;
     },
     openChronicles(context = {}) {
+      if (this.engine) {
+        this.engine.stop();
+        this.engine = null;
+      }
+      if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
+        this.game.map.destroy();
+      }
+      this.game = { exit: true };
+      this.loaded = false;
       this.chroniclesContext = context;
       this.screen = 'chronicles';
       bus.$emit('login:done');
     },
     handleChroniclesSetOut(scion = {}) {
       const scionName = typeof scion === 'string' ? scion : scion.name;
-      if (!scionName || !Socket.rememberScion(scionName)) {
+      if (!scionName || !Socket.rememberScion(scion)) {
         bus.$emit('player:chronicles:error', {
           message: 'Your authenticated session expired. Please log in again.',
         });
         return;
       }
 
-      Socket.emit('player:chronicles:select', { scionName });
+      Socket.emit('player:chronicles:select', Socket.lastLoginPayload);
+    },
+    handlePermadeath(payload = {}) {
+      if (this.permadeathHandled) {
+        return true;
+      }
+
+      const lifecycle = payload.lifecycle || (payload.stats && payload.stats.lifecycle) || {};
+      if (lifecycle.state !== 'permadead') {
+        return false;
+      }
+
+      const state = loadHouses();
+      const house = getActiveHouse(state);
+      const scion = getActiveScion(state);
+      if (!house || !scion || !scion.mortal) {
+        return false;
+      }
+
+      this.permadeathHandled = true;
+      const occurredAt = lifecycle.lastEvent && lifecycle.lastEvent.occurredAt;
+      const occurredAtDate = occurredAt ? new Date(occurredAt) : null;
+      const result = entombScion(state, house.id, scion.id, {
+        level: Number.isFinite(payload.level)
+          ? payload.level
+          : (this.game && this.game.player ? this.game.player.level : scion.level),
+        diedAt: occurredAtDate && Number.isFinite(occurredAtDate.getTime())
+          ? occurredAtDate.toISOString()
+          : undefined,
+      });
+
+      if (!result.ok || !saveHouses(result.state)) {
+        this.permadeathHandled = false;
+        this.clientErrorNotice = 'Your Scion fell, but the Chronicles could not be saved.';
+        return false;
+      }
+
+      Socket.emit('player:chronicles:return', {
+        houseId: house.id,
+        scionId: scion.id,
+      });
+      return true;
     },
     getGameContainerRef() {
       return this.$refs.gameContainer || null;
@@ -707,6 +765,7 @@ export default {
       }
       this.screen = 'login';
       this.chroniclesContext = null;
+      this.permadeathHandled = false;
       this.game = { exit: true };
       this.layout.activePane = null;
       this.layout.leftPane = defaultPaneAssignments.left;
@@ -1611,6 +1670,21 @@ export default {
       // Initialise client state immediately
       this.game = new Client(data);
 
+      // A hard-mode death is submitted to persistence immediately. If the
+      // connection drops before the live stats event reaches this client,
+      // the login snapshot must still close the Scion's record rather than
+      // briefly rebuilding a dead world and accidentally reviving on relog.
+      const initialLifecycle = this.game.player
+        && (this.game.player.lifecycle
+          || (this.game.player.stats && this.game.player.stats.lifecycle));
+      if (initialLifecycle && initialLifecycle.state === 'permadead'
+        && this.handlePermadeath({
+          lifecycle: initialLifecycle,
+          level: this.game.player.level,
+        })) {
+        return;
+      }
+
       // Ensure the game view is mounted so the canvas exists before building the map
       if (!this.loaded) {
         this.loaded = true;
@@ -1636,6 +1710,7 @@ export default {
       bus.$emit('login:done');
       this.screen = 'game';
       this.chroniclesContext = null;
+      this.permadeathHandled = false;
       this.resetChatState();
     },
     /**

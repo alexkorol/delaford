@@ -15,8 +15,15 @@ vi.mock('#server/socket.js', () => ({
   default: { emit: vi.fn(), broadcast: vi.fn() },
 }));
 
+vi.mock('#server/core/services/player-persistence.js', () => ({
+  default: {
+    savePlayer: vi.fn(() => Promise.resolve()),
+  },
+}));
+
 const { default: createPlayerStatsManager } = await import('#server/core/entities/player/stats-manager.js');
 const { createCharacterState } = await import('#shared/stats/index.js');
+const { default: playerPersistence } = await import('#server/core/services/player-persistence.js');
 
 // Playtest feedback: "there's still a movement queue that can activate after
 // death/resurrection". The old respawn cleanup wrote to path.current.walking,
@@ -29,6 +36,7 @@ describe('death and respawn cancel in-flight walking', () => {
   let manager;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     player = {
       uuid: 'walker-1',
       username: 'Walker',
@@ -60,5 +68,15 @@ describe('death and respawn cancel in-flight walking', () => {
     const result = manager.tryRespawn({ now: 999999, force: true });
     expect(result.success).toBe(true);
     expect(player.cancelPathfinding).toHaveBeenCalledTimes(1);
+  });
+
+  it('force-persists a hard-mode final death before Chronicles handoff', () => {
+    player.stats.lifecycle.mode = 'hard';
+
+    const result = manager.applyDamage(9999, { now: 1000, allowCheatDeath: false });
+
+    expect(result).toEqual(expect.objectContaining({ type: 'death', permadeath: true }));
+    expect(player.stats.lifecycle.state).toBe('permadead');
+    expect(playerPersistence.savePlayer).toHaveBeenCalledWith(player, { force: true });
   });
 });

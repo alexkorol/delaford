@@ -13,6 +13,7 @@ import {
   toClientPayload as statsToClientPayload,
 } from '#shared/stats/index.js';
 import { computeFlowerStatBonuses } from '#shared/passives/flower-of-life.js';
+import playerPersistenceService from '#server/core/services/player-persistence.js';
 
 const clone = (value) => {
   if (!value || typeof value !== 'object') {
@@ -220,6 +221,14 @@ const applyDamage = (player, amount, options = {}) => {
   if (result && (result.type === 'death' || result.type === 'permadeath')
     && typeof player.cancelPathfinding === 'function') {
     player.cancelPathfinding();
+  }
+
+  // Hard-mode final death is an identity boundary, not an ordinary autosave
+  // candidate. Persist it immediately so reconnecting before the client opens
+  // the crypt cannot resurrect the fallen Scion.
+  if (result && (result.permadeath === true
+    || (player.stats.lifecycle && player.stats.lifecycle.state === 'permadead'))) {
+    playerPersistenceService.savePlayer(player, { force: true }).catch(() => {});
   }
 
   return result;

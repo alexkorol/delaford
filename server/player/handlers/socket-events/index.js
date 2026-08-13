@@ -12,6 +12,7 @@ import playerGuest from '#server/core/data/helpers/player.json' with { type: 'js
 import playerPersistence from '#server/core/services/player-persistence.js';
 import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
+import { partyService } from '#server/player/handlers/party.js';
 import { validateScionName } from '#shared/chronicles.js';
 
 // One character, one session. When the same account logs in again (second
@@ -85,14 +86,85 @@ const getPlayerBySocket = (ws) => {
   return world.players.find(player => player.socket_id === ws.id) || null;
 };
 
-const applyScionIdentity = (player, name) => {
-  const validation = validateScionName(name);
+const cleanChroniclesId = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const cleaned = value.trim();
+  return cleaned && cleaned.length <= 80 ? cleaned : null;
+};
+
+const resetScionState = (player) => {
+  const lifecycle = player.stats && player.stats.lifecycle;
+  const resources = player.stats && player.stats.resources;
+  if (lifecycle) {
+    lifecycle.state = 'alive';
+    lifecycle.deaths = 0;
+    lifecycle.livesRemaining = 0;
+    lifecycle.lastEvent = {
+      type: 'scion-begin',
+      occurredAt: Date.now(),
+    };
+    if (lifecycle.cheatDeath) {
+      lifecycle.cheatDeath.charges = 1;
+      lifecycle.cheatDeath.lastTriggerAt = null;
+    }
+    if (lifecycle.respawn) {
+      lifecycle.respawn.pending = false;
+      lifecycle.respawn.at = null;
+      lifecycle.respawn.lastAt = null;
+      lifecycle.respawn.location = null;
+    }
+  }
+
+  if (resources && resources.health) {
+    resources.health.current = resources.health.max;
+    player.hp = resources.health;
+  }
+  if (resources && resources.mana) {
+    resources.mana.current = resources.mana.max;
+    player.mana = resources.mana;
+  }
+
+  if (player.combat) {
+    Combat.clearAutoAttack(player, 'scion-change');
+    player.combat.buffs = {};
+    player.combat.cooldowns = {};
+    player.combat.globalCooldown = 0;
+    player.combat.lastSkill = null;
+    player.combat.inputHistory = [];
+  }
+  if (typeof player.cancelPathfinding === 'function') {
+    player.cancelPathfinding();
+  }
+};
+
+const applyScionIdentity = (player, identity = {}) => {
+  const payload = typeof identity === 'string' ? { scionName: identity } : (identity || {});
+  const validation = validateScionName(payload.scionName);
   if (!validation.valid) {
     return validation;
   }
 
+  const previousScionId = cleanChroniclesId(player.chronicles && player.chronicles.scionId);
+  const scionId = cleanChroniclesId(payload.scionId);
+  const sameScion = Boolean(previousScionId && scionId && previousScionId === scionId);
+  if (!sameScion) {
+    resetScionState(player);
+  }
+
   player.username = validation.value;
-  return validation;
+  player.chronicles = {
+    houseId: cleanChroniclesId(payload.houseId),
+    scionId,
+    mortal: payload.mortal === true,
+  };
+  if (player.stats && player.stats.lifecycle) {
+    player.stats.lifecycle.mode = player.chronicles.mortal ? 'hard' : 'soft';
+    player.lifecycle = player.stats.lifecycle;
+  }
+
+  return { ...validation, sameScion };
 };
 
 const emitChroniclesError = (ws, message) => {
@@ -170,7 +242,7 @@ export default {
       ws.authenticated = true;
 
       const scionValidation = payload.scionName
-        ? applyScionIdentity(player, payload.scionName)
+        ? applyScionIdentity(player, payload)
         : null;
 
       if (payload.scionName && !scionValidation.valid) {
@@ -215,14 +287,80 @@ export default {
       return;
     }
 
-    const validation = applyScionIdentity(player, data && data.scionName);
+    if (ws.retiredScionId && cleanChroniclesId(data && data.scionId) === ws.retiredScionId) {
+      emitChroniclesError(ws, 'That Scion has already entered the crypt. Choose a living name.');
+      return;
+    }
+
+    const validation = applyScionIdentity(player, data);
     if (!validation.valid) {
       emitChroniclesError(ws, validation.reason);
       return;
     }
 
     ws.pendingPlayer = null;
+    ws.retiredScionId = null;
     Authentication.addPlayer(player);
+    if (!player.token || player.token === 'none') {
+      playerPersistence.savePlayer(player, { force: true }).catch(() => {});
+    }
+  },
+
+  /**
+   * A mortal Scion's final death returns the authenticated socket to the
+   * pending Chronicles state. The Player object stays in memory so the next
+   * Scion can inherit account-level progress, but the fallen identity cannot
+   * be selected again during this session.
+   */
+  'player:chronicles:return': ({ data }, ws) => {
+    const player = getPlayerBySocket(ws);
+    const lifecycle = player && player.stats && player.stats.lifecycle;
+    const chronicles = player && player.chronicles;
+    const requestedHouseId = cleanChroniclesId(data && data.houseId);
+    const requestedScionId = cleanChroniclesId(data && data.scionId);
+
+    if (!player || !lifecycle || lifecycle.state !== 'permadead'
+      || !chronicles || !chronicles.mortal) {
+      emitChroniclesError(ws, 'Only a fallen mortal Scion can return to the Chronicles.');
+      return;
+    }
+    if ((chronicles.houseId && requestedHouseId !== chronicles.houseId)
+      || (chronicles.scionId && requestedScionId !== chronicles.scionId)) {
+      emitChroniclesError(ws, 'The fallen Scion does not match this authenticated session.');
+      return;
+    }
+
+    const previousSceneId = player.sceneId;
+    const fallen = {
+      houseId: chronicles.houseId,
+      scionId: chronicles.scionId,
+      scionName: player.username,
+      level: player.level,
+      diedAt: lifecycle.lastEvent && lifecycle.lastEvent.occurredAt,
+    };
+
+    partyService.removePlayer(player.uuid);
+    world.removePlayer(player);
+    Socket.broadcast('player:left', ws.id, world.getScenePlayers(previousSceneId));
+
+    player.sceneId = world.defaultTownId;
+    player.x = 38;
+    player.y = 115;
+    player.preInstancePosition = null;
+    if (typeof player.cancelPathfinding === 'function') {
+      player.cancelPathfinding();
+    } else if (player.path) {
+      player.path.grid = null;
+    }
+
+    ws.pendingPlayer = player;
+    ws.retiredScionId = chronicles.scionId;
+    Socket.emit('player:chronicles:ready', {
+      player: { socket_id: ws.id },
+      accountName: player.accountUsername || player.username,
+      level: player.level,
+      fallen,
+    });
   },
 
   /**

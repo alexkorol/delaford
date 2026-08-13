@@ -38,12 +38,19 @@ export class HeadlessPlayer {
     this.events = []; // raw event log (ring buffer)
     this.pendingState = new Map(); // requestId -> resolver
     this.stateCounter = 0;
+    this.loginCount = 0;
+    this.chroniclesReadyCount = 0;
+    this.chroniclesReady = null;
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
   }
 
-  static async connect({ url = DEFAULT_URL, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  static async connect({
+    url = DEFAULT_URL,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    loginPayload = { useGuestAccount: true },
+  } = {}) {
     const ws = new WebSocket(url);
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`WS connect timeout: ${url}`)), timeoutMs);
@@ -52,8 +59,15 @@ export class HeadlessPlayer {
     });
 
     const player = new HeadlessPlayer(ws);
-    player.emit('player:login', { useGuestAccount: true });
-    await player.waitFor(() => player.player !== null, { label: 'login', timeoutMs });
+    player.emit('player:login', loginPayload);
+    if (loginPayload.awaitChronicles && !loginPayload.scionName) {
+      await player.waitFor(() => player.chroniclesReadyCount > 0, {
+        label: 'Chronicles admission',
+        timeoutMs,
+      });
+    } else {
+      await player.waitFor(() => player.player !== null, { label: 'login', timeoutMs });
+    }
     return player;
   }
 
@@ -73,9 +87,14 @@ export class HeadlessPlayer {
 
     switch (event) {
       case 'player:login':
+        this.loginCount += 1;
         this.player = data.player;
         this.scene = data.scene || null;
         this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
+        break;
+      case 'player:chronicles:ready':
+        this.chroniclesReadyCount += 1;
+        this.chroniclesReady = data;
         break;
       case 'world:scene:transition':
       case 'party:scene:transition':
@@ -324,6 +343,29 @@ export class HeadlessPlayer {
     this.emit('player:take:underfoot', {});
   }
 
+  /** Select a Chronicles Scion and wait for world admission. */
+  async selectScion(identity, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const before = this.loginCount;
+    const scion = typeof identity === 'string' ? { scionName: identity } : identity;
+    this.emit('player:chronicles:select', scion);
+    await this.waitFor(() => this.loginCount > before, {
+      label: `Scion admission (${scion && scion.scionName})`,
+      timeoutMs,
+    });
+    return this.player;
+  }
+
+  /** Move a final-dead mortal Scion back to the authenticated Chronicles. */
+  async returnToChronicles(identity, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const before = this.chroniclesReadyCount;
+    this.emit('player:chronicles:return', identity);
+    await this.waitFor(() => this.chroniclesReadyCount > before, {
+      label: 'return to Chronicles',
+      timeoutMs,
+    });
+    return this.chroniclesReady;
+  }
+
   // ── Wiz/dev commands ─────────────────────────────────────────────────
 
   devTeleport(x, y, sceneId = undefined) {
@@ -340,6 +382,10 @@ export class HeadlessPlayer {
 
   devHeal() {
     this.emit('dev:heal', {});
+  }
+
+  devKill({ allowCheatDeath = false } = {}) {
+    this.emit('dev:kill', { allowCheatDeath });
   }
 
   close() {

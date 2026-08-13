@@ -75,6 +75,20 @@ describe('Chronicles houses persistence', () => {
     expect(getActiveHouse(withScion.state).scions).toHaveLength(1);
     expect(withScion.scion.name).toBe('Orun');
     expect(getActiveScion(withScion.state).name).toBe('Orun');
+    expect(withScion.scion.mortal).toBe(false);
+  });
+
+  it('records an opt-in mortal oath and carries it into the crypt', () => {
+    const founded = foundHouse(loadHouses(), 'Morvayne');
+    const withScion = addScion(founded.state, founded.house.id, 'Orun', { mortal: true });
+    expect(withScion.scion.mortal).toBe(true);
+
+    const buried = entombScion(withScion.state, founded.house.id, withScion.scion.id, { level: 9 });
+    expect(getActiveHouse(buried.state).crypt[0]).toEqual(expect.objectContaining({
+      name: 'Orun',
+      level: 9,
+      mortal: true,
+    }));
   });
 
   it('selects a House and living Scion', () => {
@@ -143,6 +157,7 @@ describe('Chronicles houses persistence', () => {
     expect(state.houses[0].renown).toBe(0);
     expect(Array.isArray(state.houses[0].scions)).toBe(true);
     expect(Array.isArray(state.houses[0].crypt)).toBe(true);
+    expect(state.houses[0].scions).toEqual([]);
     // active id fell back to the only house
     expect(state.activeHouseId).toBe(state.houses[0].id);
     expect(state.activeScionId).toBeNull();

@@ -18,7 +18,7 @@ import {
 export { validateHouseName, validateScionName };
 
 export const STORAGE_KEY = 'verdigris_houses';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const now = () => new Date().toISOString();
 
@@ -47,6 +47,7 @@ const migrateScion = (scion = {}) => ({
   bornAt: scion.bornAt || now(),
   diedAt: scion.diedAt || null,
   deeds: Array.isArray(scion.deeds) ? scion.deeds : [],
+  mortal: Boolean(scion.mortal),
 });
 
 const emptyState = () => ({
@@ -131,7 +132,7 @@ export const foundHouse = (state, name) => {
   return { ok: true, state: next, house };
 };
 
-export const addScion = (state, houseId, name) => {
+export const addScion = (state, houseId, name, options = {}) => {
   const validation = validateScionName(name);
   if (!validation.valid) {
     return { ok: false, reason: validation.reason, state };
@@ -146,7 +147,10 @@ export const addScion = (state, houseId, name) => {
   if (duplicate) {
     return { ok: false, reason: 'That name already belongs to a living Scion.', state };
   }
-  const scion = migrateScion({ name: validation.value });
+  const scion = migrateScion({
+    name: validation.value,
+    mortal: options.mortal,
+  });
   const nextHouse = { ...house, scions: [...house.scions, scion] };
   const next = {
     ...state,
