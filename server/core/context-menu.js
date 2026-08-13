@@ -236,10 +236,12 @@ class ContextMenu {
       bankSlot: this.player.bank,
       shopSlot: this.getShopInventory(),
     };
+    const paneItemContext = Object.keys(itemSource)
+      .find(context => this.clickedOn(context));
 
     const activePaneItems = this.currentPane ? this.currentPaneData : null;
     const itemsToSearch =
-      itemSource[this.context[3]]
+      itemSource[paneItemContext]
       || activePaneItems
       || this.player.inventory.slots;
 

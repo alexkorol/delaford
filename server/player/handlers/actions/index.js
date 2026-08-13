@@ -127,6 +127,78 @@ const isActiveResourcePane = (player, pane, objectId) => {
   );
 };
 
+const NPC_INTERACTION_REACH_TILES = 4;
+const NPC_PANE_REACH_TILES = 4;
+
+const sameIdentifier = (left, right) => (
+  left !== undefined
+  && left !== null
+  && right !== undefined
+  && right !== null
+  && String(left) === String(right)
+);
+
+const getSceneNpc = (player, npcId, requiredAction) => {
+  if (!player || !sameIdentifier(player.sceneId, world.defaultTownId)) {
+    return null;
+  }
+
+  const scene = world.getSceneForPlayer(player);
+  if (!scene || !Array.isArray(scene.npcs)) {
+    return null;
+  }
+
+  return scene.npcs.find(npc => (
+    npc
+    && sameIdentifier(npc.id, npcId)
+    && Array.isArray(npc.actions)
+    && npc.actions.includes(requiredAction)
+  )) || null;
+};
+
+const isNearNpc = (player, npc, coordinates) => {
+  if (!player || !npc || !coordinates) {
+    return false;
+  }
+
+  const npcTile = {
+    x: Math.round(npc.x),
+    y: Math.round(npc.y),
+  };
+  return isWithinReach(player, npcTile, NPC_INTERACTION_REACH_TILES)
+    && isWithinReach(npcTile, coordinates, NPC_INTERACTION_REACH_TILES);
+};
+
+const openNpcPane = (player, npc, pane, action) => {
+  player.currentPane = pane;
+  player.objectId = npc.id;
+  player.currentPaneAnchor = {
+    pane,
+    objectId: npc.id,
+    npcId: npc.id,
+    npcAction: action,
+    sceneId: player.sceneId,
+    x: player.x,
+    y: player.y,
+    reach: NPC_PANE_REACH_TILES,
+  };
+};
+
+const isActiveNpcPane = (player, pane, requiredAction) => {
+  const anchor = player?.currentPaneAnchor;
+  if (!player || player.currentPane !== pane || !anchor
+    || anchor.pane !== pane
+    || !sameIdentifier(anchor.objectId, player.objectId)
+    || !sameIdentifier(anchor.npcId, player.objectId)
+    || anchor.npcAction !== requiredAction
+    || !sameIdentifier(anchor.sceneId, player.sceneId)
+    || !isWithinReach(player, anchor, anchor.reach || NPC_PANE_REACH_TILES)) {
+    return false;
+  }
+
+  return Boolean(getSceneNpc(player, anchor.npcId, requiredAction));
+};
+
 // Golden plaque shrine: one free item per player per minute.
 // NB: `Map` here is the imported game-map class — use globalThis.Map.
 const GOLDEN_PLAQUE_COOLDOWN_MS = 60 * 1000;
@@ -1166,27 +1238,28 @@ const actionEvents = {
    * A player wants opening a trade shop
    */
   'player:screen:npc:trade': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+    const player = getActionPlayer(data);
+    const target = data.todo?.item;
+    const clickedWorld = data.todo?.actionToQueue?.world;
+    const npc = target ? getSceneNpc(player, target.id, 'trade') : null;
+    const shop = npc ? world.shops.find(entry => sameIdentifier(entry.npcId, npc.id)) : null;
+    if (!player || !npc || !shop || !isNearNpc(player, npc, clickedWorld)) {
       return;
     }
-    console.log('Accessing trade shop...', data.todo.item.id);
-    world.players[data.playerIndex].currentPane = 'shop';
-    world.players[data.playerIndex].objectId = data.todo.item.id;
+
+    openNpcPane(player, npc, 'shop', 'trade');
 
     Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       screen: 'shop',
-      payload: world.shops.find(e => e.npcId === data.todo.item.id),
+      payload: shop,
     });
   },
 
   'player:screen:npc:trade:action:value': (data) => {
     const player = getPlayerFromPayload(data);
-    if (!player || !player.objectId || !data.item?.id) {
+    if (!player || !player.objectId || !data.item?.id
+      || !isActiveNpcPane(player, 'shop', 'trade')) {
       return;
     }
 
@@ -1213,7 +1286,8 @@ const actionEvents = {
    */
   'player:screen:npc:trade:action': (data) => {
     const player = getPlayerFromPayload(data);
-    if (!player || !player.objectId || !data.item?.id) {
+    if (!player || !player.objectId || !data.item?.id
+      || !isActiveNpcPane(player, 'shop', 'trade')) {
       return;
     }
 
@@ -1286,19 +1360,20 @@ const actionEvents = {
    * A player wants to access their bank
    */
   'player:screen:bank': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+    const player = getActionPlayer(data);
+    const target = data.todo?.item;
+    const clickedWorld = data.todo?.actionToQueue?.world;
+    const npc = target ? getSceneNpc(player, target.id, 'bank') : null;
+    if (!player || !npc || !isNearNpc(player, npc, clickedWorld)) {
       return;
     }
-    world.players[data.playerIndex].currentPane = 'bank';
+
+    openNpcPane(player, npc, 'bank', 'bank');
 
     Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       screen: 'bank',
-      payload: { items: world.players[data.playerIndex].bank },
+      payload: { items: player.bank },
     });
   },
 
@@ -1312,7 +1387,7 @@ const actionEvents = {
     }
 
     const player = getPlayerFromPayload(data);
-    if (!player || !data.item?.id) {
+    if (!player || !data.item?.id || !isActiveNpcPane(player, 'bank', 'bank')) {
       return;
     }
 

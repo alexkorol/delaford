@@ -175,7 +175,7 @@ export class HeadlessPlayer {
     this.ws.send(JSON.stringify({ event, data }));
   }
 
-  /** Authoritative server-side snapshot: position, hp, monsters, items, tree… */
+  /** Authoritative snapshot: position, hp, inventory/bank, NPCs, monsters, items, tree… */
   state({ timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
     this.stateCounter += 1;
     const requestId = `state-${this.stateCounter}`;

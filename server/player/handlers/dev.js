@@ -92,6 +92,16 @@ const buildStateSnapshot = (player) => {
     inventoryDetails: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(itemIdentity)
       : [],
+    bank: Array.isArray(player.bank)
+      ? player.bank.map(item => ({
+        id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
+      }))
+      : [],
+    bankDetails: Array.isArray(player.bank)
+      ? player.bank.map(itemIdentity)
+      : [],
+    currentPane: player.currentPane || null,
+    objectId: player.objectId ?? null,
     wear: player.wear
       ? Object.fromEntries(Object.entries(player.wear)
         .map(([slot, item]) => [slot, item ? item.id : null]))
@@ -122,6 +132,17 @@ const buildStateSnapshot = (player) => {
         tags: Array.isArray(m.tags) ? [...m.tags] : [],
         hp: m.stats && m.stats.resources ? { ...m.stats.resources.health } : null,
         coins: Number.isFinite(m.rewards?.coins) ? m.rewards.coins : 0,
+      }))
+      : [],
+    npcs: scene && Array.isArray(scene.npcs)
+      ? scene.npcs.filter(Boolean).map(npc => ({
+        id: npc.id,
+        name: npc.name,
+        x: npc.x,
+        y: npc.y,
+        tileX: Math.round(npc.x),
+        tileY: Math.round(npc.y),
+        actions: Array.isArray(npc.actions) ? [...npc.actions] : [],
       }))
       : [],
     groundItems: scene && Array.isArray(scene.items)

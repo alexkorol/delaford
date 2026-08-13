@@ -7,6 +7,7 @@ import { SURFACE_MONSTER_COLUMNS } from '#shared/actor-graphics.js';
 import DUNGEON_TILESET, { DUNGEON_FIRST_GID, dungeonGid } from '#shared/dungeon-tiles.js';
 import { createWorldLayout } from '#server/core/world-layout.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import npcDefinitions from '#server/core/data/npcs.js';
 
 const allScenes = layout => [layout.town, ...layout.scenes];
 const localId = gid => (gid >= DUNGEON_FIRST_GID ? gid - DUNGEON_FIRST_GID : -1);
@@ -200,6 +201,16 @@ describe('DCSS world layout', () => {
         isWalkable(layout.town, point.x, point.y)
         && hasWalkablePath(layout.town, layout.town.metadata.spawnPoints[0], point)
       ))).toBe(true);
+    });
+  });
+
+  it('keeps every town NPC spawn walkable and reachable', () => {
+    const layout = createWorldLayout();
+    const townSpawn = layout.town.metadata.spawnPoints[0];
+
+    npcDefinitions.forEach((npc) => {
+      expect(isWalkable(layout.town, npc.spawn.x, npc.spawn.y)).toBe(true);
+      expect(hasWalkablePath(layout.town, townSpawn, npc.spawn)).toBe(true);
     });
   });
 

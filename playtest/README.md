@@ -63,6 +63,7 @@ WS client or the browser console:
 
 | scenario | proves |
 |---|---|
+| `economy` | moving shop/bank NPC → real pane menus → buy/sell/deposit/withdraw |
 | `movement` | steps move the player; entering a zone mid-walk doesn't bounce |
 | `combat` | a pack **with a healer** can actually be killed, and you survive |
 | `loot` | kill → drop → real context menu → Take → in inventory |

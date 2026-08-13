@@ -211,6 +211,32 @@ describe('ContextMenu strategies', () => {
     expect(bankActions.map(entry => entry.params.quantity)).toEqual([1, 5, 10, 'All']);
   });
 
+  it('selects bank and shop items from the clicked pane rather than the same inventory slot', async () => {
+    player.inventory.slots = [{ slot: 0, id: 'inventory-item' }];
+    player.bank = [{ slot: 0, id: 'bank-item' }];
+    player.currentPane = 'bank';
+
+    const bankMenu = new ContextMenu(player, tile, {
+      clickedOn: { 3: 'bankSlot' },
+      slot: 0,
+    });
+    const bankActions = await bankMenu.build();
+    expect(bankActions.find(entry => entry.action.name === 'Withdraw')?.id).toBe('bank-item');
+
+    world.shops = [{
+      npcId: 2,
+      inventory: [{ slot: 0, id: 'shop-item' }],
+    }];
+    player.objectId = 2;
+    player.currentPane = 'shop';
+    const shopMenu = new ContextMenu(player, tile, {
+      clickedOn: { 3: 'shopSlot' },
+      slot: 0,
+    });
+    const shopActions = await shopMenu.build();
+    expect(shopActions.find(entry => entry.action.name === 'Buy')?.id).toBe('shop-item');
+  });
+
   it('does not use stale pane data after a pane has been closed', async () => {
     player.currentPane = false;
     player.currentPaneData = [{

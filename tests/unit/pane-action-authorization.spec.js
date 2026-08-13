@@ -13,6 +13,7 @@ const resetWorld = () => {
   world._players = [];
   world.clients = [];
   town.players = [];
+  town.npcs = [];
   town.items = [];
   town.respawns = {
     items: [],
@@ -40,7 +41,12 @@ const makePlayer = () => ({
     ],
   },
   bank: [],
-  currentPane: 'bank',
+  currentPane: false,
+  currentPaneAnchor: null,
+  objectId: null,
+  sceneId: world.defaultTownId,
+  x: 10,
+  y: 10,
   combat: {},
 });
 
@@ -79,8 +85,42 @@ const makeGeneralStore = (player, inventory = []) => {
     originalStock: inventory.map(item => item.id),
     inventory,
   }];
-  player.objectId = 2;
-  player.currentPane = 'shop';
+  actionEvents['player:screen:npc:trade']({
+    playerIndex: world.players.indexOf(player),
+    todo: {
+      item: { id: 2 },
+      actionToQueue: { world: { x: 11, y: 10 } },
+    },
+  });
+};
+
+const addServiceNpcs = () => {
+  world.getDefaultTown().npcs = [
+    {
+      id: 2,
+      name: 'Shop keeper',
+      x: 11,
+      y: 10,
+      actions: ['trade', 'examine'],
+    },
+    {
+      id: 4,
+      name: 'Bank gnome',
+      x: 10,
+      y: 10,
+      actions: ['bank', 'examine'],
+    },
+  ];
+};
+
+const openBank = (player) => {
+  actionEvents['player:screen:bank']({
+    playerIndex: world.players.indexOf(player),
+    todo: {
+      item: { id: 4 },
+      actionToQueue: { world: { x: 10, y: 10 } },
+    },
+  });
 };
 
 describe('pane action authorization', () => {
@@ -91,6 +131,8 @@ describe('pane action authorization', () => {
     resetWorld();
     player = makePlayer();
     world.addPlayer(player);
+    addServiceNpcs();
+    openBank(player);
   });
 
   afterEach(() => {
@@ -133,6 +175,52 @@ describe('pane action authorization', () => {
       player: { socket_id: player.socket_id },
       data: player.bank,
     }));
+  });
+
+  it('rejects forged bank state without a server-issued NPC anchor', async () => {
+    player.currentPane = 'bank';
+    player.currentPaneAnchor = null;
+    player.objectId = 4;
+
+    await actionEvents['player:screen:bank:action']({
+      player: { uuid: player.uuid, socket_id: player.socket_id },
+      item: { id: 'coins', params: { quantity: 5 } },
+      doing: 'deposit',
+    });
+
+    expect(player.inventory.slots.find(item => item.id === 'coins').qty).toBe(10);
+    expect(player.bank).toEqual([]);
+  });
+
+  it('rejects bank transfers after the player leaves the service point', async () => {
+    player.x = 30;
+    player.y = 30;
+
+    await actionEvents['player:screen:bank:action']({
+      player: { uuid: player.uuid, socket_id: player.socket_id },
+      item: { id: 'coins', params: { quantity: 5 } },
+      doing: 'deposit',
+    });
+
+    expect(player.inventory.slots.find(item => item.id === 'coins').qty).toBe(10);
+    expect(player.bank).toEqual([]);
+  });
+
+  it('does not open banking from a remote or mismatched NPC interaction', () => {
+    player.currentPane = false;
+    player.currentPaneAnchor = null;
+    player.objectId = null;
+
+    actionEvents['player:screen:bank']({
+      playerIndex: world.players.indexOf(player),
+      todo: {
+        item: { id: 2 },
+        actionToQueue: { world: { x: 80, y: 80 } },
+      },
+    });
+
+    expect(player.currentPane).toBe(false);
+    expect(player.currentPaneAnchor).toBeNull();
   });
 
   it('deposits stackable items into an existing full-bank stack', async () => {
@@ -251,6 +339,29 @@ describe('pane action authorization', () => {
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
       qty: 5,
     });
+  });
+
+  it('rejects shop purchases after the player leaves the service point', async () => {
+    withStackableCopperOre();
+    attachInventory(player, [
+      { id: 'coins', qty: 100, slot: 0 },
+    ]);
+    makeGeneralStore(player, [
+      { id: 'copper-ore', qty: 10, slot: 0 },
+    ]);
+    player.x = 30;
+    player.y = 30;
+
+    await actionEvents['player:screen:npc:trade:action']({
+      player: { uuid: player.uuid, socket_id: player.socket_id },
+      item: { id: 'copper-ore', params: { quantity: 5 } },
+      doing: 'buy',
+    });
+
+    expect(player.inventory.slots).toEqual([
+      expect.objectContaining({ id: 'coins', qty: 100 }),
+    ]);
+    expect(world.shops[0].inventory[0]).toMatchObject({ id: 'copper-ore', qty: 10 });
   });
 
   it('merges stackable shop buys into an existing full-inventory stack', async () => {
