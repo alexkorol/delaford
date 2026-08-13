@@ -18,7 +18,10 @@
         :key="item.uuid"
         :class="itemClasses(item)"
         :style="itemStyle(item)"
-        :title="itemTooltip(item)"
+        :aria-label="itemAriaLabel(item)"
+        @pointerenter="showTooltip($event, item)"
+        @pointermove="moveTooltip"
+        @pointerleave="hideTooltip"
         @pointerdown.left.prevent="beginPointerDrag($event, item)"
         @dblclick.prevent="handleDoubleClick(item)"
         @contextmenu.stop.prevent="showContextMenu($event, item)"
@@ -40,6 +43,12 @@
       :class="ghostClasses"
       :style="ghostStyle"
     />
+
+    <ItemTooltip
+      :item="tooltipItem"
+      :dimensions="tooltipDimensions"
+      :position="tooltipPosition"
+    />
   </div>
 </template>
 
@@ -51,11 +60,14 @@ import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
 import { buildInventoryContextMenuRequest } from '@/core/inventory/context-menu.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
+import { itemTooltipAriaLabel } from '@/core/inventory/item-tooltip.js';
 import bus from '@/core/utilities/bus.js';
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
+import ItemTooltip from './ItemTooltip.vue';
 
 export default {
   name: 'InventoryGrid',
+  components: { ItemTooltip },
   emits: ['commit'],
   props: {
     images: {
@@ -74,6 +86,9 @@ export default {
   setup(props, { emit }) {
     const gridRef = ref(null);
     const inventoryStore = useInventoryStore();
+    const tooltipItem = ref(null);
+    const tooltipDimensions = ref({ width: 1, height: 1 });
+    const tooltipPosition = ref({ left: 16, top: 16, bottom: null, maxHeight: 480 });
     const {
       items,
       dragState,
@@ -130,6 +145,48 @@ export default {
       }
 
       inventoryStore.clearHoverTarget();
+    };
+
+    const positionTooltip = (event) => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      const width = Math.min(326, Math.max(220, window.innerWidth - 24));
+      const gap = 16;
+      const left = event.clientX + gap + width <= window.innerWidth - 12
+        ? event.clientX + gap
+        : Math.max(12, event.clientX - width - gap);
+      const above = event.clientY > window.innerHeight / 2;
+
+      tooltipPosition.value = {
+        left,
+        top: above ? null : event.clientY + gap,
+        bottom: above ? window.innerHeight - event.clientY + gap : null,
+        maxHeight: Math.max(140, above
+          ? event.clientY - gap - 12
+          : window.innerHeight - event.clientY - gap - 12),
+      };
+    };
+
+    const showTooltip = (event, item) => {
+      if (isDragging.value) {
+        return;
+      }
+      tooltipItem.value = item;
+      tooltipDimensions.value = getItemDimensions(item, item.orientation);
+      positionTooltip(event);
+    };
+
+    const moveTooltip = (event) => {
+      if (!tooltipItem.value || isDragging.value) {
+        return;
+      }
+      positionTooltip(event);
+    };
+
+    const hideTooltip = () => {
+      tooltipItem.value = null;
     };
 
     const externalDropTargetFromEvent = (event) => {
@@ -190,6 +247,7 @@ export default {
     };
 
     const beginPointerDrag = (event, item) => {
+      hideTooltip();
       const cell = pointerCellFromEvent(event) || coordsFromIndex(item.slot, props.columns);
       const offset = {
         x: cell.x - item.position.x,
@@ -221,6 +279,7 @@ export default {
     };
 
     const showContextMenu = (event, item) => {
+      hideTooltip();
       inventoryStore.cancelDrag();
       bus.$emit('PLAYER:MENU', buildInventoryContextMenuRequest(event, item));
     };
@@ -310,14 +369,9 @@ export default {
       { 'inventory-item--dragging': isItemDragging(item.uuid) },
     ]);
 
-    const itemTooltip = (item) => {
+    const itemAriaLabel = (item) => {
       const { width, height } = getItemDimensions(item, item.orientation);
-      const name = item.displayName || item.name || item.id || 'Item';
-      const header = `${name} (${width} x ${height})`;
-      const vesselLines = Array.isArray(item.vessel?.lines)
-        ? item.vessel.lines.filter(line => line.section !== 'name').map(line => line.text)
-        : [];
-      return vesselLines.length ? [header, ...vesselLines].join('\n') : header;
+      return itemTooltipAriaLabel(item, { width, height });
     };
 
     const ghostPlacement = computed(() => {
@@ -372,11 +426,17 @@ export default {
       beginPointerDrag,
       handleDoubleClick,
       showContextMenu,
+      showTooltip,
+      moveTooltip,
+      hideTooltip,
       itemStyle,
       itemSpriteStyle,
       itemClasses,
-      itemTooltip,
+      itemAriaLabel,
       isItemDragging,
+      tooltipItem,
+      tooltipDimensions,
+      tooltipPosition,
       ghostPlacement,
       ghostClasses,
       ghostStyle,
