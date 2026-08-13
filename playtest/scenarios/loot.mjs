@@ -76,10 +76,26 @@ export default async function loot({ connect, assert }) {
     }, { timeoutMs: 30000, intervalMs: 400, label: 'a second coin drop' });
 
     p.devTeleport(drop2.x, drop2.y); // stand ON it
+    const underfoot = await p.waitFor(async () => {
+      const s = await p.state();
+      if (s.x !== drop2.x || s.y !== drop2.y) return false;
+      const reachable = s.groundItems.filter(item => (
+        (item.x === s.x && item.y === s.y)
+        || (Math.abs(item.x - s.x) + Math.abs(item.y - s.y) === 1)
+      ));
+      return reachable.some(item => item.uuid === drop2.uuid)
+        ? { uuids: new Set(reachable.map(item => item.uuid)) }
+        : false;
+    }, { timeoutMs: 6000, label: 'standing on the second drop' });
+
     p.pickupUnderfoot();
     await p.waitFor(async () => {
       const s = await p.state();
-      return !s.groundItems.some(item => item.uuid === drop2.uuid);
+      // The grab key intentionally takes one reachable item. A gear roll can
+      // share the monster's tile with its guaranteed coins, so assert the
+      // real one-key contract instead of requiring a particular stack.
+      const remaining = new Set(s.groundItems.map(item => item.uuid));
+      return [...underfoot.uuids].some(uuid => !remaining.has(uuid));
     }, { timeoutMs: 6000, label: 'underfoot pickup' });
   } finally {
     p.close();

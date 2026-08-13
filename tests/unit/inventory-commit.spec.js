@@ -257,6 +257,40 @@ describe('inventory commit identity validation', () => {
     expect(Socket.broadcast).toHaveBeenCalledWith('item:change', scene.items, [player]);
   });
 
+  it('takes one item from the player tile through the grab-key action', () => {
+    const scene = world.ensureScene('zone:inventory-underfoot-test', {
+      map: { foreground: [], background: [] },
+      items: [],
+      respawns: { items: [], monsters: [], resources: [] },
+    });
+    const coins = {
+      id: 'coins',
+      uuid: 'underfoot-coins',
+      x: player.x,
+      y: player.y,
+      qty: 7,
+    };
+    const gear = {
+      id: 'bronze-sword',
+      uuid: 'underfoot-gear',
+      x: player.x,
+      y: player.y,
+    };
+    scene.items = [coins, gear];
+    player.inventory.slots = [];
+    player.inventory.add = vi.fn();
+    world.assignPlayerToScene(player, scene.id);
+
+    actionEvents['player:take:underfoot']({}, { id: player.socket_id });
+
+    expect(scene.items).toEqual([gear]);
+    expect(player.inventory.add).toHaveBeenCalledWith('coins', 7, {
+      uuid: coins.uuid,
+      existingItem: coins,
+    });
+    expect(Socket.broadcast).toHaveBeenCalledWith('item:change', scene.items, [player]);
+  });
+
   it('marks a circulating heirloom recovered after its exact pickup is persisted', async () => {
     const scene = world.ensureScene('zone:heirloom-take-test', {
       map: { foreground: [], background: [] },
