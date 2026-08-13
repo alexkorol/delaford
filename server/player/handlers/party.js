@@ -441,7 +441,14 @@ class PartyService {
     party.metadata.completedAt = null;
 
     this.teleportMembersToSpawns(party, scene);
-    this.forEachMember(party, member => notifyProgression(member, 'delve'));
+    const delveContext = {
+      zoneId: zone?.id || null,
+      template: party.metadata.template,
+      layout: party.metadata.layout,
+      theme: generation.metadata.theme,
+      depth,
+    };
+    this.forEachMember(party, member => notifyProgression(member, 'delve', delveContext));
 
     this.sendPartyUpdate(party);
     this.sendSceneTransition(party, scene);

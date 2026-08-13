@@ -166,6 +166,31 @@ describe('monster loot drops', () => {
     expect(drops[1].vessel.item.formId).toBeTruthy();
   });
 
+  it('does not extend the Proof of Temper guarantee to later elite quests', () => {
+    const sceneId = 'scene-later-elite';
+    const scene = { id: sceneId, items: [], players: [] };
+    world.scenes.set(sceneId, scene);
+    const player = {
+      quests: {
+        activeQuestId: 'the-pale-crown',
+        objectiveIndex: 1,
+        completed: [
+          { id: 'aldwyns-charge', completedAt: 1 },
+          { id: 'proof-of-temper', completedAt: 2 },
+        ],
+        questPoints: 2,
+      },
+    };
+
+    const drops = dropMonsterLoot(
+      makeSlainMonster(sceneId, { rarityId: 'elite' }),
+      { player, rng: makeRngQueue([0.99]) },
+    );
+
+    expect(drops).toHaveLength(1);
+    expect(drops[0].id).toBe('coins');
+  });
+
   it('returns a queued House heirloom from an elite with exact identity', () => {
     const sceneId = 'scene-relic-drop';
     const scene = { id: sceneId, items: [], players: [] };

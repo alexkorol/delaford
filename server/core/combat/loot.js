@@ -2,7 +2,10 @@ import ItemFactory from '#server/core/items/factory.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
-import { isCurrentQuestObjective } from '#server/core/services/quest-service.js';
+import {
+  isActiveQuest,
+  isCurrentQuestObjective,
+} from '#server/core/services/quest-service.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
 export const GEAR_DROP_CHANCES = {
@@ -92,6 +95,7 @@ export const dropMonsterLoot = (monster, options = {}) => {
   // The guardian still chooses a random native form; only the first drop is
   // guaranteed while that exact objective is current.
   const guaranteesQuestVessel = rarityId === 'elite'
+    && isActiveQuest(player, 'proof-of-temper')
     && isCurrentQuestObjective(player, 'slay-elite');
   if (guaranteesQuestVessel || rng() < gearChance) {
     const gearId = GEAR_DROP_POOL[Math.floor(rng() * GEAR_DROP_POOL.length)];

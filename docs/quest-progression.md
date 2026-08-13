@@ -4,7 +4,7 @@ Quest progress is server-authored and persisted with the player. Definitions
 live in `server/shared/quests.js` so server rules and the Vue journal use the
 same titles, objectives, and reward copy.
 
-## First vertical slice
+## Campaign vertical slice
 
 `aldwyns-charge` advances only in this order:
 
@@ -22,6 +22,24 @@ without letting either client author completion. On completion the server:
 - records `Answered Aldwyn's Charge` on the living Scion;
 - adds five authoritative House renown, idempotently by deed;
 - force-saves player progress and pushes a live quest-journal update.
+
+`proof-of-temper` begins immediately afterward. It requires a real elite kill,
+guarantees one native Vessel only while that exact quest objective is current,
+then verifies the same item entered the inventory and was truly equipped. It
+awards the second passive point and ten House renown.
+
+`the-pale-crown` is the first contextual campaign contract:
+
+1. enter **Weir Crypt** specifically (another crypt-themed layout does not
+   count);
+2. defeat **The Pale Sovereign** in a crypt instance;
+3. use the opened stairs to reach floor two of that crypt expedition.
+
+Delve and kill events carry server-derived zone, layout, theme, depth, and
+monster identity context. Objective criteria are matched only on the server
+and are stripped from the client journal snapshot. The contract awards the
+third passive point, 15 House renown, and the Scion deed
+`Broke the Pale Sovereign's seal`.
 
 Guest saves include the quest state. Account saves send it as `questsData`.
 Malformed or unknown persisted quest entries are discarded and quest points

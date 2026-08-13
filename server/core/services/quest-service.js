@@ -66,7 +66,9 @@ export const questLogSnapshot = (player) => {
       description: definition.description,
       objectiveIndex: state.objectiveIndex,
       objectives: definition.objectives.map((objective, index) => ({
-        ...objective,
+        id: objective.id,
+        trigger: objective.trigger,
+        label: objective.label,
         completed: index < state.objectiveIndex,
         current: index === state.objectiveIndex,
       })),
@@ -108,9 +110,29 @@ export const currentQuestObjective = (player) => {
   return definition?.objectives?.[state.objectiveIndex] || null;
 };
 
-export const isCurrentQuestObjective = (player, trigger) => (
-  currentQuestObjective(player)?.trigger === trigger
+export const isActiveQuest = (player, questId) => (
+  ensureQuestState(player).activeQuestId === questId
 );
+
+export const questObjectiveMatches = (objective, context = {}) => {
+  const criteria = objective && objective.criteria;
+  if (!criteria || typeof criteria !== 'object') {
+    return true;
+  }
+
+  return Object.entries(criteria).every(([key, expected]) => {
+    if (key === 'minDepth') {
+      return Number.isFinite(Number(context.depth)) && Number(context.depth) >= Number(expected);
+    }
+    const actual = context && context[key];
+    return Array.isArray(expected) ? expected.includes(actual) : actual === expected;
+  });
+};
+
+export const isCurrentQuestObjective = (player, trigger, context = {}) => {
+  const objective = currentQuestObjective(player);
+  return objective?.trigger === trigger && questObjectiveMatches(objective, context);
+};
 
 const completeQuest = (player, definition) => {
   const state = ensureQuestState(player);
@@ -146,7 +168,7 @@ const completeQuest = (player, definition) => {
   return true;
 };
 
-export const notifyQuest = (player, trigger) => {
+export const notifyQuest = (player, trigger, context = {}) => {
   if (!player || typeof trigger !== 'string') {
     return false;
   }
@@ -154,7 +176,8 @@ export const notifyQuest = (player, trigger) => {
   const state = ensureQuestState(player);
   const definition = getQuestDefinition(state.activeQuestId);
   const objective = definition && definition.objectives[state.objectiveIndex];
-  if (!definition || !objective || objective.trigger !== trigger) {
+  if (!definition || !objective || objective.trigger !== trigger
+    || !questObjectiveMatches(objective, context)) {
     return false;
   }
 
@@ -171,9 +194,11 @@ export default {
   emitQuestLog,
   ensureQuestState,
   currentQuestObjective,
+  isActiveQuest,
   isCurrentQuestObjective,
   maybeStartQuest,
   normaliseQuestState,
   notifyQuest,
+  questObjectiveMatches,
   questLogSnapshot,
 };

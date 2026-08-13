@@ -1,7 +1,7 @@
 /**
- * Progression loop: complete Aldwyn's first real commission through movement,
- * combat, loot, and instance entry; then relog and verify its passive point,
- * House renown, and Scion deed remain authoritative.
+ * Progression loop: complete the three authoritative commissions through
+ * movement, combat, loot, equipment, a named boss, and floor descent; then
+ * relog and verify points, House renown, and Scion deeds remain authoritative.
  */
 export default async function quest({ connect, assert }) {
   let p = await connect({
@@ -181,7 +181,7 @@ export default async function quest({ connect, assert }) {
     p.equipItem(carriedVessel, carriedVessel.equipSlot);
     const tempered = await p.waitFor(async () => {
       const next = await p.state();
-      return next.quests.activeQuestId === null
+      return next.quests.activeQuestId === 'the-pale-crown'
         && next.quests.completed.some(entry => entry.id === 'proof-of-temper')
         ? next
         : false;
@@ -194,15 +194,82 @@ export default async function quest({ connect, assert }) {
     assert(temperedScion.deeds.includes('Proved their temper in the old realms'),
       'the Scion records the elite Vessel deed');
 
+    // A crypt-themed zone with the wrong layout is not Weir Crypt and must
+    // not satisfy a contextual objective merely because the tiles look alike.
+    await p.enterZone('crypt', 'gauntlet');
+    state = await p.state();
+    assert(state.quests.activeQuestId === 'the-pale-crown'
+      && state.quests.objectiveIndex === 0,
+    'Sunken Colonnade cannot stand in for Weir Crypt');
+
+    await p.enterZone('crypt', 'warren');
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.quests.activeQuestId === 'the-pale-crown'
+        && next.quests.objectiveIndex === 1 ? next : false;
+    }, { label: 'enter Weir Crypt for The Pale Crown' });
+    assert(state.sceneName === 'Weir Crypt', 'the named campaign delve enters Weir Crypt');
+
+    const sovereign = state.monsters.find(monster => (
+      monster.rarity === 'elite' && monster.name === 'The Pale Sovereign'
+    ));
+    assert(sovereign, 'Weir Crypt is sealed by the named Pale Sovereign boss');
+    p.devSetLevel(50);
+    p.devHeal();
+    p.devTeleport(sovereign.x + 1, sovereign.y);
+    await p.attack(sovereign);
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      const livingSovereign = next.monsters.find(monster => monster.uuid === sovereign.uuid);
+      if (!livingSovereign && next.quests.objectiveIndex === 2) {
+        return next;
+      }
+      if (!livingSovereign) {
+        throw new Error(`Pale Sovereign died without quest progress: ${JSON.stringify(next.quests)}`);
+      }
+      if (livingSovereign) {
+        p.devHeal();
+        if (Math.abs(livingSovereign.x - next.x) > 1
+          || Math.abs(livingSovereign.y - next.y) > 1) {
+          p.devTeleport(livingSovereign.x + 1, livingSovereign.y);
+        }
+        await p.attack(livingSovereign);
+      }
+      return false;
+    }, { timeoutMs: 30000, intervalMs: 350, label: 'Pale Sovereign campaign boss' });
+    assert(state.quests.objectiveIndex === 2,
+      'only the named crypt sovereign breaks the campaign seal');
+
+    const stairsDown = state.sceneMetadata.stairsDown;
+    assert(stairsDown, 'the broken seal exposes stairs to the deeper realm');
+    p.devTeleport(stairsDown.x, stairsDown.y);
+    const crowned = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.sceneMetadata.depth === 2
+        && next.quests.activeQuestId === null
+        && next.quests.completed.some(entry => entry.id === 'the-pale-crown')
+        ? next
+        : false;
+    }, { label: 'descend beneath the Pale Sovereign seal' });
+    assert(crowned.quests.questPoints === 3, 'three commissions grant three passive points');
+    const crownedHouse = crowned.chroniclesRecord.state.houses
+      .find(entry => entry.id === house.id);
+    const crownedScion = crownedHouse.scions.find(entry => entry.id === living.id);
+    assert(crownedHouse.renown === 30, 'the campaign chain grants thirty House renown');
+    assert(crownedScion.deeds.includes("Broke the Pale Sovereign's seal"),
+      'the Scion records the named boss and descent deed');
+
     p.close();
     await new Promise(resolve => { setTimeout(resolve, 900); });
     p = await connect();
     const reloaded = await p.state();
-    assert(reloaded.quests.questPoints === 2, 'both quest points survive relogging');
+    assert(reloaded.quests.questPoints === 3, 'all three quest points survive relogging');
     assert(reloaded.quests.completed.some(entry => entry.id === 'aldwyns-charge'),
       "Aldwyn's Charge survives relogging");
     assert(reloaded.quests.completed.some(entry => entry.id === 'proof-of-temper'),
       'Proof of Temper survives relogging');
+    assert(reloaded.quests.completed.some(entry => entry.id === 'the-pale-crown'),
+      'The Pale Crown survives relogging');
   } finally {
     p.close();
   }

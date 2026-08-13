@@ -27,6 +27,27 @@ describe('quest journal', () => {
     expect(quest.rewards).toEqual({ passivePoints: 1, houseRenown: 10 });
   });
 
+  it('continues into a contextual named-boss and floor-descent campaign', () => {
+    const quest = QUEST_DEFINITIONS[2];
+
+    expect(quest.id).toBe('the-pale-crown');
+    expect(quest.objectives).toEqual([
+      expect.objectContaining({
+        trigger: 'delve',
+        criteria: { zoneId: 'weir-crypt', depth: 1 },
+      }),
+      expect.objectContaining({
+        trigger: 'slay-elite',
+        criteria: { monsterName: 'The Pale Sovereign', theme: 'crypt' },
+      }),
+      expect.objectContaining({
+        trigger: 'delve',
+        criteria: { template: 'crypt', minDepth: 2 },
+      }),
+    ]);
+    expect(quest.rewards).toEqual({ passivePoints: 1, houseRenown: 15 });
+  });
+
   it('renders live objectives instead of the legacy placeholder', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../../src/components/slots/Quests.vue', import.meta.url)),

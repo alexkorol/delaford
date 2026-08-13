@@ -34,6 +34,36 @@ export const QUEST_DEFINITIONS = [
     },
     deed: 'Proved their temper in the old realms',
   },
+  {
+    id: 'the-pale-crown',
+    title: 'The Pale Crown',
+    description: 'Break the sovereign seal in Weir Crypt and follow the opened road into the deeper realm.',
+    objectives: [
+      {
+        id: 'enter-weir-crypt',
+        trigger: 'delve',
+        label: 'Enter Weir Crypt',
+        criteria: { zoneId: 'weir-crypt', depth: 1 },
+      },
+      {
+        id: 'slay-pale-sovereign',
+        trigger: 'slay-elite',
+        label: 'Defeat the Pale Sovereign',
+        criteria: { monsterName: 'The Pale Sovereign', theme: 'crypt' },
+      },
+      {
+        id: 'descend-beneath-seal',
+        trigger: 'delve',
+        label: 'Descend to the second floor',
+        criteria: { template: 'crypt', minDepth: 2 },
+      },
+    ],
+    rewards: {
+      passivePoints: 1,
+      houseRenown: 15,
+    },
+    deed: "Broke the Pale Sovereign's seal",
+  },
 ];
 
 export const getQuestDefinition = questId => (

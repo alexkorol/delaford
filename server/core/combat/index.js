@@ -324,9 +324,17 @@ const applyHitToMonster = (player, monster, skill, now) => {
     experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
     dropMonsterLoot(monster, { player });
-    notifyProgression(player, 'slay');
+    const scene = world.getScene(player.sceneId);
+    const killContext = {
+      monsterId: monster.templateId || monster.id || null,
+      monsterName: monster.name || null,
+      rarity: monster.rarityId || monster.rarity || null,
+      theme: scene?.metadata?.theme || null,
+      depth: scene?.metadata?.depth || null,
+    };
+    notifyProgression(player, 'slay', killContext);
     if ((monster.rarityId || monster.rarity) === 'elite') {
-      notifyProgression(player, 'slay-elite');
+      notifyProgression(player, 'slay-elite', killContext);
     }
   }
 

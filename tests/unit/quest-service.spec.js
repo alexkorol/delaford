@@ -117,7 +117,7 @@ describe('authoritative quest progression', () => {
     });
 
     expect(player.quests).toEqual(expect.objectContaining({
-      activeQuestId: null,
+      activeQuestId: 'the-pale-crown',
       objectiveIndex: 0,
       questPoints: 2,
       completed: [
@@ -135,5 +135,68 @@ describe('authoritative quest progression', () => {
     expect(notifyQuest(player, 'equip-vessel')).toBe(false);
     expect(player.quests.questPoints).toBe(2);
     expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
+
+    expect(notifyQuest(player, 'delve', {
+      zoneId: 'sunken-colonnade', theme: 'crypt', depth: 1,
+    })).toBe(false);
+    expect(player.quests.objectiveIndex).toBe(0);
+    expect(notifyQuest(player, 'delve', {
+      zoneId: 'weir-crypt', theme: 'crypt', depth: 1,
+    })).toBe(true);
+    expect(player.quests.objectiveIndex).toBe(1);
+
+    expect(notifyQuest(player, 'slay-elite', {
+      monsterName: 'The Pale Sovereign', theme: 'stone', depth: 1,
+    })).toBe(false);
+    expect(notifyQuest(player, 'slay-elite', {
+      monsterName: 'The Pale Sovereign', theme: 'crypt', depth: 1,
+    })).toBe(true);
+    expect(player.quests.objectiveIndex).toBe(2);
+
+    expect(notifyQuest(player, 'delve', { template: 'stone', depth: 2 })).toBe(false);
+    expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 1 })).toBe(false);
+    expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 2 })).toBe(true);
+    expect(player.quests).toEqual(expect.objectContaining({
+      activeQuestId: null,
+      objectiveIndex: 0,
+      questPoints: 3,
+      completed: [
+        expect.objectContaining({ id: 'aldwyns-charge' }),
+        expect.objectContaining({ id: 'proof-of-temper' }),
+        expect.objectContaining({ id: 'the-pale-crown' }),
+      ],
+    }));
+    expect(chroniclesStoreMock.recordScionDeed).toHaveBeenCalledWith(
+      player.uuid,
+      player.chronicles,
+      { deed: "Broke the Pale Sovereign's seal", renown: 15 },
+    );
+
+    vi.clearAllMocks();
+    expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 2 })).toBe(false);
+    expect(player.quests.questPoints).toBe(3);
+    expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
+  });
+
+  it('keeps server-only objective criteria out of the client journal', () => {
+    const player = makePlayer();
+    player.quests = {
+      activeQuestId: 'the-pale-crown',
+      objectiveIndex: 0,
+      completed: [
+        { id: 'aldwyns-charge', completedAt: 1 },
+        { id: 'proof-of-temper', completedAt: 2 },
+      ],
+      questPoints: 2,
+    };
+
+    const log = questLogSnapshot(player);
+    expect(log.active.objectives[0]).toEqual({
+      id: 'enter-weir-crypt',
+      trigger: 'delve',
+      label: 'Enter Weir Crypt',
+      completed: false,
+      current: true,
+    });
   });
 });

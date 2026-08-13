@@ -36,11 +36,13 @@ solo zone/instance entry (Adventure menu), and the Chronicles Houses & Scions
 persistence model (`src/core/chronicles/houses.js`).
 
 Chronicles creation, authoritative persistence, mortal Scion entombment, and
-fallen-heirloom circulation are now playable end to end. The first two real
+fallen-heirloom circulation are now playable end to end. The first three real
 quests form a server-owned progression chain. **Aldwyn's Charge** turns
 movement → combat → loot → Adventure entry into onboarding; **Proof of
 Temper** follows with an elite hunt, guaranteed native Vessel, equipment
-objective, second passive point, House renown, and Scion deed.
+objective, second passive point, House renown, and Scion deed. **The Pale
+Crown** then validates a specific named zone, named generated boss, and real
+floor-two descent before awarding the third point and campaign deed.
 
 The character sheet now reuses the generated player sprite for its portrait
 and each equipped item's real atlas frame; generic slot glyphs remain only for
@@ -105,8 +107,8 @@ deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
 - Logging/analytics for balance.
 - Live operations tools (GM commands, rollback, event triggers).
 - Localization scaffolding.
-- Expand the authoritative quest journal beyond Aldwyn's onboarding commission
-  toward the 23-point quest budget reserved by the passive tree.
+- Expand the authoritative campaign beyond its first three commissions toward
+  the 23-point quest budget reserved by the passive tree.
 - Wire the currently Dormant Vesselforge effects into authoritative combat
   before exposing crafting and awakening as player-facing progression.
 
