@@ -73,11 +73,18 @@ export default {
     bus.$on('PLAYER:MENU', this.buildMenu);
     bus.$on('game:context-menu:items', this.createMenu);
     bus.$on('contextmenu:close', this.closeMenu);
-    bus.$on('canvas:select-action', (event) => {
-      this.selectAction(event.event, event.item);
-    });
+    bus.$on('canvas:select-action', this.handleCanvasSelectAction);
+  },
+  beforeUnmount() {
+    bus.$off('PLAYER:MENU', this.buildMenu);
+    bus.$off('game:context-menu:items', this.createMenu);
+    bus.$off('contextmenu:close', this.closeMenu);
+    bus.$off('canvas:select-action', this.handleCanvasSelectAction);
   },
   methods: {
+    handleCanvasSelectAction(event) {
+      this.selectAction(event.event, event.item);
+    },
     getTilePayload() {
       const payload = {
         x: this.tile.x,

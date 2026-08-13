@@ -133,11 +133,11 @@ export default {
     },
   },
   created() {
-    bus.$on('canvas:getMouse', () => this.mouseSelection());
+    bus.$on('canvas:getMouse', this.handleCanvasGetMouse);
     bus.$on('open:screen', this.openScreen);
     bus.$on('screen:close', this.closePane);
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
-    bus.$on('canvas:reset-context-menu', () => this.mouseSelection());
+    bus.$on('canvas:reset-context-menu', this.handleCanvasResetContextMenu);
     bus.$on('game:renderer:mode', this.onRendererModeChanged);
   },
   mounted() {
@@ -152,6 +152,11 @@ export default {
   beforeUnmount() {
     window.removeEventListener('keydown', this.handleGlobalKeyDown);
     window.removeEventListener('keyup', this.handleGlobalKeyUp);
+    bus.$off('canvas:getMouse', this.handleCanvasGetMouse);
+    bus.$off('open:screen', this.openScreen);
+    bus.$off('screen:close', this.closePane);
+    bus.$off('game:context-menu:first-only', ClientUI.displayFirstAction);
+    bus.$off('canvas:reset-context-menu', this.handleCanvasResetContextMenu);
     bus.$off('game:renderer:mode', this.onRendererModeChanged);
     if (this.inputController) {
       this.inputController.destroy();
@@ -159,6 +164,12 @@ export default {
     }
   },
   methods: {
+    handleCanvasGetMouse() {
+      this.mouseSelection();
+    },
+    handleCanvasResetContextMenu() {
+      this.mouseSelection();
+    },
     resolveTileDimensions() {
       const fallback = (config && config.map && config.map.tileset && config.map.tileset.tile) || {};
       const runtime = this.game

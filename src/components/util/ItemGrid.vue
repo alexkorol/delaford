@@ -82,6 +82,9 @@ export default {
     this.$forceUpdate();
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
   },
+  beforeUnmount() {
+    bus.$off('game:context-menu:first-only', ClientUI.displayFirstAction);
+  },
   methods: {
     /**
      * Get the item's column of a certain slot in the inventory
