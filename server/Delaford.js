@@ -194,7 +194,15 @@ class Delaford {
     }
 
     try {
-      partyService.removePlayer(player.uuid);
+      const updatedParty = partyService.removePlayer(player.uuid);
+      if (updatedParty) {
+        partyService.sendPartyUpdate(updatedParty, {
+          meta: {
+            reason: 'member-disconnected',
+            playerUuid: player.uuid,
+          },
+        });
+      }
     } catch (error) {
       console.error(`[disconnect] Party cleanup failed for ${player.username}: ${error instanceof Error ? error.message : error}`);
     }

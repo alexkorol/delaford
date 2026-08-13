@@ -124,6 +124,7 @@ vi.mock('#server/player/handlers/party.js', () => ({
   partyService: {
     evaluateInstances: vi.fn(),
     removePlayer: vi.fn(),
+    sendPartyUpdate: vi.fn(),
   },
 }));
 
@@ -219,6 +220,34 @@ describe('Delaford.close – failure-tolerant disconnect cleanup', () => {
     expect(Socket.broadcast).toHaveBeenCalledWith('player:left', ws.id, []);
     expect(errorSpy).toHaveBeenCalledTimes(2);
     errorSpy.mockRestore();
+  });
+
+  it('pushes the authoritative roster to party members who remain connected', async () => {
+    const ws = { id: 'member-socket' };
+    const player = {
+      uuid: 'departing-member',
+      username: 'Departing',
+      token: 'none',
+      sceneId: 'town:delaford',
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+    const updatedParty = {
+      id: 'party-1',
+      leaderId: 'remaining-member',
+      members: new Map([['remaining-member', { uuid: 'remaining-member' }]]),
+    };
+    world.clients = [ws];
+    world.removePlayerBySocket.mockReturnValue(player);
+    partyService.removePlayer.mockReturnValue(updatedParty);
+
+    await Delaford.close(ws);
+
+    expect(partyService.sendPartyUpdate).toHaveBeenCalledWith(updatedParty, {
+      meta: {
+        reason: 'member-disconnected',
+        playerUuid: player.uuid,
+      },
+    });
   });
 
   it('reaps a socket that disconnects before creating a player', async () => {
