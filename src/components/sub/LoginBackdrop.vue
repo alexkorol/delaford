@@ -17,7 +17,7 @@ import {
 
 import { DUNGEON_FIRST_GID, dungeonGid, dungeonGroupGids } from '@shared/dungeon-tiles.js';
 import dungeonAtlasUrl from '@/assets/tiles/dungeon.png';
-import playerSheetUrl from '@/assets/graphics/actors/players/human.png';
+import playerSheetUrl from '@/assets/graphics/actors/players/human-v2.png';
 import npcSheetUrl from '@/assets/graphics/actors/npcs.png';
 import monsterSheetUrl from '@/assets/graphics/actors/monsters.png';
 
@@ -29,6 +29,7 @@ const props = defineProps({
 });
 
 const TILE = 32;
+const PLAYER_FRAME_SIZE = 64;
 const ATLAS_COLUMNS = 16;
 const GRID_W = 48;
 const GRID_H = 27;
@@ -361,12 +362,13 @@ const makeRenderer = (canvas, images, rng) => {
         ax = actor.patrol.from + (span * cycle);
       }
       const bob = Math.round(Math.sin((t * actor.bobSpeed) + actor.phase) * actor.bobAmp);
+      const frameSize = actor.sheet === 'player' ? PLAYER_FRAME_SIZE : TILE;
       ctx.drawImage(
         sheetFor(images, actor.sheet),
-        actor.column * TILE,
+        actor.column * frameSize,
         0,
-        TILE,
-        TILE,
+        frameSize,
+        frameSize,
         Math.round(ax * TILE),
         Math.round((actor.y * TILE) + bob),
         TILE,

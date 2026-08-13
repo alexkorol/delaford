@@ -4,43 +4,44 @@ import {
   DEFAULT_ANIMATION_HOLDS,
 } from '@shared/combat.js';
 
-// The current human sprite sheet (human.png) is a single 32x32 frame: one
-// column, one row. Every state must therefore point at column 0 and row 0 —
-// referencing columns 1/2 (as the old run/attack/dash/hurt frames did) samples
-// outside the image and draws nothing, which made the character flicker and
-// vanish while acting. States keep their durations/holds so the combat state
-// machine still works; only the (nonexistent) frame motion is removed. When a
-// multi-frame sprite lands, restore per-state frame arrays and rows here.
+// human-v2.png is a 4x4 contact sheet. Rows are the four cardinal directions;
+// columns are idle, two opposing stride poses, and a compact sword attack.
+// Source frames are deliberately larger than their in-world footprint so the
+// perspective renderer has enough detail for zoom and depth-of-field.
 const baseRows = {
   down: 0,
-  left: 0,
-  right: 0,
-  up: 0,
+  left: 1,
+  right: 2,
+  up: 3,
 };
 
-const singleFrame = [0];
+const idleFrames = [0];
+const runFrames = [1, 2];
+const attackFrames = [0, 3];
 
 export const PLAYER_SPRITE_CONFIG = {
-  tileSize: 32,
+  tileSize: 64,
+  renderSize: 32,
+  perspectiveScale: 0.725,
   defaultState: 'idle',
   defaultDirection: DEFAULT_FACING_DIRECTION,
   states: {
     idle: {
-      frames: singleFrame,
+      frames: idleFrames,
       frameDuration: 480,
       rows: baseRows,
       loop: true,
       holdState: null,
     },
     run: {
-      frames: singleFrame,
+      frames: runFrames,
       frameDuration: 110,
       rows: baseRows,
       loop: true,
       holdState: null,
     },
     attack: {
-      frames: singleFrame,
+      frames: attackFrames,
       frameDuration: 90,
       rows: baseRows,
       loop: false,
@@ -48,7 +49,7 @@ export const PLAYER_SPRITE_CONFIG = {
       duration: DEFAULT_ANIMATION_DURATIONS.attack,
     },
     dash: {
-      frames: singleFrame,
+      frames: runFrames,
       frameDuration: 70,
       rows: baseRows,
       loop: false,
@@ -56,7 +57,7 @@ export const PLAYER_SPRITE_CONFIG = {
       duration: DEFAULT_ANIMATION_DURATIONS.dash,
     },
     hurt: {
-      frames: singleFrame,
+      frames: idleFrames,
       frameDuration: 120,
       rows: baseRows,
       loop: false,

@@ -955,26 +955,39 @@ class Map {
 
     const center = this.getViewportCenter();
     const tileSize = this.config.map.tileset.tile.width;
-    const drawX = Math.round(center.x - (tileSize / 2));
-    const drawY = Math.round(center.y - (tileSize / 2));
+    const sourceSize = PLAYER_SPRITE_CONFIG.tileSize;
+    const renderSize = PLAYER_SPRITE_CONFIG.renderSize || tileSize;
+    const drawX = Math.round(center.x - (renderSize / 2));
+    const drawY = Math.round(center.y - (renderSize / 2));
 
     const animator = this.ensureAnimation(this.player);
     const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
-    const { sourceX, sourceY } = this.clampSpriteSource(this.images.playerImage, frame, tileSize);
+    const { sourceX, sourceY } = this.clampSpriteSource(
+      this.images.playerImage,
+      frame,
+      sourceSize,
+    );
 
     ctx.drawImage(
       this.images.playerImage,
       sourceX,
       sourceY,
-      tileSize,
-      tileSize,
+      sourceSize,
+      sourceSize,
       drawX,
       drawY,
-      tileSize,
-      tileSize,
+      renderSize,
+      renderSize,
     );
 
-    this.drawHitTint(ctx, drawX, drawY, tileSize, this.player && this.player.lastHitAt, now());
+    this.drawHitTint(
+      ctx,
+      drawX,
+      drawY,
+      renderSize,
+      this.player && this.player.lastHitAt,
+      now(),
+    );
   }
 
   /**
@@ -988,6 +1001,8 @@ class Map {
 
     const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
+    const sourceSize = PLAYER_SPRITE_CONFIG.tileSize;
+    const renderSize = PLAYER_SPRITE_CONFIG.renderSize || tileSize;
     const nearbyPlayers = this.players.filter((player) => this.isWithinViewport(player, metrics));
 
     nearbyPlayers.forEach((player) => {
@@ -996,29 +1011,40 @@ class Map {
         : centerOfTile(player.x, player.y, tileSize);
 
       const topLeft = {
-        x: centerPosition.x - (tileSize / 2),
-        y: centerPosition.y - (tileSize / 2),
+        x: centerPosition.x - (renderSize / 2),
+        y: centerPosition.y - (renderSize / 2),
       };
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
       const animator = this.ensureAnimation(player);
       const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
-      const { sourceX, sourceY } = this.clampSpriteSource(this.images.playerImage, frame, tileSize);
+      const { sourceX, sourceY } = this.clampSpriteSource(
+        this.images.playerImage,
+        frame,
+        sourceSize,
+      );
 
       ctx.drawImage(
         this.images.playerImage,
         sourceX,
         sourceY,
-        tileSize,
-        tileSize,
+        sourceSize,
+        sourceSize,
         screenPosition.x,
         screenPosition.y,
-        tileSize,
-        tileSize,
+        renderSize,
+        renderSize,
       );
 
-      this.drawHitTint(ctx, screenPosition.x, screenPosition.y, tileSize, player.lastHitAt, now());
+      this.drawHitTint(
+        ctx,
+        screenPosition.x,
+        screenPosition.y,
+        renderSize,
+        player.lastHitAt,
+        now(),
+      );
     });
   }
 

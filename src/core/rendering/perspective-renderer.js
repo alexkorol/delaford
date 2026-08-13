@@ -1,5 +1,6 @@
 import UI from '@shared/ui.js';
 import { now } from '../config/movement.js';
+import { PLAYER_SPRITE_CONFIG } from '../config/animation.js';
 import { centerOfTile } from '../utilities/movement-controller.js';
 import PerspectiveCamera from './perspective-camera.js';
 import TerrainRenderer from './terrain-renderer.js';
@@ -209,7 +210,7 @@ class PerspectiveRenderer {
       const foot = this.getActorFoot(player, tileSize);
       draws.push({
         depthY: foot.y,
-        draw: () => this.drawPlayerActor(player, foot, tileSize, timestamp),
+        draw: () => this.drawPlayerActor(player, foot, timestamp),
       });
     });
 
@@ -217,7 +218,7 @@ class PerspectiveRenderer {
       const foot = this.getPlayerFoot(tileSize);
       draws.push({
         depthY: foot.y,
-        draw: () => this.drawPlayerActor(this.map.player, foot, tileSize, timestamp),
+        draw: () => this.drawPlayerActor(this.map.player, foot, timestamp),
       });
     }
 
@@ -362,21 +363,23 @@ class PerspectiveRenderer {
     });
   }
 
-  drawPlayerActor(player, foot, tileSize, timestamp) {
+  drawPlayerActor(player, foot, timestamp) {
     const animator = this.map.ensureAnimation(player);
     const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
+    const sourceSize = PLAYER_SPRITE_CONFIG.tileSize;
     const { sourceX, sourceY } = this.map.clampSpriteSource(
       this.map.images.playerImage,
       frame,
-      tileSize,
+      sourceSize,
     );
 
     this.drawFrame({
       image: this.map.images.playerImage,
       sourceX,
       sourceY,
-      sourceSize: tileSize,
+      sourceSize,
       foot,
+      scale: PLAYER_SPRITE_CONFIG.perspectiveScale,
       lastHitAt: player.lastHitAt,
       timestamp,
     });

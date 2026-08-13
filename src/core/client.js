@@ -4,7 +4,7 @@ import dungeonTileset from '../assets/tiles/dungeon.png';
 
 import monsterImage from '../assets/graphics/actors/monsters.png';
 import npcImage from '../assets/graphics/actors/npcs.png';
-import playerImage from '../assets/graphics/actors/players/human.png';
+import playerImage from '../assets/graphics/actors/players/human-v2.png';
 import weaponsImage from '../assets/graphics/items/weapons.png';
 import armorImage from '../assets/graphics/items/armor.png';
 import jewelryImage from '../assets/graphics/items/jewelry.png';

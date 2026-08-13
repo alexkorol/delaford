@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 import { PLAYER_SPRITE_CONFIG } from '@/core/config/animation.js';
 
-// Regression: the human sprite sheet is a single 32x32 frame. Animation states
-// that referenced columns 1/2 sampled outside the image and made the character
-// flicker and vanish while acting. Every frame must stay within the sheet.
+// Regression: animation states that referenced frames outside an older sheet
+// sampled empty pixels and made the character flicker and vanish while acting.
+// Every v2 pose must remain inside the 4x4 sheet contract.
 
 const pngDimensions = (path) => {
   const buffer = readFileSync(path);
@@ -17,12 +17,22 @@ const pngDimensions = (path) => {
 
 describe('player animation frames stay within the sprite sheet', () => {
   const spritePath = fileURLToPath(
-    new URL('../../src/assets/graphics/actors/players/human.png', import.meta.url),
+    new URL('../../src/assets/graphics/actors/players/human-v2.png', import.meta.url),
   );
   const { width, height } = pngDimensions(spritePath);
   const tile = PLAYER_SPRITE_CONFIG.tileSize;
   const maxColumn = Math.floor(width / tile) - 1;
   const maxRow = Math.floor(height / tile) - 1;
+
+  it('ships four columns and four directional rows of 64px frames', () => {
+    expect({ width, height, tile }).toEqual({ width: 256, height: 256, tile: 64 });
+    expect(PLAYER_SPRITE_CONFIG.states.idle.rows).toEqual({
+      down: 0,
+      left: 1,
+      right: 2,
+      up: 3,
+    });
+  });
 
   it('never references a frame column outside the sheet', () => {
     Object.entries(PLAYER_SPRITE_CONFIG.states).forEach(([stateName, state]) => {
@@ -42,5 +52,11 @@ describe('player animation frames stay within the sprite sheet', () => {
       expect(PLAYER_SPRITE_CONFIG.states[stateName]).toBeTruthy();
       expect(PLAYER_SPRITE_CONFIG.states[stateName].frames.length).toBeGreaterThan(0);
     });
+  });
+
+  it('uses distinct stride and attack poses', () => {
+    expect(PLAYER_SPRITE_CONFIG.states.run.frames).toEqual([1, 2]);
+    expect(PLAYER_SPRITE_CONFIG.states.attack.frames).toEqual([0, 3]);
+    expect(PLAYER_SPRITE_CONFIG.renderSize).toBe(32);
   });
 });
