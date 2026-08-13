@@ -27,4 +27,20 @@ describe('quest journal', () => {
     expect(source).toContain('questState.objectiveIndex');
     expect(source).not.toContain('Haunted Trails');
   });
+
+  it('keeps the journal reachable from the HUD and Q hotkey', () => {
+    const rootSource = readFileSync(
+      fileURLToPath(new URL('../../src/Delaford.vue', import.meta.url)),
+      'utf8',
+    );
+    const containerSource = readFileSync(
+      fileURLToPath(new URL('../../src/components/layout/GameContainer.vue', import.meta.url)),
+      'utf8',
+    );
+
+    expect(rootSource).toContain("q: 'quests'");
+    expect(rootSource).toContain('@request-pane="requestPane"');
+    expect(containerSource).toContain("@click=\"$emit('request-pane', 'quests')\"");
+    expect(containerSource).toContain('Quest journal (Q)');
+  });
 });

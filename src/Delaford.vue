@@ -70,6 +70,7 @@
       @party-accept-invite="handlePartyAcceptInvite"
       @party-decline-invite="handlePartyDeclineInvite"
       @enter-zone="handleEnterZone"
+      @request-pane="requestPane"
       @toggle-chat="toggleChat"
       @toggle-chat-pin="toggleChatPin"
       @chat-hover="handleChatHover"
@@ -1229,6 +1230,7 @@ export default {
           c: 'stats',
           i: 'inventory',
           p: 'flowerOfLife',
+          q: 'quests',
         };
         if (paneHotkeys[key]) {
           this.openPane(paneHotkeys[key]);

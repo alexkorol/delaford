@@ -68,6 +68,14 @@
               >
                 Adventure
               </button>
+              <button
+                type="button"
+                class="game-container__party-toggle"
+                title="Quest journal (Q)"
+                @click="$emit('request-pane', 'quests')"
+              >
+                Quests
+              </button>
               <div
                 v-if="adventureOpen"
                 class="game-container__zone-menu"
