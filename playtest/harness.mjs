@@ -43,6 +43,8 @@ export class HeadlessPlayer {
     this.chroniclesReady = null;
     this.chroniclesUpdateCount = 0;
     this.chroniclesUpdate = null;
+    this.partyUpdateCount = 0;
+    this.party = null;
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
@@ -139,6 +141,10 @@ export class HeadlessPlayer {
       case 'party:error':
         this.partyErrors = this.partyErrors || [];
         this.partyErrors.push(data && data.error && data.error.message ? data.error.message : '');
+        break;
+      case 'party:update':
+        this.partyUpdateCount += 1;
+        this.party = data ? data.party : null;
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);

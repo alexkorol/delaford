@@ -163,30 +163,50 @@ class Delaford {
   static async close(ws, logout = false) {
     const player = world.removePlayerBySocket(ws.id);
 
-    if (player) {
-      // Logout the player out and save the profile
+    // A socket can disappear before login creates a Player. Always reap the
+    // transport entry on an actual disconnect so unauthenticated connections
+    // cannot accumulate in world.clients. An explicit logout leaves the socket
+    // alive until its subsequent close event, preserving the existing flow.
+    if (!logout) {
+      world.clients = world.clients.filter(c => c.id !== ws.id);
+    }
+
+    if (!player) {
+      return;
+    }
+
+    // Persistence and the account API are independent teardown steps. Neither
+    // is allowed to suppress party cleanup or the player:left notification.
+    try {
+      await player.update();
+    } catch (error) {
+      console.error(`[disconnect] Failed to save ${player.username}: ${error instanceof Error ? error.message : error}`);
+    }
+
+    // Guest players carry the sentinel token "none" and have no account API
+    // session. Calling logout for them produces an invalid URL in local play.
+    if (player.token && player.token !== 'none') {
       try {
-        await player.update();
         await Authentication.logout(player.token);
-
-        console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
-
-        // If the user did not logout,
-        // then we remove them from list
-        if (!logout) {
-          world.clients = world.clients.filter(c => c.id !== ws.id);
-        }
-
-        // Remove from any parties the player was in
-        partyService.removePlayer(player.uuid);
-
-        // Tell the clients someone left
-        const scenePlayers = world.getScenePlayers(player.sceneId);
-        Socket.broadcast('player:left', ws.id, scenePlayers);
-      } catch (err) {
-        console.log(err);
+      } catch (error) {
+        console.error(`[disconnect] Account logout failed for ${player.username}: ${error instanceof Error ? error.message : error}`);
       }
     }
+
+    try {
+      partyService.removePlayer(player.uuid);
+    } catch (error) {
+      console.error(`[disconnect] Party cleanup failed for ${player.username}: ${error instanceof Error ? error.message : error}`);
+    }
+
+    try {
+      const scenePlayers = world.getScenePlayers(player.sceneId);
+      Socket.broadcast('player:left', ws.id, scenePlayers);
+    } catch (error) {
+      console.error(`[disconnect] Departure broadcast failed for ${player.username}: ${error instanceof Error ? error.message : error}`);
+    }
+
+    console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
   }
 
   registerPeriodicTasks() {

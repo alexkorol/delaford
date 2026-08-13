@@ -136,7 +136,10 @@ vi.mock('uuid', () => ({
 }));
 
 const { default: Handler } = await import('#server/player/handler.js');
+const { default: Authentication } = await import('#server/player/authentication.js');
+const { default: Socket } = await import('#server/socket.js');
 const { default: world } = await import('#server/core/world.js');
+const { partyService } = await import('#server/player/handlers/party.js');
 
 // Import the real Delaford class
 const { default: Delaford } = await import('#server/Delaford.js');
@@ -162,6 +165,74 @@ const createMockWs = (id = 'test-socket-001') => {
     },
   };
 };
+
+describe('Delaford.close – failure-tolerant disconnect cleanup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    world.clients = [];
+    world.players = [];
+    world.removePlayerBySocket.mockReset().mockReturnValue(null);
+    world.getScenePlayers.mockReset().mockReturnValue([]);
+  });
+
+  it('saves a guest without calling the account API and completes all cleanup', async () => {
+    const ws = { id: 'guest-socket' };
+    const peer = { id: 'peer-socket' };
+    const player = {
+      uuid: 'guest-player',
+      username: 'Guest',
+      token: 'none',
+      sceneId: 'town:delaford',
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+    world.clients = [ws, peer];
+    world.removePlayerBySocket.mockReturnValue(player);
+
+    await Delaford.close(ws);
+
+    expect(player.update).toHaveBeenCalledOnce();
+    expect(Authentication.logout).not.toHaveBeenCalled();
+    expect(world.clients).toEqual([peer]);
+    expect(partyService.removePlayer).toHaveBeenCalledWith(player.uuid);
+    expect(Socket.broadcast).toHaveBeenCalledWith('player:left', ws.id, []);
+  });
+
+  it('still removes party state and broadcasts when save and account logout fail', async () => {
+    const ws = { id: 'account-socket' };
+    const player = {
+      uuid: 'account-player',
+      username: 'Account',
+      token: 'jwt-token',
+      sceneId: 'town:delaford',
+      update: vi.fn().mockRejectedValue(new Error('save unavailable')),
+    };
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    world.clients = [ws];
+    world.removePlayerBySocket.mockReturnValue(player);
+    Authentication.logout.mockRejectedValue(new Error('account API unavailable'));
+
+    await Delaford.close(ws);
+
+    expect(Authentication.logout).toHaveBeenCalledWith(player.token);
+    expect(world.clients).toEqual([]);
+    expect(partyService.removePlayer).toHaveBeenCalledWith(player.uuid);
+    expect(Socket.broadcast).toHaveBeenCalledWith('player:left', ws.id, []);
+    expect(errorSpy).toHaveBeenCalledTimes(2);
+    errorSpy.mockRestore();
+  });
+
+  it('reaps a socket that disconnects before creating a player', async () => {
+    const ws = { id: 'anonymous-socket' };
+    const peer = { id: 'peer-socket' };
+    world.clients = [ws, peer];
+
+    await Delaford.close(ws);
+
+    expect(world.clients).toEqual([peer]);
+    expect(partyService.removePlayer).not.toHaveBeenCalled();
+    expect(Socket.broadcast).not.toHaveBeenCalled();
+  });
+});
 
 describe('Delaford.connection – message handler validation', () => {
   let game;

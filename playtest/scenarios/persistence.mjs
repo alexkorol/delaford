@@ -9,6 +9,7 @@ export default async function persistence({ connect, assert }) {
   let ringIdentity;
   let swordIdentity;
   let shieldIdentity;
+  let disconnectedPartyId;
   const identityOf = item => JSON.stringify({
     uuid: item.uuid,
     name: item.name,
@@ -75,6 +76,12 @@ export default async function persistence({ connect, assert }) {
       line.section === 'implicit' && /Chance to Block/.test(line.text)
     )), 'shield tooltip presents block as a live implicit');
     shieldIdentity = identityOf(shieldEquipped.wearDetails.left_hand);
+
+    first.emit('party:create', {});
+    const createdParty = await first.waitFor(() => (
+      first.partyUpdateCount > 0 && first.party ? first.party : false
+    ), { label: 'party created before disconnect' });
+    disconnectedPartyId = createdParty.id;
     levelBefore = 4;
   } finally {
     first.close(); // disconnect triggers a forced save
@@ -97,6 +104,16 @@ export default async function persistence({ connect, assert }) {
     assert(s.combat.blockChance === 4, 'Vesselforge block chance was restored on login');
     assert(s.combat.criticalChance === 22, 'Keen Eye critical chance was restored on login');
     assert(s.combat.damageAgainstBeasts === 13, 'Beastbane damage was restored on login');
+
+    // A stale one-member party used to survive disconnect when the guest
+    // account logout call threw. A fresh create after relog must produce a
+    // different party, proving the old membership was removed.
+    second.emit('party:create', {});
+    const freshParty = await second.waitFor(() => (
+      second.partyUpdateCount > 0 && second.party ? second.party : false
+    ), { label: 'fresh party created after reconnect' });
+    assert(freshParty.id !== disconnectedPartyId,
+      'disconnect removed the previous party membership before relogin');
   } finally {
     second.close();
   }
