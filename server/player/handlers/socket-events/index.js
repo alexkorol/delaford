@@ -626,6 +626,7 @@ export default {
 
     player.currentPane = false;
     player.currentPaneData = null;
+    player.currentPaneAnchor = null;
     player.objectId = null;
   },
 };

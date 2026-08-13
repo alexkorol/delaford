@@ -48,6 +48,7 @@ const tile = {
   fountainSparkling: dungeonGid('fountain_sparkling'),
   fountainDry: dungeonGid('fountain_dry'),
   grate: dungeonGid('grate'),
+  altarGeneric: dungeonGid('altar_generic_0'),
   statueAngel: dungeonGid('statue_angel'),
   statueArcher: dungeonGid('statue_archer'),
   statueDragon: dungeonGid('statue_dragon'),
@@ -214,6 +215,10 @@ const addBuilding = (map, {
 
   const doorX = x + door.x;
   const doorY = y + door.y;
+  // Doors occupy the foreground layer, but pathing also evaluates the
+  // background beneath them. Carve the wall tile itself into floor or every
+  // rebuilt village building is visually open yet physically sealed.
+  setBg(map, doorX, doorY, floor, salt);
   setFg(map, doorX, doorY, tile.doorOpen);
 
   if (door.y === 0) {
@@ -299,6 +304,7 @@ const makeScene = ({
   map,
   spawnPoints,
   portals = [],
+  interactions = [],
   monsterDefinitions = [],
 }) => ({
   id,
@@ -316,6 +322,7 @@ const makeScene = ({
   metadata: {
     spawnPoints,
     portals,
+    interactions,
     monsterDefinitions,
   },
 });
@@ -362,6 +369,16 @@ const createTownScene = () => {
   setFg(map, 43, 133, tile.stairsDown);
   setFg(map, 53, 121, tile.grate);
   setFg(map, 57, 121, tile.grate);
+  // The rebuilt DCSS world no longer uses the legacy objects atlas, so
+  // interaction identity lives in scene metadata instead of being inferred
+  // from a sprite gid. These two fixtures restore the village smithy while
+  // keeping its artwork in the unified 2.5D tileset.
+  setFg(map, 52, 121, tile.grate);
+  setFg(map, 55, 121, tile.altarGeneric);
+  scene.metadata.interactions.push(
+    { id: 'delaford-furnace', objectId: 217, x: 52, y: 121 },
+    { id: 'delaford-anvil', objectId: 287, x: 55, y: 121 },
+  );
   setFg(map, 42, 132, tile.statueAngel);
   addFlowers(map, 31, 111, 15, 9, 2, 60);
   addGrove(map, 2, 84, 77, 15, tile.trees, 4, 61);

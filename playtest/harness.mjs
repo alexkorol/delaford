@@ -45,6 +45,9 @@ export class HeadlessPlayer {
     this.chroniclesUpdate = null;
     this.partyUpdateCount = 0;
     this.party = null;
+    this.screenOpenCount = 0;
+    this.currentScreen = null;
+    this.currentScreenPayload = null;
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
@@ -145,6 +148,15 @@ export class HeadlessPlayer {
       case 'party:update':
         this.partyUpdateCount += 1;
         this.party = data ? data.party : null;
+        break;
+      case 'open:screen':
+        this.screenOpenCount += 1;
+        this.currentScreen = data ? data.screen : null;
+        this.currentScreenPayload = data ? data.payload : null;
+        break;
+      case 'core:pane:close':
+        this.currentScreen = null;
+        this.currentScreenPayload = null;
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
@@ -276,6 +288,28 @@ export class HeadlessPlayer {
    * and resolves with its entries (label + everything needed to choose one).
    */
   async rightClick(worldX, worldY, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    return this.contextMenu({
+      miscData: { clickedOn: { 0: 'main-canvas', 1: 'gameMap' } },
+      tile: {
+        x: 0, y: 0, world: { x: worldX, y: worldY },
+      },
+      timeoutMs,
+    });
+  }
+
+  /** Build a context menu for a specialised pane slot. */
+  async paneMenu(context, slot, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const s = await this.state();
+    return this.contextMenu({
+      miscData: { clickedOn: { 3: context }, slot },
+      tile: {
+        x: 0, y: 0, world: { x: s.x, y: s.y },
+      },
+      timeoutMs,
+    });
+  }
+
+  async contextMenu({ miscData, tile, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     const menuPromise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('context menu build timed out')), timeoutMs);
       const onMessage = (raw) => {
@@ -293,10 +327,8 @@ export class HeadlessPlayer {
 
     // Server derives world coordinates from tile.world when provided.
     this.emit('player:context-menu:build', {
-      miscData: { clickedOn: { 0: 'main-canvas', 1: 'gameMap' } },
-      tile: {
-        x: 0, y: 0, world: { x: worldX, y: worldY },
-      },
+      miscData,
+      tile,
       player: { socket_id: this.player.socket_id },
     });
 

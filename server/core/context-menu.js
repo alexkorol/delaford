@@ -220,7 +220,16 @@ class ContextMenu {
       { center: this.viewportCenter },
     ) - 252;
 
-    const foregroundData = Query.getForegroundData(foregroundTile);
+    const sceneInteraction = Array.isArray(this.scene?.metadata?.interactions)
+      ? this.scene.metadata.interactions.find(interaction => (
+        interaction
+        && interaction.x === this.coordinates.map.x
+        && interaction.y === this.coordinates.map.y
+      ))
+      : null;
+    const foregroundData = Query.getForegroundData(
+      sceneInteraction?.objectId ?? foregroundTile,
+    );
 
     const itemSource = {
       inventorySlot: this.player.inventory.slots,

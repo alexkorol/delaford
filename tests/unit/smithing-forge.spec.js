@@ -1,88 +1,190 @@
 /** @vitest-environment node */
 
-import { describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
-// Tests to verify the forge() splice fix:
-// Previously, forge() called findIndex once, then spliced at the same index
-// in a loop. After the first splice, the array shifts, so subsequent splices
-// removed wrong items. The fix re-finds the index each iteration.
+import actionEvents from '#server/player/handlers/actions/index.js';
+import Inventory from '#server/core/utilities/common/player/inventory.js';
+import Smithing from '#server/core/skills/smithing.js';
+import Socket from '#server/socket.js';
+import world from '#server/core/world.js';
 
-describe('smithing forge splice correctness', () => {
-  // Replicate the fixed forge pattern
-  function removeBars(inventory, barId, count) {
-    for (let index = 0; index < count; index += 1) {
-      const barIndex = inventory.findIndex(inv => inv.id === barId);
-      if (barIndex !== -1) {
-        inventory.splice(barIndex, 1);
-      }
-    }
-    return inventory;
-  }
+const resetWorld = () => {
+  const town = world.getDefaultTown();
+  world._players = [];
+  world.clients = [];
+  town.players = [];
+  town.items = [];
+};
 
-  it('removes the correct number of bars from inventory', () => {
-    const inventory = [
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'iron-ore', qty: 5 },
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'hammer', qty: 1 },
-      { id: 'bronze-bar', qty: 1 },
-    ];
+const inventoryItems = ids => ids.map((id, slot) => ({
+  id,
+  qty: 1,
+  slot,
+}));
 
-    removeBars(inventory, 'bronze-bar', 3);
+const makePlayer = ({ level = 1, inventory = [] } = {}) => {
+  const player = {
+    uuid: 'smith-player',
+    socket_id: 'smith-socket',
+    username: 'Smith',
+    x: 38,
+    y: 115,
+    sceneId: world.defaultTownId,
+    skills: {
+      smithing: { level, exp: 0 },
+    },
+    currentPane: false,
+    currentPaneData: null,
+  };
+  player.inventory = new Inventory(inventoryItems(inventory), player.socket_id);
+  world.addPlayer(player);
+  return player;
+};
 
-    expect(inventory.length).toBe(2);
-    expect(inventory.find(i => i.id === 'bronze-bar')).toBeUndefined();
-    expect(inventory.find(i => i.id === 'iron-ore')).toBeDefined();
-    expect(inventory.find(i => i.id === 'hammer')).toBeDefined();
+const actionPayload = (player, slot) => ({
+  data: {
+    player: {
+      uuid: player.uuid,
+      socket_id: player.socket_id,
+    },
+    data: { miscData: { slot } },
+  },
+});
+
+const openResourcePane = (player, type) => {
+  const furnace = type === 'furnace';
+  actionEvents[furnace
+    ? 'player:resource:smelt:furnace:pane'
+    : 'player:resource:smith:anvil:pane']({
+    playerIndex: world.players.indexOf(player),
+    todo: {
+      item: { id: furnace ? 217 : 287 },
+      actionToQueue: { world: { x: player.x + 1, y: player.y } },
+    },
+  });
+};
+
+describe('authoritative smithing flow', () => {
+  beforeEach(() => {
+    resetWorld();
+    vi.spyOn(Socket, 'emit').mockImplementation(() => {});
+    vi.spyOn(Socket, 'broadcast').mockImplementation(() => {});
+    vi.spyOn(Socket, 'sendMessageToPlayer').mockImplementation(() => {});
   });
 
-  it('stops gracefully when fewer bars exist than required', () => {
-    const inventory = [
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'hammer', qty: 1 },
-    ];
-
-    removeBars(inventory, 'bronze-bar', 5);
-
-    // Should only remove 1 bar (only 1 exists)
-    expect(inventory.length).toBe(1);
-    expect(inventory[0].id).toBe('hammer');
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetWorld();
   });
 
-  it('preserves insertion order of non-bar items', () => {
-    const inventory = [
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'sword', qty: 1 },
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'shield', qty: 1 },
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'helmet', qty: 1 },
-    ];
+  it('opens resource panes only for the matching nearby world fixture', () => {
+    const player = makePlayer({ inventory: ['hammer', 'bronze-bar'] });
 
-    removeBars(inventory, 'bronze-bar', 3);
+    actionEvents['player:resource:smith:anvil:pane']({
+      playerIndex: 0,
+      todo: {
+        item: { id: 217 },
+        actionToQueue: { world: { x: player.x + 1, y: player.y } },
+      },
+    });
+    expect(player.currentPane).toBe(false);
 
-    expect(inventory.map(i => i.id)).toEqual(['sword', 'shield', 'helmet']);
+    openResourcePane(player, 'anvil');
+    expect(player.currentPane).toBe('anvil');
+    expect(player.currentPaneData).toEqual(Smithing.getItemsToSmith('bronze-bar'));
   });
 
-  // Demonstrate the old bug: using stale index would remove wrong items
-  it('stale index would remove wrong items (old bug)', () => {
-    const inventory = [
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'sword', qty: 1 },
-      { id: 'bronze-bar', qty: 1 },
-      { id: 'shield', qty: 1 },
-    ];
+  it('does not grant experience when a locked recipe is rejected', async () => {
+    const player = makePlayer({ level: 1, inventory: ['hammer', 'bronze-bar'] });
+    openResourcePane(player, 'anvil');
 
-    // OLD bugged behaviour: find index once (0), then splice index 0 three times
-    const staleIndex = inventory.findIndex(inv => inv.id === 'bronze-bar');
-    const copy = [...inventory.map(i => ({ ...i }))];
-    copy.splice(staleIndex, 1); // removes bronze-bar at 0
-    copy.splice(staleIndex, 1); // BUG: now removes bronze-bar at 0 (which was sword at 1, but shifted)
+    await actionEvents['player:resource:smelt:anvil:action'](actionPayload(player, 4));
 
-    // With stale index, sword gets removed instead of second bronze-bar
-    const hasSword = copy.some(i => i.id === 'sword');
-    // In the old code, sword could be removed. The important thing is our
-    // fixed code above does NOT have this issue.
-    expect(hasSword).toBe(false); // demonstrates the old bug
+    expect(player.skills.smithing.exp).toBe(0);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-sword')).toBe(false);
+    expect(player.inventory.slots.filter(item => item.id === 'bronze-bar')).toHaveLength(1);
+  });
+
+  it('does not grant experience or consume bars when materials are insufficient', async () => {
+    const player = makePlayer({ level: 4, inventory: ['hammer', 'bronze-bar'] });
+    openResourcePane(player, 'anvil');
+
+    await actionEvents['player:resource:smelt:anvil:action'](actionPayload(player, 4));
+
+    expect(player.skills.smithing.exp).toBe(0);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-sword')).toBe(false);
+    expect(player.inventory.slots.filter(item => item.id === 'bronze-bar')).toHaveLength(1);
+  });
+
+  it('rejects crafting after the player leaves the station', async () => {
+    const player = makePlayer({ level: 1, inventory: ['hammer', 'bronze-bar'] });
+    openResourcePane(player, 'anvil');
+    player.x += 4;
+
+    await actionEvents['player:resource:smelt:anvil:action'](actionPayload(player, 0));
+
+    expect(player.skills.smithing.exp).toBe(0);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-dagger')).toBe(false);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-bar')).toBe(true);
+  });
+
+  it('forges armor through the real recipe and inventory implementation', async () => {
+    const player = makePlayer({ level: 3, inventory: ['hammer', 'bronze-bar'] });
+    openResourcePane(player, 'anvil');
+
+    await actionEvents['player:resource:smelt:anvil:action'](actionPayload(player, 3));
+
+    expect(player.skills.smithing.exp).toBe(21);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-bar')).toBe(false);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-med-helm')).toBe(true);
+    expect(Socket.sendMessageToPlayer).toHaveBeenCalledWith(
+      0,
+      'You successfully smithed a Bronze Med Helm.',
+    );
+  });
+
+  it('forges the final sword recipe and grants experience once', async () => {
+    const player = makePlayer({
+      level: 4,
+      inventory: ['hammer', 'bronze-bar', 'bronze-bar'],
+    });
+    openResourcePane(player, 'anvil');
+
+    await actionEvents['player:resource:smelt:anvil:action'](actionPayload(player, 4));
+
+    expect(player.skills.smithing.exp).toBe(25);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-bar')).toBe(false);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-sword')).toBe(true);
+  });
+
+  it('returns promptly without consuming ore or granting experience on a failed smelt', async () => {
+    const player = makePlayer({ inventory: ['tin-ore'] });
+    openResourcePane(player, 'furnace');
+
+    await actionEvents['player:resource:smelt:furnace:action'](actionPayload(player, 0));
+
+    expect(player.skills.smithing.exp).toBe(0);
+    expect(player.inventory.slots.some(item => item.id === 'tin-ore')).toBe(true);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-bar')).toBe(false);
+    expect(Socket.sendMessageToPlayer).toHaveBeenCalledWith(0, 'You do not have enough ore.');
+  });
+
+  it('smelts server-owned ingredients into a bar and grants experience once', async () => {
+    const player = makePlayer({ inventory: ['tin-ore', 'copper-ore'] });
+    openResourcePane(player, 'furnace');
+
+    await actionEvents['player:resource:smelt:furnace:action'](actionPayload(player, 0));
+
+    expect(player.skills.smithing.exp).toBe(7);
+    expect(player.inventory.slots.some(item => item.id === 'tin-ore')).toBe(false);
+    expect(player.inventory.slots.some(item => item.id === 'copper-ore')).toBe(false);
+    expect(player.inventory.slots.some(item => item.id === 'bronze-bar')).toBe(true);
   });
 });

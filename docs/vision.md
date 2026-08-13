@@ -50,6 +50,12 @@ The character sheet now reuses the generated player sprite for its portrait
 and each equipped item's real atlas frame; generic slot glyphs remain only for
 empty equipment positions.
 
+The rebuilt Delaford Village now exposes a reachable smithy inside the 2.5D
+world: interaction identity is scene metadata rather than an obsolete atlas
+tile number, blocked stations path to a valid adjacent square, and the real
+furnace → bronze bar → anvil loop consumes authoritative materials and grants
+smithing experience only after a successful craft.
+
 The live bestiary and townsfolk are now reference-driven 64px actors as well.
 All 15 surface-campaign monsters have named silhouettes, and the 28 Adventure
 identities are mapped by seven themes × four combat roles instead of every

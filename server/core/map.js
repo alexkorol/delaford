@@ -1049,7 +1049,7 @@ class Map {
    * @param {integer} x The x-axis coord on where user clicked on game-gap
    * @param {integer} y The y-axis coord on where user clicked on game-gap
    */
-  static findQuickestPath(x, y, playerIndex) {
+  static findQuickestPath(x, y, playerIndex, { stopAdjacent = false } = {}) {
     const player = world.players[playerIndex];
     return new Promise((resolve) => {
       if (!player || !player.path || !player.path.grid) {
@@ -1062,17 +1062,53 @@ class Map {
         y: Math.floor(config.map.viewport.y / 2),
       };
       const center = player.path.center || defaultCenter;
-      const grid = typeof player.path.grid.clone === 'function'
-        ? player.path.grid.clone()
-        : player.path.grid;
+      const sourceGrid = player.path.grid;
 
       /**
        * Get location of all 4 spots, check tile if blocked
        * Get direction based off player and where to check first
        */
 
-      const path = player.path.finder.findPath(center.x, center.y, x, y, grid);
-      resolve(path);
+      const candidates = stopAdjacent
+        ? [
+          { x: x - 1, y },
+          { x: x + 1, y },
+          { x, y: y - 1 },
+          { x, y: y + 1 },
+          { x: x - 1, y: y - 1 },
+          { x: x + 1, y: y - 1 },
+          { x: x - 1, y: y + 1 },
+          { x: x + 1, y: y + 1 },
+        ]
+        : [{ x, y }];
+
+      const paths = candidates
+        .filter((candidate) => {
+          if (candidate.x < 0 || candidate.y < 0
+            || candidate.x >= sourceGrid.width || candidate.y >= sourceGrid.height) {
+            return false;
+          }
+          if (typeof sourceGrid.isWalkableAt !== 'function') {
+            return true;
+          }
+          return sourceGrid.isWalkableAt(candidate.x, candidate.y);
+        })
+        .map((candidate) => {
+          const grid = typeof sourceGrid.clone === 'function'
+            ? sourceGrid.clone()
+            : sourceGrid;
+          return player.path.finder.findPath(
+            center.x,
+            center.y,
+            candidate.x,
+            candidate.y,
+            grid,
+          );
+        })
+        .filter(path => path.length > 0)
+        .sort((left, right) => left.length - right.length);
+
+      resolve(paths[0] || []);
     });
   }
 
@@ -1102,15 +1138,13 @@ class Map {
 
     // The player's x-y on map (always 7,5)
     // to where they clicked on the map
-    const path = await Map.findQuickestPath(x, y, playerIndex);
+    const path = await Map.findQuickestPath(x, y, playerIndex, {
+      stopAdjacent: location === 'edge',
+    });
 
     // Since we are performing an action on a resource or tile,
     // let's end the path one step so we don't step on it.
     // (For example, mining block, tree, door, etc.)
-    if (location === 'edge') {
-      path.pop();
-    }
-
     // If the tile we clicked on
     // can be walked on, continue ->
     if (world.players[playerIndex].path.current.walkable && path.length && path.length >= 1) {

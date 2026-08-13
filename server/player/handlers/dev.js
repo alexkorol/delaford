@@ -109,6 +109,7 @@ const buildStateSnapshot = (player) => {
       damageAgainstBeasts: player.combat.damageAgainstBeasts || 0,
       respawnProtectionUntil: player.combat.respawnProtectionUntil || 0,
     } : null,
+    skills: player.skills ? structuredClone(player.skills) : {},
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
       ? scene.monsters.filter(m => m && m.isAlive).map(m => ({

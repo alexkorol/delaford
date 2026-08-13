@@ -73,6 +73,20 @@ const getPlayerFromPayload = (incoming) => {
   ));
 };
 
+const getActionPlayer = (incoming = {}) => {
+  if (Number.isInteger(incoming.playerIndex)) {
+    return world.players[incoming.playerIndex] || null;
+  }
+  return getPlayerFromPayload(incoming) || null;
+};
+
+const getActionMiscData = (incoming = {}) => (
+  incoming.data?.data?.miscData
+  || incoming.data?.miscData
+  || incoming.miscData
+  || {}
+);
+
 const resolveItemActionPayload = (incoming = {}) => {
   const nested = incoming.data && typeof incoming.data === 'object' ? incoming.data : {};
   const item = nested.item || incoming.item || {};
@@ -98,6 +112,19 @@ const isWithinReach = (player, coords, reach = ACTION_REACH_TILES) => {
   }
 
   return Math.max(Math.abs(player.x - coords.x), Math.abs(player.y - coords.y)) <= reach;
+};
+
+const isActiveResourcePane = (player, pane, objectId) => {
+  const anchor = player?.currentPaneAnchor;
+  return Boolean(
+    player
+    && player.currentPane === pane
+    && anchor
+    && anchor.pane === pane
+    && anchor.objectId === objectId
+    && anchor.sceneId === player.sceneId
+    && isWithinReach(player, anchor, 2),
+  );
 };
 
 // Golden plaque shrine: one free item per player per minute.
@@ -740,26 +767,27 @@ const actionEvents = {
     action.do(incoming.data.data, incoming.data.queueItem);
   },
 
-  'player:resource:smelt:anvil:action': (data) => {
+  'player:resource:smelt:anvil:action': async (data) => {
     // Forge bar to item (weapon/shield/armor)
     // Check for smithing level and return appropriate response
-    const playerIndex = world.players.findIndex(
-      player => player.uuid === data.player.uuid,
-    );
-    if (playerIndex === -1) {
+    const player = getActionPlayer(data);
+    const playerIndex = world.players.indexOf(player);
+    if (playerIndex === -1 || !isActiveResourcePane(player, 'anvil', 287)) {
       return;
     }
-    const paneItems = Array.isArray(data.player.currentPaneData) ? data.player.currentPaneData : [];
-    const itemClickedOn = paneItems[data.data.miscData.slot];
+    const paneItems = Array.isArray(player.currentPaneData) ? player.currentPaneData : [];
+    const itemClickedOn = paneItems[getActionMiscData(data).slot];
     if (!itemClickedOn) {
       return;
     }
 
     const smith = new Smithing(playerIndex, itemClickedOn, 'forge');
-    const { player } = data;
-    smith.forge(player.inventory.slots);
+    const forged = await smith.forge(player.inventory.slots);
+    if (!forged) {
+      return;
+    }
 
-    // Update the experience
+    // Only successful crafts grant experience.
     smith.updateExperience(itemClickedOn.expGained);
 
     // Tell client of their new experience in that skill
@@ -769,21 +797,18 @@ const actionEvents = {
     });
   },
   'player:resource:smelt:furnace:action': async (data) => {
-    const paneItems = Array.isArray(data.player.currentPaneData) ? data.player.currentPaneData : [];
-    const itemClickedOn = paneItems[data.data.miscData.slot];
-    if (!itemClickedOn) {
+    const player = getActionPlayer(data);
+    const playerIndex = world.players.indexOf(player);
+    if (playerIndex === -1 || !isActiveResourcePane(player, 'furnace', 217)) {
       return;
     }
-    const playerIndex = world.players.findIndex(
-      player => player.uuid === data.player.uuid,
-    );
-    if (playerIndex === -1) {
+    const paneItems = Array.isArray(player.currentPaneData) ? player.currentPaneData : [];
+    const itemClickedOn = paneItems[getActionMiscData(data).slot];
+    if (!itemClickedOn) {
       return;
     }
     const smithing = new Smithing(playerIndex, itemClickedOn, 'smelt');
     const smithingLevelToSmelt = Smithing.bars();
-
-    const { player } = data;
 
     if (player.skills.smithing.level >= smithingLevelToSmelt[itemClickedOn]) {
       const barSmelted = await smithing.smelt(player.inventory.slots);
@@ -805,16 +830,22 @@ const actionEvents = {
   },
 
   'player:resource:smelt:furnace:pane': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    const { playerIndex } = data;
-    if (playerIndex === -1 || !world.players[playerIndex]) {
+    const player = getActionPlayer(data);
+    const playerIndex = world.players.indexOf(player);
+    const target = data.todo?.item;
+    const clickedWorld = data.todo?.actionToQueue?.world;
+    if (playerIndex === -1 || target?.id !== 217
+      || !clickedWorld || !isWithinReach(player, clickedWorld)) {
       return;
     }
-    const player = world.players[playerIndex];
-    world.players[data.playerIndex].currentPane = 'furnace';
+    player.currentPane = 'furnace';
+    player.currentPaneAnchor = {
+      pane: 'furnace',
+      objectId: 217,
+      sceneId: player.sceneId,
+      x: clickedWorld.x,
+      y: clickedWorld.y,
+    };
 
     // TODO
     // Can definitely be abstracted out to something
@@ -825,10 +856,10 @@ const actionEvents = {
     // Sometimes whats on the pane needs to travel
     // with the screen because its not being tracked in
     // the world object. So we need to pass the items to player.
-    world.players[data.playerIndex].currentPaneData = itemsToReturn;
+    player.currentPaneData = itemsToReturn;
 
     Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       screen: 'furnace',
       payload: {
         smithingLevel: player.skills.smithing.level,
@@ -838,17 +869,14 @@ const actionEvents = {
   },
 
   'player:resource:smith:anvil:pane': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    const { playerIndex } = data;
-    if (playerIndex === -1 || !world.players[playerIndex]) {
+    const player = getActionPlayer(data);
+    const playerIndex = world.players.indexOf(player);
+    const target = data.todo?.item;
+    const clickedWorld = data.todo?.actionToQueue?.world;
+    if (playerIndex === -1 || target?.id !== 287
+      || !clickedWorld || !isWithinReach(player, clickedWorld)) {
       return;
     }
-    const player = world.players[playerIndex];
-    world.players[data.playerIndex].currentPane = 'anvil';
-
     const getBars = player.inventory.slots.filter(item => item.id.includes('-bar'));
     const getHammer = player.inventory.slots.filter(
       item => item.id === 'hammer',
@@ -856,12 +884,20 @@ const actionEvents = {
 
     const hasRequiredTools = () => getBars.length > 0 && getHammer.length > 0;
     if (hasRequiredTools()) {
+      player.currentPane = 'anvil';
+      player.currentPaneAnchor = {
+        pane: 'anvil',
+        objectId: 287,
+        sceneId: player.sceneId,
+        x: clickedWorld.x,
+        y: clickedWorld.y,
+      };
       const barToSmith = getBars ? getBars[0] : null;
       const bar = barToSmith.id.split('-')[0];
       const itemsToReturn = Smithing.getItemsToSmith(barToSmith.id);
 
       Socket.emit('open:screen', {
-        player: { socket_id: world.players[data.playerIndex].socket_id },
+        player: { socket_id: player.socket_id },
         screen: 'anvil',
         payload: {
           bar,
@@ -873,7 +909,7 @@ const actionEvents = {
       // Sometimes whats on the pane needs to travel
       // with the screen because its not being tracked in
       // the world object. So we need to pass the items to player.
-      world.players[data.playerIndex].currentPaneData = itemsToReturn;
+      player.currentPaneData = itemsToReturn;
     } else if (!getBars || getBars.length === 0) {
       Socket.sendMessageToPlayer(playerIndex, 'You need bars to smelt.');
     } else if (!getHammer || getHammer.length === 0) {

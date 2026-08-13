@@ -156,6 +156,27 @@ describe('DCSS world layout', () => {
     });
   });
 
+  it('places reachable furnace and anvil interactions in the rebuilt village', () => {
+    const layout = createWorldLayout();
+    const interactions = layout.town.metadata.interactions || [];
+    const stationIds = new Set(interactions.map(interaction => interaction.objectId));
+
+    expect(stationIds).toEqual(new Set([217, 287]));
+    interactions.forEach((interaction) => {
+      const stationIndex = (interaction.y * 200) + interaction.x;
+      expect(layout.town.map.foreground[stationIndex]).toBeGreaterThanOrEqual(DUNGEON_FIRST_GID);
+      expect([
+        { x: interaction.x - 1, y: interaction.y },
+        { x: interaction.x + 1, y: interaction.y },
+        { x: interaction.x, y: interaction.y - 1 },
+        { x: interaction.x, y: interaction.y + 1 },
+      ].some(point => (
+        isWalkable(layout.town, point.x, point.y)
+        && hasWalkablePath(layout.town, layout.town.metadata.spawnPoints[0], point)
+      ))).toBe(true);
+    });
+  });
+
   it('places a visible monster encounter near every non-town arrival', () => {
     const layout = createWorldLayout();
     const scenesById = new Map(allScenes(layout).map(scene => [scene.id, scene]));
