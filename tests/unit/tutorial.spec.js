@@ -108,6 +108,7 @@ describe('tutorial onboarding', () => {
     expect(player.tutorial.completedAt).toBeTruthy();
     expect(player.skills.attack.exp).toBe(TUTORIAL_REWARD.experience);
     expect(player.inventory.add).toHaveBeenCalledWith('coins', TUTORIAL_REWARD.coins);
+    expect(messagesSentTo(player).at(-1)).toContain('press C for your character sheet');
 
     // Further triggers are ignored once complete
     vi.clearAllMocks();

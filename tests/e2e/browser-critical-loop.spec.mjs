@@ -61,11 +61,10 @@ const completeChroniclesOnboarding = async (page) => {
 
 test('the built game supports the browser-critical guest loop', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto('/?useGuestAccount');
+  await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Verdigris' })).toBeVisible();
-  await expect(page.getByLabel('Guest account?')).toBeChecked();
-  await page.getByRole('button', { name: 'Login', exact: true }).click();
+  await page.getByRole('button', { name: 'Play as Guest', exact: true }).click();
   await completeChroniclesOnboarding(page);
 
   const canvas = page.locator('canvas[aria-label="Game world"]');

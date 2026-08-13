@@ -1,8 +1,23 @@
 <template>
   <div class="form">
+    <button
+      class="button play_guest"
+      :disabled="isLoginInProgress"
+      @click="playAsGuest"
+    >
+      {{ isLoginInProgress && guestAccount ? 'Entering Delaford…' : 'Play as Guest' }}
+    </button>
+    <p class="guest_hint">
+      No account needed — your progress is saved on this server.
+    </p>
+
+    <div class="divider">
+      <span>or sign in with an account</span>
+    </div>
+
     <div
       v-tippy
-      title="Load pre-made guest account. No progress will be saved on this account."
+      title="Load pre-made guest account. Guest progress is saved on this server."
       class="checkbox guest_account"
     >
       <label for="guest_account">
@@ -55,9 +70,10 @@
     <div class="action_buttons">
       <button
         class="button login"
+        :disabled="isLoginInProgress"
         @click="login"
       >
-        Login
+        {{ isLoginInProgress && !guestAccount ? 'Signing in…' : 'Login' }}
       </button>
       <div
         v-if="inDevelopment"
@@ -176,6 +192,15 @@ const login = () => {
   Socket.emit('player:login', data);
 };
 
+// One click from the title screen to playing: skip the credential form
+// entirely and log in with the shared guest account.
+const playAsGuest = () => {
+  if (isLoginInProgress.value) return;
+  guestAccount.value = true;
+  uiStore.setGuestAccount(true);
+  login();
+};
+
 const handleLoginError = () => incorrectLogin();
 const handleLoginComplete = () => setLoginProgress(false);
 
@@ -219,6 +244,76 @@ onBeforeUnmount(() => {
 
 div.form {
   width: 100%;
+
+  .play_guest {
+    width: 100%;
+    font-family: 'GameFont', sans-serif;
+    font-size: 1.25rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f7eeda;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85);
+    background: linear-gradient(180deg, #5f7a4a 0%, #42582f 55%, #2f4220 100%);
+    border: 2px solid #141c0d;
+    border-top-color: rgba(200, 230, 160, 0.6);
+    border-left-color: rgba(200, 230, 160, 0.35);
+    border-radius: 0;
+    padding: 0.65em var(--space-xl);
+    cursor: pointer;
+    box-shadow:
+      0 4px 10px rgba(0, 0, 0, 0.45),
+      0 0 16px rgba(140, 190, 100, 0.2),
+      inset 0 0 12px rgba(0, 0, 0, 0.25);
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent-strong);
+      outline-offset: 2px;
+    }
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(180deg, #6d8a55 0%, #4d6538 55%, #374a26 100%);
+      box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.45),
+        0 0 22px rgba(140, 190, 100, 0.35),
+        inset 0 0 12px rgba(0, 0, 0, 0.25);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+  }
+
+  .guest_hint {
+    margin: 0.6em 0 0;
+    text-align: center;
+    color: rgba(230, 216, 186, 0.75);
+    font-family: "ChatFont", sans-serif;
+    font-size: 0.95rem;
+    text-shadow: 1px 1px 0 #000;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    margin: 1.1em 0 0.4em;
+    color: rgba(230, 216, 186, 0.6);
+    font-family: "ChatFont", sans-serif;
+    font-size: 0.9rem;
+    text-shadow: 1px 1px 0 #000;
+
+    &::before,
+    &::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid rgba(190, 160, 110, 0.35);
+    }
+  }
 
   form {
     display: flex;
@@ -297,7 +392,17 @@ div.form {
         0 4px 10px rgba(0, 0, 0, 0.45),
         inset 0 0 12px rgba(0, 0, 0, 0.25);
 
-      &:hover {
+      &:focus-visible {
+        outline: 2px solid var(--color-accent-strong);
+        outline-offset: 2px;
+      }
+
+      &:disabled {
+        opacity: 0.7;
+        cursor: wait;
+      }
+
+      &:hover:not(:disabled) {
         background: linear-gradient(180deg, #97825a 0%, #6a5538 55%, #4e3f28 100%);
         box-shadow:
           0 4px 10px rgba(0, 0, 0, 0.45),
@@ -305,16 +410,11 @@ div.form {
           inset 0 0 12px rgba(0, 0, 0, 0.25);
       }
 
-      &:active {
+      &:active:not(:disabled) {
         transform: translateY(1px);
         border-top-color: #20180d;
         border-left-color: #20180d;
         border-bottom-color: rgba(230, 205, 150, 0.3);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--color-accent-strong);
-        outline-offset: 2px;
       }
     }
   }

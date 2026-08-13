@@ -13,13 +13,13 @@ export const TUTORIAL_STEPS = [
   {
     id: 'move',
     trigger: 'move',
-    prompt: 'First things first: use W, A, S and D to take a walk around town.',
+    prompt: 'First things first: use W, A, S and D (or the arrow keys) to take a walk around town.',
     completion: 'You walk with purpose already.',
   },
   {
     id: 'attack',
     trigger: 'attack',
-    prompt: 'Steel answers steel out here. Walk into a monster to strike it, or face one and use your attack key.',
+    prompt: 'Steel answers steel out here. Walk into a monster to strike it, or face one and press SPACE (or 1).',
     completion: 'A solid strike!',
   },
   {
@@ -31,13 +31,13 @@ export const TUTORIAL_STEPS = [
   {
     id: 'loot',
     trigger: 'loot',
-    prompt: 'The fallen leave their spoils behind. Pick an item up off the ground.',
-    completion: 'Spoils rightfully claimed. Check your backpack on the right.',
+    prompt: 'The fallen leave their spoils behind. Stand over an item and press Z to grab it — or right-click it and choose Take.',
+    completion: 'Spoils rightfully claimed. Check your backpack on the right (press I any time).',
   },
   {
     id: 'delve',
     trigger: 'delve',
-    prompt: 'You are ready for the depths. Form a party and enter an instance — the true treasures wait below.',
+    prompt: 'You are ready for the depths. Open the ADVENTURE menu above the map and choose a zone — the true treasures wait below.',
     completion: 'The dungeon swallows you whole. This is where legends are made — and where they end. Tread carefully.',
   },
 ];
@@ -124,6 +124,7 @@ export const notifyTutorial = (player, trigger) => {
     Promise.resolve(player.inventory.add('coins', TUTORIAL_REWARD.coins)).catch(() => {});
   }
   say(player, `Your training is complete. Take this purse of ${TUTORIAL_REWARD.coins} coins — you have earned it. Delaford is yours to explore.`);
+  say(player, 'One last lesson: press C for your character sheet, I for your backpack, and P for the Flower of Life — your skill tree. Spend your points wisely.');
   return true;
 };
 
