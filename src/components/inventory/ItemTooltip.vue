@@ -211,6 +211,12 @@ export default {
   color: #d27878;
 }
 
+.item-tooltip__line--dormant,
+.item-tooltip__line--tone-inactive {
+  color: rgba(215, 209, 194, 0.42);
+  font-style: italic;
+}
+
 .item-tooltip__line--flavor,
 .item-tooltip__line--attune {
   margin-top: 7px;

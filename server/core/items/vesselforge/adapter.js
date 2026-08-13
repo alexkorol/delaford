@@ -15,6 +15,17 @@ const COMBAT_CHANNEL_BY_FORM = Object.freeze({
   sling: 'range',
 });
 
+const ACTIVE_BRAND_MODS = new Set([
+  'keen',
+  'heavy',
+  'swift_haft',
+  'warded',
+  'hale',
+  'spirited',
+  'emberkiss',
+  'strongback',
+]);
+
 const DEFAULT_ITEM_LEVEL = 10;
 
 const forge = createForge(verdigrisPack);
@@ -31,6 +42,41 @@ const zeroCombatStats = () => ({
   attack: { stab: 0, slash: 0, crush: 0, range: 0 },
   defense: { stab: 0, slash: 0, crush: 0, range: 0 },
 });
+
+const implicitIsActive = (form) => {
+  const statId = form?.implicit?.stat?.id;
+  if (statId === 'life' || statId === 'spirit' || statId === 'attrs') {
+    return true;
+  }
+  return Boolean(form?.weapon && (statId === 'phys_pct' || statId === 'atk_speed'));
+};
+
+const markDormantLine = line => ({
+  ...line,
+  section: 'dormant',
+  text: `Dormant · ${line.text}`,
+  tone: 'inactive',
+});
+
+const honestTooltipLines = (vesselItem, lines) => {
+  const form = verdigrisPack.forms[vesselItem.formId];
+  let brandIndex = 0;
+
+  return lines.map((line) => {
+    if (line.section === 'implicit') {
+      return implicitIsActive(form) ? line : markDormantLine(line);
+    }
+    if (line.section === 'brand') {
+      const brand = vesselItem.brands[brandIndex];
+      brandIndex += 1;
+      return brand && ACTIVE_BRAND_MODS.has(brand.modId) ? line : markDormantLine(line);
+    }
+    if (['bond', 'trophy', 'power'].includes(line.section)) {
+      return markDormantLine(line);
+    }
+    return line;
+  });
+};
 
 /**
  * Translate Vesselforge's damage/ward sheet into the legacy combat ratings the
@@ -52,6 +98,7 @@ export const deriveVesselCombat = (vesselItem) => {
     damage: null,
     ward: Math.max(0, Math.round(aggregate.sheet?.ward || 0)),
     attributes: null,
+    resources: null,
     ratings: stats,
   };
 
@@ -99,6 +146,12 @@ export const deriveVesselCombat = (vesselItem) => {
     };
   }
 
+  const health = Math.max(0, Math.round(Number(sums.life || 0) + Number(sums.hale || 0)));
+  const mana = Math.max(0, Math.round(Number(sums.spirit || 0) + Number(sums.spirited || 0)));
+  if (health > 0 || mana > 0) {
+    combat.resources = { health, mana };
+  }
+
   return combat;
 };
 
@@ -124,7 +177,7 @@ export const createVesselBlock = (baseItem, options = {}) => {
     : DEFAULT_ITEM_LEVEL;
 
   const vesselItem = forge.generateItem({ ilvl, formId, materialId });
-  const lines = forge.tooltip(vesselItem);
+  const lines = honestTooltipLines(vesselItem, forge.tooltip(vesselItem));
   const combat = deriveVesselCombat(vesselItem);
   return {
     packId: verdigrisPack.id,

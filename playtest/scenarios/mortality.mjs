@@ -18,6 +18,7 @@ export default async function mortality({ connect, assert }) {
     vessel: item.vessel,
     stats: item.stats,
     attributes: item.attributes,
+    resourceBonuses: item.resourceBonuses,
   });
   let heirloomIdentity;
   let heirloomUuid;

@@ -107,6 +107,9 @@ const createFromBase = (baseItem, options = {}) => {
       if (vessel.combat?.attributes) {
         instance.attributes = structuredCloneSafe(vessel.combat.attributes);
       }
+      if (vessel.combat?.resources) {
+        instance.resourceBonuses = structuredCloneSafe(vessel.combat.resources);
+      }
       if (Number.isFinite(vessel.item?.w) && Number.isFinite(vessel.item?.h)) {
         instance.size = { width: vessel.item.w, height: vessel.item.h };
       }

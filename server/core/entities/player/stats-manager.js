@@ -129,6 +129,22 @@ const getEquipmentAttributeTotals = (player) => {
   return totals;
 };
 
+const getEquipmentResourceTotals = (player) => {
+  const totals = { health: 0, mana: 0 };
+  Object.values(player.wear || {}).forEach((item) => {
+    if (!item || !item.resourceBonuses) {
+      return;
+    }
+    Object.keys(totals).forEach((resourceId) => {
+      const value = Number(item.resourceBonuses[resourceId]);
+      if (Number.isFinite(value)) {
+        totals[resourceId] += Math.max(0, value);
+      }
+    });
+  });
+  return totals;
+};
+
 const buildInitialStats = (player, data = {}) => {
   const attributeSources = {
     base: data.attributes && data.attributes.base
@@ -195,10 +211,21 @@ const refreshDerivedStats = (player, overrides = {}) => {
     current: player.mana && player.mana.current !== undefined ? player.mana.current : undefined,
   };
 
+  const previousHealth = player.stats.resources?.health || {};
+  const previousMana = player.stats.resources?.mana || {};
   const resources = computeResources(
     { level: player.level, attributes: aggregated.total },
     { health: healthOverride, mana: manaOverride },
   );
+  const equipmentResources = getEquipmentResourceTotals(player);
+  resources.health.max += equipmentResources.health;
+  resources.mana.max += equipmentResources.mana;
+  resources.health.current = previousHealth.current >= previousHealth.max
+    ? resources.health.max
+    : Math.min(resources.health.current, resources.health.max);
+  resources.mana.current = previousMana.current >= previousMana.max
+    ? resources.mana.max
+    : Math.min(resources.mana.current, resources.mana.max);
 
   player.stats.level = player.level;
   player.stats.attributes = aggregated;
@@ -291,6 +318,7 @@ const createPlayerStatsManager = (player) => ({
   applyHealing: (amount, options) => applyHealing(player, amount, options),
   tryRespawn: options => tryRespawn(player, options),
   getEquipmentAttributeTotals: () => getEquipmentAttributeTotals(player),
+  getEquipmentResourceTotals: () => getEquipmentResourceTotals(player),
 });
 
 export default createPlayerStatsManager;

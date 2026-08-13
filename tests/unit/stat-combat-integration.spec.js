@@ -194,4 +194,34 @@ describe('stat pipeline → combat integration', () => {
     expect(player.stats.resources.health.max).toBe(110);
     expect(player.stats.resources.health.current).toBe(110);
   });
+
+  it('applies and removes flat health and spirit from equipped Vessel gear', () => {
+    const player = {
+      level: 1,
+      wear: {
+        armor: {
+          resourceBonuses: { health: 15, mana: 10 },
+        },
+      },
+    };
+    player.stats = createCharacterState({
+      level: 1,
+      attributes: {
+        base: { strength: 10, dexterity: 10, intelligence: 10 },
+      },
+    });
+    syncShortcuts(player.stats, player);
+
+    const manager = createPlayerStatsManager(player);
+    manager.refreshDerivedStats();
+
+    expect(player.stats.resources.health).toMatchObject({ current: 125, max: 125 });
+    expect(player.stats.resources.mana).toMatchObject({ current: 100, max: 100 });
+
+    player.wear.armor = null;
+    manager.refreshDerivedStats();
+
+    expect(player.stats.resources.health).toMatchObject({ current: 110, max: 110 });
+    expect(player.stats.resources.mana).toMatchObject({ current: 90, max: 90 });
+  });
 });

@@ -17,6 +17,7 @@ export default async function persistence({ connect, assert }) {
     vessel: item.vessel,
     stats: item.stats,
     attributes: item.attributes,
+    resourceBonuses: item.resourceBonuses,
   });
   try {
     first.devGive('vessel-ring', 1);

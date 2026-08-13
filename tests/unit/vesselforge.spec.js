@@ -317,6 +317,17 @@ describe('Vesselforge game integration', () => {
     });
   });
 
+  it('makes resource implicits live and labels unsupported effects dormant', () => {
+    const wrap = ItemFactory.createById('vessel-wrap', { rng: () => 0, itemLevel: 10 });
+    const shield = ItemFactory.createById('vessel-shield', { rng: () => 0, itemLevel: 10 });
+
+    expect(wrap.resourceBonuses.health).toBeGreaterThanOrEqual(15);
+    expect(wrap.vessel.lines.some(line => line.section === 'implicit'
+      && /Maximum Life/.test(line.text))).toBe(true);
+    expect(shield.vessel.lines.some(line => line.section === 'dormant'
+      && /Dormant.*Block/.test(line.text))).toBe(true);
+  });
+
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {
     const legacy = ItemFactory.createById('bronze-sword', { rng: () => 0.5 });
 

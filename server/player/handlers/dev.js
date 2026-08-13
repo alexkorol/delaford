@@ -46,6 +46,7 @@ const itemIdentity = item => (item ? {
   vessel: item.vessel,
   stats: item.stats,
   attributes: item.attributes,
+  resourceBonuses: item.resourceBonuses,
   size: item.size,
 } : null);
 
