@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import Monster from '#server/core/monster.js';
+import { SURFACE_MONSTER_COLUMNS } from '#shared/actor-graphics.js';
 import DUNGEON_TILESET, { DUNGEON_FIRST_GID } from '#shared/dungeon-tiles.js';
 import { createWorldLayout } from '#server/core/world-layout.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
@@ -266,7 +267,7 @@ describe('world portal transitions', () => {
       name: 'Old Wood Wolf',
       x: 100,
       y: 170,
-      column: 16,
+      column: SURFACE_MONSTER_COLUMNS['oldwood-wolf'],
       row: 0,
     }));
     expect(sceneEvent[1].scene.monsters[0].uuid).toBeTruthy();

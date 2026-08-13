@@ -1,3 +1,5 @@
+import { surfaceMonsterGraphic } from '#shared/actor-graphics.js';
+
 export default [
   {
     id: 'ashen-wolf',
@@ -6,10 +8,7 @@ export default [
     archetype: 'skirmisher',
     rarity: 'common',
     sceneId: null,
-    graphic: {
-      column: 0,
-      row: 0,
-    },
+    graphic: surfaceMonsterGraphic('ashen-wolf'),
     spawn: {
       x: 42,
       y: 118,
@@ -33,10 +32,7 @@ export default [
     archetype: 'brute',
     rarity: 'uncommon',
     sceneId: null,
-    graphic: {
-      column: 1,
-      row: 0,
-    },
+    graphic: surfaceMonsterGraphic('hollow-guard'),
     spawn: {
       x: 55,
       y: 112,
@@ -60,10 +56,7 @@ export default [
     archetype: 'mystic',
     rarity: 'rare',
     sceneId: null,
-    graphic: {
-      column: 2,
-      row: 0,
-    },
+    graphic: surfaceMonsterGraphic('ember-seer'),
     spawn: {
       x: 61,
       y: 125,

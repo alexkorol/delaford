@@ -151,20 +151,20 @@ and expose an `F6` debug toggle. Toggling must not change game/server state.
 
 ## Asset strategy
 
-The current sheets are valid transparent pixel art, but they are sparse:
+The sparse integration sheets have now been replaced where the live renderer
+showed the most leverage. The player uses a reference-driven 4×4 directional
+and action sheet. Monsters and NPCs use foot-aligned 64px identity frames built
+from three fixed 4×4 pure-black-matte source sheets. The generated bestiary
+covers all 15 surface monsters and all 28 combinations of seven Adventure
+themes × four roles; generated instances no longer collapse to frame zero.
 
-- `human.png` is only one 32 x 32 frame with no directional or action animation;
-- NPC and monster art uses independent 32 x 32 cells with inconsistent occupied
-  height and ground padding;
-- magnification near the camera will make those differences more visible.
-
-They will remain the phase 1–4 integration assets. After the renderer is stable,
-the browser acceptance pass will decide which actors actually fail at near and far
-depths. If regeneration is needed, ImageGen will use the existing sprites as style
-and identity references, produce separate opaque subjects on a flat chroma-key
-background, remove the key locally, validate alpha/foot alignment, and assemble
-new non-destructive versioned sheets. Generated art will not replace existing
-files until it has been visually compared in the live renderer.
+The deterministic actor builder, source order, and runtime column contract are
+documented in `docs/actor-art-pipeline.md`. Shipping frames remain transparent,
+render into a 32px world footprint in the legacy renderer, and use an equivalent
+scale in perspective so source resolution improves zoom detail without changing
+collision or visual occupancy. New actors must extend the source sheet and
+server mapping together, then pass both live near/far comparison and the atlas
+contract tests.
 
 ## Known failure guards adopted from the reference
 

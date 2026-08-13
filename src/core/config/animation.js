@@ -67,4 +67,25 @@ export const PLAYER_SPRITE_CONFIG = {
   },
 };
 
+// Generated monsters and townsfolk are one 64px identity per column. They
+// render into the same 32px world footprint as the player, retaining enough
+// source detail for perspective zoom without pretending static identities are
+// directional animation frames.
+export const MONSTER_SPRITE_CONFIG = {
+  tileSize: 64,
+  renderSize: 32,
+  perspectiveScale: 0.725,
+};
+
+export const NPC_SPRITE_CONFIG = {
+  tileSize: 64,
+  renderSize: 32,
+  perspectiveScale: 0.725,
+};
+
+export const actorIdentityFrame = actor => ({
+  column: Number.isFinite(actor && actor.column) ? actor.column : 0,
+  row: 0,
+});
+
 export default PLAYER_SPRITE_CONFIG;

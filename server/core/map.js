@@ -6,6 +6,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
 import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
+import { instanceMonsterGraphic } from '#shared/actor-graphics.js';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
@@ -206,7 +207,7 @@ const TEMPLATE_THEMES = {
 };
 
 // Monster identities per theme so each floor reads differently.
-const THEME_MONSTERS = {
+export const THEME_MONSTERS = {
   stone: {
     melee: 'Dread Vanguard',
     ranged: 'Ashen Marksman',
@@ -762,7 +763,7 @@ class Map {
     const roleCycle = ['melee', 'ranged', 'support'];
     const buildMonsterDefinition = ({
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
-      healthMultiplier = 0.13, damageMultiplier = 0.35,
+      healthMultiplier = 0.13, damageMultiplier = 0.35, graphicRole = role,
     }) => {
       const behaviour = {
         type: role,
@@ -800,6 +801,7 @@ class Map {
         level: Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus,
         archetype,
         rarity,
+        graphic: instanceMonsterGraphic(themeName, graphicRole),
         // Squishy trash so packs can be mown through; bosses pass 1.0.
         healthMultiplier,
         damageMultiplier,
@@ -876,6 +878,7 @@ class Map {
           role: 'melee',
           rarity: 'elite',
           name: themeMonsters.boss,
+          graphicRole: 'boss',
           levelBonus: 3,
           rewardMultiplier: 3,
           healthMultiplier: 0.5,

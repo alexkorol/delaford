@@ -30,6 +30,7 @@ const props = defineProps({
 
 const TILE = 32;
 const PLAYER_FRAME_SIZE = 64;
+const ACTOR_FRAME_SIZE = 64;
 const ATLAS_COLUMNS = 16;
 const GRID_W = 48;
 const GRID_H = 27;
@@ -192,9 +193,7 @@ const buildScene = (rng) => {
     gid: pick(rng, altarGids),
   }));
 
-  /* The inhabitants. Columns follow the live sprite sheets:
-   * monsters.png — 0 ashen wolf, 1 hollow guard, 2 ember seer;
-   * npcs.png — 0 Baynard. */
+  /* The inhabitants. Columns follow the live generated actor atlases. */
   const actors = [
     { sheet: 'player', column: 0, x: entryMidX - 1.5, y: entryMidY + 1.6, bobAmp: 1.5, bobSpeed: 1.6, phase: 0.4 },
     { sheet: 'player', column: 0, x: entryMidX + 1.2, y: entryMidY + 2.1, bobAmp: 1.5, bobSpeed: 1.4, phase: 2.8 },
@@ -362,7 +361,7 @@ const makeRenderer = (canvas, images, rng) => {
         ax = actor.patrol.from + (span * cycle);
       }
       const bob = Math.round(Math.sin((t * actor.bobSpeed) + actor.phase) * actor.bobAmp);
-      const frameSize = actor.sheet === 'player' ? PLAYER_FRAME_SIZE : TILE;
+      const frameSize = actor.sheet === 'player' ? PLAYER_FRAME_SIZE : ACTOR_FRAME_SIZE;
       ctx.drawImage(
         sheetFor(images, actor.sheet),
         actor.column * frameSize,

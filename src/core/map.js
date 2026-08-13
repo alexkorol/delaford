@@ -6,7 +6,12 @@ import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
 import bus from './utilities/bus.js';
 import MovementController, { centerOfTile } from './utilities/movement-controller.js';
 import SpriteAnimator from './utilities/sprite-animator.js';
-import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
+import {
+  actorIdentityFrame,
+  MONSTER_SPRITE_CONFIG,
+  NPC_SPRITE_CONFIG,
+  PLAYER_SPRITE_CONFIG,
+} from './config/animation.js';
 import { now } from './config/movement.js';
 import PerspectiveRenderer from './rendering/perspective-renderer.js';
 import {
@@ -1145,6 +1150,8 @@ class Map {
     }
 
     const { tileSize } = metrics;
+    const sourceSize = MONSTER_SPRITE_CONFIG.tileSize;
+    const renderSize = MONSTER_SPRITE_CONFIG.renderSize || tileSize;
     const spriteSheet = this.images.monstersImage || this.images.npcsImage;
 
     const timestamp = now();
@@ -1164,34 +1171,35 @@ class Map {
         : centerOfTile(monster.x, monster.y, tileSize);
 
       const topLeft = {
-        x: centerPosition.x - (tileSize / 2),
-        y: centerPosition.y - (tileSize / 2),
+        x: centerPosition.x - (renderSize / 2),
+        y: centerPosition.y - (renderSize / 2),
       };
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
-      const fallbackColumn = Number.isFinite(monster.column) ? monster.column : 0;
-      const fallbackRow = Number.isFinite(monster.row) ? monster.row : 0;
-      const sourceX = fallbackColumn * tileSize;
-      const sourceY = fallbackRow * tileSize;
+      const { sourceX, sourceY } = this.clampSpriteSource(
+        spriteSheet,
+        actorIdentityFrame(monster),
+        sourceSize,
+      );
 
       ctx.drawImage(
         spriteSheet,
         sourceX,
         sourceY,
-        tileSize,
-        tileSize,
+        sourceSize,
+        sourceSize,
         screenPosition.x,
         screenPosition.y,
-        tileSize,
-        tileSize,
+        renderSize,
+        renderSize,
       );
 
       // Soft, sprite-inset tint when recently hit (never hides the sprite)
-      this.drawHitTint(ctx, screenPosition.x, screenPosition.y, tileSize, monster.lastHitAt, timestamp);
+      this.drawHitTint(ctx, screenPosition.x, screenPosition.y, renderSize, monster.lastHitAt, timestamp);
 
       // Health bar once the monster has taken damage
       if (health && Number.isFinite(health.max) && health.max > 0 && health.current < health.max) {
-        const barWidth = tileSize - 8;
+        const barWidth = renderSize - 8;
         const barHeight = 3;
         const barX = screenPosition.x + 4;
         const barY = screenPosition.y - (barHeight + 2);
@@ -1333,6 +1341,8 @@ class Map {
 
     const metrics = this.getViewportMetrics();
     const { tileSize } = metrics;
+    const sourceSize = NPC_SPRITE_CONFIG.tileSize;
+    const renderSize = NPC_SPRITE_CONFIG.renderSize || tileSize;
     const nearbyNPCs = this.npcs.filter((npc) => this.isWithinViewport(npc, metrics));
 
     nearbyNPCs.forEach((npc) => {
@@ -1341,28 +1351,28 @@ class Map {
         : centerOfTile(npc.x, npc.y, tileSize);
 
       const topLeft = {
-        x: centerPosition.x - (tileSize / 2),
-        y: centerPosition.y - (tileSize / 2),
+        x: centerPosition.x - (renderSize / 2),
+        y: centerPosition.y - (renderSize / 2),
       };
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
-      const animator = this.ensureAnimation(npc);
-      const frame = animator ? animator.getCurrentFrame() : null;
-      const fallbackColumn = Number.isFinite(npc.column) ? npc.column : 0;
-      const sourceX = frame ? frame.column * tileSize : (fallbackColumn * tileSize);
-      const sourceY = frame ? frame.row * tileSize : 0;
+      const { sourceX, sourceY } = this.clampSpriteSource(
+        this.images.npcsImage,
+        actorIdentityFrame(npc),
+        sourceSize,
+      );
 
       ctx.drawImage(
         this.images.npcsImage,
         sourceX,
         sourceY,
-        tileSize,
-        tileSize,
+        sourceSize,
+        sourceSize,
         screenPosition.x,
         screenPosition.y,
-        tileSize,
-        tileSize,
+        renderSize,
+        renderSize,
       );
     });
   }

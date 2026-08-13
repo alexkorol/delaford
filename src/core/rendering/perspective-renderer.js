@@ -1,6 +1,11 @@
 import UI from '@shared/ui.js';
 import { now } from '../config/movement.js';
-import { PLAYER_SPRITE_CONFIG } from '../config/animation.js';
+import {
+  actorIdentityFrame,
+  MONSTER_SPRITE_CONFIG,
+  NPC_SPRITE_CONFIG,
+  PLAYER_SPRITE_CONFIG,
+} from '../config/animation.js';
 import { centerOfTile } from '../utilities/movement-controller.js';
 import PerspectiveCamera from './perspective-camera.js';
 import TerrainRenderer from './terrain-renderer.js';
@@ -187,7 +192,7 @@ class PerspectiveRenderer {
       const foot = this.getActorFoot(npc, tileSize);
       draws.push({
         depthY: foot.y,
-        draw: () => this.drawNPC(npc, foot, tileSize),
+        draw: () => this.drawNPC(npc, foot),
       });
     });
 
@@ -202,7 +207,7 @@ class PerspectiveRenderer {
       const foot = this.getActorFoot(monster, tileSize);
       draws.push({
         depthY: foot.y,
-        draw: () => this.drawMonster(monster, foot, tileSize, timestamp),
+        draw: () => this.drawMonster(monster, foot, timestamp),
       });
     });
 
@@ -386,40 +391,39 @@ class PerspectiveRenderer {
     });
   }
 
-  drawNPC(npc, foot, tileSize) {
-    const animator = this.map.ensureAnimation(npc);
-    const frame = animator ? animator.getCurrentFrame() : {
-      column: Number.isFinite(npc.column) ? npc.column : 0,
-      row: Number.isFinite(npc.row) ? npc.row : 0,
-    };
+  drawNPC(npc, foot) {
+    const sourceSize = NPC_SPRITE_CONFIG.tileSize;
     const { sourceX, sourceY } = this.map.clampSpriteSource(
       this.map.images.npcsImage,
-      frame,
-      tileSize,
+      actorIdentityFrame(npc),
+      sourceSize,
     );
 
     this.drawFrame({
       image: this.map.images.npcsImage,
       sourceX,
       sourceY,
-      sourceSize: tileSize,
+      sourceSize,
       foot,
+      scale: NPC_SPRITE_CONFIG.perspectiveScale,
     });
   }
 
-  drawMonster(monster, foot, tileSize, timestamp) {
+  drawMonster(monster, foot, timestamp) {
     const image = this.map.images.monstersImage || this.map.images.npcsImage;
-    const frame = {
-      column: Number.isFinite(monster.column) ? monster.column : 0,
-      row: Number.isFinite(monster.row) ? monster.row : 0,
-    };
-    const { sourceX, sourceY } = this.map.clampSpriteSource(image, frame, tileSize);
+    const sourceSize = MONSTER_SPRITE_CONFIG.tileSize;
+    const { sourceX, sourceY } = this.map.clampSpriteSource(
+      image,
+      actorIdentityFrame(monster),
+      sourceSize,
+    );
     const projected = this.drawFrame({
       image,
       sourceX,
       sourceY,
-      sourceSize: tileSize,
+      sourceSize,
       foot,
+      scale: MONSTER_SPRITE_CONFIG.perspectiveScale,
       lastHitAt: monster.lastHitAt,
       timestamp,
     });

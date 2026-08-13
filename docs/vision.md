@@ -46,6 +46,13 @@ The character sheet now reuses the generated player sprite for its portrait
 and each equipped item's real atlas frame; generic slot glyphs remain only for
 empty equipment positions.
 
+The live bestiary and townsfolk are now reference-driven 64px actors as well.
+All 15 surface-campaign monsters have named silhouettes, and the 28 Adventure
+identities are mapped by seven themes × four combat roles instead of every
+generated floor silently showing monster frame zero. Baynard, both merchants,
+and the bank gnome likewise retain their own server-selected frames. The
+deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
+
 ## Pillars
 
 - **WASD-first ARPG**: keyboard movement/combat with optional mouse context menus.
