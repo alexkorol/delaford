@@ -45,7 +45,7 @@ const zeroCombatStats = () => ({
 
 const implicitIsActive = (form) => {
   const statId = form?.implicit?.stat?.id;
-  if (statId === 'life' || statId === 'spirit' || statId === 'attrs') {
+  if (['life', 'spirit', 'attrs', 'block'].includes(statId)) {
     return true;
   }
   return Boolean(form?.weapon && (statId === 'phys_pct' || statId === 'atk_speed'));
@@ -99,6 +99,7 @@ export const deriveVesselCombat = (vesselItem) => {
     ward: Math.max(0, Math.round(aggregate.sheet?.ward || 0)),
     attributes: null,
     resources: null,
+    modifiers: null,
     ratings: stats,
   };
 
@@ -152,7 +153,41 @@ export const deriveVesselCombat = (vesselItem) => {
     combat.resources = { health, mana };
   }
 
+  const blockChance = Math.max(0, Math.min(75, Number(sums.block) || 0));
+  if (blockChance > 0) {
+    combat.modifiers = { blockChance };
+  }
+
   return combat;
+};
+
+/**
+ * Rebuild the derived and presentation layers of a persisted Vessel while
+ * preserving the rolled item itself. This lets newly-live mechanics apply to
+ * old saves without rerolling their identity, material, Brands, or patience.
+ */
+export const refreshVesselBlock = (savedVessel) => {
+  const vesselItem = savedVessel?.item;
+  const form = vesselItem && verdigrisPack.forms[vesselItem.formId];
+  const material = vesselItem && verdigrisPack.materials[vesselItem.materialId];
+  if (!vesselItem || !form || !material) {
+    return null;
+  }
+
+  const lines = honestTooltipLines(vesselItem, forge.tooltip(vesselItem));
+  return {
+    ...savedVessel,
+    packId: verdigrisPack.id,
+    item: vesselItem,
+    material: material.name,
+    materialTier: material.tier,
+    form: form.name,
+    displayName: lines.find(line => line.section === 'name')?.text
+      || savedVessel.displayName
+      || form.name,
+    lines,
+    combat: deriveVesselCombat(vesselItem),
+  };
 };
 
 /**
@@ -177,18 +212,11 @@ export const createVesselBlock = (baseItem, options = {}) => {
     : DEFAULT_ITEM_LEVEL;
 
   const vesselItem = forge.generateItem({ ilvl, formId, materialId });
-  const lines = honestTooltipLines(vesselItem, forge.tooltip(vesselItem));
-  const combat = deriveVesselCombat(vesselItem);
-  return {
-    packId: verdigrisPack.id,
-    item: vesselItem,
-    material: verdigrisPack.materials[vesselItem.materialId].name,
-    materialTier: verdigrisPack.materials[vesselItem.materialId].tier,
-    form: verdigrisPack.forms[vesselItem.formId].name,
-    displayName: lines.find(line => line.section === 'name')?.text || baseItem.name,
-    lines,
-    combat,
-  };
+  const vessel = refreshVesselBlock({ item: vesselItem });
+  if (vessel && !vessel.displayName) {
+    vessel.displayName = baseItem.name;
+  }
+  return vessel;
 };
 
 export const vesselTooltip = (vesselItem, ctx = {}) => forge.tooltip(vesselItem, ctx);
@@ -198,6 +226,7 @@ export const getForge = () => forge;
 export default {
   createVesselBlock,
   deriveVesselCombat,
+  refreshVesselBlock,
   vesselEligible,
   vesselTooltip,
   getForge,

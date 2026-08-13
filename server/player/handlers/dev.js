@@ -47,6 +47,7 @@ const itemIdentity = item => (item ? {
   stats: item.stats,
   attributes: item.attributes,
   resourceBonuses: item.resourceBonuses,
+  combatBonuses: item.combatBonuses,
   size: item.size,
 } : null);
 
@@ -88,6 +89,7 @@ const buildStateSnapshot = (player) => {
     combat: player.combat ? {
       attack: { ...player.combat.attack },
       defense: { ...player.combat.defense },
+      blockChance: player.combat.blockChance || 0,
     } : null,
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)

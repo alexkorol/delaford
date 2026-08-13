@@ -61,4 +61,12 @@ describe('combat log formatting', () => {
       color: '#ff8a80',
     });
   });
+
+  it('reports a block as defense rather than a zero-damage hit', () => {
+    expect(formatCombatLogText({
+      attacker: 'Pale Archer',
+      target: 'You',
+      payload: { amount: 0, blocked: true },
+    })).toBe("You blocked Pale Archer's attack.");
+  });
 });

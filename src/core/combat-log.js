@@ -43,6 +43,13 @@ export const formatCombatLogText = ({
   const skillName = formatCombatSkillName(payload);
   const skill = skillName ? ` with ${skillName}` : '';
 
+  if (payload.blocked) {
+    if (target === 'You') {
+      return `You blocked ${attacker}'s attack.`;
+    }
+    return `${target} blocked ${attacker}'s attack.`;
+  }
+
   let text = `${attacker} hit ${target}${skill} for ${amount}.`;
   if (attacker === 'You') {
     text = `You hit ${target}${skill} for ${amount}.`;

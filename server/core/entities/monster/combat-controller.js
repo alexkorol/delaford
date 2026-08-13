@@ -202,6 +202,11 @@ const getArmourMitigation = (target, now, rawDamage, attackRange) => {
   return buffMitigation + equipmentMitigation;
 };
 
+const rollsBlock = (target) => {
+  const chance = Math.max(0, Math.min(75, Number(target?.combat?.blockChance) || 0));
+  return chance > 0 && UI.getRandomInt(1, 100) <= chance;
+};
+
 const resolvePendingAttack = (monster, now = Date.now()) => {
   const payload = monster.state.pendingAttack;
   if (!payload) {
@@ -224,14 +229,19 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   }
 
   const nowTs = now;
-  const mitigation = getArmourMitigation(target, nowTs, payload.damage, range);
-  const damage = Math.max(0, Math.floor(payload.damage - mitigation));
+  const blocked = rollsBlock(target);
+  const mitigation = blocked
+    ? Math.max(0, Math.floor(payload.damage))
+    : getArmourMitigation(target, nowTs, payload.damage, range);
+  const damage = blocked ? 0 : Math.max(0, Math.floor(payload.damage - mitigation));
   target.combat = target.combat || {};
   target.combat.lastCombatAt = nowTs;
   const result = target.applyDamage(damage, { allowCheatDeath: true, now: nowTs });
 
   if (result) {
-    target.setAnimationState('hurt', { direction: target.facing, startedAt: nowTs });
+    if (!blocked) {
+      target.setAnimationState('hurt', { direction: target.facing, startedAt: nowTs });
+    }
     // Stats broadcast handled by player logic
 
     // Auto-retaliate: a struck, unengaged player fights back at their
@@ -262,6 +272,7 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     damage,
     rawDamage: payload.damage,
     mitigation,
+    blocked,
   } : false;
 };
 

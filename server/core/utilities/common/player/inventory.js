@@ -2,6 +2,7 @@ import Query from '#server/core/data/query.js';
 import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import ItemFactory from '#server/core/items/factory.js';
+import { refreshVesselBlock } from '#server/core/items/vesselforge/adapter.js';
 import { packInventoryItems } from '#shared/inventory-footprints.js';
 
 const hydrateInventoryItem = (item = {}) => {
@@ -17,6 +18,7 @@ const hydrateInventoryItem = (item = {}) => {
   const equipSlot = item.equipSlot
     || item.slotType
     || (typeof baseItem.slot === 'string' ? baseItem.slot : null);
+  const refreshedVessel = item.vessel?.item ? refreshVesselBlock(item.vessel) : null;
 
   return {
     ...baseItem,
@@ -28,6 +30,12 @@ const hydrateInventoryItem = (item = {}) => {
       : item.graphics || baseItem.graphics,
     stats: item.stats || baseItem.stats,
     actions: item.actions || baseItem.actions,
+    ...(refreshedVessel ? {
+      vessel: refreshedVessel,
+      ...(refreshedVessel.combat?.modifiers
+        ? { combatBonuses: refreshedVessel.combat.modifiers }
+        : {}),
+    } : {}),
     ...(equipSlot ? { equipSlot, slotType: equipSlot } : {}),
   };
 };

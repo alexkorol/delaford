@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import Query from '#server/core/data/query.js';
 import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine.js';
-import { createVesselBlock } from './vesselforge/adapter.js';
+import { createVesselBlock, refreshVesselBlock } from './vesselforge/adapter.js';
 import { resolveItemSize } from '#shared/inventory-footprints.js';
 
 const composeAffixedName = (baseName, brand, bond) => {
@@ -110,6 +110,9 @@ const createFromBase = (baseItem, options = {}) => {
       if (vessel.combat?.resources) {
         instance.resourceBonuses = structuredCloneSafe(vessel.combat.resources);
       }
+      if (vessel.combat?.modifiers) {
+        instance.combatBonuses = structuredCloneSafe(vessel.combat.modifiers);
+      }
       if (Number.isFinite(vessel.item?.w) && Number.isFinite(vessel.item?.h)) {
         instance.size = { width: vessel.item.w, height: vessel.item.h };
       }
@@ -182,6 +185,18 @@ const adoptExisting = (existingItem, options = {}) => {
   // reference; the UUID, material, rolls, stats, and provenance stay exact.
   if (baseItem?.graphics?.tileset === 'vessels') {
     clone.graphics = structuredCloneSafe(baseItem.graphics);
+  }
+
+  if (clone.vessel?.item) {
+    const refreshedVessel = refreshVesselBlock(clone.vessel);
+    if (refreshedVessel) {
+      clone.vessel = refreshedVessel;
+      if (refreshedVessel.combat?.modifiers) {
+        clone.combatBonuses = structuredCloneSafe(refreshedVessel.combat.modifiers);
+      } else {
+        delete clone.combatBonuses;
+      }
+    }
   }
 
   if (!clone.affixes && eligibleForAffixes(bindingReference)) {

@@ -42,6 +42,13 @@ class Wear {
     };
   }
 
+  static getCombatBonuses(item) {
+    if (!item || typeof item !== 'object') {
+      return {};
+    }
+    return item.combatBonuses || item.vessel?.combat?.modifiers || {};
+  }
+
   /**
    * Update a player's combat attack and defense
    */
@@ -63,6 +70,7 @@ class Wear {
         crush: 0,
         range: 0,
       },
+      blockChance: 0,
     };
 
     // Go through each wear item and add up its value
@@ -71,6 +79,7 @@ class Wear {
       if (val !== null && val.uuid && val.id) {
         const attack = this.getAttack(val);
         const defense = this.getDefense(val);
+        const combatBonuses = this.getCombatBonuses(val);
 
         stats.attack.stab += attack.stab || 0;
         stats.attack.slash += attack.slash || 0;
@@ -81,8 +90,11 @@ class Wear {
         stats.defense.slash += defense.slash || 0;
         stats.defense.crush += defense.crush || 0;
         stats.defense.range += defense.range || 0;
+        stats.blockChance += Number(combatBonuses.blockChance) || 0;
       }
     });
+
+    stats.blockChance = Math.max(0, Math.min(75, stats.blockChance));
 
     return stats;
   }

@@ -59,6 +59,7 @@ class Player {
         crush: 0,
         range: 0,
       },
+      blockChance: 0,
       stance: 'neutral',
       globalCooldown: 0,
       sequence: 0,
@@ -79,6 +80,7 @@ class Player {
     const equippedCombat = Wear.calculateCombat(this.wear);
     this.combat.attack = equippedCombat.attack;
     this.combat.defense = equippedCombat.defense;
+    this.combat.blockChance = equippedCombat.blockChance;
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).

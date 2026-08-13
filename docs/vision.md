@@ -109,8 +109,9 @@ deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
 - Localization scaffolding.
 - Expand the authoritative campaign beyond its first three commissions toward
   the 23-point quest budget reserved by the passive tree.
-- Wire the currently Dormant Vesselforge effects into authoritative combat
-  before exposing crafting and awakening as player-facing progression.
+- Continue wiring the remaining Dormant Vesselforge effects into authoritative
+  combat before exposing crafting and awakening as player-facing progression.
+  Shield block is now live, persisted, and shown as `BLOCK` in combat feedback.
 
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?

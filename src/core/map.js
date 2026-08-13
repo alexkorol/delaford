@@ -506,18 +506,22 @@ class Map {
             ...payload.health,
           };
         }
-        monster.lastHitAt = at;
+        if (!payload.blocked) {
+          monster.lastHitAt = at;
+        }
         this.monsters.splice(index, 1, monster);
       }
     } else if (payload.targetType === 'player') {
       // Tint the struck player (self or others) rather than hiding the sprite.
-      if (this.player && this.player.uuid === payload.targetId) {
+      if (!payload.blocked && this.player && this.player.uuid === payload.targetId) {
         this.player.lastHitAt = at;
       }
       const index = (this.players || []).findIndex((player) => player.uuid === payload.targetId);
       if (index !== -1) {
         const player = this.players[index];
-        player.lastHitAt = at;
+        if (!payload.blocked) {
+          player.lastHitAt = at;
+        }
         this.players.splice(index, 1, player);
       }
     }
@@ -526,6 +530,7 @@ class Map {
       targetId: payload.targetId,
       targetType: payload.targetType || 'monster',
       amount: Number.isFinite(payload.amount) ? payload.amount : 0,
+      blocked: Boolean(payload.blocked),
       died: Boolean(payload.died),
       startedAt: at,
     });
@@ -1319,9 +1324,11 @@ class Map {
       ctx.textAlign = 'center';
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-      ctx.fillStyle = entry.targetType === 'player' ? '#ff5252' : '#ffd54f';
+      ctx.fillStyle = entry.blocked
+        ? '#8bd5ff'
+        : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f');
 
-      const label = entry.amount > 0 ? `-${entry.amount}` : '0';
+      const label = entry.blocked ? 'BLOCK' : (entry.amount > 0 ? `-${entry.amount}` : '0');
       const textX = screenPosition.x;
       const textY = screenPosition.y - rise;
       ctx.strokeText(label, textX, textY);

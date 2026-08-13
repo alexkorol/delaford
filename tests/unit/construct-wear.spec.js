@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { constructWear } from '#server/core/entities/player/inventory-manager.js';
+import ItemFactory from '#server/core/items/factory.js';
 import Wear from '#server/core/utilities/wear.js';
 
 // Regression: constructWear runs inside the Player constructor on every login.
@@ -76,5 +77,17 @@ describe('constructWear', () => {
     const wear = constructWear({ arrows: 'bronze-arrow', head: null });
     expect(wear).not.toHaveProperty('arrows');
     expect(wear.head).toBeNull();
+  });
+
+  it('restores an equipped Vessel shield block chance without rerolling it', () => {
+    const shield = ItemFactory.createById('vessel-shield', { rng: () => 0, itemLevel: 10 });
+    const wear = constructWear({ left_hand: shield });
+    const combat = Wear.calculateCombat(wear);
+
+    expect(wear.left_hand.uuid).toBe(shield.uuid);
+    expect(wear.left_hand.combatBonuses.blockChance).toBe(4);
+    expect(wear.left_hand.vessel.lines.some(line => line.section === 'implicit'
+      && /Chance to Block/.test(line.text))).toBe(true);
+    expect(combat.blockChance).toBe(4);
   });
 });

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Monster from '#server/core/monster.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
+import UI from '#shared/ui.js';
 
 const TEST_SCENES = [
   'test:ranged-attack-range',
@@ -146,6 +147,40 @@ describe('ranged monster combat', () => {
 
     expect(monster.resolvePendingAttack(5_300)).toBe(true);
     expect(player.applyDamage).toHaveBeenCalledWith(15, expect.objectContaining({ now: 5_300 }));
+  });
+
+  it('lets an equipped block chance fully intercept an incoming hit', () => {
+    const sceneId = 'test:ranged-attack-range';
+    const monster = makeRangedMonster(sceneId);
+    const player = makeTargetPlayer(sceneId, {
+      combat: {
+        defense: { stab: 0, slash: 0, crush: 0, range: 0 },
+        blockChance: 4,
+      },
+    });
+
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [monster],
+      metadata: { spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    monster.state.pendingAttack = {
+      targetId: player.uuid,
+      resolveAt: 5_300,
+      damage: 20,
+    };
+    vi.spyOn(UI, 'getRandomInt').mockReturnValueOnce(1);
+
+    expect(monster.resolvePendingAttack(5_300)).toBe(true);
+    expect(player.applyDamage).toHaveBeenCalledWith(0, expect.objectContaining({ now: 5_300 }));
+    expect(player.setAnimationState).not.toHaveBeenCalledWith('hurt', expect.anything());
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'combat:hit',
+      expect.objectContaining({ amount: 0, blocked: true, targetType: 'player' }),
+      expect.anything(),
+    );
   });
 
   it('refuses to attack beyond its configured range', () => {

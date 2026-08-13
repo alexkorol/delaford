@@ -8,6 +8,7 @@ export default async function persistence({ connect, assert }) {
   let levelBefore;
   let ringIdentity;
   let swordIdentity;
+  let shieldIdentity;
   const identityOf = item => JSON.stringify({
     uuid: item.uuid,
     name: item.name,
@@ -18,16 +19,21 @@ export default async function persistence({ connect, assert }) {
     stats: item.stats,
     attributes: item.attributes,
     resourceBonuses: item.resourceBonuses,
+    combatBonuses: item.combatBonuses,
   });
   try {
     first.devGive('vessel-ring', 1);
     first.devGive('vessel-khopesh', 1);
+    first.devGive('vessel-shield', 1);
     first.devSetLevel(4);
     const generated = await first.waitFor(async () => {
       const s = await first.state();
       const ring = s.inventoryDetails.find(item => item.id === 'vessel-ring');
       const sword = s.inventoryDetails.find(item => item.id === 'vessel-khopesh');
-      return s.level === 4 && ring && sword ? { s, ring, sword } : false;
+      const shield = s.inventoryDetails.find(item => item.id === 'vessel-shield');
+      return s.level === 4 && ring && sword && shield ? {
+        s, ring, sword, shield,
+      } : false;
     }, { label: 'item granted + level set' });
     assert(generated.ring.vessel && generated.ring.affixes,
       'generated inventory gear carries vessel and affix identity');
@@ -41,6 +47,17 @@ export default async function persistence({ connect, assert }) {
     assert(equipped.combat.attack.slash > 0,
       'equipped Vesselforge weapon contributes its derived combat rating');
     swordIdentity = identityOf(equipped.wearDetails.right_hand);
+    first.equipItem(generated.shield, 'left_hand');
+    const shieldEquipped = await first.waitFor(async () => {
+      const s = await first.state();
+      return s.wearDetails.left_hand?.uuid === generated.shield.uuid ? s : false;
+    }, { label: 'generated shield equipped' });
+    assert(shieldEquipped.combat.blockChance === 4,
+      'equipped Vessel shield contributes its live 4% block chance');
+    assert(shieldEquipped.wearDetails.left_hand.vessel.lines.some(line => (
+      line.section === 'implicit' && /Chance to Block/.test(line.text)
+    )), 'shield tooltip presents block as a live implicit');
+    shieldIdentity = identityOf(shieldEquipped.wearDetails.left_hand);
     levelBefore = 4;
   } finally {
     first.close(); // disconnect triggers a forced save
@@ -57,7 +74,10 @@ export default async function persistence({ connect, assert }) {
     assert(identityOf(ring) === ringIdentity, 'inventory affixes and vessel survived the relogin exactly');
     assert(identityOf(s.wearDetails.right_hand) === swordIdentity,
       'equipped item identity survived the relogin exactly');
+    assert(identityOf(s.wearDetails.left_hand) === shieldIdentity,
+      'equipped shield identity survived the relogin exactly');
     assert(s.combat.attack.slash > 0, 'derived Vesselforge combat stats were restored on login');
+    assert(s.combat.blockChance === 4, 'Vesselforge block chance was restored on login');
   } finally {
     second.close();
   }

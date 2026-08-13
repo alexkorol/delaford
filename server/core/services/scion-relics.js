@@ -30,6 +30,7 @@ const refreshEquipment = (player) => {
     ...(player.combat || {}),
     attack: combat.attack,
     defense: combat.defense,
+    blockChance: combat.blockChance,
   };
   if (typeof player.refreshDerivedStats === 'function') {
     player.refreshDerivedStats();

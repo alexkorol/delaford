@@ -161,7 +161,9 @@ class Monster {
       return false;
     }
 
-    const { target, result, damage } = outcome;
+    const {
+      target, result, damage, blocked,
+    } = outcome;
     syncShortcuts(target.stats, target);
     Player.broadcastAnimation(target);
     Player.broadcastStats(target);
@@ -178,6 +180,7 @@ class Monster {
       skillId: 'monster:attack',
       skillName: 'Attack',
       amount,
+      blocked: Boolean(blocked),
       health: {
         current: target.stats.resources.health.current,
         max: target.stats.resources.health.max,

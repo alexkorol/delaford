@@ -317,15 +317,18 @@ describe('Vesselforge game integration', () => {
     });
   });
 
-  it('makes resource implicits live and labels unsupported effects dormant', () => {
+  it('makes resource and block implicits live while retaining honest tooltip sections', () => {
     const wrap = ItemFactory.createById('vessel-wrap', { rng: () => 0, itemLevel: 10 });
     const shield = ItemFactory.createById('vessel-shield', { rng: () => 0, itemLevel: 10 });
 
     expect(wrap.resourceBonuses.health).toBeGreaterThanOrEqual(15);
     expect(wrap.vessel.lines.some(line => line.section === 'implicit'
       && /Maximum Life/.test(line.text))).toBe(true);
-    expect(shield.vessel.lines.some(line => line.section === 'dormant'
-      && /Dormant.*Block/.test(line.text))).toBe(true);
+    expect(shield.combatBonuses.blockChance).toBe(4);
+    expect(shield.vessel.combat.modifiers.blockChance).toBe(4);
+    expect(shield.vessel.lines.some(line => line.section === 'implicit'
+      && /Chance to Block/.test(line.text))).toBe(true);
+    expect(shield.vessel.lines.some(line => /Dormant.*Block/.test(line.text))).toBe(false);
   });
 
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {
