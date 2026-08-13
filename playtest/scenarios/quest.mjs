@@ -283,6 +283,22 @@ export default async function quest({ connect, assert }) {
       monster.rarity === 'elite' && monster.name === 'The Rotfather'
     ));
     assert(rotfather, 'Marsh of Reeds is guarded by The Rotfather');
+    const marshInventoryBefore = new Set(state.inventoryDetails.map(item => item.uuid));
+    p.devGive('vessel-macuahuitl', 1, { seed: 12086, itemLevel: 80 });
+    const marshWeapon = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.inventoryDetails.find(item => (
+        item.id === 'vessel-macuahuitl'
+        && !marshInventoryBefore.has(item.uuid)
+      )) || false;
+    }, { label: 'prepare deterministic Rotfather weapon' });
+    assert(marshWeapon.vessel.combat.modifiers.damageAgainstBeasts > 0,
+      'the measured Rotfather setup carries live Beastbane damage');
+    p.equipItem(marshWeapon, 'right_hand');
+    await p.waitFor(async () => {
+      const next = await p.state();
+      return next.wearDetails.right_hand?.uuid === marshWeapon.uuid ? next : false;
+    }, { label: 'equip deterministic Rotfather weapon' });
     p.devHeal();
     p.devTeleport(rotfather.x + 1, rotfather.y);
     await p.attack(rotfather);
