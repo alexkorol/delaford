@@ -610,6 +610,16 @@ class PartyService {
     }
 
     const town = world.getDefaultTown();
+    const departedZone = ADVENTURE_ZONES.find(entry => (
+      entry.template === party.metadata.template
+      && (entry.layout || null) === (party.metadata.layout || null)
+    )) || ADVENTURE_ZONES.find(entry => entry.template === party.metadata.template);
+    const returnContext = {
+      zoneId: departedZone?.id || null,
+      template: party.metadata.template,
+      layout: party.metadata.layout,
+      depth: party.metadata.depth || 1,
+    };
     party.state = 'lobby';
     party.sceneId = null;
     party.metadata.seed = null;
@@ -644,6 +654,7 @@ class PartyService {
         player.path.grid = null;
       }
       player.lastReturnScene = returnScene;
+      notifyProgression(player, 'return-surface', returnContext);
     });
 
     this.sendPartyUpdate(party);

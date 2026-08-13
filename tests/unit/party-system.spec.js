@@ -98,6 +98,9 @@ vi.mock('#shared/stats/index.js', () => ({
   toClientPayload: (s) => s,
 }));
 
+const progressionMock = vi.hoisted(() => ({ notifyProgression: vi.fn() }));
+vi.mock('#server/core/progression-events.js', () => progressionMock);
+
 const { PartyService } = await import('#server/player/handlers/party.js').then(mod => ({
   PartyService: mod.partyService.constructor,
 }));
@@ -333,6 +336,25 @@ describe('PartyService', () => {
     expect(leader.y).toBe(90);
     expect(leader.preInstancePosition).toBeNull();
     expect(leader.cancelPathfinding).toHaveBeenCalled();
+  });
+
+  it('reports the authoritative departed zone when returning to the surface', async () => {
+    await service.startSoloInstance(leader, { template: 'marsh', layout: 'clearings' });
+    const party = service.getPartyForPlayer(leader.uuid);
+
+    progressionMock.notifyProgression.mockClear();
+    service.returnToTown(party);
+
+    expect(progressionMock.notifyProgression).toHaveBeenCalledWith(
+      leader,
+      'return-surface',
+      expect.objectContaining({
+        zoneId: 'marsh-of-reeds',
+        template: 'marsh',
+        layout: 'clearings',
+        depth: 1,
+      }),
+    );
   });
 
   it('falls back to the town spawn when no entry position was recorded', async () => {

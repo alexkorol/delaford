@@ -1,5 +1,5 @@
 /**
- * Progression loop: complete the three authoritative commissions through
+ * Progression loop: complete the four authoritative commissions through
  * movement, combat, loot, equipment, a named boss, and floor descent; then
  * relog and verify points, House renown, and Scion deeds remain authoritative.
  */
@@ -258,7 +258,7 @@ export default async function quest({ connect, assert }) {
     const crowned = await p.waitFor(async () => {
       const next = await p.state();
       return next.sceneMetadata.depth === 2
-        && next.quests.activeQuestId === null
+        && next.quests.activeQuestId === 'rot-in-the-reeds'
         && next.quests.completed.some(entry => entry.id === 'the-pale-crown')
         ? next
         : false;
@@ -271,17 +271,73 @@ export default async function quest({ connect, assert }) {
     assert(crownedScion.deeds.includes("Broke the Pale Sovereign's seal"),
       'the Scion records the named boss and descent deed');
 
+    await p.enterZone('marsh', 'clearings');
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.quests.activeQuestId === 'rot-in-the-reeds'
+        && next.quests.objectiveIndex === 1 ? next : false;
+    }, { label: 'enter Marsh of Reeds for Rot in the Reeds' });
+    assert(state.sceneName === 'Marsh of Reeds', 'the fourth commission enters its named marsh');
+
+    const rotfather = state.monsters.find(monster => (
+      monster.rarity === 'elite' && monster.name === 'The Rotfather'
+    ));
+    assert(rotfather, 'Marsh of Reeds is guarded by The Rotfather');
+    p.devHeal();
+    p.devTeleport(rotfather.x + 1, rotfather.y);
+    await p.attack(rotfather);
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      const livingRotfather = next.monsters.find(monster => monster.uuid === rotfather.uuid);
+      if (!livingRotfather && next.quests.objectiveIndex === 2) {
+        return next;
+      }
+      if (!livingRotfather) {
+        throw new Error(`The Rotfather died without quest progress: ${JSON.stringify(next.quests)}`);
+      }
+      p.devHeal();
+      if (Math.abs(livingRotfather.x - next.x) > 1
+        || Math.abs(livingRotfather.y - next.y) > 1) {
+        p.devTeleport(livingRotfather.x + 1, livingRotfather.y);
+      }
+      await p.attack(livingRotfather);
+      return false;
+    }, { timeoutMs: 30000, intervalMs: 350, label: 'Rotfather campaign boss' });
+    assert(state.quests.objectiveIndex === 2,
+      'only the named marsh sovereign advances the fourth commission');
+
+    const marshExit = state.sceneMetadata.stairsUp;
+    assert(marshExit, 'the cleared marsh retains its route to the surface');
+    p.devTeleport(marshExit.x, marshExit.y);
+    const reedsCleared = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.sceneType === 'town'
+        && next.quests.activeQuestId === null
+        && next.quests.completed.some(entry => entry.id === 'rot-in-the-reeds')
+        ? next
+        : false;
+    }, { label: 'return from Marsh of Reeds' });
+    assert(reedsCleared.quests.questPoints === 4, 'four commissions grant four passive points');
+    const reedsHouse = reedsCleared.chroniclesRecord.state.houses
+      .find(entry => entry.id === house.id);
+    const reedsScion = reedsHouse.scions.find(entry => entry.id === living.id);
+    assert(reedsHouse.renown === 50, 'the four commissions grant fifty House renown');
+    assert(reedsScion.deeds.includes('Ended the rot beneath the reeds'),
+      'the Scion records the return from the blighted marsh');
+
     p.close();
     await new Promise(resolve => { setTimeout(resolve, 900); });
     p = await connect();
     const reloaded = await p.state();
-    assert(reloaded.quests.questPoints === 3, 'all three quest points survive relogging');
+    assert(reloaded.quests.questPoints === 4, 'all four quest points survive relogging');
     assert(reloaded.quests.completed.some(entry => entry.id === 'aldwyns-charge'),
       "Aldwyn's Charge survives relogging");
     assert(reloaded.quests.completed.some(entry => entry.id === 'proof-of-temper'),
       'Proof of Temper survives relogging');
     assert(reloaded.quests.completed.some(entry => entry.id === 'the-pale-crown'),
       'The Pale Crown survives relogging');
+    assert(reloaded.quests.completed.some(entry => entry.id === 'rot-in-the-reeds'),
+      'Rot in the Reeds survives relogging');
   } finally {
     p.close();
   }

@@ -157,7 +157,7 @@ describe('authoritative quest progression', () => {
     expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 1 })).toBe(false);
     expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 2 })).toBe(true);
     expect(player.quests).toEqual(expect.objectContaining({
-      activeQuestId: null,
+      activeQuestId: 'rot-in-the-reeds',
       objectiveIndex: 0,
       questPoints: 3,
       completed: [
@@ -175,6 +175,42 @@ describe('authoritative quest progression', () => {
     vi.clearAllMocks();
     expect(notifyQuest(player, 'delve', { template: 'crypt', depth: 2 })).toBe(false);
     expect(player.quests.questPoints).toBe(3);
+    expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
+
+    expect(notifyQuest(player, 'delve', {
+      zoneId: 'the-wilds', theme: 'wilds', depth: 1,
+    })).toBe(false);
+    expect(notifyQuest(player, 'delve', {
+      zoneId: 'marsh-of-reeds', theme: 'marsh', depth: 1,
+    })).toBe(true);
+    expect(notifyQuest(player, 'slay-elite', {
+      monsterName: 'The Rotfather', theme: 'grove', depth: 1,
+    })).toBe(false);
+    expect(notifyQuest(player, 'slay-elite', {
+      monsterName: 'The Rotfather', theme: 'marsh', depth: 1,
+    })).toBe(true);
+    expect(notifyQuest(player, 'return-surface', { zoneId: 'the-wilds' })).toBe(false);
+    expect(notifyQuest(player, 'return-surface', { zoneId: 'marsh-of-reeds' })).toBe(true);
+    expect(player.quests).toEqual(expect.objectContaining({
+      activeQuestId: null,
+      objectiveIndex: 0,
+      questPoints: 4,
+      completed: [
+        expect.objectContaining({ id: 'aldwyns-charge' }),
+        expect.objectContaining({ id: 'proof-of-temper' }),
+        expect.objectContaining({ id: 'the-pale-crown' }),
+        expect.objectContaining({ id: 'rot-in-the-reeds' }),
+      ],
+    }));
+    expect(chroniclesStoreMock.recordScionDeed).toHaveBeenCalledWith(
+      player.uuid,
+      player.chronicles,
+      { deed: 'Ended the rot beneath the reeds', renown: 20 },
+    );
+
+    vi.clearAllMocks();
+    expect(notifyQuest(player, 'return-surface', { zoneId: 'marsh-of-reeds' })).toBe(false);
+    expect(player.quests.questPoints).toBe(4);
     expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
   });
 

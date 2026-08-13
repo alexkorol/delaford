@@ -41,6 +41,13 @@ and are stripped from the client journal snapshot. The contract awards the
 third passive point, 15 House renown, and the Scion deed
 `Broke the Pale Sovereign's seal`.
 
+`rot-in-the-reeds` continues the campaign into **Marsh of Reeds**. It requires
+the exact named zone, the marsh boss **The Rotfather**, and an authoritative
+return from that expedition to the surface. Capturing the departed zone before
+the instance is torn down prevents another marsh-like realm—or a client-authored
+message—from satisfying the return. The commission awards the fourth passive
+point, 20 House renown, and the deed `Ended the rot beneath the reeds`.
+
 Guest saves include the quest state. Account saves send it as `questsData`.
 Malformed or unknown persisted quest entries are discarded and quest points
 are clamped to the reserved 23-point quest budget.

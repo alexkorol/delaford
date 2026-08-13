@@ -64,6 +64,36 @@ export const QUEST_DEFINITIONS = [
     },
     deed: "Broke the Pale Sovereign's seal",
   },
+  {
+    id: 'rot-in-the-reeds',
+    title: 'Rot in the Reeds',
+    description: 'Hunt the source of the marsh blight, then carry word of its end back to the surface.',
+    objectives: [
+      {
+        id: 'enter-marsh-of-reeds',
+        trigger: 'delve',
+        label: 'Enter Marsh of Reeds',
+        criteria: { zoneId: 'marsh-of-reeds', depth: 1 },
+      },
+      {
+        id: 'slay-rotfather',
+        trigger: 'slay-elite',
+        label: 'Defeat The Rotfather',
+        criteria: { monsterName: 'The Rotfather', theme: 'marsh' },
+      },
+      {
+        id: 'return-from-marsh',
+        trigger: 'return-surface',
+        label: 'Return from Marsh of Reeds',
+        criteria: { zoneId: 'marsh-of-reeds' },
+      },
+    ],
+    rewards: {
+      passivePoints: 1,
+      houseRenown: 20,
+    },
+    deed: 'Ended the rot beneath the reeds',
+  },
 ];
 
 export const getQuestDefinition = questId => (
