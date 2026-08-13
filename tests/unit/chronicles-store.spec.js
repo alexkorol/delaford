@@ -258,6 +258,35 @@ describe('ChroniclesStore', () => {
     expect(second.state.houses[0].crypt).toHaveLength(1);
   });
 
+  it('records a living Scion deed and House renown idempotently', () => {
+    const store = makeStore();
+    store.save('account-1', state());
+
+    const first = store.recordScionDeed('account-1', {
+      houseId: 'house-vaelmont',
+      scionId: 'scion-vesper',
+    }, {
+      deed: "Answered Aldwyn's Charge",
+      renown: 5,
+    });
+    const repeated = store.recordScionDeed('account-1', {
+      houseId: 'house-vaelmont',
+      scionId: 'scion-vesper',
+    }, {
+      deed: "Answered Aldwyn's Charge",
+      renown: 5,
+    });
+
+    expect(first.state.houses[0]).toEqual(expect.objectContaining({ renown: 5 }));
+    expect(first.scion.deeds).toEqual(["Answered Aldwyn's Charge"]);
+    expect(repeated).toEqual(expect.objectContaining({
+      ok: true,
+      idempotent: true,
+      revision: first.revision,
+    }));
+    expect(repeated.state.houses[0].renown).toBe(5);
+  });
+
   it('drops malformed account records instead of throwing during load', () => {
     const store = makeStore();
     fs.mkdirSync(path.dirname(store.storeFile), { recursive: true });

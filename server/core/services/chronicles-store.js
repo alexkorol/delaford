@@ -563,6 +563,46 @@ export class ChroniclesStore {
     const committed = this.commit(key, state);
     return committed.ok ? { ...committed, relic: clone(relic) } : committed;
   }
+
+  recordScionDeed(accountId, identity = {}, details = {}) {
+    const key = accountId ? String(accountId) : null;
+    const current = key && this.state.accounts[key];
+    const houseId = cleanId(identity.houseId);
+    const scionId = cleanId(identity.scionId);
+    const house = current && current.state.houses.find(entry => entry.id === houseId);
+    const scion = house && house.scions.find(entry => entry.id === scionId);
+    const deed = typeof details.deed === 'string'
+      ? details.deed.trim().slice(0, MAX_DEED_LENGTH)
+      : '';
+    if (!current || !house || !scion || !deed) {
+      return { ok: false, reason: 'The deed does not belong to a living Scion.' };
+    }
+    if (scion.deeds.includes(deed)) {
+      return {
+        ok: true,
+        idempotent: true,
+        ...this.snapshot(key),
+        scion: clone(scion),
+      };
+    }
+
+    const renown = cleanInteger(details.renown, 0, MAX_RENOWN);
+    const nextScion = {
+      ...scion,
+      deeds: [...scion.deeds, deed].slice(-MAX_DEEDS_PER_SCION),
+    };
+    const nextHouse = {
+      ...house,
+      renown: Math.min(MAX_RENOWN, house.renown + renown),
+      scions: house.scions.map(entry => (entry.id === scion.id ? nextScion : entry)),
+    };
+    const state = {
+      ...current.state,
+      houses: current.state.houses.map(entry => (entry.id === house.id ? nextHouse : entry)),
+    };
+    const committed = this.commit(key, state);
+    return committed.ok ? { ...committed, scion: clone(nextScion) } : committed;
+  }
 }
 
 const chroniclesStore = new ChroniclesStore();

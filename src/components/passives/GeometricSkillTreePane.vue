@@ -242,6 +242,11 @@ const earnedPointsForLevel = (level) => {
   return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, Math.min(fromLevels, VERDIGRIS_SKILL_TREE_SOURCES.levels));
 };
 
+const earnedPointsForPlayer = (player) => Math.min(
+  VERDIGRIS_SKILL_TREE_POINTS.skill,
+  earnedPointsForLevel(player?.level) + Math.max(0, Math.floor(Number(player?.quests?.questPoints) || 0)),
+);
+
 const makeSvgEl = (tag, attrs = {}) => {
   const el = document.createElementNS(SVG_NS, tag);
   Object.entries(attrs).forEach(([key, value]) => {
@@ -647,7 +652,7 @@ export default {
   },
   mounted() {
     this.skillTree = new VerdigrisGeometricTree({
-      availablePoints: earnedPointsForLevel(this.game?.player?.level),
+      availablePoints: earnedPointsForPlayer(this.game?.player),
     });
 
     // Restore saved allocations — a fresh tree on every open threw away the
@@ -670,7 +675,7 @@ export default {
       if (Number.isFinite(saved.earned)) {
         this.skillTree.initialPoints = Math.max(0, saved.earned);
       }
-      this.skillTree.setAvailablePoints(earnedPointsForLevel(this.game?.player?.level));
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer(this.game?.player));
     }
 
     this.treeState = this.skillTree.toState();
@@ -699,7 +704,15 @@ export default {
   watch: {
     'game.player.level': function watchLevel(level) {
       if (!this.skillTree) return;
-      this.skillTree.setAvailablePoints(earnedPointsForLevel(level));
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer({
+        ...this.game?.player,
+        level,
+      }));
+      this.syncTreeState();
+    },
+    'game.player.quests.questPoints': function watchQuestPoints() {
+      if (!this.skillTree) return;
+      this.skillTree.setAvailablePoints(earnedPointsForPlayer(this.game?.player));
       this.syncTreeState();
     },
   },

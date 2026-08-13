@@ -7,7 +7,7 @@ import Combat from '#server/core/combat/index.js';
 import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import config from '#server/config.js';
-import { notifyTutorial } from '#server/core/tutorial.js';
+import { notifyProgression } from '#server/core/progression-events.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
@@ -578,7 +578,7 @@ export default {
 
     Combat.clearAutoAttack(player, 'movement');
     player.move(payload.direction, { startedAt, direction: payload.direction });
-    notifyTutorial(player, 'move');
+    notifyProgression(player, 'move');
 
     if (!player.lastPortalTransitionAt || player.lastPortalTransitionAt < startedAt) {
       Player.broadcastMovement(player);

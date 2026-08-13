@@ -77,6 +77,7 @@ export const buildGuestSnapshot = (player) => ({
   inventory: durableInventory(player.inventory && player.inventory.slots),
   bank: Array.isArray(player.bank) ? player.bank : [],
   passiveTree: player.passiveTree || null,
+  quests: player.quests || null,
   chronicles: player.chronicles || null,
   lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle : null,
   resources: player.stats && player.stats.resources ? player.stats.resources : null,

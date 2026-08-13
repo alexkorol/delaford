@@ -27,7 +27,7 @@ import {
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
-import { notifyTutorial } from '#server/core/tutorial.js';
+import { notifyProgression } from '#server/core/progression-events.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
 
@@ -1006,7 +1006,7 @@ const actionEvents = {
       data: world.players[playerIndex].inventory.slots,
     });
 
-    notifyTutorial(world.players[playerIndex], 'loot');
+    notifyProgression(world.players[playerIndex], 'loot');
   },
 
   /**
@@ -1078,7 +1078,7 @@ const actionEvents = {
     }
 
     refreshInventory(player);
-    notifyTutorial(player, 'loot');
+    notifyProgression(player, 'loot');
   },
 
   /**

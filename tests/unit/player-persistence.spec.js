@@ -88,6 +88,13 @@ describe('PlayerPersistenceService', () => {
         lifecycle: { mode: 'hard', state: 'permadead' },
       },
       chronicles: { houseId: 'house-1', scionId: 'scion-1', mortal: true },
+      quests: {
+        version: 1,
+        activeQuestId: 'aldwyns-charge',
+        objectiveIndex: 3,
+        questPoints: 0,
+        completed: [],
+      },
       inventory: { slots: [] },
       wear: {},
       skills: {},
@@ -101,6 +108,10 @@ describe('PlayerPersistenceService', () => {
     });
     expect(snapshot.lifecycle).toEqual({ mode: 'hard', state: 'permadead' });
     expect(snapshot.resources.health.current).toBe(0);
+    expect(snapshot.quests).toEqual(expect.objectContaining({
+      activeQuestId: 'aldwyns-charge',
+      objectiveIndex: 3,
+    }));
   });
 
   it('keeps rolled inventory and equipped-item identity while stripping world state', () => {

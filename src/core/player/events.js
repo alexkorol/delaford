@@ -6,6 +6,7 @@ import monsterEvents from './events/monster.js';
 import worldEvents from './events/world.js';
 import screenEvents from './events/screen.js';
 import partyEvents from './events/party.js';
+import questEvents from './events/quest.js';
 
 /**
  * A global event handler [CLIENT SIDE] (RPC)
@@ -26,6 +27,7 @@ const handler = {
   ...worldEvents,
   ...screenEvents,
   ...partyEvents,
+  ...questEvents,
 
   /**
    * Receive the data from the client upon browser open

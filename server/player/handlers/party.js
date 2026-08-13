@@ -4,7 +4,7 @@ import GameMap, { LAYOUT_IDS } from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
-import { notifyTutorial } from '#server/core/tutorial.js';
+import { notifyProgression } from '#server/core/progression-events.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 const INSTANCE_START_COOLDOWN_MS = Number(process.env.INSTANCE_START_COOLDOWN_MS) || 3000;
@@ -441,7 +441,7 @@ class PartyService {
     party.metadata.completedAt = null;
 
     this.teleportMembersToSpawns(party, scene);
-    this.forEachMember(party, member => notifyTutorial(member, 'delve'));
+    this.forEachMember(party, member => notifyProgression(member, 'delve'));
 
     this.sendPartyUpdate(party);
     this.sendSceneTransition(party, scene);

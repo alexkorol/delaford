@@ -16,4 +16,15 @@ describe('PlayerRepository identity persistence', () => {
 
     expect(data.username).toBe('account-owner');
   });
+
+  it('includes quest progression in account save payloads', () => {
+    const repository = new PlayerRepository({ baseUrl: 'https://example.test' });
+    const quests = {
+      activeQuestId: null,
+      completed: [{ id: 'aldwyns-charge', completedAt: 1234 }],
+      questPoints: 1,
+    };
+
+    expect(repository.buildPayload({ uuid: 'account-1', quests }).questsData).toEqual(quests);
+  });
 });

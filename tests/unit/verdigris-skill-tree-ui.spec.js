@@ -37,4 +37,11 @@ describe('Verdigris skill tree UI copy', () => {
     expect(source).not.toContain('petals spent');
     expect(source).not.toContain('flowerSummary');
   });
+
+  it('adds authoritative quest rewards to the passive-point pool', () => {
+    const source = readSource('src/components/passives/GeometricSkillTreePane.vue');
+
+    expect(source).toContain('player?.quests?.questPoints');
+    expect(source).toContain("'game.player.quests.questPoints'");
+  });
 });

@@ -28,9 +28,11 @@ scaled points), PoE-style quickbar, inventory slot texture + varied drops,
 solo zone/instance entry (Adventure menu), and the Chronicles Houses & Scions
 persistence model (`src/core/chronicles/houses.js`).
 
-Still open: the Chronicles creation *screen* (found House → create scion →
-set out) and the permadeath-to-crypt hook — the data model and tests are in
-place, the UI wiring into the login/auth flow is the remaining piece.
+Chronicles creation, authoritative persistence, mortal Scion entombment, and
+fallen-heirloom circulation are now playable end to end. The first real quest,
+**Aldwyn's Charge**, turns movement → combat → loot → Adventure entry into a
+server-owned progression loop that grants a passive point, House renown, and a
+Scion deed.
 
 ## Pillars
 
@@ -84,6 +86,8 @@ place, the UI wiring into the login/auth flow is the remaining piece.
 - Logging/analytics for balance.
 - Live operations tools (GM commands, rollback, event triggers).
 - Localization scaffolding.
+- Expand the authoritative quest journal beyond Aldwyn's onboarding commission
+  toward the 23-point quest budget reserved by the passive tree.
 
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?

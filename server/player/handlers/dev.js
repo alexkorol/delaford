@@ -66,6 +66,7 @@ const buildStateSnapshot = (player) => {
     lifecycleMode: player.stats && player.stats.lifecycle ? player.stats.lifecycle.mode : null,
     chronicles: player.chronicles ? { ...player.chronicles } : null,
     chroniclesRecord: chroniclesStore.snapshot(player.uuid),
+    quests: player.quests ? structuredClone(player.quests) : null,
     inventory: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(item => ({
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,

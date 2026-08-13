@@ -3,6 +3,7 @@ import axios from 'axios';
 import world from '#server/core/world.js';
 import { maybeStartTutorial } from '#server/core/tutorial.js';
 import { publicSceneMetadata } from '#server/core/world-transitions.js';
+import { maybeStartQuest } from '#server/core/services/quest-service.js';
 
 class Authentication {
   /**
@@ -92,6 +93,7 @@ class Authentication {
    */
   static addPlayer(player) {
     world.addPlayer(player);
+    maybeStartQuest(player);
 
     const scene = world.getSceneForPlayer(player);
 

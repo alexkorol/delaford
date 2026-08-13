@@ -84,6 +84,12 @@ class Player {
     // persisted via player:skilltree:save).
     this.passiveTree = data.passiveTree || null;
 
+    // Server-authored quest progress supplies the quest portion of the
+    // passive-point economy and survives both guest and account relogs.
+    this.quests = data.quests && typeof data.quests === 'object'
+      ? { ...data.quests }
+      : null;
+
     // Chronicles identity is distinct from the authenticated account name.
     // Guest saves persist this so reconnecting cannot reset a mortal Scion's
     // hard lifecycle simply by opening a new socket.
