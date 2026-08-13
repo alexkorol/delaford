@@ -128,4 +128,32 @@ describe('character sheet model', () => {
 
     expect(sheet.skills.map(skill => skill.id)).toEqual(['attack', 'mining', 'smithing']);
   });
+
+  it('surfaces authoritative Vesselforge combat effects as percentages', () => {
+    const sheet = buildCharacterSheet({
+      combat: {
+        blockChance: 4,
+        criticalChance: 22,
+        goodsFound: 10,
+      },
+    });
+
+    expect(sheet.vesselEffects).toEqual([
+      expect.objectContaining({ id: 'block', label: 'Block', value: 4, suffix: '%' }),
+      expect.objectContaining({ id: 'critical', label: 'Critical', value: 22, suffix: '%' }),
+      expect.objectContaining({ id: 'goods-found', label: 'Goods Found', value: 10, suffix: '%' }),
+    ]);
+  });
+
+  it('clamps malformed Vesselforge combat effects to their server caps', () => {
+    const sheet = buildCharacterSheet({
+      combat: {
+        blockChance: -5,
+        criticalChance: 120,
+        goodsFound: 999,
+      },
+    });
+
+    expect(sheet.vesselEffects.map(effect => effect.value)).toEqual([0, 75, 100]);
+  });
 });

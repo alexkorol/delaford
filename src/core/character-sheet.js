@@ -119,6 +119,14 @@ const combatTotal = (player = {}, type) => {
   return sumWearCombat(player.wear, type);
 };
 
+const percentEffect = (id, label, value, cap, description) => ({
+  id,
+  label,
+  value: clamp(Math.round(toNumber(value)), 0, cap),
+  suffix: '%',
+  description,
+});
+
 const slotDefenseTotal = item => (item && item.stats && item.stats.defense ? sumCombatMap(item.stats.defense) : 0);
 
 const cloneTile = tile => ({ ...tile });
@@ -231,6 +239,30 @@ export const buildCharacterSheet = (player = {}) => {
     { id: 'speed', label: 'Spd', value: Math.max(1, Math.round(toNumber(player.movementSpeed || player.speed || 10) || 10)) },
   ];
 
+  const vesselEffects = [
+    percentEffect(
+      'block',
+      'Block',
+      player.combat?.blockChance,
+      75,
+      'Chance to completely intercept a monster attack.',
+    ),
+    percentEffect(
+      'critical',
+      'Critical',
+      player.combat?.criticalChance,
+      75,
+      'Chance for a player attack to deal 150% damage.',
+    ),
+    percentEffect(
+      'goods-found',
+      'Goods Found',
+      player.combat?.goodsFound,
+      100,
+      'Increases monster coin bounties and gear-drop chance.',
+    ),
+  ];
+
   const resistances = RESISTANCE_ROWS.map(row => {
     const value = Object.values(wear).reduce((total, item) => total + readResistance(item, row.id), 0);
     return {
@@ -279,6 +311,7 @@ export const buildCharacterSheet = (player = {}) => {
     attributes,
     defenses,
     offense,
+    vesselEffects,
     resistances,
     equipment,
     skills,

@@ -47,6 +47,22 @@
       </div>
     </section>
 
+    <section class="vesselforge-summary" aria-label="Vesselforge effects">
+      <header>Vesselforge Effects</header>
+      <div class="vesselforge-grid">
+        <div
+          v-for="effect in characterSheet.vesselEffects"
+          :key="effect.id"
+          class="vesselforge-effect"
+          :class="{ 'is-dormant': effect.value === 0 }"
+          :title="effect.description"
+        >
+          <span class="vesselforge-effect__label">{{ effect.label }}</span>
+          <strong class="vesselforge-effect__value">{{ effect.value }}{{ effect.suffix }}</strong>
+        </div>
+      </div>
+    </section>
+
     <section class="equipment-summary">
       <header>Equipment</header>
       <ul class="equipment-summary__list">
@@ -598,7 +614,8 @@ div.stats_slot {
 }
 
 .dcss-scoreboard,
-.resistance-grid {
+.resistance-grid,
+.vesselforge-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
@@ -633,6 +650,45 @@ div.stats_slot {
 
 .score-pill--offense .score-pill__value {
   color: #92cbdf;
+}
+
+.vesselforge-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vesselforge-effect {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(118, 173, 151, 0.28);
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, rgba(29, 67, 57, 0.28), rgba(3, 9, 9, 0.52)),
+    rgba(2, 3, 5, 0.46);
+
+  &__label {
+    overflow: hidden;
+    color: rgba(198, 224, 210, 0.78);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__value {
+    color: #9bd9bd;
+  }
+
+  &.is-dormant {
+    border-color: rgba(202, 172, 104, 0.14);
+    background: rgba(2, 3, 5, 0.34);
+    opacity: 0.66;
+
+    .vesselforge-effect__value {
+      color: rgba(226, 218, 196, 0.68);
+    }
+  }
 }
 
 .resistance-pill {
@@ -705,6 +761,7 @@ div.stats_slot {
 @media (width <= 520px) {
   .dcss-scoreboard,
   .resistance-grid,
+  .vesselforge-grid,
   .character-hero__meters {
     grid-template-columns: 1fr 1fr;
   }

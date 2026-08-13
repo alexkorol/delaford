@@ -18,6 +18,8 @@ describe('character screen art', () => {
     expect(source).toContain("@/assets/graphics/actors/players/human-v2.png");
     expect(source).toContain("@/assets/graphics/items/vessels.png");
     expect(source).toContain("@/assets/tiles/objects.png");
+    expect(source).toContain('aria-label="Vesselforge effects"');
+    expect(source).toContain('characterSheet.vesselEffects');
     expect(source).not.toContain("@/assets/tiles/dungeon.png");
     expect(source).not.toContain('<span>@</span>');
   });
