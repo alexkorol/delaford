@@ -144,20 +144,32 @@ export default async function quest({ connect, assert }) {
     p.devTeleport(guardian.x + 1, guardian.y);
     await p.attack(guardian);
 
-    state = await p.waitFor(async () => {
-      const next = await p.state();
-      const livingGuardian = next.monsters.find(monster => monster.uuid === guardian.uuid);
-      if (!livingGuardian && next.quests.objectiveIndex >= 1) {
-        return next;
-      }
-      if (livingGuardian) {
-        if (Math.abs(livingGuardian.x - next.x) > 1 || Math.abs(livingGuardian.y - next.y) > 1) {
-          p.devTeleport(livingGuardian.x + 1, livingGuardian.y);
+    try {
+      state = await p.waitFor(async () => {
+        const next = await p.state();
+        const livingGuardian = next.monsters.find(monster => monster.uuid === guardian.uuid);
+        if (!livingGuardian && next.quests.objectiveIndex >= 1) {
+          return next;
         }
-        await p.attack(livingGuardian);
-      }
-      return false;
-    }, { timeoutMs: 30000, intervalMs: 350, label: 'Proof of Temper guardian' });
+        if (livingGuardian) {
+          if (Math.abs(livingGuardian.x - next.x) > 1 || Math.abs(livingGuardian.y - next.y) > 1) {
+            p.devTeleport(livingGuardian.x + 1, livingGuardian.y);
+          }
+          await p.attack(livingGuardian);
+        }
+        return false;
+      }, { timeoutMs: 30000, intervalMs: 350, label: 'Proof of Temper guardian' });
+    } catch (error) {
+      const stalled = await p.state();
+      const livingGuardian = stalled.monsters.find(monster => monster.uuid === guardian.uuid);
+      throw new Error(`${error.message}; guardian=${JSON.stringify(livingGuardian)} player=${JSON.stringify({
+        x: stalled.x,
+        y: stalled.y,
+        level: stalled.level,
+        hp: stalled.hp,
+        lifecycle: stalled.lifecycle,
+      })}`);
+    }
     assert(state.quests.objectiveIndex === 1, 'slaying an elite advances Proof of Temper');
 
     const questVessel = state.groundItems.find(item => (
