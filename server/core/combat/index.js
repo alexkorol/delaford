@@ -308,6 +308,29 @@ export const rollsPlayerCritical = (player) => {
   return chance > 0 && UI.getRandomInt(1, 100) <= chance;
 };
 
+export const isBeastTarget = monster => Boolean(
+  monster
+  && Array.isArray(monster.tags)
+  && monster.tags.includes('beast'),
+);
+
+export const beastbanePercentFor = (player, monster) => {
+  if (!isBeastTarget(monster)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(100, Number(player?.combat?.damageAgainstBeasts) || 0),
+  );
+};
+
+export const applyBeastbaneDamage = (damage, player, monster) => {
+  const baseDamage = Math.max(0, Math.floor(Number(damage) || 0));
+  const percent = beastbanePercentFor(player, monster);
+  return Math.max(0, Math.round(baseDamage * (1 + (percent / 100))));
+};
+
 const experienceForKill = (monster) => {
   if (monster.rewards && Number.isFinite(monster.rewards.experience)) {
     return Math.max(0, Math.floor(monster.rewards.experience));
@@ -318,10 +341,13 @@ const experienceForKill = (monster) => {
 
 const applyHitToMonster = (player, monster, skill, now) => {
   const baseDamage = rollPlayerDamage(player, skill);
+  const beastbanePercent = beastbanePercentFor(player, monster);
+  const beastbaneDamage = applyBeastbaneDamage(baseDamage, player, monster);
+  const beastbane = beastbanePercent > 0;
   const critical = rollsPlayerCritical(player);
   const damage = critical
-    ? Math.max(baseDamage + 1, Math.round(baseDamage * CRITICAL_DAMAGE_MULTIPLIER))
-    : baseDamage;
+    ? Math.max(beastbaneDamage + 1, Math.round(beastbaneDamage * CRITICAL_DAMAGE_MULTIPLIER))
+    : beastbaneDamage;
   const result = monster.takeDamage(damage, { now });
 
   if (!result) {
@@ -362,6 +388,9 @@ const applyHitToMonster = (player, monster, skill, now) => {
     skillName: skill.label || skill.name || skill.id,
     amount: result.amount !== undefined ? result.amount : damage,
     baseAmount: baseDamage,
+    beastbaneAmount: beastbaneDamage,
+    beastbanePercent,
+    beastbane,
     critical,
     health: {
       current: monster.stats.resources.health.current,
@@ -804,6 +833,9 @@ export default {
   processResourceRegeneration,
   isPlayerAlive,
   rollPlayerDamage,
+  isBeastTarget,
+  beastbanePercentFor,
+  applyBeastbaneDamage,
   findMeleeTargets,
   findProjectileTarget,
   findAreaTargets,

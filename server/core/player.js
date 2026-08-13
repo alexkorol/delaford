@@ -62,6 +62,7 @@ class Player {
       blockChance: 0,
       criticalChance: 0,
       goodsFound: 0,
+      damageAgainstBeasts: 0,
       stance: 'neutral',
       globalCooldown: 0,
       sequence: 0,
@@ -85,6 +86,7 @@ class Player {
     this.combat.blockChance = equippedCombat.blockChance;
     this.combat.criticalChance = equippedCombat.criticalChance;
     this.combat.goodsFound = equippedCombat.goodsFound;
+    this.combat.damageAgainstBeasts = equippedCombat.damageAgainstBeasts;
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).

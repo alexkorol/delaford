@@ -1,14 +1,14 @@
 /**
- * Vesselforge effects: equip deterministic Keen Eye and Wealthy gear, then
- * prove both modifiers reach live combat rewards. The dev force only removes
- * critical-roll flakiness; generation, equip, damage, loot, and WebSocket
- * payloads all use their production paths.
+ * Vesselforge effects: equip deterministic Keen Eye, Wealthy, and Beastbane
+ * gear, then prove all modifiers reach live combat rewards. The dev force only
+ * removes critical-roll flakiness; generation, equip, damage, loot, creature
+ * tags, and WebSocket payloads all use their production paths.
  */
 export default async function vesselforge({ connect, assert }) {
   const p = await connect();
   try {
     let state = await p.state();
-    if (!state.wearDetails.ring?.combatBonuses?.goodsFound) {
+    if (state.wearDetails.ring?.combatBonuses?.goodsFound !== 10) {
       p.devGive('vessel-ring', 1, { seed: 4, itemLevel: 40 });
       const ring = await p.waitFor(async () => {
         const next = await p.state();
@@ -24,13 +24,15 @@ export default async function vesselforge({ connect, assert }) {
       }, { label: 'equip Wealthy ring' });
     }
 
-    if (!state.wearDetails.right_hand?.combatBonuses?.criticalChance) {
-      p.devGive('vessel-khopesh', 1, { seed: 539, itemLevel: 40 });
+    if (state.wearDetails.right_hand?.combatBonuses?.criticalChance !== 22
+      || state.wearDetails.right_hand?.combatBonuses?.damageAgainstBeasts !== 13) {
+      p.devGive('vessel-khopesh', 1, { seed: 1670, itemLevel: 40 });
       const weapon = await p.waitFor(async () => {
         const next = await p.state();
         return next.inventoryDetails.find(item => (
           item.id === 'vessel-khopesh'
           && item.combatBonuses?.criticalChance === 22
+          && item.combatBonuses?.damageAgainstBeasts === 13
         )) || false;
       }, { label: 'deterministic Keen Eye weapon' });
       p.equipItem(weapon, 'right_hand');
@@ -49,6 +51,11 @@ export default async function vesselforge({ connect, assert }) {
     assert(state.wearDetails.ring.vessel.lines.some(line => (
       line.section === 'brand' && /Goods Found/.test(line.text)
     )), 'Wealthy is presented as a live Brand');
+    assert(state.combat.damageAgainstBeasts === 13,
+      'Beastbane reaches combat state (13%)');
+    assert(state.wearDetails.right_hand.vessel.lines.some(line => (
+      line.section === 'brand' && /Damage against Beasts/.test(line.text)
+    )), 'Beastbane is presented as a live Brand');
 
     await p.enterZone('dungeon', 'warren');
     p.devSetLevel(50);
@@ -92,6 +99,31 @@ export default async function vesselforge({ connect, assert }) {
     }, { timeoutMs: 10000, intervalMs: 250, label: 'Wealthy coin drop' });
     assert(coin.qty === boostedCoins,
       `Wealthy boosts the real coin bounty by 10% (${target.coins} -> ${coin.qty})`);
+
+    await p.enterZone('grove', 'clearings');
+    const grove = await p.state();
+    const beast = grove.monsters
+      .filter(monster => monster.tags.includes('beast'))
+      .sort((a, b) => (Math.abs(a.x - grove.x) + Math.abs(a.y - grove.y))
+        - (Math.abs(b.x - grove.x) + Math.abs(b.y - grove.y)))[0];
+    assert(beast, 'the generated grove exposes an explicitly tagged beast');
+
+    const hitsBeforeBeast = p.hits.length;
+    const beastHit = await p.waitFor(async () => {
+      const hitOnBeast = p.hits.slice(hitsBeforeBeast)
+        .find(entry => entry.targetId === beast.uuid && entry.beastbane);
+      if (hitOnBeast) return hitOnBeast;
+      const next = await p.state();
+      const stillAlive = next.monsters.find(monster => monster.uuid === beast.uuid);
+      if (stillAlive) {
+        p.devTeleport(Math.round(stillAlive.x) + 1, Math.round(stillAlive.y));
+        await p.attack(stillAlive);
+      }
+      return false;
+    }, { timeoutMs: 10000, intervalMs: 250, label: 'Beastbane combat event' });
+    const beastbaneDamage = Math.round(beastHit.baseAmount * 1.13);
+    assert(beastHit.beastbaneAmount === beastbaneDamage,
+      `Beastbane applies the measured 13% bonus (${beastHit.baseAmount} -> ${beastHit.beastbaneAmount})`);
   } finally {
     p.close();
   }

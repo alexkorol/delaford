@@ -42,6 +42,7 @@ export const formatCombatLogText = ({
   const amount = Number.isFinite(payload.amount) ? payload.amount : 0;
   const skillName = formatCombatSkillName(payload);
   const skill = skillName ? ` with ${skillName}` : '';
+  const beastbane = payload.beastbane ? ' (Beastbane)' : '';
 
   if (payload.blocked) {
     if (target === 'You') {
@@ -51,11 +52,11 @@ export const formatCombatLogText = ({
   }
 
   const hitVerb = payload.critical ? 'critically hit' : 'hit';
-  let text = `${attacker} ${hitVerb} ${target}${skill} for ${amount}.`;
+  let text = `${attacker} ${hitVerb} ${target}${skill} for ${amount}${beastbane}.`;
   if (attacker === 'You') {
-    text = `You ${hitVerb} ${target}${skill} for ${amount}.`;
+    text = `You ${hitVerb} ${target}${skill} for ${amount}${beastbane}.`;
   } else if (target === 'You') {
-    text = `${attacker} ${hitVerb} you for ${amount}.`;
+    text = `${attacker} ${hitVerb} you for ${amount}${beastbane}.`;
   }
 
   if (payload.died) {

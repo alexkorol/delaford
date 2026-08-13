@@ -90,4 +90,27 @@ describe('constructWear', () => {
       && /Chance to Block/.test(line.text))).toBe(true);
     expect(combat.blockChance).toBe(4);
   });
+
+  it('restores equipped Beastbane damage without rerolling the weapon', () => {
+    const seededRng = (() => {
+      let state = 19;
+      return () => {
+        state = (state + 0x6D2B79F5) >>> 0;
+        let value = state;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+      };
+    })();
+    const weapon = ItemFactory.createById('vessel-handaxe', {
+      rng: seededRng,
+      itemLevel: 40,
+    });
+    const wear = constructWear({ right_hand: weapon });
+    const combat = Wear.calculateCombat(wear);
+
+    expect(wear.right_hand.uuid).toBe(weapon.uuid);
+    expect(wear.right_hand.combatBonuses.damageAgainstBeasts).toBe(14);
+    expect(combat.damageAgainstBeasts).toBe(14);
+  });
 });

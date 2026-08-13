@@ -108,6 +108,7 @@ export default {
       blockChance: combatStats.blockChance,
       criticalChance: combatStats.criticalChance,
       goodsFound: combatStats.goodsFound,
+      damageAgainstBeasts: combatStats.damageAgainstBeasts,
     };
     if (typeof player.refreshDerivedStats === 'function') {
       player.refreshDerivedStats();
@@ -208,6 +209,7 @@ export default {
         blockChance: combatStats.blockChance,
         criticalChance: combatStats.criticalChance,
         goodsFound: combatStats.goodsFound,
+        damageAgainstBeasts: combatStats.damageAgainstBeasts,
       };
 
       if (typeof player.refreshDerivedStats === 'function') {

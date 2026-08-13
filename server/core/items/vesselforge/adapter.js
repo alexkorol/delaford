@@ -26,6 +26,7 @@ const ACTIVE_BRAND_MODS = new Set([
   'strongback',
   'keen_eye',
   'wealthy',
+  'beastbane',
 ]);
 
 const DEFAULT_ITEM_LEVEL = 10;
@@ -159,6 +160,7 @@ export const deriveVesselCombat = (vesselItem) => {
   const blockChance = Math.max(0, Math.min(75, Number(sums.block) || 0));
   const criticalChance = Math.max(0, Math.min(75, Number(sums.keen_eye) || 0));
   const goodsFound = Math.max(0, Math.min(100, Number(sums.wealthy) || 0));
+  const damageAgainstBeasts = Math.max(0, Math.min(100, Number(sums.beastbane) || 0));
   if (blockChance > 0) {
     modifiers.blockChance = blockChance;
   }
@@ -167,6 +169,9 @@ export const deriveVesselCombat = (vesselItem) => {
   }
   if (goodsFound > 0) {
     modifiers.goodsFound = goodsFound;
+  }
+  if (damageAgainstBeasts > 0) {
+    modifiers.damageAgainstBeasts = damageAgainstBeasts;
   }
   if (Object.keys(modifiers).length) {
     combat.modifiers = modifiers;

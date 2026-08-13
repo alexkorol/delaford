@@ -4,6 +4,7 @@ export default [
   {
     id: 'ashen-wolf',
     name: 'Ashen Wolf',
+    tags: ['beast'],
     level: 4,
     archetype: 'skirmisher',
     rarity: 'common',

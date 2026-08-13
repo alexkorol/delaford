@@ -79,4 +79,14 @@ describe('combat log formatting', () => {
       },
     })).toBe('You critically hit Mire Stalker with Blade Sweep for 18.');
   });
+
+  it('names Beastbane hits instead of presenting an unexplained damage bonus', () => {
+    expect(formatCombatLogText({
+      attacker: 'You',
+      target: 'Ashen Wolf',
+      payload: {
+        skillName: 'Blade Sweep', amount: 14, beastbane: true,
+      },
+    })).toBe('You hit Ashen Wolf with Blade Sweep for 14 (Beastbane).');
+  });
 });

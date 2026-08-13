@@ -171,6 +171,16 @@ describe('generateInstance themes', () => {
     }
   });
 
+  it('tags only declared creature identities as beasts', async () => {
+    const grove = await GameMap.generateInstance({ seed: 4, template: 'grove', depth: 1 });
+    const stone = await GameMap.generateInstance({ seed: 4, template: 'dungeon', depth: 1 });
+    const groveBeasts = grove.monsters.filter(monster => monster.tags?.includes('beast'));
+
+    expect(groveBeasts.length).toBeGreaterThan(0);
+    expect(groveBeasts.every(monster => monster.name === 'Thornclad Stag')).toBe(true);
+    expect(stone.monsters.some(monster => monster.tags?.includes('beast'))).toBe(false);
+  });
+
   it('guarantees full connectivity across templates, seeds and depths', async () => {
     const templates = ['dungeon', 'crypt', 'marsh', 'grove', 'wilds'];
     for (const template of templates) {

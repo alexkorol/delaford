@@ -135,6 +135,7 @@ describe('character sheet model', () => {
         blockChance: 4,
         criticalChance: 22,
         goodsFound: 10,
+        damageAgainstBeasts: 14,
       },
     });
 
@@ -142,6 +143,7 @@ describe('character sheet model', () => {
       expect.objectContaining({ id: 'block', label: 'Block', value: 4, suffix: '%' }),
       expect.objectContaining({ id: 'critical', label: 'Critical', value: 22, suffix: '%' }),
       expect.objectContaining({ id: 'goods-found', label: 'Goods Found', value: 10, suffix: '%' }),
+      expect.objectContaining({ id: 'beastbane', label: 'Beast Dmg', value: 14, suffix: '%' }),
     ]);
   });
 
@@ -151,9 +153,10 @@ describe('character sheet model', () => {
         blockChance: -5,
         criticalChance: 120,
         goodsFound: 999,
+        damageAgainstBeasts: 250,
       },
     });
 
-    expect(sheet.vesselEffects.map(effect => effect.value)).toEqual([0, 75, 100]);
+    expect(sheet.vesselEffects.map(effect => effect.value)).toEqual([0, 75, 100, 100]);
   });
 });

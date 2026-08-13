@@ -532,6 +532,7 @@ class Map {
       amount: Number.isFinite(payload.amount) ? payload.amount : 0,
       blocked: Boolean(payload.blocked),
       critical: Boolean(payload.critical),
+      beastbane: Boolean(payload.beastbane),
       died: Boolean(payload.died),
       startedAt: at,
     });
@@ -1327,11 +1328,16 @@ class Map {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillStyle = entry.blocked
         ? '#8bd5ff'
-        : (entry.critical ? '#fff176' : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f'));
+        : (entry.critical
+          ? '#fff176'
+          : (entry.beastbane ? '#8de6a5' : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f')));
 
+      const hitPrefix = [entry.critical ? 'CRIT' : '', entry.beastbane ? 'BANE' : '']
+        .filter(Boolean)
+        .join(' ');
       const label = entry.blocked
         ? 'BLOCK'
-        : `${entry.critical ? 'CRIT ' : ''}${entry.amount > 0 ? `-${entry.amount}` : '0'}`;
+        : `${hitPrefix ? `${hitPrefix} ` : ''}${entry.amount > 0 ? `-${entry.amount}` : '0'}`;
       const textX = screenPosition.x;
       const textY = screenPosition.y - rise;
       ctx.strokeText(label, textX, textY);

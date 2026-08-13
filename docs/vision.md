@@ -111,8 +111,9 @@ deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
   the 23-point quest budget reserved by the passive tree.
 - Continue wiring the remaining Dormant Vesselforge effects into authoritative
   combat before exposing crafting and awakening as player-facing progression.
-  Shield block, Keen Eye critical chance, and Wealthy loot bonuses are now live
-  and persisted, with explicit `BLOCK` and `CRIT` combat feedback.
+  Shield block, Keen Eye critical chance, Wealthy loot bonuses, and Beastbane
+  damage against explicitly tagged creatures are now live and persisted, with
+  explicit `BLOCK`, `CRIT`, and `BANE` combat feedback.
 
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?

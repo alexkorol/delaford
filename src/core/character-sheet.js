@@ -261,6 +261,13 @@ export const buildCharacterSheet = (player = {}) => {
       100,
       'Increases monster coin bounties and gear-drop chance.',
     ),
+    percentEffect(
+      'beastbane',
+      'Beast Dmg',
+      player.combat?.damageAgainstBeasts,
+      100,
+      'Increases damage dealt to creatures explicitly tagged as beasts.',
+    ),
   ];
 
   const resistances = RESISTANCE_ROWS.map(row => {

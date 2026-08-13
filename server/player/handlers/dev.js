@@ -103,6 +103,7 @@ const buildStateSnapshot = (player) => {
       blockChance: player.combat.blockChance || 0,
       criticalChance: player.combat.criticalChance || 0,
       goodsFound: player.combat.goodsFound || 0,
+      damageAgainstBeasts: player.combat.damageAgainstBeasts || 0,
     } : null,
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
@@ -113,6 +114,7 @@ const buildStateSnapshot = (player) => {
         y: m.y,
         level: m.level,
         rarity: m.rarityId,
+        tags: Array.isArray(m.tags) ? [...m.tags] : [],
         hp: m.stats && m.stats.resources ? { ...m.stats.resources.health } : null,
         coins: Number.isFinite(m.rewards?.coins) ? m.rewards.coins : 0,
       }))

@@ -252,6 +252,16 @@ export const THEME_MONSTERS = {
   },
 };
 
+// Creature tags are combat truth, separate from role/archetype. Only named
+// identities that are plainly beasts receive Beastbane damage; humanoids,
+// undead, plants, and spirits remain untagged even when they share AI.
+export const THEME_MONSTER_TAGS = {
+  volcanic: { ranged: ['beast'] },
+  marsh: { melee: ['beast'] },
+  grove: { melee: ['beast'] },
+  wilds: { boss: ['beast'] },
+};
+
 // Treasure-room gear pools; deeper floors roll better bases.
 const INSTANCE_LOOT_TIERS = [
   { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
@@ -795,6 +805,7 @@ class Map {
       return {
         id: `instance-${seed}-${index}`,
         name,
+        tags: [...(THEME_MONSTER_TAGS[themeName]?.[graphicRole] || [])],
         // Floor-1 trash tracks a fresh character (level 1-3); depth and role
         // bonuses layer on top. Bosses take an explicit levelBonus. Scaling is
         // gentle so a floor is uniformly mow-through rather than spiking late.

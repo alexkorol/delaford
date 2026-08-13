@@ -295,6 +295,34 @@ describe('tryUseSkill', () => {
     );
   });
 
+  it('applies Beastbane only to explicitly tagged beasts', () => {
+    const player = makePlayer({ facing: 'right' });
+    player.combat.damageAgainstBeasts = 25;
+    const beast = makeMonster({ x: 11, y: 10, tags: ['beast'] });
+    setupScene(player, [beast]);
+    const random = vi.spyOn(UI, 'getRandomInt').mockReturnValue(10);
+
+    const beastOutcome = Combat.tryUseSkill(player, {
+      skillId: 'primary-attack',
+      direction: 'right',
+    });
+    random.mockRestore();
+
+    expect(beast.takeDamage).toHaveBeenCalledWith(13, expect.anything());
+    expect(beastOutcome.hits[0]).toEqual(expect.objectContaining({
+      amount: 13,
+      baseAmount: 10,
+      beastbaneAmount: 13,
+      beastbanePercent: 25,
+      beastbane: true,
+      critical: false,
+    }));
+
+    const humanoid = makeMonster({ tags: ['humanoid'] });
+    expect(Combat.applyBeastbaneDamage(10, player, humanoid)).toBe(10);
+    expect(Combat.applyBeastbaneDamage(10, player, beast)).toBe(13);
+  });
+
   it('awards attack experience when the monster dies', () => {
     const player = makePlayer({ facing: 'right' });
     const monster = makeMonster({

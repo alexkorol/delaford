@@ -25,6 +25,11 @@ class Monster {
     this.id = definition.instanceId || this.templateId || uuid();
     this.uuid = uuid();
     this.name = definition.name || 'Monster';
+    this.tags = Array.from(new Set(
+      (Array.isArray(definition.tags) ? definition.tags : [])
+        .filter(tag => typeof tag === 'string' && tag.trim())
+        .map(tag => tag.trim().toLowerCase()),
+    ));
     this.level = Number.isFinite(definition.level) ? definition.level : 1;
     this.sceneId = definition.sceneId || world.defaultTownId;
     this.archetypeId = definition.archetype || 'brute';
@@ -240,6 +245,7 @@ class Monster {
       uuid: this.uuid,
       templateId: this.templateId,
       name: this.name,
+      tags: [...this.tags],
       level: this.level,
       sceneId: this.sceneId,
       archetype: this.archetypeId,

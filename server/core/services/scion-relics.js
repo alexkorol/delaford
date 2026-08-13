@@ -33,6 +33,7 @@ const refreshEquipment = (player) => {
     blockChance: combat.blockChance,
     criticalChance: combat.criticalChance,
     goodsFound: combat.goodsFound,
+    damageAgainstBeasts: combat.damageAgainstBeasts,
   };
   if (typeof player.refreshDerivedStats === 'function') {
     player.refreshDerivedStats();

@@ -62,6 +62,17 @@ describe('monster lifecycle', () => {
     ].forEach(sceneId => world.scenes.delete(sceneId));
   });
 
+  it('normalises creature tags and exposes them to clients', () => {
+    const monster = new Monster({
+      id: 'tagged-wolf',
+      name: 'Tagged Wolf',
+      tags: [' Beast ', 'beast', '', null],
+    });
+
+    expect(monster.tags).toEqual(['beast']);
+    expect(monster.toJSON().tags).toEqual(['beast']);
+  });
+
   it('dies immediately on lethal damage instead of consuming player cheat-death state', () => {
     const monster = makeMonster();
 

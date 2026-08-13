@@ -23,10 +23,10 @@ export default async function persistence({ connect, assert }) {
   });
   try {
     first.devGive('vessel-ring', 1);
-    // Seed 539 at ilvl 40 deterministically rolls a 22% Keen Eye Brand. The
-    // production factory still owns the item; the dev seed only makes this
-    // real-protocol assertion reproducible.
-    first.devGive('vessel-khopesh', 1, { seed: 539, itemLevel: 40 });
+    // Seed 1670 at ilvl 40 deterministically rolls 22% Keen Eye and 13%
+    // Beastbane Brands. The production factory still owns the item; the dev
+    // seed only makes this real-protocol assertion reproducible.
+    first.devGive('vessel-khopesh', 1, { seed: 1670, itemLevel: 40 });
     first.devGive('vessel-shield', 1);
     first.devSetLevel(4);
     const generated = await first.waitFor(async () => {
@@ -35,6 +35,7 @@ export default async function persistence({ connect, assert }) {
       const sword = s.inventoryDetails.find(item => (
         item.id === 'vessel-khopesh'
         && item.combatBonuses?.criticalChance === 22
+        && item.combatBonuses?.damageAgainstBeasts === 13
       ));
       const shield = s.inventoryDetails.find(item => (
         item.id === 'vessel-shield'
@@ -57,6 +58,8 @@ export default async function persistence({ connect, assert }) {
       'equipped Vesselforge weapon contributes its derived combat rating');
     assert(equipped.combat.criticalChance === 22,
       'equipped Keen Eye Brand contributes its live 22% critical chance');
+    assert(equipped.combat.damageAgainstBeasts === 13,
+      'equipped Beastbane Brand contributes its live 13% beast damage');
     assert(equipped.wearDetails.right_hand.vessel.lines.some(line => (
       line.section === 'brand' && /Critical Chance/.test(line.text)
     )), 'Keen Eye tooltip presents critical chance as a live Brand');
@@ -93,6 +96,7 @@ export default async function persistence({ connect, assert }) {
     assert(s.combat.attack.slash > 0, 'derived Vesselforge combat stats were restored on login');
     assert(s.combat.blockChance === 4, 'Vesselforge block chance was restored on login');
     assert(s.combat.criticalChance === 22, 'Keen Eye critical chance was restored on login');
+    assert(s.combat.damageAgainstBeasts === 13, 'Beastbane damage was restored on login');
   } finally {
     second.close();
   }

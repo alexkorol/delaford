@@ -369,6 +369,24 @@ describe('Vesselforge game integration', () => {
     expect(refreshed.lines.some(line => /Dormant.*Goods Found/.test(line.text))).toBe(false);
   });
 
+  it('makes Beastbane a capped live damage modifier', () => {
+    const item = forge.generateItem({
+      ilvl: 40,
+      formId: 'handaxe',
+      materialId: 'flint',
+      brands: 0,
+    });
+    item.brands.push({
+      id: 'beastbane-test', modId: 'beastbane', tier: 2, value: 30,
+    });
+    const refreshed = refreshVesselBlock({ item });
+
+    expect(refreshed.combat.modifiers.damageAgainstBeasts).toBe(30);
+    expect(refreshed.lines.some(line => line.section === 'brand'
+      && /Damage against Beasts/.test(line.text))).toBe(true);
+    expect(refreshed.lines.some(line => /Dormant.*Damage against Beasts/.test(line.text))).toBe(false);
+  });
+
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {
     const legacy = ItemFactory.createById('bronze-sword', { rng: () => 0.5 });
 

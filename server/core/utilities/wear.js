@@ -73,6 +73,7 @@ class Wear {
       blockChance: 0,
       criticalChance: 0,
       goodsFound: 0,
+      damageAgainstBeasts: 0,
     };
 
     // Go through each wear item and add up its value
@@ -95,12 +96,14 @@ class Wear {
         stats.blockChance += Number(combatBonuses.blockChance) || 0;
         stats.criticalChance += Number(combatBonuses.criticalChance) || 0;
         stats.goodsFound += Number(combatBonuses.goodsFound) || 0;
+        stats.damageAgainstBeasts += Number(combatBonuses.damageAgainstBeasts) || 0;
       }
     });
 
     stats.blockChance = Math.max(0, Math.min(75, stats.blockChance));
     stats.criticalChance = Math.max(0, Math.min(75, stats.criticalChance));
     stats.goodsFound = Math.max(0, Math.min(100, stats.goodsFound));
+    stats.damageAgainstBeasts = Math.max(0, Math.min(100, stats.damageAgainstBeasts));
 
     return stats;
   }
