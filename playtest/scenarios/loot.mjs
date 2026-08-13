@@ -43,8 +43,15 @@ export default async function loot({ connect, assert }) {
     }, { timeoutMs: 30000, intervalMs: 400, label: 'a coin drop' });
 
     // The real menu must offer Take for it.
-    p.devTeleport(drop.x, drop.y + 1); // stand adjacent, like a player
-    const before = await p.state();
+    // A fixed adjacent offset can itself be a blocked dungeon tile, leaving a
+    // queued Take path with nowhere to start. Stand on the drop through the
+    // dev movement path, as the quest scenario does, then exercise the same
+    // real server-built right-click menu and Take action.
+    p.devTeleport(drop.x, drop.y);
+    const before = await p.waitFor(async () => {
+      const state = await p.state();
+      return state.x === drop.x && state.y === drop.y ? state : false;
+    }, { timeoutMs: 6000, label: 'reach the first drop' });
     const coinsBefore = before.inventory
       .filter(item => item.id === 'coins')
       .reduce((sum, item) => sum + (item.qty || 0), 0);
