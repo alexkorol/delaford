@@ -371,6 +371,7 @@ export default {
   place-items: center;
   width: 54px;
   height: 54px;
+  margin-inline: 25px;
   flex: 0 0 auto;
   color: #8bd2bc;
   font-size: 1.45rem;
@@ -690,6 +691,12 @@ summary:focus-visible {
 }
 
 @media (width <= 580px) {
+  .chronicles__sigil {
+    width: 44px;
+    height: 44px;
+    margin-inline: 10px;
+  }
+
   .chronicles__ledger {
     grid-template-columns: 1fr;
   }
