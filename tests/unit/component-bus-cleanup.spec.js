@@ -84,6 +84,10 @@ describe('component event-bus cleanup', () => {
     component.created.call(vm);
     component.beforeUnmount.call(vm);
 
+    // Vue 3 cannot queue a component update from created(): its render job
+    // does not exist yet. Doing so made bank, shop, furnace, and anvil panes
+    // abort their first render with queueJob reading a null job.
+    expect(vm.$forceUpdate).not.toHaveBeenCalled();
     expect(on).toHaveBeenCalledWith(
       'game:context-menu:first-only',
       ClientUI.displayFirstAction,
