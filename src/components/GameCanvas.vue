@@ -443,6 +443,7 @@ export default {
 
       const canvasX = position.x * scaleX;
       const canvasY = position.y * scaleY;
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
       if (
         this.game
@@ -467,8 +468,6 @@ export default {
 
       const tileX = Math.floor((canvasX + camera.offsetX) / tile.width);
       const tileY = Math.floor((canvasY + camera.offsetY) / tile.height);
-
-      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
       return {
         x: clamp(tileX, 0, Math.max(viewport.x - 1, 0)),
