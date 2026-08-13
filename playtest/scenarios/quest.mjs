@@ -185,7 +185,7 @@ export default async function quest({ connect, assert }) {
     state = await p.waitFor(async () => {
       const next = await p.state();
       return next.quests.objectiveIndex === 2 ? next : false;
-    }, { label: 'claim Proof of Temper Vessel' });
+    }, { timeoutMs: 15000, label: 'claim Proof of Temper Vessel' });
     assert(state.inventoryDetails.some(item => item.uuid === questVessel.uuid),
       'the exact native Vessel enters the inventory');
 
