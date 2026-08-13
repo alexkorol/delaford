@@ -629,7 +629,7 @@ div.game {
   }
 
   .pane {
-    z-index: 5;
+    z-index: 65;
     width: 90%;
     height: 90%;
     margin: 0;
