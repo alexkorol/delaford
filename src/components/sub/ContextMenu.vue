@@ -212,8 +212,13 @@ export default {
       }
 
       // Remove misc info
+      const eventTarget = data.target
+        || (data.event && (data.event.currentTarget || data.event.target));
+      const clickedOn = eventTarget && eventTarget.classList
+        ? eventTarget.classList
+        : [];
       const miscData = omit(
-        { ...data, clickedOn: data.event.target.classList },
+        { ...data, clickedOn },
         ['coordinates', 'event', 'target', 'world', 'viewport', 'center'],
       );
 

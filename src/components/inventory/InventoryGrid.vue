@@ -19,8 +19,9 @@
         :class="itemClasses(item)"
         :style="itemStyle(item)"
         :title="itemTooltip(item)"
-        @pointerdown.prevent="beginPointerDrag($event, item)"
+        @pointerdown.left.prevent="beginPointerDrag($event, item)"
         @dblclick.prevent="handleDoubleClick(item)"
+        @contextmenu.stop.prevent="showContextMenu($event, item)"
       >
         <div
           class="inventory-item__sprite"
@@ -47,8 +48,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 
 import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
+import { buildInventoryContextMenuRequest } from '@/core/inventory/context-menu.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
+import bus from '@/core/utilities/bus.js';
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
 
 export default {
@@ -217,6 +220,11 @@ export default {
       });
     };
 
+    const showContextMenu = (event, item) => {
+      inventoryStore.cancelDrag();
+      bus.$emit('PLAYER:MENU', buildInventoryContextMenuRequest(event, item));
+    };
+
     const handleKeyUp = (event) => {
       if (!isDragging.value) {
         return;
@@ -297,6 +305,7 @@ export default {
 
     const itemClasses = (item) => ([
       'inventory-item',
+      'inventorySlot',
       `inventory-item--rarity-${itemRarity(item)}`,
       { 'inventory-item--dragging': isItemDragging(item.uuid) },
     ]);
@@ -362,6 +371,7 @@ export default {
       handlePointerLeave,
       beginPointerDrag,
       handleDoubleClick,
+      showContextMenu,
       itemStyle,
       itemSpriteStyle,
       itemClasses,

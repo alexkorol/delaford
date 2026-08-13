@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
+import { buildInventoryContextMenuRequest } from '@/core/inventory/context-menu.js';
 import { positionFromSlot } from '@shared/inventory-footprints.js';
 
 const readSource = relativePath => readFileSync(
@@ -246,6 +247,10 @@ describe('inventory drag target component wiring', () => {
     expect(inventoryGrid).toContain("const equipmentSlot = closest('[data-equipment-slot]');");
     expect(inventoryGrid).toContain('valid: canEquipInventoryItemToSlot(activeItem.value, slotId)');
     expect(inventoryGrid).toContain("if (closest('[data-world-drop-zone]')) {");
+    expect(inventoryGrid).toContain('@pointerdown.left.prevent="beginPointerDrag($event, item)"');
+    expect(inventoryGrid).toContain('@contextmenu.stop.prevent="showContextMenu($event, item)"');
+    expect(inventoryGrid).toContain("'inventorySlot'");
+    expect(inventoryGrid).toContain("bus.$emit('PLAYER:MENU', buildInventoryContextMenuRequest(event, item));");
 
     expect(worldDropZone).toContain('data-world-drop-zone="true"');
     expect(worldDropZone).toContain('const storeValue = value => unref(value);');
@@ -256,5 +261,28 @@ describe('inventory drag target component wiring', () => {
 
     expect(containerStack).toContain('storeValue(inventoryStore.containerStack) || []');
     expect(containerStack).not.toContain('inventoryStore.containerStack.value');
+  });
+});
+
+describe('inventory context-menu request', () => {
+  it('targets the item root and sends its persisted slot', () => {
+    const itemRoot = {
+      classList: ['inventory-item', 'inventorySlot'],
+      getBoundingClientRect: () => ({ left: 64, top: 96 }),
+    };
+    const nestedSprite = { classList: ['inventory-item__sprite'] };
+    const event = {
+      currentTarget: itemRoot,
+      target: nestedSprite,
+      clientX: 80,
+      clientY: 112,
+    };
+
+    expect(buildInventoryContextMenuRequest(event, { slot: 17 })).toEqual({
+      event,
+      coordinates: { x: 0, y: 0 },
+      slot: 17,
+      target: itemRoot,
+    });
   });
 });
