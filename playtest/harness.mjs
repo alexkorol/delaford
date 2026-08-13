@@ -41,6 +41,8 @@ export class HeadlessPlayer {
     this.loginCount = 0;
     this.chroniclesReadyCount = 0;
     this.chroniclesReady = null;
+    this.chroniclesUpdateCount = 0;
+    this.chroniclesUpdate = null;
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
@@ -95,6 +97,10 @@ export class HeadlessPlayer {
       case 'player:chronicles:ready':
         this.chroniclesReadyCount += 1;
         this.chroniclesReady = data;
+        break;
+      case 'player:chronicles:update':
+        this.chroniclesUpdateCount += 1;
+        this.chroniclesUpdate = data;
         break;
       case 'world:scene:transition':
       case 'party:scene:transition':
@@ -353,6 +359,17 @@ export class HeadlessPlayer {
       timeoutMs,
     });
     return this.player;
+  }
+
+  /** Save a complete Chronicles record and wait for the canonical revision. */
+  async saveChronicles(state, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const before = this.chroniclesUpdateCount;
+    this.emit('player:chronicles:save', { state });
+    await this.waitFor(() => this.chroniclesUpdateCount > before, {
+      label: 'Chronicles persistence',
+      timeoutMs,
+    });
+    return this.chroniclesUpdate;
   }
 
   /** Move a final-dead mortal Scion back to the authenticated Chronicles. */

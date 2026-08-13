@@ -92,9 +92,11 @@ class Delaford {
     }
 
     // Chronicles intentionally authenticates before the player is admitted
-    // to the world. This one transition is therefore bound to the pending
-    // Player on the socket rather than to world.players.
-    if (data.event === 'player:chronicles:select') {
+    // to the world. These record operations are therefore bound to the
+    // pending Player on the socket rather than to world.players.
+    if (data.event === 'player:chronicles:select'
+      || data.event === 'player:chronicles:save'
+      || data.event === 'player:chronicles:mutate') {
       return Boolean(
         ws.pendingPlayer
         && ws.pendingPlayer.socket_id === ws.id,

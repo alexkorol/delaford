@@ -85,6 +85,22 @@ vi.mock('#server/core/repositories/guest-save-store.js', () => ({
   saveGuest: vi.fn(),
 }));
 
+const chroniclesStoreMock = vi.hoisted(() => ({
+  snapshot: vi.fn(() => ({
+    exists: false,
+    revision: 0,
+    state: { version: 3, houses: [], activeHouseId: null, activeScionId: null },
+  })),
+  findLivingScion: vi.fn(() => null),
+  save: vi.fn(),
+  mutate: vi.fn(),
+  entomb: vi.fn(),
+}));
+
+vi.mock('#server/core/services/chronicles-store.js', () => ({
+  default: chroniclesStoreMock,
+}));
+
 const { default: socketEvents } = await import('#server/player/handlers/socket-events/index.js');
 const { default: Authentication } = await import('#server/player/authentication.js');
 const { default: Socket } = await import('#server/socket.js');
@@ -95,6 +111,23 @@ describe('Chronicles login admission', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     world.players.splice(0, world.players.length);
+    chroniclesStoreMock.snapshot.mockReturnValue({
+      exists: false,
+      revision: 0,
+      state: { version: 3, houses: [], activeHouseId: null, activeScionId: null },
+    });
+    chroniclesStoreMock.findLivingScion.mockReturnValue(null);
+    chroniclesStoreMock.save.mockReturnValue({
+      ok: true,
+      revision: 1,
+      state: { version: 3, houses: [], activeHouseId: null, activeScionId: null },
+    });
+    chroniclesStoreMock.mutate.mockReturnValue({
+      ok: true,
+      revision: 1,
+      state: { version: 3, houses: [], activeHouseId: null, activeScionId: null },
+    });
+    chroniclesStoreMock.entomb.mockReturnValue({ ok: true });
   });
 
   it('holds a browser login outside the world until a Scion is selected', async () => {
@@ -111,6 +144,8 @@ describe('Chronicles login admission', () => {
       'player:chronicles:ready',
       expect.objectContaining({
         accountName: 'dev',
+        chroniclesRevision: 0,
+        chroniclesExists: false,
         player: { socket_id: 'socket-a' },
       }),
     );
@@ -121,6 +156,89 @@ describe('Chronicles login admission', () => {
     expect(Authentication.addPlayer).toHaveBeenCalledOnce();
     expect(Authentication.addPlayer.mock.calls[0][0].username).toBe('Vesper');
     expect(Authentication.addPlayer.mock.calls[0][0].accountUsername).toBe('dev');
+  });
+
+  it('persists a browser Chronicle and acknowledges the canonical revision', async () => {
+    const player = { uuid: 'account-1', socket_id: 'socket-save' };
+    const ws = { id: 'socket-save', authenticated: true, pendingPlayer: player };
+    const state = { version: 3, houses: [], activeHouseId: null, activeScionId: null };
+    chroniclesStoreMock.save.mockReturnValue({ ok: true, revision: 4, state });
+
+    socketEvents['player:chronicles:save']({ data: { state } }, ws);
+
+    expect(chroniclesStoreMock.save).toHaveBeenCalledWith('account-1', state);
+    expect(Socket.emit).toHaveBeenCalledWith('player:chronicles:update', expect.objectContaining({
+      player: { socket_id: 'socket-save' },
+      chronicles: state,
+      chroniclesRevision: 4,
+      chroniclesExists: true,
+    }));
+  });
+
+  it('applies a bounded Chronicle mutation and acknowledges the canonical revision', () => {
+    const player = { uuid: 'account-1', socket_id: 'socket-mutate' };
+    const ws = { id: 'socket-mutate', authenticated: true, pendingPlayer: player };
+    const mutation = { type: 'select-house', houseId: 'house-real' };
+    const state = { version: 3, houses: [], activeHouseId: null, activeScionId: null };
+    chroniclesStoreMock.mutate.mockReturnValue({ ok: true, revision: 5, state });
+
+    socketEvents['player:chronicles:mutate']({ data: mutation }, ws);
+
+    expect(chroniclesStoreMock.mutate).toHaveBeenCalledWith('account-1', mutation);
+    expect(Socket.emit).toHaveBeenCalledWith('player:chronicles:update', expect.objectContaining({
+      chroniclesRevision: 5,
+      chronicles: state,
+    }));
+  });
+
+  it('uses the server-owned living identity instead of client-authored fields', () => {
+    const player = {
+      uuid: 'account-1',
+      socket_id: 'socket-canonical',
+      username: 'account',
+      accountUsername: 'account',
+      chronicles: null,
+      stats: {
+        resources: {
+          health: { current: 10, max: 10 },
+          mana: { current: 10, max: 10 },
+        },
+        lifecycle: {
+          mode: 'soft',
+          state: 'alive',
+          cheatDeath: {},
+          respawn: {},
+        },
+      },
+      combat: { inputHistory: [] },
+      cancelPathfinding: vi.fn(),
+    };
+    const ws = { id: 'socket-canonical', authenticated: true, pendingPlayer: player };
+    chroniclesStoreMock.snapshot.mockReturnValue({
+      exists: true,
+      revision: 2,
+      state: { version: 3, houses: [], activeHouseId: null, activeScionId: null },
+    });
+    chroniclesStoreMock.findLivingScion.mockReturnValue({
+      house: { id: 'house-real' },
+      scion: { id: 'scion-real', name: 'Vesper', mortal: true },
+    });
+
+    socketEvents['player:chronicles:select']({
+      data: {
+        houseId: 'house-forged',
+        scionId: 'scion-forged',
+        scionName: 'Impostor',
+        mortal: false,
+      },
+    }, ws);
+
+    expect(player.username).toBe('Vesper');
+    expect(player.chronicles).toEqual({
+      houseId: 'house-real',
+      scionId: 'scion-real',
+      mortal: true,
+    });
   });
 
   it('keeps the raw headless login contract unchanged', async () => {

@@ -38,6 +38,10 @@
         <ChroniclesScreen
           v-if="screen === 'chronicles'"
           :account-name="chroniclesContext && chroniclesContext.accountName"
+          :account-id="chroniclesContext && chroniclesContext.chroniclesAccountId"
+          :chronicles-state="chroniclesContext && chroniclesContext.chronicles"
+          :chronicles-revision="chroniclesContext && chroniclesContext.chroniclesRevision"
+          :chronicles-exists="Boolean(chroniclesContext && chroniclesContext.chroniclesExists)"
           @set-out="$emit('set-out', $event)"
         />
 

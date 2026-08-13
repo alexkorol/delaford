@@ -68,6 +68,8 @@ class Socket {
    */
   static lastLoginPayload = null;
 
+  static chroniclesAccountId = null;
+
   static rememberScion(identity) {
     if (!Socket.lastLoginPayload) {
       return false;

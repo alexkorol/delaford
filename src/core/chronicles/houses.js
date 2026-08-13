@@ -31,6 +31,22 @@ const getStorage = () => {
   return null;
 };
 
+export const getChroniclesStorageKey = accountId => (
+  accountId ? `${STORAGE_KEY}:${String(accountId)}` : STORAGE_KEY
+);
+
+export const hasChroniclesCache = (accountId = null) => {
+  const storage = getStorage();
+  if (!storage) {
+    return false;
+  }
+  try {
+    return Boolean(storage.getItem(getChroniclesStorageKey(accountId)));
+  } catch (error) {
+    return false;
+  }
+};
+
 const migrateHouse = (house = {}) => ({
   id: house.id || randomId('house'),
   name: typeof house.name === 'string' ? house.name : 'Nameless House',
@@ -50,55 +66,68 @@ const migrateScion = (scion = {}) => ({
   mortal: Boolean(scion.mortal),
 });
 
-const emptyState = () => ({
+export const emptyState = () => ({
   version: SCHEMA_VERSION,
   houses: [],
   activeHouseId: null,
   activeScionId: null,
 });
 
+/** Normalise either a server snapshot or a legacy browser record. */
+export const normaliseHouses = (candidate = {}) => {
+  const houses = Array.isArray(candidate.houses) ? candidate.houses.map(migrateHouse) : [];
+  const activeHouseId = houses.some(house => house.id === candidate.activeHouseId)
+    ? candidate.activeHouseId
+    : (houses[0] ? houses[0].id : null);
+  const activeHouse = houses.find(house => house.id === activeHouseId) || null;
+  const activeScionId = activeHouse && activeHouse.scions.some(scion => scion.id === candidate.activeScionId)
+    ? candidate.activeScionId
+    : (activeHouse && activeHouse.scions[0] ? activeHouse.scions[0].id : null);
+
+  return {
+    version: SCHEMA_VERSION,
+    houses,
+    activeHouseId,
+    activeScionId,
+  };
+};
+
+export const isChroniclesEmpty = state => !state || !Array.isArray(state.houses) || state.houses.length === 0;
+
 /**
  * Load and migrate the saved Chronicles state. Never throws — corrupt or
  * missing data yields a fresh empty state.
  */
-export const loadHouses = () => {
+export const loadHouses = (accountId = null) => {
   const storage = getStorage();
   if (!storage) {
     return emptyState();
   }
   try {
-    const raw = storage.getItem(STORAGE_KEY);
+    const scopedKey = getChroniclesStorageKey(accountId);
+    // The unscoped v3 key is read only as an upgrade source. Once the server
+    // acknowledges it, clearLegacyHouses removes it so another account on the
+    // same browser cannot inherit the record.
+    const raw = storage.getItem(scopedKey)
+      || (accountId ? storage.getItem(STORAGE_KEY) : null);
     if (!raw) {
       return emptyState();
     }
     const parsed = JSON.parse(raw);
-    const houses = Array.isArray(parsed.houses) ? parsed.houses.map(migrateHouse) : [];
-    const activeHouseId = houses.some(house => house.id === parsed.activeHouseId)
-      ? parsed.activeHouseId
-      : (houses[0] ? houses[0].id : null);
-    const activeHouse = houses.find(house => house.id === activeHouseId) || null;
-    const activeScionId = activeHouse && activeHouse.scions.some(scion => scion.id === parsed.activeScionId)
-      ? parsed.activeScionId
-      : (activeHouse && activeHouse.scions[0] ? activeHouse.scions[0].id : null);
-    return {
-      version: SCHEMA_VERSION,
-      houses,
-      activeHouseId,
-      activeScionId,
-    };
+    return normaliseHouses(parsed);
   } catch (error) {
     console.warn('[chronicles] Failed to load houses; starting fresh.', error);
     return emptyState();
   }
 };
 
-export const saveHouses = (state) => {
+export const saveHouses = (state, accountId = null) => {
   const storage = getStorage();
   if (!storage) {
     return false;
   }
   try {
-    storage.setItem(STORAGE_KEY, JSON.stringify({
+    storage.setItem(getChroniclesStorageKey(accountId), JSON.stringify({
       version: SCHEMA_VERSION,
       houses: Array.isArray(state.houses) ? state.houses : [],
       activeHouseId: state.activeHouseId || null,
@@ -107,6 +136,20 @@ export const saveHouses = (state) => {
     return true;
   } catch (error) {
     console.warn('[chronicles] Failed to save houses.', error);
+    return false;
+  }
+};
+
+export const clearLegacyHouses = (accountId = null) => {
+  const storage = getStorage();
+  if (!storage || !accountId) {
+    return false;
+  }
+  try {
+    storage.removeItem(STORAGE_KEY);
+    return true;
+  } catch (error) {
+    console.warn('[chronicles] Failed to clear the legacy browser record.', error);
     return false;
   }
 };
@@ -237,6 +280,12 @@ export const getActiveScion = (state) => {
 
 export default {
   STORAGE_KEY,
+  getChroniclesStorageKey,
+  hasChroniclesCache,
+  clearLegacyHouses,
+  emptyState,
+  normaliseHouses,
+  isChroniclesEmpty,
   loadHouses,
   saveHouses,
   foundHouse,

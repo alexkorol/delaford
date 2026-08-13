@@ -82,6 +82,8 @@ vi.mock('#server/player/handler.js', () => ({
   default: {
     'player:login': vi.fn(),
     'player:chronicles:select': vi.fn(),
+    'player:chronicles:save': vi.fn(),
+    'player:chronicles:mutate': vi.fn(),
     'player:move': vi.fn(),
     'player:say': vi.fn(),
     'player:context-menu:action': vi.fn(),
@@ -300,6 +302,32 @@ describe('Delaford.connection – authentication gate', () => {
     await ws._triggerMessage(msg);
 
     expect(Handler['player:chronicles:select']).toHaveBeenCalledOnce();
+  });
+
+  it('allows an authenticated pending player to migrate a Chronicles record', async () => {
+    ws.authenticated = true;
+    ws.pendingPlayer = { uuid: 'abc', socket_id: ws.id };
+    const msg = JSON.stringify({
+      event: 'player:chronicles:save',
+      data: { state: { houses: [] } },
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:chronicles:save']).toHaveBeenCalledOnce();
+  });
+
+  it('allows an authenticated pending player to mutate a Chronicles record', async () => {
+    ws.authenticated = true;
+    ws.pendingPlayer = { uuid: 'abc', socket_id: ws.id };
+    const msg = JSON.stringify({
+      event: 'player:chronicles:mutate',
+      data: { type: 'select-house', houseId: 'house-a' },
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:chronicles:mutate']).toHaveBeenCalledOnce();
   });
 
   it('rejects Chronicles selection without a socket-bound pending player', async () => {

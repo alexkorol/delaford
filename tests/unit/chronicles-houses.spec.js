@@ -32,6 +32,11 @@ const {
   validateHouseName,
   validateScionName,
   STORAGE_KEY,
+  getChroniclesStorageKey,
+  hasChroniclesCache,
+  clearLegacyHouses,
+  normaliseHouses,
+  isChroniclesEmpty,
 } = houses;
 
 describe('Chronicles houses persistence', () => {
@@ -44,6 +49,40 @@ describe('Chronicles houses persistence', () => {
     expect(state.houses).toEqual([]);
     expect(state.activeHouseId).toBeNull();
     expect(state.activeScionId).toBeNull();
+    expect(isChroniclesEmpty(state)).toBe(true);
+  });
+
+  it('normalises an authoritative server snapshot without touching storage', () => {
+    const normalised = normaliseHouses({
+      houses: [{
+        id: 'house-server',
+        name: 'Serverkeep',
+        scions: [{ id: 'scion-server', name: 'Sable', mortal: true }],
+      }],
+      activeHouseId: 'house-server',
+      activeScionId: 'scion-server',
+    });
+
+    expect(getActiveHouse(normalised).name).toBe('Serverkeep');
+    expect(getActiveScion(normalised)).toEqual(expect.objectContaining({
+      name: 'Sable',
+      mortal: true,
+    }));
+    expect(isChroniclesEmpty(normalised)).toBe(false);
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('scopes browser caches per account and consumes the legacy key after migration', () => {
+    const founded = foundHouse(loadHouses(), 'Oldguard');
+    saveHouses(founded.state);
+
+    expect(loadHouses('account-a').houses[0].name).toBe('Oldguard');
+    expect(saveHouses(founded.state, 'account-a')).toBe(true);
+    expect(hasChroniclesCache('account-a')).toBe(true);
+    expect(window.localStorage.getItem(getChroniclesStorageKey('account-a'))).toBeTruthy();
+    expect(clearLegacyHouses('account-a')).toBe(true);
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(loadHouses('account-b').houses).toEqual([]);
   });
 
   it('validates house and scion names', () => {

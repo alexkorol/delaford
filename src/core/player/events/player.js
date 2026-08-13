@@ -81,6 +81,10 @@ export default {
     bus.$emit('player:chronicles:error', data.data);
   },
 
+  'player:chronicles:update': (data) => {
+    bus.$emit('player:chronicles:update', data.data);
+  },
+
   /**
    * A player logins into the game
    */

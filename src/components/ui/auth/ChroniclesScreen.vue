@@ -155,12 +155,16 @@
 <script>
 import playerSheet from '@/assets/graphics/actors/players/human-v2.png';
 import bus from '@/core/utilities/bus.js';
+import Socket from '@/core/utilities/socket.js';
 import {
   addScion,
+  clearLegacyHouses,
   foundHouse,
   getActiveHouse,
   getActiveScion,
+  hasChroniclesCache,
   loadHouses,
+  normaliseHouses,
   saveHouses,
   selectHouse,
   selectScion,
@@ -173,11 +177,38 @@ export default {
       type: String,
       default: '',
     },
+    accountId: {
+      type: String,
+      default: '',
+    },
+    chroniclesState: {
+      type: Object,
+      default: null,
+    },
+    chroniclesRevision: {
+      type: Number,
+      default: 0,
+    },
+    chroniclesExists: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['set-out'],
   data() {
+    const cached = loadHouses(this.accountId);
+    const migratingLegacy = Boolean(
+      !this.chroniclesExists
+      && this.accountId
+      && !hasChroniclesCache(this.accountId)
+      && hasChroniclesCache()
+      && cached.houses.length,
+    );
     return {
-      state: loadHouses(),
+      state: this.chroniclesExists ? normaliseHouses(this.chroniclesState) : cached,
+      serverRevision: this.chroniclesRevision,
+      serverRecordExists: this.chroniclesExists,
+      migratingLegacy,
       houseName: '',
       scionName: '',
       mortalScion: false,
@@ -199,17 +230,29 @@ export default {
   },
   mounted() {
     bus.$on('player:chronicles:error', this.handleServerError);
+    bus.$on('player:chronicles:update', this.handleServerUpdate);
+    if (!this.serverRecordExists && this.state.houses.length) {
+      // One-time import path for Chronicles created before server ownership.
+      this.persist(this.state);
+    }
   },
   beforeUnmount() {
     bus.$off('player:chronicles:error', this.handleServerError);
+    bus.$off('player:chronicles:update', this.handleServerUpdate);
   },
   methods: {
-    persist(nextState) {
+    persist(nextState, mutation = null) {
       this.state = nextState;
-      if (!saveHouses(nextState)) {
-        this.error = 'This browser could not save the Chronicles. Check local storage permissions.';
-        return false;
+      if (!saveHouses(nextState, this.accountId)) {
+        this.error = 'The server will keep this Chronicle, but this browser could not cache it locally.';
       }
+      Socket.emit(
+        mutation ? 'player:chronicles:mutate' : 'player:chronicles:save',
+        mutation || {
+          state: nextState,
+          chroniclesRevision: this.serverRevision,
+        },
+      );
       return true;
     },
     createHouse() {
@@ -219,7 +262,7 @@ export default {
         this.error = result.reason;
         return;
       }
-      this.persist(result.state);
+      this.persist(result.state, { type: 'found-house', house: result.house });
       this.houseName = '';
       this.foundingHouse = false;
     },
@@ -232,7 +275,7 @@ export default {
       this.error = '';
       const result = selectHouse(this.state, houseId);
       if (result.ok) {
-        this.persist(result.state);
+        this.persist(result.state, { type: 'select-house', houseId });
       }
     },
     createScion() {
@@ -244,7 +287,11 @@ export default {
         this.error = result.reason;
         return;
       }
-      this.persist(result.state);
+      this.persist(result.state, {
+        type: 'add-scion',
+        houseId: this.activeHouse.id,
+        scion: result.scion,
+      });
       this.scionName = '';
       this.mortalScion = false;
     },
@@ -252,7 +299,11 @@ export default {
       this.error = '';
       const result = selectScion(this.state, scionId);
       if (result.ok) {
-        this.persist(result.state);
+        this.persist(result.state, {
+          type: 'select-scion',
+          houseId: this.activeHouse.id,
+          scionId,
+        });
       }
     },
     setOut() {
@@ -270,6 +321,21 @@ export default {
     handleServerError(payload = {}) {
       this.submitting = false;
       this.error = payload.message || 'The way into Delaford could not be opened.';
+    },
+    handleServerUpdate(payload = {}) {
+      const revision = Number(payload.chroniclesRevision) || 0;
+      if (!payload.chronicles || revision < this.serverRevision) {
+        return;
+      }
+      this.serverRevision = revision;
+      this.serverRecordExists = true;
+      this.state = normaliseHouses(payload.chronicles);
+      if (!saveHouses(this.state, this.accountId)) {
+        this.error = 'The server saved this Chronicle, but this browser could not cache it locally.';
+      } else if (this.migratingLegacy) {
+        clearLegacyHouses(this.accountId);
+        this.migratingLegacy = false;
+      }
     },
   },
 };

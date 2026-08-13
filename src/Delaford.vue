@@ -667,6 +667,7 @@ export default {
       this.game = { exit: true };
       this.loaded = false;
       this.resetPartyState();
+      Socket.chroniclesAccountId = context.chroniclesAccountId || null;
       this.chroniclesContext = context;
       this.screen = 'chronicles';
       bus.$emit('login:done');
@@ -692,34 +693,38 @@ export default {
         return false;
       }
 
-      const state = loadHouses();
+      const state = loadHouses(Socket.chroniclesAccountId);
       const house = getActiveHouse(state);
       const scion = getActiveScion(state);
-      if (!house || !scion || !scion.mortal) {
+      const remembered = Socket.lastLoginPayload || {};
+      const houseId = house?.id || remembered.houseId;
+      const scionId = scion?.id || remembered.scionId;
+      const mortal = scion ? scion.mortal : remembered.mortal;
+      if (!houseId || !scionId || !mortal) {
         return false;
       }
 
       this.permadeathHandled = true;
       const occurredAt = lifecycle.lastEvent && lifecycle.lastEvent.occurredAt;
       const occurredAtDate = occurredAt ? new Date(occurredAt) : null;
-      const result = entombScion(state, house.id, scion.id, {
-        level: Number.isFinite(payload.level)
-          ? payload.level
-          : (this.game && this.game.player ? this.game.player.level : scion.level),
-        diedAt: occurredAtDate && Number.isFinite(occurredAtDate.getTime())
-          ? occurredAtDate.toISOString()
-          : undefined,
-      });
+      if (house && scion) {
+        const result = entombScion(state, house.id, scion.id, {
+          level: Number.isFinite(payload.level)
+            ? payload.level
+            : (this.game && this.game.player ? this.game.player.level : scion.level),
+          diedAt: occurredAtDate && Number.isFinite(occurredAtDate.getTime())
+            ? occurredAtDate.toISOString()
+            : undefined,
+        });
 
-      if (!result.ok || !saveHouses(result.state)) {
-        this.permadeathHandled = false;
-        this.clientErrorNotice = 'Your Scion fell, but the Chronicles could not be saved.';
-        return false;
+        if (result.ok && !saveHouses(result.state, Socket.chroniclesAccountId)) {
+          this.clientErrorNotice = 'Your Scion fell. The server saved the Chronicle, but this browser could not cache it.';
+        }
       }
 
       Socket.emit('player:chronicles:return', {
-        houseId: house.id,
-        scionId: scion.id,
+        houseId,
+        scionId,
       });
       return true;
     },

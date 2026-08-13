@@ -10,6 +10,7 @@ import config from '#server/config.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
+import chroniclesStore from '#server/core/services/chronicles-store.js';
 import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
@@ -167,6 +168,41 @@ const applyScionIdentity = (player, identity = {}) => {
   return { ...validation, sameScion };
 };
 
+const resolveScionIdentity = (player, identity = {}) => {
+  const snapshot = chroniclesStore.snapshot(player.uuid);
+  if (!snapshot.exists) {
+    return applyScionIdentity(player, identity);
+  }
+
+  const match = chroniclesStore.findLivingScion(player.uuid, identity);
+  if (!match) {
+    return {
+      valid: false,
+      reason: 'That Scion is not living in this account Chronicle.',
+    };
+  }
+
+  return applyScionIdentity(player, {
+    houseId: match.house.id,
+    scionId: match.scion.id,
+    scionName: match.scion.name,
+    mortal: match.scion.mortal,
+  });
+};
+
+const chroniclesPayload = (player, extra = {}) => {
+  const record = chroniclesStore.snapshot(player.uuid);
+  return {
+    chroniclesAccountId: player.uuid,
+    accountName: player.accountUsername || player.username,
+    level: player.level,
+    chronicles: record.state,
+    chroniclesRevision: record.revision,
+    chroniclesExists: record.exists,
+    ...extra,
+  };
+};
+
 const emitChroniclesError = (ws, message) => {
   Socket.emit('player:chronicles:error', {
     player: { socket_id: ws.id },
@@ -242,7 +278,7 @@ export default {
       ws.authenticated = true;
 
       const scionValidation = payload.scionName
-        ? applyScionIdentity(player, payload)
+        ? resolveScionIdentity(player, payload)
         : null;
 
       if (payload.scionName && !scionValidation.valid) {
@@ -255,8 +291,7 @@ export default {
         ws.pendingPlayer = player;
         Socket.emit('player:chronicles:ready', {
           player: { socket_id: ws.id },
-          accountName: player.accountUsername || player.username,
-          level: player.level,
+          ...chroniclesPayload(player),
         });
         return;
       }
@@ -292,7 +327,7 @@ export default {
       return;
     }
 
-    const validation = applyScionIdentity(player, data);
+    const validation = resolveScionIdentity(player, data);
     if (!validation.valid) {
       emitChroniclesError(ws, validation.reason);
       return;
@@ -304,6 +339,53 @@ export default {
     if (!player.token || player.token === 'none') {
       playerPersistence.savePlayer(player, { force: true }).catch(() => {});
     }
+  },
+
+  /**
+   * Seed a legacy browser Chronicle when an account has no server record yet.
+   * Once imported, normal edits use bounded mutations below.
+   */
+  'player:chronicles:save': ({ data }, ws) => {
+    const player = (ws && ws.pendingPlayer) || getPlayerBySocket(ws);
+    if (!player) {
+      emitChroniclesError(ws, 'This authenticated session no longer owns a Chronicle.');
+      return;
+    }
+
+    const result = chroniclesStore.save(player.uuid, data && data.state);
+    if (!result.ok) {
+      emitChroniclesError(ws, result.reason);
+      return;
+    }
+
+    Socket.emit('player:chronicles:update', {
+      player: { socket_id: ws.id },
+      chronicles: result.state,
+      chroniclesRevision: result.revision,
+      chroniclesExists: true,
+    });
+  },
+
+  /** Apply one bounded, server-validated Chronicles edit. */
+  'player:chronicles:mutate': ({ data }, ws) => {
+    const player = (ws && ws.pendingPlayer) || getPlayerBySocket(ws);
+    if (!player) {
+      emitChroniclesError(ws, 'This authenticated session no longer owns a Chronicle.');
+      return;
+    }
+
+    const result = chroniclesStore.mutate(player.uuid, data);
+    if (!result.ok) {
+      emitChroniclesError(ws, result.reason);
+      return;
+    }
+
+    Socket.emit('player:chronicles:update', {
+      player: { socket_id: ws.id },
+      chronicles: result.state,
+      chroniclesRevision: result.revision,
+      chroniclesExists: true,
+    });
   },
 
   /**
@@ -339,6 +421,18 @@ export default {
       diedAt: lifecycle.lastEvent && lifecycle.lastEvent.occurredAt,
     };
 
+    const record = chroniclesStore.snapshot(player.uuid);
+    const entombed = record.exists
+      ? chroniclesStore.entomb(player.uuid, chronicles, {
+        level: player.level,
+        diedAt: fallen.diedAt,
+      })
+      : null;
+    if (record.exists && !entombed.ok) {
+      emitChroniclesError(ws, entombed.reason);
+      return;
+    }
+
     partyService.removePlayer(player.uuid);
     world.removePlayer(player);
     Socket.broadcast('player:left', ws.id, world.getScenePlayers(previousSceneId));
@@ -357,8 +451,7 @@ export default {
     ws.retiredScionId = chronicles.scionId;
     Socket.emit('player:chronicles:ready', {
       player: { socket_id: ws.id },
-      accountName: player.accountUsername || player.username,
-      level: player.level,
+      ...chroniclesPayload(player),
       fallen,
     });
   },
