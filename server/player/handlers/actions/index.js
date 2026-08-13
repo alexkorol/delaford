@@ -65,6 +65,18 @@ const getPlayerFromPayload = (incoming) => {
   ));
 };
 
+const resolveItemActionPayload = (incoming = {}) => {
+  const nested = incoming.data && typeof incoming.data === 'object' ? incoming.data : {};
+  const item = nested.item || incoming.item || {};
+  const miscData = item.miscData || nested.miscData || {};
+
+  return {
+    payload: nested.item ? nested : incoming,
+    item: item.miscData ? item : { ...item, miscData },
+    miscData,
+  };
+};
+
 /**
  * Chebyshev distance guard for world interactions. Legit clients walk to a
  * target before the queued action fires, so the player is always adjacent;
@@ -535,9 +547,10 @@ const actionEvents = {
     }
     // Real dispatch wraps the client payload in data.data; tolerate a flat
     // payload too (some callers/tests pass it unwrapped).
-    const payload = data.data || data;
-    const itemPayload = payload.item || {};
-    const miscData = itemPayload.miscData || {};
+    const {
+      item: itemPayload,
+      miscData,
+    } = resolveItemActionPayload(data);
     const getItem = wearableItems.find(i => i.id === itemPayload.id);
     if (!getItem) {
       return;
@@ -600,9 +613,11 @@ const actionEvents = {
    */
   'item:unequip': (data) => {
     const player = getPlayerFromPayload(data);
-    const payload = data.data || data;
-    const itemPayload = payload.item || {};
-    const miscData = itemPayload.miscData || {};
+    const {
+      payload,
+      item: itemPayload,
+      miscData,
+    } = resolveItemActionPayload(data);
     const slotId = miscData.slot || itemPayload.slot || null;
     if (!player || !slotId || !player.wear) {
       return;

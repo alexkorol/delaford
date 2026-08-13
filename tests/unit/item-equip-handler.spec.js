@@ -63,6 +63,20 @@ const wrappedEquip = uuid => ({
   },
 });
 
+const contextActionEquip = uuid => ({
+  id: 'player-1',
+  player: { uuid: 'player-1', socket_id: 'socket-1' },
+  item: {
+    uuid,
+    id: 'bronze-sword',
+    miscData: { slot: 0 },
+    action: { actionId: 'item:equip', name: 'Equip' },
+  },
+  data: {
+    miscData: { slot: 0 },
+  },
+});
+
 describe('item:equip socket handler', () => {
   beforeEach(() => {
     resetWorld();
@@ -94,5 +108,46 @@ describe('item:equip socket handler', () => {
     await actionEvents['item:equip'](wrappedEquip('sword-uuid-1'));
 
     expect(player.wear.right_hand).toBeNull();
+  });
+
+  it('equips from the server-built context-action envelope', async () => {
+    const player = makePlayer();
+    world._players.push(player);
+
+    await actionEvents['item:equip'](contextActionEquip('sword-uuid-1'));
+
+    expect(player.wear.right_hand).toEqual(expect.objectContaining({
+      id: 'bronze-sword',
+      uuid: 'sword-uuid-1',
+    }));
+    expect(player.inventory.slots).toHaveLength(0);
+  });
+
+  it('unequips from the server-built context-action envelope', async () => {
+    const player = makePlayer();
+    const sword = player.inventory.slots.shift();
+    player.wear.right_hand = sword;
+    world._players.push(player);
+
+    actionEvents['item:unequip']({
+      id: 'player-1',
+      player: { uuid: 'player-1', socket_id: 'socket-1' },
+      item: {
+        uuid: sword.uuid,
+        id: sword.id,
+        miscData: { slot: 'right_hand' },
+        action: { actionId: 'item:unequip', name: 'Unequip' },
+      },
+      data: {
+        miscData: { slot: 'right_hand' },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(player.wear.right_hand).toBeNull();
+    });
+    expect(player.inventory.slots).toEqual([
+      expect.objectContaining({ id: 'bronze-sword', uuid: 'sword-uuid-1' }),
+    ]);
   });
 });
