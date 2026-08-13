@@ -470,8 +470,11 @@ class PartyService {
 
     try {
       party.metadata.baseSeed = Date.now();
-      await this.enterFloor(party, 1);
+      // Publish the post-admission lobby state, not the stale launch state.
+      // enterFloor emits party/update and the scene transition; clearing after
+      // those messages left every client displaying Ready inside the dungeon.
       this.clearReadyState(party);
+      await this.enterFloor(party, 1);
     } catch (error) {
       console.error('Failed to start party instance', error);
       this.sendError(initiator, 'Failed to prepare the instance. Please try again.');

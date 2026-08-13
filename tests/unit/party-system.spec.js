@@ -249,6 +249,23 @@ describe('PartyService', () => {
     expect(party.sceneId).toContain('instance-');
   });
 
+  it('publishes cleared readiness in the instance admission snapshot', async () => {
+    const { default: Socket } = await import('#server/socket.js');
+    const party = service.createParty(leader);
+    service.addMember(party, member);
+    service.toggleReady(party, leader.uuid);
+    service.toggleReady(party, member.uuid);
+    Socket.emit.mockClear();
+
+    await service.startInstance(party, leader);
+
+    const updates = Socket.emit.mock.calls
+      .filter(([event]) => event === 'party:update')
+      .map(([, payload]) => payload.party);
+    expect(updates).not.toHaveLength(0);
+    expect(updates.at(-1).members.every(entry => entry.ready === false)).toBe(true);
+  });
+
   it('startSoloInstance falls back to the dungeon template for unknown zones', async () => {
     await service.startSoloInstance(leader, { template: 'not-a-zone' });
     const party = service.getPartyForPlayer(leader.uuid);

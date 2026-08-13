@@ -74,6 +74,11 @@ export default async function party({ connect, assert }) {
     assert(leaderState.sceneId === memberState.sceneId, 'both members enter the same instance scene');
     assert(leaderState.sceneType === 'instance', 'the shared party scene is an instance');
     assert(leader.party.state === 'instance' && member.party.state === 'instance', 'instance state reaches both clients');
+    assert(
+      leader.party.members.every(entry => !entry.ready)
+      && member.party.members.every(entry => !entry.ready),
+      'instance admission clears readiness on both clients',
+    );
 
     const memberTownTransitions = member.sceneTransitions || 0;
     member.emit('party:leave', {});
