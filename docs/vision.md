@@ -42,6 +42,10 @@ movement → combat → loot → Adventure entry into onboarding; **Proof of
 Temper** follows with an elite hunt, guaranteed native Vessel, equipment
 objective, second passive point, House renown, and Scion deed.
 
+The character sheet now reuses the generated player sprite for its portrait
+and each equipped item's real atlas frame; generic slot glyphs remain only for
+empty equipment positions.
+
 ## Pillars
 
 - **WASD-first ARPG**: keyboard movement/combat with optional mouse context menus.

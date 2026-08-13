@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCharacterSheet,
-  DCSS_CHARACTER_TILE,
+  CHARACTER_PORTRAIT_TILE,
   formatResistancePips,
   resolveDcssEquipmentTile,
 } from '@/core/character-sheet.js';
@@ -65,7 +65,7 @@ describe('character sheet model', () => {
     });
 
     expect(sheet.identity).toMatchObject({ name: 'Tester', level: 4 });
-    expect(sheet.identity.tile).toEqual(DCSS_CHARACTER_TILE);
+    expect(sheet.identity.tile).toEqual(CHARACTER_PORTRAIT_TILE);
     expect(sheet.resources.hp).toEqual({ current: 48, max: 80 });
     expect(sheet.offense.find(row => row.id === 'damage').value).toBeGreaterThan(1);
     expect(sheet.defenses.find(row => row.id === 'ac').value).toBeGreaterThan(0);
@@ -103,6 +103,17 @@ describe('character sheet model', () => {
       atlas: 'objects',
       column: 1,
       row: 28,
+    });
+
+    expect(resolveDcssEquipmentTile('right_hand', {
+      name: 'Flint Khopesh',
+      graphics: { tileset: 'vessels', column: 4, row: 0 },
+    })).toEqual({
+      atlas: 'vessels',
+      column: 4,
+      row: 0,
+      label: 'Flint Khopesh',
+      tileSize: 32,
     });
   });
 

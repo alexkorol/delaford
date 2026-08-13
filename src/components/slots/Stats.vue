@@ -181,12 +181,22 @@ import {
   VERDIGRIS_SKILL_TREE_POINTS,
   VERDIGRIS_SKILL_TREE_SOURCES,
 } from '@/core/passives/verdigris-skill-tree.js';
-import dungeonAtlasUrl from '@/assets/tiles/dungeon.png';
 import objectsAtlasUrl from '@/assets/tiles/objects.png';
+import playerAtlasUrl from '@/assets/graphics/actors/players/human-v2.png';
+import armorAtlasUrl from '@/assets/graphics/items/armor.png';
+import generalAtlasUrl from '@/assets/graphics/items/general.png';
+import jewelryAtlasUrl from '@/assets/graphics/items/jewelry.png';
+import vesselsAtlasUrl from '@/assets/graphics/items/vessels.png';
+import weaponsAtlasUrl from '@/assets/graphics/items/weapons.png';
 
 const DCSS_ATLAS_URLS = {
-  dungeon: dungeonAtlasUrl,
+  armor: armorAtlasUrl,
+  general: generalAtlasUrl,
+  jewelry: jewelryAtlasUrl,
   objects: objectsAtlasUrl,
+  players: playerAtlasUrl,
+  vessels: vesselsAtlasUrl,
+  weapons: weaponsAtlasUrl,
 };
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);
@@ -467,7 +477,7 @@ div.stats_slot {
     overflow: hidden;
 
     .character-hero__sprite {
-      transform: scale(1.45);
+      transform: scale(0.82);
       transform-origin: center;
       filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.84));
     }

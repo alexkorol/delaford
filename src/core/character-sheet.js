@@ -31,7 +31,13 @@ const dcssTile = (atlas, column, row, label) => ({
   tileSize: DCSS_TILE_SIZE,
 });
 
-export const DCSS_CHARACTER_TILE = dcssTile('dungeon', 12, 8, 'DCSS adventurer placeholder');
+export const CHARACTER_PORTRAIT_TILE = {
+  atlas: 'players',
+  column: 0,
+  row: 0,
+  label: 'Verdigris adventurer',
+  tileSize: 64,
+};
 
 export const DCSS_EQUIPMENT_SLOT_TILES = {
   right_hand: dcssTile('objects', 1, 27, 'Weapon'),
@@ -129,7 +135,7 @@ const normaliseExplicitTile = (tile) => {
   }
 
   return {
-    atlas: tile.atlas || 'objects',
+    atlas: tile.atlas || tile.tileset || 'objects',
     column,
     row,
     label: tile.label || 'Item',
@@ -146,8 +152,12 @@ const itemSearchText = item => [
 ].filter(Boolean).join(' ').toLowerCase();
 
 export const resolveDcssEquipmentTile = (slotId, item = null) => {
-  const explicitTile = normaliseExplicitTile(item && (item.dcssTile || item.tile));
+  const explicitSource = item && (item.dcssTile || item.tile || item.graphics);
+  const explicitTile = normaliseExplicitTile(explicitSource);
   if (explicitTile) {
+    if (item && explicitSource === item.graphics) {
+      explicitTile.label = item.displayName || item.name || explicitTile.label;
+    }
     return explicitTile;
   }
 
@@ -263,7 +273,7 @@ export const buildCharacterSheet = (player = {}) => {
       name: player.username || player.name || 'Adventurer',
       level,
       state: lifecycle.state || 'alive',
-      tile: cloneTile(DCSS_CHARACTER_TILE),
+      tile: cloneTile(CHARACTER_PORTRAIT_TILE),
     },
     resources: { hp, mp },
     attributes,
