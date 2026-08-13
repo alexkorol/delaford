@@ -48,7 +48,12 @@ export default async function vesselforge({ connect, assert }) {
     assert(state.wearDetails.right_hand.vessel.lines.some(line => (
       line.section === 'brand' && /Critical Chance/.test(line.text)
     )), 'Keen Eye is presented as a live Brand');
-    assert(state.combat.goodsFound === 10, 'Wealthy reaches combat state (10%)');
+    const equippedGoodsFound = Math.min(100, Object.values(state.wearDetails)
+      .reduce((total, item) => total + (item?.combatBonuses?.goodsFound || 0), 0));
+    assert(state.wearDetails.ring.combatBonuses?.goodsFound === 10,
+      'the deterministic Wealthy ring contributes its 10% Brand');
+    assert(state.combat.goodsFound === equippedGoodsFound,
+      `Wealthy reaches combat state (${state.combat.goodsFound}%)`);
     assert(state.wearDetails.ring.vessel.lines.some(line => (
       line.section === 'brand' && /Goods Found/.test(line.text)
     )), 'Wealthy is presented as a live Brand');
@@ -82,7 +87,7 @@ export default async function vesselforge({ connect, assert }) {
     assert(hit.amount === expected,
       `critical hit deals the measured 1.5x result (${hit.baseAmount} -> ${hit.amount})`);
 
-    const boostedCoins = Math.floor(target.coins * 1.1);
+    const boostedCoins = Math.floor(target.coins * (1 + (state.combat.goodsFound / 100)));
     const coin = await p.waitFor(async () => {
       const next = await p.state();
       const fresh = next.groundItems.find(item => (
@@ -99,7 +104,7 @@ export default async function vesselforge({ connect, assert }) {
       return false;
     }, { timeoutMs: 10000, intervalMs: 250, label: 'Wealthy coin drop' });
     assert(coin.qty === boostedCoins,
-      `Wealthy boosts the real coin bounty by 10% (${target.coins} -> ${coin.qty})`);
+      `Wealthy boosts the real coin bounty by ${state.combat.goodsFound}% (${target.coins} -> ${coin.qty})`);
 
     await p.enterZone('grove', 'clearings');
     const grove = await p.state();
