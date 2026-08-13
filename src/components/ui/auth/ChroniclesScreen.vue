@@ -132,7 +132,11 @@
           <summary>Open the crypt ({{ activeHouse.crypt.length }})</summary>
           <ul>
             <li v-for="scion in activeHouse.crypt" :key="scion.id">
-              {{ scion.name }}, level {{ scion.level }}
+              <span>{{ scion.name }}, level {{ scion.level }}</span>
+              <small v-if="scion.relic" class="chronicles__relic">
+                Heirloom: {{ scion.relic.item.displayName || scion.relic.item.name }}
+                · {{ relicStatus(scion.relic.status) }}
+              </small>
             </li>
           </ul>
         </details>
@@ -241,6 +245,11 @@ export default {
     bus.$off('player:chronicles:update', this.handleServerUpdate);
   },
   methods: {
+    relicStatus(status) {
+      if (status === 'recovered') return 'recovered';
+      if (status === 'circulating') return 'abroad in the world';
+      return 'awaiting an heir';
+    },
     persist(nextState, mutation = null) {
       this.state = nextState;
       if (!saveHouses(nextState, this.accountId)) {
@@ -653,6 +662,16 @@ export default {
     margin: 5px 0;
     padding-left: 20px;
   }
+
+  li + li {
+    margin-top: 5px;
+  }
+}
+
+.chronicles__relic {
+  display: block;
+  margin-top: 2px;
+  color: #b9cfbd;
 }
 
 .chronicles__set-out {

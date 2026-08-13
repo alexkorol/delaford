@@ -72,6 +72,28 @@ describe('Chronicles houses persistence', () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  it('keeps server-authored heirloom state in the account-scoped browser cache', () => {
+    const relic = {
+      id: 'heirloom-1',
+      status: 'queued',
+      item: { id: 'bronze-sword', uuid: 'heirloom-1', displayName: 'Verdant Sword' },
+    };
+    const normalised = normaliseHouses({
+      houses: [{
+        id: 'house-server',
+        name: 'Serverkeep',
+        scions: [],
+        crypt: [{ id: 'fallen-1', name: 'Morrow', diedAt: new Date().toISOString(), relic }],
+      }],
+      activeHouseId: 'house-server',
+      activeScionId: null,
+    });
+
+    expect(normalised.houses[0].crypt[0].relic).toEqual(relic);
+    expect(saveHouses(normalised, 'account-1')).toBe(true);
+    expect(loadHouses('account-1').houses[0].crypt[0].relic).toEqual(relic);
+  });
+
   it('scopes browser caches per account and consumes the legacy key after migration', () => {
     const founded = foundHouse(loadHouses(), 'Oldguard');
     saveHouses(founded.state);

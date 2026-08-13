@@ -16,6 +16,7 @@ import {
   validateHouseName,
   validateScionName,
 } from '#shared/chronicles.js';
+import { buildDurableItemSnapshot } from '#server/core/repositories/guest-save-store.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_STORE_FILE = path.resolve(here, '..', '..', 'data', 'chronicles-store.json');
@@ -28,8 +29,11 @@ const MAX_DEEDS_PER_SCION = 100;
 const MAX_DEED_LENGTH = 160;
 const MAX_LEVEL = 9999;
 const MAX_RENOWN = 1_000_000_000;
-const MAX_MIGRATION_BYTES = 12 * 1024;
+const MAX_CLIENT_MIGRATION_BYTES = 12 * 1024;
+const MAX_SERVER_RECORD_BYTES = 512 * 1024;
+const MAX_RELIC_BYTES = 24 * 1024;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{1,80}$/;
+const RELIC_STATUSES = new Set(['queued', 'circulating', 'recovered']);
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -64,7 +68,39 @@ const cleanInteger = (value, fallback, maximum) => {
   return Math.min(maximum, Math.max(0, Math.floor(numeric)));
 };
 
-const sanitiseScion = (candidate, { fallen = false } = {}) => {
+const sanitiseRelic = (candidate, { resetCirculation = false } = {}) => {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  const id = cleanId(candidate.id);
+  const item = buildDurableItemSnapshot(candidate.item);
+  if (!id || !item || cleanId(item.uuid) !== id
+    || JSON.stringify(item).length > MAX_RELIC_BYTES) {
+    return null;
+  }
+
+  const requestedStatus = RELIC_STATUSES.has(candidate.status) ? candidate.status : 'queued';
+  const status = resetCirculation && requestedStatus === 'circulating'
+    ? 'queued'
+    : requestedStatus;
+  return {
+    id,
+    status,
+    item,
+    droppedAt: status === 'circulating'
+      ? cleanTimestamp(candidate.droppedAt, new Date().toISOString())
+      : null,
+    recoveredAt: status === 'recovered'
+      ? cleanTimestamp(candidate.recoveredAt, new Date().toISOString())
+      : null,
+  };
+};
+
+const sanitiseScion = (candidate, {
+  fallen = false,
+  preserveRelics = false,
+  resetCirculation = false,
+} = {}) => {
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
@@ -75,6 +111,10 @@ const sanitiseScion = (candidate, { fallen = false } = {}) => {
   }
 
   const diedAt = cleanTimestamp(candidate.diedAt, fallen ? new Date().toISOString() : null);
+
+  const relic = fallen && preserveRelics
+    ? sanitiseRelic(candidate.relic, { resetCirculation })
+    : null;
 
   return {
     id,
@@ -90,6 +130,7 @@ const sanitiseScion = (candidate, { fallen = false } = {}) => {
         .slice(0, MAX_DEEDS_PER_SCION)
       : [],
     mortal: candidate.mortal === true,
+    ...(relic ? { relic } : {}),
   };
 };
 
@@ -105,14 +146,18 @@ const sanitiseScions = (candidates, options = {}) => {
   return ids.size === clean.length ? clean : null;
 };
 
-const sanitiseHouse = (candidate) => {
+const sanitiseHouse = (candidate, options = {}) => {
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
   const id = cleanId(candidate.id);
   const validation = validateHouseName(candidate.name);
   const scions = sanitiseScions(candidate.scions);
-  const crypt = sanitiseScions(candidate.crypt, { fallen: true });
+  const crypt = sanitiseScions(candidate.crypt, {
+    fallen: true,
+    preserveRelics: options.preserveRelics === true,
+    resetCirculation: options.resetCirculation === true,
+  });
   if (!id || !validation.valid || !scions || !crypt) {
     return null;
   }
@@ -131,14 +176,17 @@ const sanitiseHouse = (candidate) => {
   };
 };
 
-export const sanitiseChroniclesState = (candidate) => {
+export const sanitiseChroniclesState = (candidate, options = {}) => {
+  const maximumBytes = options.preserveRelics
+    ? MAX_SERVER_RECORD_BYTES
+    : MAX_CLIENT_MIGRATION_BYTES;
   if (!candidate || typeof candidate !== 'object' || !Array.isArray(candidate.houses)
     || candidate.houses.length > MAX_HOUSES
-    || JSON.stringify(candidate).length > MAX_MIGRATION_BYTES) {
+    || JSON.stringify(candidate).length > maximumBytes) {
     return { ok: false, reason: 'The Chronicles record has an invalid shape.' };
   }
 
-  const houses = candidate.houses.map(sanitiseHouse);
+  const houses = candidate.houses.map(house => sanitiseHouse(house, options));
   if (houses.some(house => !house)) {
     return { ok: false, reason: 'The Chronicles record contains an invalid House or Scion.' };
   }
@@ -182,7 +230,12 @@ export class ChroniclesStore {
       if (parsed && typeof parsed === 'object' && parsed.accounts && typeof parsed.accounts === 'object') {
         const accounts = {};
         Object.entries(parsed.accounts).forEach(([accountId, account]) => {
-          const sanitised = sanitiseChroniclesState(account && account.state);
+          const sanitised = sanitiseChroniclesState(account && account.state, {
+            preserveRelics: true,
+            // A server restart destroys transient world drops. Requeue any
+            // heirloom that was circulating so it can appear again.
+            resetCirculation: true,
+          });
           if (!sanitised.ok) {
             return;
           }
@@ -374,18 +427,49 @@ export class ChroniclesStore {
     const scionId = cleanId(identity.scionId);
     const house = current && current.state.houses.find(entry => entry.id === houseId);
     const scion = house && house.scions.find(entry => entry.id === scionId);
-    if (!current || !house || !scion) {
+    const alreadyFallen = house && house.crypt.find(entry => entry.id === scionId);
+    if (!current || !house || (!scion && !alreadyFallen)) {
       return { ok: false, reason: 'The fallen Scion is not part of this account Chronicle.' };
+    }
+    if (!scion && alreadyFallen) {
+      return {
+        ok: true,
+        idempotent: true,
+        ...this.snapshot(key),
+        fallen: clone(alreadyFallen),
+      };
     }
 
     const numericDeath = typeof details.diedAt === 'number' ? new Date(details.diedAt) : null;
     const diedAt = numericDeath && Number.isFinite(numericDeath.getTime())
       ? numericDeath.toISOString()
       : cleanTimestamp(details.diedAt, new Date().toISOString());
+    let relic = null;
+    const relicItem = buildDurableItemSnapshot(details.relic);
+    if (relicItem && cleanId(relicItem.uuid)
+      && JSON.stringify(relicItem).length <= MAX_RELIC_BYTES) {
+      const relicId = relicItem.uuid;
+      relicItem.boundTo = key;
+      relicItem.chroniclesRelic = {
+        id: relicId,
+        houseId: house.id,
+        houseName: house.name,
+        scionId: scion.id,
+        scionName: scion.name,
+      };
+      relic = {
+        id: relicId,
+        status: 'queued',
+        item: relicItem,
+        droppedAt: null,
+        recoveredAt: null,
+      };
+    }
     const fallen = {
       ...scion,
       level: Math.max(1, cleanInteger(details.level, scion.level, MAX_LEVEL)),
       diedAt,
+      ...(relic ? { relic } : {}),
     };
     const nextHouse = {
       ...house,
@@ -401,6 +485,83 @@ export class ChroniclesStore {
       activeScionId: activeScion ? activeScion.id : null,
     };
     return { ...this.commit(key, state), fallen: clone(fallen) };
+  }
+
+  beginRelicDrop(accountId, identity = {}) {
+    const key = accountId ? String(accountId) : null;
+    const current = key && this.state.accounts[key];
+    const houseId = cleanId(identity.houseId);
+    const house = current && current.state.houses.find(entry => entry.id === houseId);
+    const fallen = house && house.crypt.find(entry => (
+      entry.relic && entry.relic.status === 'queued'
+    ));
+    if (!current || !house || !fallen) {
+      return { ok: false, reason: 'No fallen heirloom is awaiting this House.' };
+    }
+
+    const relic = {
+      ...fallen.relic,
+      status: 'circulating',
+      droppedAt: new Date().toISOString(),
+      recoveredAt: null,
+    };
+    const nextFallen = { ...fallen, relic };
+    const nextHouse = {
+      ...house,
+      crypt: house.crypt.map(entry => (entry.id === fallen.id ? nextFallen : entry)),
+    };
+    const state = {
+      ...current.state,
+      houses: current.state.houses.map(entry => (entry.id === house.id ? nextHouse : entry)),
+    };
+    const committed = this.commit(key, state);
+    return committed.ok
+      ? { ...committed, relic: clone(relic), fallen: clone(nextFallen) }
+      : committed;
+  }
+
+  recoverRelic(accountId, relicId) {
+    const key = accountId ? String(accountId) : null;
+    const current = key && this.state.accounts[key];
+    const cleanRelicId = cleanId(relicId);
+    let matchedHouse = null;
+    let matchedScion = null;
+    if (current && cleanRelicId) {
+      current.state.houses.some((house) => {
+        const fallen = house.crypt.find(entry => (
+          entry.relic
+          && entry.relic.id === cleanRelicId
+          && entry.relic.status === 'circulating'
+        ));
+        if (!fallen) {
+          return false;
+        }
+        matchedHouse = house;
+        matchedScion = fallen;
+        return true;
+      });
+    }
+    if (!current || !matchedHouse || !matchedScion) {
+      return { ok: false, reason: 'That heirloom is not circulating.' };
+    }
+
+    const relic = {
+      ...matchedScion.relic,
+      status: 'recovered',
+      droppedAt: null,
+      recoveredAt: new Date().toISOString(),
+    };
+    const nextScion = { ...matchedScion, relic };
+    const nextHouse = {
+      ...matchedHouse,
+      crypt: matchedHouse.crypt.map(entry => (entry.id === matchedScion.id ? nextScion : entry)),
+    };
+    const state = {
+      ...current.state,
+      houses: current.state.houses.map(entry => (entry.id === matchedHouse.id ? nextHouse : entry)),
+    };
+    const committed = this.commit(key, state);
+    return committed.ok ? { ...committed, relic: clone(relic) } : committed;
   }
 }
 

@@ -323,7 +323,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
   if (died) {
     experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
-    dropMonsterLoot(monster);
+    dropMonsterLoot(monster, { player });
     notifyTutorial(player, 'slay');
   }
 

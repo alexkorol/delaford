@@ -171,6 +171,93 @@ describe('ChroniclesStore', () => {
     })).toBeNull();
   });
 
+  it('circulates an exact fallen heirloom and only closes it after recovery', () => {
+    const store = makeStore();
+    store.save('account-1', state({
+      living: [scion('scion-morrow', 'Morrow', { mortal: true })],
+    }));
+    const item = {
+      id: 'bronze-sword',
+      uuid: 'relic-sword-1',
+      name: 'Verdant Bronze Sword of Cinders',
+      displayName: 'Verdant Bronze Sword of Cinders',
+      type: 'weapon',
+      equipSlot: 'right_hand',
+      stats: { attack: { stab: 4, slash: 9, crush: 1, range: 0 } },
+      affixes: { brand: { id: 'verdant' }, bond: { id: 'cinders' } },
+      vessel: { ilvl: 12, rarity: 'rare', sockets: [] },
+      x: 99,
+      y: 100,
+      timestamp: 1234,
+    };
+
+    const entombed = store.entomb('account-1', {
+      houseId: 'house-vaelmont',
+      scionId: 'scion-morrow',
+    }, { relic: item });
+
+    expect(entombed.ok).toBe(true);
+    expect(entombed.fallen.relic).toMatchObject({
+      id: 'relic-sword-1',
+      status: 'queued',
+      item: {
+        uuid: 'relic-sword-1',
+        name: 'Verdant Bronze Sword of Cinders',
+        boundTo: 'account-1',
+        stats: item.stats,
+        affixes: item.affixes,
+        vessel: item.vessel,
+        chroniclesRelic: {
+          scionId: 'scion-morrow',
+          scionName: 'Morrow',
+        },
+      },
+    });
+    expect(entombed.fallen.relic.item).not.toHaveProperty('x');
+    expect(entombed.fallen.relic.item).not.toHaveProperty('timestamp');
+
+    const released = store.beginRelicDrop('account-1', { houseId: 'house-vaelmont' });
+    expect(released).toEqual(expect.objectContaining({ ok: true }));
+    expect(released.relic.status).toBe('circulating');
+
+    // A restart destroys the transient ground item, so an in-flight relic is
+    // made eligible for another elite rather than lost forever.
+    const reloaded = new ChroniclesStore({
+      storeFile: store.storeFile,
+      logger: { warn: vi.fn(), error: vi.fn() },
+    });
+    expect(reloaded.snapshot('account-1').state.houses[0].crypt[0].relic.status).toBe('queued');
+
+    const rereleased = reloaded.beginRelicDrop('account-1', { houseId: 'house-vaelmont' });
+    const recovered = reloaded.recoverRelic('account-1', rereleased.relic.id);
+    expect(recovered.ok).toBe(true);
+    expect(recovered.relic.status).toBe('recovered');
+    expect(recovered.relic.recoveredAt).toBeTruthy();
+    expect(reloaded.beginRelicDrop('account-1', { houseId: 'house-vaelmont' }).ok).toBe(false);
+  });
+
+  it('treats a repeated entomb request as an idempotent handoff', () => {
+    const store = makeStore();
+    store.save('account-1', state({
+      living: [scion('scion-morrow', 'Morrow', { mortal: true })],
+    }));
+    const first = store.entomb('account-1', {
+      houseId: 'house-vaelmont',
+      scionId: 'scion-morrow',
+    });
+    const second = store.entomb('account-1', {
+      houseId: 'house-vaelmont',
+      scionId: 'scion-morrow',
+    });
+
+    expect(second).toEqual(expect.objectContaining({
+      ok: true,
+      idempotent: true,
+      revision: first.revision,
+    }));
+    expect(second.state.houses[0].crypt).toHaveLength(1);
+  });
+
   it('drops malformed account records instead of throwing during load', () => {
     const store = makeStore();
     fs.mkdirSync(path.dirname(store.storeFile), { recursive: true });

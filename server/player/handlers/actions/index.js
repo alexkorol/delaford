@@ -28,6 +28,8 @@ import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import world from '#server/core/world.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
+import chroniclesStore from '#server/core/services/chronicles-store.js';
+import playerPersistence from '#server/core/services/player-persistence.js';
 
 const refreshInventory = (player) => {
   if (!player || !player.socket_id) {
@@ -963,6 +965,27 @@ const actionEvents = {
       uuid: todo.item.uuid,
       existingItem: worldItem,
     });
+
+    if (worldItem.chroniclesRelic && worldItem.chroniclesRelic.id) {
+      // Persist the recovered identity before closing the Chronicle entry.
+      // A restart can safely requeue a still-circulating world drop.
+      Promise.resolve(playerPersistence.savePlayer(player, { force: true }))
+        .catch((error) => {
+          console.warn(`[actions] Failed to persist recovered heirloom ${worldItem.uuid}: ${error.message}`);
+        })
+        .then(() => {
+          const recovered = chroniclesStore.recoverRelic(
+            player.uuid,
+            worldItem.chroniclesRelic.id,
+          );
+          if (recovered.ok) {
+            Socket.sendMessageToPlayer(
+              playerIndex,
+              `${worldItem.chroniclesRelic.scionName}'s heirloom is home once more.`,
+            );
+          }
+        });
+    }
 
     // Add respawn timer on item (if is a respawn)
     const sceneRespawns = getSceneRespawns(scene);

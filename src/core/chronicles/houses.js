@@ -56,15 +56,24 @@ const migrateHouse = (house = {}) => ({
   crypt: Array.isArray(house.crypt) ? house.crypt.map(migrateScion) : [],
 });
 
-const migrateScion = (scion = {}) => ({
-  id: scion.id || randomId('scion'),
-  name: typeof scion.name === 'string' ? scion.name : 'Unnamed',
-  level: Number.isFinite(scion.level) ? scion.level : 1,
-  bornAt: scion.bornAt || now(),
-  diedAt: scion.diedAt || null,
-  deeds: Array.isArray(scion.deeds) ? scion.deeds : [],
-  mortal: Boolean(scion.mortal),
-});
+const migrateScion = (scion = {}) => {
+  const relic = scion.relic
+    && typeof scion.relic === 'object'
+    && scion.relic.item
+    && typeof scion.relic.item === 'object'
+    ? scion.relic
+    : null;
+  return {
+    id: scion.id || randomId('scion'),
+    name: typeof scion.name === 'string' ? scion.name : 'Unnamed',
+    level: Number.isFinite(scion.level) ? scion.level : 1,
+    bornAt: scion.bornAt || now(),
+    diedAt: scion.diedAt || null,
+    deeds: Array.isArray(scion.deeds) ? scion.deeds : [],
+    mortal: Boolean(scion.mortal),
+    ...(relic ? { relic } : {}),
+  };
+};
 
 export const emptyState = () => ({
   version: SCHEMA_VERSION,

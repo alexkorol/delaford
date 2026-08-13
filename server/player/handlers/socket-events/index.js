@@ -11,6 +11,11 @@ import { notifyTutorial } from '#server/core/tutorial.js';
 import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import playerPersistence from '#server/core/services/player-persistence.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
+import {
+  pruneUnrecoveredRelics,
+  removeItemIdentity,
+  selectScionRelic,
+} from '#server/core/services/scion-relics.js';
 import { loadGuest, saveGuest } from '#server/core/repositories/guest-save-store.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
@@ -333,6 +338,11 @@ export default {
       return;
     }
 
+    const record = chroniclesStore.snapshot(player.uuid);
+    if (record.exists) {
+      pruneUnrecoveredRelics(player, record.state);
+    }
+
     ws.pendingPlayer = null;
     ws.retiredScionId = null;
     Authentication.addPlayer(player);
@@ -421,16 +431,26 @@ export default {
       diedAt: lifecycle.lastEvent && lifecycle.lastEvent.occurredAt,
     };
 
+    const selectedRelic = selectScionRelic(player);
     const record = chroniclesStore.snapshot(player.uuid);
     const entombed = record.exists
       ? chroniclesStore.entomb(player.uuid, chronicles, {
         level: player.level,
         diedAt: fallen.diedAt,
+        relic: selectedRelic && selectedRelic.item,
       })
       : null;
     if (record.exists && !entombed.ok) {
       emitChroniclesError(ws, entombed.reason);
       return;
+    }
+
+    const relicItem = entombed && entombed.fallen && entombed.fallen.relic
+      ? entombed.fallen.relic.item
+      : null;
+    if (relicItem) {
+      removeItemIdentity(player, relicItem.uuid);
+      playerPersistence.savePlayer(player, { force: true }).catch(() => {});
     }
 
     partyService.removePlayer(player.uuid);
@@ -452,7 +472,10 @@ export default {
     Socket.emit('player:chronicles:ready', {
       player: { socket_id: ws.id },
       ...chroniclesPayload(player),
-      fallen,
+      fallen: {
+        ...fallen,
+        relic: entombed && entombed.fallen ? entombed.fallen.relic : undefined,
+      },
     });
   },
 

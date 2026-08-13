@@ -1,6 +1,7 @@
 import ItemFactory from '#server/core/items/factory.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
+import chroniclesStore from '#server/core/services/chronicles-store.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
 export const GEAR_DROP_CHANCES = {
@@ -51,7 +52,7 @@ export const GEAR_DROP_POOL = [
  * monster's scene and are broadcast to the players inside it.
  *
  * @param {object} monster The monster that died
- * @param {object} options Optional rng override for tests
+ * @param {object} options Optional killer and rng override for tests
  * @returns {array} The world item instances dropped
  */
 export const dropMonsterLoot = (monster, options = {}) => {
@@ -83,6 +84,21 @@ export const dropMonsterLoot = (monster, options = {}) => {
   }
 
   const rarityId = monster.rarityId || 'common';
+  const player = options.player;
+  if (rarityId === 'elite' && player && player.uuid && player.chronicles) {
+    const released = chroniclesStore.beginRelicDrop(player.uuid, player.chronicles);
+    if (released.ok && released.relic && released.relic.item) {
+      const heirloom = ItemFactory.adoptExisting(released.relic.item);
+      if (heirloom) {
+        drops.push(ItemFactory.toWorldInstance(heirloom, { x: dropX, y: dropY }));
+        Socket.emit('game:send:message', {
+          player: { socket_id: player.socket_id },
+          text: `${released.fallen.name}'s heirloom has returned to the world.`,
+        });
+      }
+    }
+  }
+
   const gearChance = GEAR_DROP_CHANCES[rarityId] !== undefined
     ? GEAR_DROP_CHANCES[rarityId]
     : GEAR_DROP_CHANCES.common;

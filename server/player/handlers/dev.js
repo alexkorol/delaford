@@ -14,6 +14,7 @@ import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import chroniclesStore from '#server/core/services/chronicles-store.js';
 
 const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
 
@@ -64,6 +65,7 @@ const buildStateSnapshot = (player) => {
     lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle.state : null,
     lifecycleMode: player.stats && player.stats.lifecycle ? player.stats.lifecycle.mode : null,
     chronicles: player.chronicles ? { ...player.chronicles } : null,
+    chroniclesRecord: chroniclesStore.snapshot(player.uuid),
     inventory: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(item => ({
         id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
@@ -98,7 +100,13 @@ const buildStateSnapshot = (player) => {
       : [],
     groundItems: scene && Array.isArray(scene.items)
       ? scene.items.map(item => ({
-        id: item.id, uuid: item.uuid, x: item.x, y: item.y, qty: item.qty || 1,
+        id: item.id,
+        uuid: item.uuid,
+        name: item.name,
+        x: item.x,
+        y: item.y,
+        qty: item.qty || 1,
+        chroniclesRelic: item.chroniclesRelic || null,
       }))
       : [],
     sceneMetadata: scene && scene.metadata ? {

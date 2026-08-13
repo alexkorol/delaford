@@ -1,6 +1,12 @@
 /** @vitest-environment node */
 
-import { describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 vi.mock('#server/core/world.js', () => {
   const scenes = new Map();
@@ -31,6 +37,7 @@ const { dropMonsterLoot, GEAR_DROP_POOL } = await import('#server/core/combat/lo
 const { default: world } = await import('#server/core/world.js');
 const { default: Socket } = await import('#server/socket.js');
 const { default: UI } = await import('#shared/ui.js');
+const { default: chroniclesStore } = await import('#server/core/services/chronicles-store.js');
 
 const makeRngQueue = (values) => {
   const queue = [...values];
@@ -99,6 +106,10 @@ describe('monster loot drops', () => {
     ...overrides,
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('always drops the coin bounty into the scene', () => {
     const sceneId = 'scene-loot-1';
     const scene = { id: sceneId, items: [], players: [] };
@@ -126,6 +137,52 @@ describe('monster loot drops', () => {
     expect(drops).toHaveLength(2);
     expect(GEAR_DROP_POOL).toContain(drops[1].id);
     expect(drops[1].uuid).toBeTruthy();
+  });
+
+  it('returns a queued House heirloom from an elite with exact identity', () => {
+    const sceneId = 'scene-relic-drop';
+    const scene = { id: sceneId, items: [], players: [] };
+    world.scenes.set(sceneId, scene);
+    const item = {
+      id: 'bronze-sword',
+      uuid: 'fallen-heirloom-1',
+      name: 'Verdant Bronze Sword',
+      displayName: 'Verdant Bronze Sword',
+      type: 'weapon',
+      boundTo: 'account-1',
+      affixes: { brand: { id: 'verdant' }, bond: null },
+      vessel: { ilvl: 7, rarity: 'uncommon' },
+      stats: { attack: { slash: 8 } },
+      chroniclesRelic: { id: 'fallen-heirloom-1', scionName: 'Morrow' },
+    };
+    vi.spyOn(chroniclesStore, 'beginRelicDrop').mockReturnValue({
+      ok: true,
+      relic: { id: item.uuid, status: 'circulating', item },
+      fallen: { name: 'Morrow' },
+    });
+    const player = {
+      uuid: 'account-1',
+      socket_id: 'socket-1',
+      chronicles: { houseId: 'house-1', scionId: 'scion-successor' },
+    };
+
+    const drops = dropMonsterLoot(
+      makeSlainMonster(sceneId, { rarityId: 'elite', rewards: {} }),
+      { player, rng: makeRngQueue([0.99]) },
+    );
+
+    expect(chroniclesStore.beginRelicDrop).toHaveBeenCalledWith('account-1', player.chronicles);
+    expect(drops).toHaveLength(1);
+    expect(drops[0]).toMatchObject({
+      id: item.id,
+      uuid: item.uuid,
+      name: item.name,
+      boundTo: 'account-1',
+      affixes: item.affixes,
+      vessel: item.vessel,
+      stats: item.stats,
+      chroniclesRelic: item.chroniclesRelic,
+    });
   });
 
   it('drops nothing without a scene or rewards', () => {

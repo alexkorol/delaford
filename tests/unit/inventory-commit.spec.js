@@ -6,6 +6,8 @@ import Socket from '#server/socket.js';
 import actionEvents from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
 import { positionFromSlot } from '#shared/inventory-footprints.js';
+import chroniclesStore from '#server/core/services/chronicles-store.js';
+import playerPersistence from '#server/core/services/player-persistence.js';
 
 const makeStack = (uuid, slot, qty) => ({
   id: 'coins',
@@ -253,6 +255,53 @@ describe('inventory commit identity validation', () => {
     expect(scene.respawns.items[0].pickedUp).toBe(true);
     expect(scene.respawns.items[0].willRespawnIn).toBeInstanceOf(Date);
     expect(Socket.broadcast).toHaveBeenCalledWith('item:change', scene.items, [player]);
+  });
+
+  it('marks a circulating heirloom recovered after its exact pickup is persisted', async () => {
+    const scene = world.ensureScene('zone:heirloom-take-test', {
+      map: { foreground: [], background: [] },
+      items: [],
+      respawns: { items: [], monsters: [], resources: [] },
+    });
+    const heirloom = {
+      id: 'bronze-sword',
+      uuid: 'heirloom-1',
+      name: 'Verdant Bronze Sword',
+      type: 'weapon',
+      boundTo: player.uuid,
+      x: player.x,
+      y: player.y,
+      chroniclesRelic: {
+        id: 'heirloom-1',
+        scionName: 'Morrow',
+      },
+    };
+    scene.items = [heirloom];
+    player.inventory.slots = [];
+    player.inventory.add = vi.fn();
+    world.assignPlayerToScene(player, scene.id);
+    const save = vi.spyOn(playerPersistence, 'savePlayer').mockResolvedValue({ saved: true });
+    const recover = vi.spyOn(chroniclesStore, 'recoverRelic').mockReturnValue({ ok: true });
+    vi.spyOn(Socket, 'sendMessageToPlayer').mockImplementation(() => {});
+
+    actionEvents['player:take']({
+      playerIndex: 0,
+      todo: {
+        item: { id: heirloom.id, uuid: heirloom.uuid },
+        at: { x: player.x, y: player.y },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(recover).toHaveBeenCalledWith(player.uuid, heirloom.chroniclesRelic.id);
+    });
+    expect(save).toHaveBeenCalledWith(player, { force: true });
+    expect(save.mock.invocationCallOrder[0]).toBeLessThan(recover.mock.invocationCallOrder[0]);
+    expect(player.inventory.add).toHaveBeenCalledWith('bronze-sword', 1, {
+      uuid: heirloom.uuid,
+      existingItem: heirloom,
+    });
+    expect(scene.items).toEqual([]);
   });
 
   it('keeps ground items in the scene when the backpack is full', () => {

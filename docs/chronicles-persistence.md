@@ -16,6 +16,8 @@ v3 Chronicle:
 
 - Houses, living Scions, crypt entries, and active selection
 - server-owned renown and crypt membership
+- optional fallen-Scion heirlooms with exact generated item identity and a
+  server-owned `queued` → `circulating` → `recovered` lifecycle
 - bounded names, IDs, levels, timestamps, and deeds
 
 Malformed records are skipped during load rather than preventing the game
@@ -39,3 +41,23 @@ living Scion into the crypt, persists that revision, removes the player from
 the world, and then returns the authenticated socket to Chronicles. Reconnect
 and world admission resolve the selected identity against the server's living
 roster, so a crypt entry cannot be resurrected by changing a browser payload.
+
+## Fallen heirlooms
+
+When a mortal Scion is entombed, the server selects one eligible item: equipped
+gear first (main hand has highest priority), then non-stackable weapon, armour,
+or jewelry in the backpack. The exact UUID, generated name, affixes, VesselForge
+record, stats, and binding are stored on the crypt entry. The item is removed
+from inherited character state; successor admission also prunes the UUID while
+it remains unrecovered, closing the duplication window if a process stopped
+mid-handoff.
+
+The next elite slain by a living Scion of that House releases one queued
+heirloom into the real scene loot. It remains account-bound and carries its
+House/Scion provenance. A successful real pickup persists the character item
+and moves the Chronicle record to `recovered`. `circulating` is transient world
+state, so a server restart safely requeues it rather than losing the heirloom.
+
+Entombment is idempotent. Repeating the return request after an interrupted
+handoff returns the existing crypt record without duplicating the fallen Scion
+or incrementing the Chronicle revision.
