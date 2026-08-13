@@ -53,6 +53,22 @@ describe('PerspectiveCamera', () => {
     expect(terrain.y).toBeCloseTo(ground.y - (24 * ground.scale), 10);
   });
 
+  it('matches the WebGL vertex-shader projection numerically', () => {
+    const camera = makeCamera();
+    const samples = [
+      { x: 720, y: 620, height: 0 },
+      { x: 1200, y: 1600, height: 24 },
+      { x: 1680, y: 1920, height: 8 },
+    ];
+
+    samples.forEach((sample) => {
+      const javascript = camera.project(sample.x, sample.y, sample.height);
+      const shader = camera.projectWithShaderMath(sample.x, sample.y, sample.height);
+      expect(shader.x).toBeCloseTo(javascript.x, 10);
+      expect(shader.y).toBeCloseTo(javascript.y, 10);
+    });
+  });
+
   it('rejects zero-sized startup viewports without producing projection state', () => {
     const camera = new PerspectiveCamera();
 

@@ -765,60 +765,9 @@ class Map {
       tileCrop,
     } = this.getViewportMetrics();
 
-    const { tileset, size, objects } = this.config.map;
+    const { size } = this.config.map;
     const { offsetX, offsetY } = this.camera;
-
-    // Tile sheets by zero-based global id (gid - 1):
-    // terrain 0..251 | objects 252..539 | dungeon 540..
-    const dungeonImage = this.images.dungeonImage;
-    const sheets = [
-      {
-        from: 540,
-        image: dungeonImage,
-        columns: dungeonImage && dungeonImage.width ? dungeonImage.width / tileSize : 16,
-      },
-      {
-        from: 252,
-        image: this.images.objectImage,
-        columns: objects.width / tileSize,
-      },
-      {
-        from: 0,
-        image: this.images.terrainImage,
-        columns: tileset.width / tileSize,
-      },
-    ];
-
-    const resolveSheet = (zeroId) => {
-      for (let i = 0; i < sheets.length; i += 1) {
-        if (zeroId >= sheets[i].from) {
-          return sheets[i];
-        }
-      }
-      return sheets[sheets.length - 1];
-    };
-
-    const drawTile = (zeroId, drawX, drawY) => {
-      if (zeroId < 0) {
-        return;
-      }
-      const sheet = resolveSheet(zeroId);
-      if (!sheet.image || !sheet.columns) {
-        return;
-      }
-      const local = zeroId - sheet.from;
-      ctx.drawImage(
-        sheet.image,
-        Math.floor(local % sheet.columns) * tileSize,
-        Math.floor(local / sheet.columns) * tileSize,
-        tileSize,
-        tileSize,
-        drawX,
-        drawY,
-        tileSize,
-        tileSize,
-      );
-    };
+    const sheets = this.getTileSheets();
 
     for (let column = -1; column <= viewport.y + 1; column += 1) {
       for (let row = -1; row <= viewport.x + 1; row += 1) {
@@ -834,12 +783,101 @@ class Map {
             const drawX = Math.round((row * tileSize) - offsetX);
             const drawY = Math.round((column * tileSize) - offsetY);
 
-            drawTile(backgroundIndex - 1, drawX, drawY);
-            drawTile(foregroundIndex - 1, drawX, drawY);
+            this.drawTile(ctx, backgroundIndex - 1, drawX, drawY, tileSize, sheets);
+            this.drawTile(ctx, foregroundIndex - 1, drawX, drawY, tileSize, sheets);
           }
         }
       }
     }
+  }
+
+  getTileSheets() {
+    const tileSize = this.config.map.tileset.tile.width;
+    const dungeonImage = this.images.dungeonImage;
+    return [
+      {
+        from: 540,
+        image: dungeonImage,
+        columns: dungeonImage && dungeonImage.width ? dungeonImage.width / tileSize : 16,
+      },
+      {
+        from: 252,
+        image: this.images.objectImage,
+        columns: this.config.map.objects.width / tileSize,
+      },
+      {
+        from: 0,
+        image: this.images.terrainImage,
+        columns: this.config.map.tileset.width / tileSize,
+      },
+    ];
+  }
+
+  resolveTileSheet(zeroId, sheets = this.getTileSheets()) {
+    return sheets.find(sheet => zeroId >= sheet.from) || sheets[sheets.length - 1];
+  }
+
+  drawTile(ctx, zeroId, drawX, drawY, drawSize, sheets = null) {
+    if (zeroId < 0) {
+      return;
+    }
+
+    const tileSize = this.config.map.tileset.tile.width;
+    const sheet = this.resolveTileSheet(zeroId, sheets || this.getTileSheets());
+    if (!sheet || !sheet.image || !sheet.columns) {
+      return;
+    }
+
+    const local = zeroId - sheet.from;
+    ctx.drawImage(
+      sheet.image,
+      Math.floor(local % sheet.columns) * tileSize,
+      Math.floor(local / sheet.columns) * tileSize,
+      tileSize,
+      tileSize,
+      drawX,
+      drawY,
+      drawSize,
+      drawSize,
+    );
+  }
+
+  bakeGroundTexture({ tileSize = 16, marginTiles = 0 } = {}) {
+    const { size } = this.config.map;
+    const canvas = document.createElement('canvas');
+    canvas.width = (size.x + (marginTiles * 2)) * tileSize;
+    canvas.height = (size.y + (marginTiles * 2)) * tileSize;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#0c1510';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const sheets = this.getTileSheets();
+
+    for (let worldY = 0; worldY < size.y; worldY += 1) {
+      for (let worldX = 0; worldX < size.x; worldX += 1) {
+        const index = (worldY * size.x) + worldX;
+        const drawX = (worldX + marginTiles) * tileSize;
+        const drawY = (worldY + marginTiles) * tileSize;
+        this.drawTile(
+          ctx,
+          (this.background[index] || 0) - 1,
+          drawX,
+          drawY,
+          tileSize,
+          sheets,
+        );
+        this.drawTile(
+          ctx,
+          (this.foreground[index] || 0) - 1,
+          drawX,
+          drawY,
+          tileSize,
+          sheets,
+        );
+      }
+    }
+
+    return canvas;
   }
 
   /**

@@ -2,6 +2,7 @@ import UI from '@shared/ui.js';
 import { now } from '../config/movement.js';
 import { centerOfTile } from '../utilities/movement-controller.js';
 import PerspectiveCamera from './perspective-camera.js';
+import TerrainRenderer from './terrain-renderer.js';
 
 const ACTOR_SCALE = 1.45;
 const ITEM_SCALE = 0.92;
@@ -16,6 +17,9 @@ class PerspectiveRenderer {
     });
     this.legacyGroundCanvas = document.createElement('canvas');
     this.legacyGroundContext = this.legacyGroundCanvas.getContext('2d');
+    this.terrainRenderer = new TerrainRenderer(map, {
+      heightAt: (worldX, worldY) => this.terrainHeight(worldX, worldY),
+    });
   }
 
   terrainHeight() {
@@ -58,8 +62,15 @@ class PerspectiveRenderer {
       return;
     }
 
-    this.map.drawMap();
-    this.alignLegacyGround(ctx, canvas);
+    const skyColour = [116, 132, 126];
+    this.drawSky(ctx, canvas, skyColour);
+    if (this.terrainRenderer.render(this.camera, skyColour)) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this.terrainRenderer.canvas, 0, 0);
+    } else {
+      this.map.drawMap();
+      this.alignLegacyGround(ctx, canvas);
+    }
 
     const draws = this.collectBillboards();
     draws.sort((left, right) => left.depthY - right.depthY);
@@ -90,6 +101,36 @@ class PerspectiveRenderer {
     ctx.fillStyle = '#111913';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(this.legacyGroundCanvas, Math.round(shiftX), Math.round(shiftY));
+  }
+
+  drawSky(ctx, canvas, skyColour) {
+    const skyline = Math.max(
+      canvas.height * 0.16,
+      this.camera.horizon + ((this.camera.focus - this.camera.horizon) / 2.14),
+    );
+    const gradient = ctx.createLinearGradient(0, 0, 0, Math.max(2, skyline * 1.35));
+    gradient.addColorStop(
+      0,
+      `rgb(${Math.round(skyColour[0] * 0.55)}, ${Math.round(skyColour[1] * 0.62)}, ${Math.round(skyColour[2] * 0.76)})`,
+    );
+    gradient.addColorStop(1, `rgb(${skyColour.join(', ')})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.filter = 'blur(2.5px)';
+    ctx.fillStyle = `rgba(${Math.round(skyColour[0] * 0.24)}, ${Math.round(skyColour[1] * 0.28)}, ${Math.round(skyColour[2] * 0.26)}, 0.92)`;
+    ctx.beginPath();
+    ctx.moveTo(-20, skyline + 8);
+    for (let x = 0; x <= canvas.width; x += canvas.width / 26) {
+      const variation = (Math.sin((x * 0.013) + (this.camera.x * 0.002)) * 7)
+        + (Math.sin((x * 0.031) + 7) * 4);
+      ctx.lineTo(x, skyline - (10 + Math.abs(variation)));
+    }
+    ctx.lineTo(canvas.width + 20, skyline + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   collectBillboards() {
@@ -486,6 +527,7 @@ class PerspectiveRenderer {
   }
 
   destroy() {
+    this.terrainRenderer.destroy();
     this.legacyGroundCanvas.width = 1;
     this.legacyGroundCanvas.height = 1;
   }

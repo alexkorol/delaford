@@ -94,6 +94,26 @@ class PerspectiveCamera {
       y: this.cameraFootY - depth,
     };
   }
+
+  projectWithShaderMath(worldX, worldY, elevation = 0) {
+    if (!this.valid) {
+      return null;
+    }
+
+    const depth = this.cameraFootY - worldY;
+    const projectionScale = this.zoom * this.depthToFocus;
+    const clipX = (2 / this.width) * (worldX - this.x) * projectionScale;
+    const clipY = depth - ((2 / this.height) * (
+      (this.horizon * depth) + this.projectionArea - (elevation * projectionScale)
+    ));
+    const normalizedX = clipX / depth;
+    const normalizedY = clipY / depth;
+
+    return {
+      x: ((normalizedX + 1) * this.width) / 2,
+      y: ((1 - normalizedY) * this.height) / 2,
+    };
+  }
 }
 
 export {
