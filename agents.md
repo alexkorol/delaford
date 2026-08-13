@@ -4,6 +4,41 @@ This file is the single source of truth for AI coding agents (Claude Code,
 OpenAI Codex, or any other). `CLAUDE.md` imports it. If you update agent
 guidance, update THIS file.
 
+## HARD STOP: synchronize Git before spending work
+
+Before planning, editing, generating assets, running expensive tests, or
+committing anything, every coding agent MUST run this preflight from the
+repository root:
+
+```bash
+git status --short
+git remote -v
+git fetch --prune origin
+git status -sb
+git rev-list --left-right --count HEAD...@{upstream}
+```
+
+This preflight is the only repository work allowed until it passes.
+
+- If `git fetch` fails, the branch has no upstream, or the remote reports that
+  the repository moved, STOP. Fix/confirm the remote and rerun the preflight;
+  never assume the local checkout is current.
+- If the worktree is dirty, preserve the user's changes. Do not pull, rebase,
+  switch branches, or hide them in a stash without explicit approval. Use a
+  clean worktree from the current remote branch for isolated work, or stop and
+  ask.
+- If the behind count is nonzero, DO NOT edit files. A clean branch that is
+  only behind may use `git pull --ff-only`; a diverged branch must stop and be
+  reconciled deliberately before implementation begins.
+- Repeat the preflight after a long pause/compaction, when resuming a handoff
+  from another machine or agent, and immediately before publishing work.
+- Before any push, fetch again and confirm the behind count is zero. Never
+  force-push over remote work unless the user explicitly names the branch and
+  authorizes that exact overwrite after seeing what would be lost.
+
+Do not spend tokens or compute on a substantive task while these checks are
+unresolved. Report the exact ahead/behind counts to the user instead.
+
 Vue 3 + Vite client (`:5173`) and Node WebSocket server (`:6500`, PORT is
 pinned — do not override it, the client hardcodes the WS URL).
 `Z:\Code\WIZARD` is the prototype sandbox whose tools get ported here.
