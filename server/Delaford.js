@@ -91,6 +91,16 @@ class Delaford {
       return true;
     }
 
+    // Chronicles intentionally authenticates before the player is admitted
+    // to the world. This one transition is therefore bound to the pending
+    // Player on the socket rather than to world.players.
+    if (data.event === 'player:chronicles:select') {
+      return Boolean(
+        ws.pendingPlayer
+        && ws.pendingPlayer.socket_id === ws.id,
+      );
+    }
+
     const player = Delaford.getSocketPlayer(ws);
     if (!player) {
       console.warn(`[socket] Authenticated socket ${ws.id.substring(0, 5)}... has no bound player for "${data.event}".`);

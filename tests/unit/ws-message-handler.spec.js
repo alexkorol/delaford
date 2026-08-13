@@ -81,6 +81,7 @@ vi.mock('#server/player/authentication.js', () => ({
 vi.mock('#server/player/handler.js', () => ({
   default: {
     'player:login': vi.fn(),
+    'player:chronicles:select': vi.fn(),
     'player:move': vi.fn(),
     'player:say': vi.fn(),
     'player:context-menu:action': vi.fn(),
@@ -286,6 +287,31 @@ describe('Delaford.connection – authentication gate', () => {
     const msg = JSON.stringify({ event: 'player:move', data: {} });
     await ws._triggerMessage(msg);
     expect(Handler['player:move']).toHaveBeenCalledOnce();
+  });
+
+  it('allows an authenticated pending player to select a Chronicles Scion', async () => {
+    ws.authenticated = true;
+    ws.pendingPlayer = { uuid: 'abc', socket_id: ws.id };
+    const msg = JSON.stringify({
+      event: 'player:chronicles:select',
+      data: { scionName: 'Vesper' },
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:chronicles:select']).toHaveBeenCalledOnce();
+  });
+
+  it('rejects Chronicles selection without a socket-bound pending player', async () => {
+    ws.authenticated = true;
+    const msg = JSON.stringify({
+      event: 'player:chronicles:select',
+      data: { scionName: 'Vesper' },
+    });
+
+    await ws._triggerMessage(msg);
+
+    expect(Handler['player:chronicles:select']).not.toHaveBeenCalled();
   });
 });
 
