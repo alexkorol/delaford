@@ -51,6 +51,14 @@ export default async function combat({ connect, assert }) {
 
     const after = await p.state();
     assert(after.lifecycle === 'alive', `survived the pack (hp ${after.hp.current}/${after.hp.max})`);
+    // dev:state can observe the scene removal one WebSocket tick before the
+    // combat:hit broadcast reaches the harness. Wait for that real protocol
+    // event instead of turning delivery order into a flaky assertion.
+    await p.waitFor(() => p.hits.some(hit => hit.died), {
+      timeoutMs: 2000,
+      intervalMs: 25,
+      label: 'combat kill event',
+    });
     assert(p.hits.some(hit => hit.died), 'combat log recorded the kill');
   } finally {
     p.close();
