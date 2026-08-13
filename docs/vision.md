@@ -111,7 +111,8 @@ deterministic source-to-atlas contract lives in `docs/actor-art-pipeline.md`.
   the 23-point quest budget reserved by the passive tree.
 - Continue wiring the remaining Dormant Vesselforge effects into authoritative
   combat before exposing crafting and awakening as player-facing progression.
-  Shield block is now live, persisted, and shown as `BLOCK` in combat feedback.
+  Shield block and Keen Eye critical chance are now live and persisted, with
+  explicit `BLOCK` and `CRIT` combat feedback.
 
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?

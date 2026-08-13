@@ -23,14 +23,23 @@ export default async function persistence({ connect, assert }) {
   });
   try {
     first.devGive('vessel-ring', 1);
-    first.devGive('vessel-khopesh', 1);
+    // Seed 539 at ilvl 40 deterministically rolls a 22% Keen Eye Brand. The
+    // production factory still owns the item; the dev seed only makes this
+    // real-protocol assertion reproducible.
+    first.devGive('vessel-khopesh', 1, { seed: 539, itemLevel: 40 });
     first.devGive('vessel-shield', 1);
     first.devSetLevel(4);
     const generated = await first.waitFor(async () => {
       const s = await first.state();
       const ring = s.inventoryDetails.find(item => item.id === 'vessel-ring');
-      const sword = s.inventoryDetails.find(item => item.id === 'vessel-khopesh');
-      const shield = s.inventoryDetails.find(item => item.id === 'vessel-shield');
+      const sword = s.inventoryDetails.find(item => (
+        item.id === 'vessel-khopesh'
+        && item.combatBonuses?.criticalChance === 22
+      ));
+      const shield = s.inventoryDetails.find(item => (
+        item.id === 'vessel-shield'
+        && item.combatBonuses?.blockChance === 4
+      ));
       return s.level === 4 && ring && sword && shield ? {
         s, ring, sword, shield,
       } : false;
@@ -46,6 +55,11 @@ export default async function persistence({ connect, assert }) {
     }, { label: 'generated sword equipped' });
     assert(equipped.combat.attack.slash > 0,
       'equipped Vesselforge weapon contributes its derived combat rating');
+    assert(equipped.combat.criticalChance === 22,
+      'equipped Keen Eye Brand contributes its live 22% critical chance');
+    assert(equipped.wearDetails.right_hand.vessel.lines.some(line => (
+      line.section === 'brand' && /Critical Chance/.test(line.text)
+    )), 'Keen Eye tooltip presents critical chance as a live Brand');
     swordIdentity = identityOf(equipped.wearDetails.right_hand);
     first.equipItem(generated.shield, 'left_hand');
     const shieldEquipped = await first.waitFor(async () => {
@@ -78,6 +92,7 @@ export default async function persistence({ connect, assert }) {
       'equipped shield identity survived the relogin exactly');
     assert(s.combat.attack.slash > 0, 'derived Vesselforge combat stats were restored on login');
     assert(s.combat.blockChance === 4, 'Vesselforge block chance was restored on login');
+    assert(s.combat.criticalChance === 22, 'Keen Eye critical chance was restored on login');
   } finally {
     second.close();
   }

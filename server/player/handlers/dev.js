@@ -18,6 +18,17 @@ import chroniclesStore from '#server/core/services/chronicles-store.js';
 
 const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
 
+const seededRng = (seed) => {
+  let state = Math.floor(seed) >>> 0;
+  return () => {
+    state = (state + 0x6D2B79F5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
 const getPlayerBySocket = (ws) => {
   if (!ws || !ws.id) {
     return null;
@@ -90,6 +101,7 @@ const buildStateSnapshot = (player) => {
       attack: { ...player.combat.attack },
       defense: { ...player.combat.defense },
       blockChance: player.combat.blockChance || 0,
+      criticalChance: player.combat.criticalChance || 0,
     } : null,
     passiveTree: player.passiveTree || null,
     monsters: scene && Array.isArray(scene.monsters)
@@ -184,7 +196,12 @@ const devEvents = {
     }
 
     const quantity = Number.isFinite(payload.qty) ? Math.max(1, Math.floor(payload.qty)) : 1;
-    player.inventory.add(payload.itemId, quantity);
+    const seed = Number(payload.seed);
+    const itemLevel = Number(payload.itemLevel);
+    player.inventory.add(payload.itemId, quantity, {
+      ...(Number.isFinite(seed) ? { rng: seededRng(seed) } : {}),
+      ...(Number.isFinite(itemLevel) ? { itemLevel } : {}),
+    });
     Socket.emit('core:refresh:inventory', {
       player: { socket_id: player.socket_id },
       data: player.inventory.slots,
@@ -232,6 +249,16 @@ const devEvents = {
     }
     broadcastStats(player);
     sendDevMessage(player, 'Fully healed.');
+  },
+
+  /** Mark the next player hit critical for deterministic end-to-end QA. */
+  'dev:forcecritical': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!DEV_MODE || !player || !player.combat) {
+      return;
+    }
+    player.combat.forceCritical = true;
+    sendDevMessage(player, 'The next hit will critically strike.');
   },
 
   /**

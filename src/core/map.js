@@ -531,6 +531,7 @@ class Map {
       targetType: payload.targetType || 'monster',
       amount: Number.isFinite(payload.amount) ? payload.amount : 0,
       blocked: Boolean(payload.blocked),
+      critical: Boolean(payload.critical),
       died: Boolean(payload.died),
       startedAt: at,
     });
@@ -1326,9 +1327,11 @@ class Map {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillStyle = entry.blocked
         ? '#8bd5ff'
-        : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f');
+        : (entry.critical ? '#fff176' : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f'));
 
-      const label = entry.blocked ? 'BLOCK' : (entry.amount > 0 ? `-${entry.amount}` : '0');
+      const label = entry.blocked
+        ? 'BLOCK'
+        : `${entry.critical ? 'CRIT ' : ''}${entry.amount > 0 ? `-${entry.amount}` : '0'}`;
       const textX = screenPosition.x;
       const textY = screenPosition.y - rise;
       ctx.strokeText(label, textX, textY);

@@ -389,8 +389,8 @@ export class HeadlessPlayer {
     this.emit('dev:teleport', { x, y, sceneId });
   }
 
-  devGive(itemId, qty = 1) {
-    this.emit('dev:give', { itemId, qty });
+  devGive(itemId, qty = 1, options = {}) {
+    this.emit('dev:give', { itemId, qty, ...options });
   }
 
   equipItem(item, targetSlot) {
@@ -413,6 +413,10 @@ export class HeadlessPlayer {
 
   devHeal() {
     this.emit('dev:heal', {});
+  }
+
+  devForceCritical() {
+    this.emit('dev:forcecritical', {});
   }
 
   devKill({ allowCheatDeath = false } = {}) {

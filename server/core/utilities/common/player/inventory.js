@@ -60,7 +60,12 @@ export default class Inventory {
       const baseItem = Query.getItemData(itemId) || { id: itemId };
       const stackable = !!baseItem.stackable;
       const rounds = stackable ? 1 : qty; // How many times to iterate on inventory?
-      const { existingItem = null, uuid: incomingUuid = null } = options;
+      const {
+        existingItem = null,
+        uuid: incomingUuid = null,
+        rng,
+        itemLevel,
+      } = options;
       const player = world.players[this.playerIndex];
       const playerUuid = player ? player.uuid : null;
 
@@ -84,6 +89,8 @@ export default class Inventory {
             uuid: incomingUuid,
             quantity: stackable ? qty : 1,
             bindTo: playerUuid,
+            rng,
+            itemLevel,
           });
         }
 

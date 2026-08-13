@@ -267,6 +267,34 @@ describe('tryUseSkill', () => {
     );
   });
 
+  it('applies a measured 1.5x critical hit through the authoritative damage path', () => {
+    const player = makePlayer({ facing: 'right' });
+    player.combat.criticalChance = 12;
+    const monster = makeMonster({ x: 11, y: 10 });
+    setupScene(player, [monster]);
+    const random = vi.spyOn(UI, 'getRandomInt').mockImplementation((min, max) => (
+      min === 1 && max === 100 ? 1 : 8
+    ));
+
+    const outcome = Combat.tryUseSkill(player, {
+      skillId: 'primary-attack',
+      direction: 'right',
+    });
+    random.mockRestore();
+
+    expect(monster.takeDamage).toHaveBeenCalledWith(12, expect.anything());
+    expect(outcome.hits[0]).toEqual(expect.objectContaining({
+      amount: 12,
+      baseAmount: 8,
+      critical: true,
+    }));
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'combat:hit',
+      expect.objectContaining({ amount: 12, critical: true }),
+      expect.anything(),
+    );
+  });
+
   it('awards attack experience when the monster dies', () => {
     const player = makePlayer({ facing: 'right' });
     const monster = makeMonster({

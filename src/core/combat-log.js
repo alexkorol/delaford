@@ -50,11 +50,12 @@ export const formatCombatLogText = ({
     return `${target} blocked ${attacker}'s attack.`;
   }
 
-  let text = `${attacker} hit ${target}${skill} for ${amount}.`;
+  const hitVerb = payload.critical ? 'critically hit' : 'hit';
+  let text = `${attacker} ${hitVerb} ${target}${skill} for ${amount}.`;
   if (attacker === 'You') {
-    text = `You hit ${target}${skill} for ${amount}.`;
+    text = `You ${hitVerb} ${target}${skill} for ${amount}.`;
   } else if (target === 'You') {
-    text = `${attacker} hit you for ${amount}.`;
+    text = `${attacker} ${hitVerb} you for ${amount}.`;
   }
 
   if (payload.died) {

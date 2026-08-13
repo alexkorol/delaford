@@ -546,8 +546,10 @@ class PerspectiveRenderer {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillStyle = entry.blocked
         ? '#8bd5ff'
-        : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f');
-      const label = entry.blocked ? 'BLOCK' : (entry.amount > 0 ? `-${entry.amount}` : '0');
+        : (entry.critical ? '#fff176' : (entry.targetType === 'player' ? '#ff5252' : '#ffd54f'));
+      const label = entry.blocked
+        ? 'BLOCK'
+        : `${entry.critical ? 'CRIT ' : ''}${entry.amount > 0 ? `-${entry.amount}` : '0'}`;
       ctx.strokeText(label, point.x, point.y - rise);
       ctx.fillText(label, point.x, point.y - rise);
       ctx.restore();

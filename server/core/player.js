@@ -60,6 +60,7 @@ class Player {
         range: 0,
       },
       blockChance: 0,
+      criticalChance: 0,
       stance: 'neutral',
       globalCooldown: 0,
       sequence: 0,
@@ -81,6 +82,7 @@ class Player {
     this.combat.attack = equippedCombat.attack;
     this.combat.defense = equippedCombat.defense;
     this.combat.blockChance = equippedCombat.blockChance;
+    this.combat.criticalChance = equippedCombat.criticalChance;
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).

@@ -106,6 +106,7 @@ export default {
       attack: combatStats.attack,
       defense: combatStats.defense,
       blockChance: combatStats.blockChance,
+      criticalChance: combatStats.criticalChance,
     };
     if (typeof player.refreshDerivedStats === 'function') {
       player.refreshDerivedStats();
@@ -204,6 +205,7 @@ export default {
         attack: combatStats.attack,
         defense: combatStats.defense,
         blockChance: combatStats.blockChance,
+        criticalChance: combatStats.criticalChance,
       };
 
       if (typeof player.refreshDerivedStats === 'function') {

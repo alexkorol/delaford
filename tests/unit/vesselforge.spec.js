@@ -7,6 +7,7 @@ import pack from '#server/core/items/vesselforge/verdigris-pack.js';
 import {
   createVesselBlock,
   deriveVesselCombat,
+  refreshVesselBlock,
   vesselEligible,
 } from '#server/core/items/vesselforge/adapter.js';
 import ItemFactory from '#server/core/items/factory.js';
@@ -329,6 +330,25 @@ describe('Vesselforge game integration', () => {
     expect(shield.vessel.lines.some(line => line.section === 'implicit'
       && /Chance to Block/.test(line.text))).toBe(true);
     expect(shield.vessel.lines.some(line => /Dormant.*Block/.test(line.text))).toBe(false);
+  });
+
+  it('makes Keen Eye a live critical modifier without rerolling the Vessel', () => {
+    const item = forge.generateItem({
+      ilvl: 40,
+      formId: 'khopesh',
+      materialId: 'bronze',
+      brands: 0,
+    });
+    item.brands.push({
+      id: 'keen-eye-test', modId: 'keen_eye', tier: 2, value: 18,
+    });
+    const refreshed = refreshVesselBlock({ item });
+
+    expect(refreshed.item).toBe(item);
+    expect(refreshed.combat.modifiers.criticalChance).toBe(18);
+    expect(refreshed.lines.some(line => line.section === 'brand'
+      && /Critical Chance/.test(line.text))).toBe(true);
+    expect(refreshed.lines.some(line => /Dormant.*Critical Chance/.test(line.text))).toBe(false);
   });
 
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {

@@ -71,6 +71,7 @@ class Wear {
         range: 0,
       },
       blockChance: 0,
+      criticalChance: 0,
     };
 
     // Go through each wear item and add up its value
@@ -91,10 +92,12 @@ class Wear {
         stats.defense.crush += defense.crush || 0;
         stats.defense.range += defense.range || 0;
         stats.blockChance += Number(combatBonuses.blockChance) || 0;
+        stats.criticalChance += Number(combatBonuses.criticalChance) || 0;
       }
     });
 
     stats.blockChance = Math.max(0, Math.min(75, stats.blockChance));
+    stats.criticalChance = Math.max(0, Math.min(75, stats.criticalChance));
 
     return stats;
   }

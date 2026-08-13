@@ -69,4 +69,14 @@ describe('combat log formatting', () => {
       payload: { amount: 0, blocked: true },
     })).toBe("You blocked Pale Archer's attack.");
   });
+
+  it('names critical hits instead of presenting an unexplained damage spike', () => {
+    expect(formatCombatLogText({
+      attacker: 'You',
+      target: 'Mire Stalker',
+      payload: {
+        skillName: 'Blade Sweep', amount: 18, critical: true,
+      },
+    })).toBe('You critically hit Mire Stalker with Blade Sweep for 18.');
+  });
 });

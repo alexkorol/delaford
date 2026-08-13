@@ -20,6 +20,7 @@ const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
 // the auto-attack leash needs diagonal headroom beyond strict adjacency.
 const AUTO_ATTACK_RANGE = 1.9;
 const DEFAULT_DASH_DISTANCE = 3;
+const CRITICAL_DAMAGE_MULTIPLIER = 1.5;
 
 // Continuous monster positions still fight over the tile grid: melee arcs and
 // tile lookups act on the tile a monster is standing on.
@@ -298,6 +299,15 @@ export const rollPlayerDamage = (player, skill = {}) => {
   return UI.getRandomInt(min, max);
 };
 
+export const rollsPlayerCritical = (player) => {
+  if (player?.combat?.forceCritical === true) {
+    delete player.combat.forceCritical;
+    return true;
+  }
+  const chance = Math.max(0, Math.min(75, Number(player?.combat?.criticalChance) || 0));
+  return chance > 0 && UI.getRandomInt(1, 100) <= chance;
+};
+
 const experienceForKill = (monster) => {
   if (monster.rewards && Number.isFinite(monster.rewards.experience)) {
     return Math.max(0, Math.floor(monster.rewards.experience));
@@ -307,7 +317,11 @@ const experienceForKill = (monster) => {
 };
 
 const applyHitToMonster = (player, monster, skill, now) => {
-  const damage = rollPlayerDamage(player, skill);
+  const baseDamage = rollPlayerDamage(player, skill);
+  const critical = rollsPlayerCritical(player);
+  const damage = critical
+    ? Math.max(baseDamage + 1, Math.round(baseDamage * CRITICAL_DAMAGE_MULTIPLIER))
+    : baseDamage;
   const result = monster.takeDamage(damage, { now });
 
   if (!result) {
@@ -347,6 +361,8 @@ const applyHitToMonster = (player, monster, skill, now) => {
     skillId: skill.id,
     skillName: skill.label || skill.name || skill.id,
     amount: result.amount !== undefined ? result.amount : damage,
+    baseAmount: baseDamage,
+    critical,
     health: {
       current: monster.stats.resources.health.current,
       max: monster.stats.resources.health.max,
