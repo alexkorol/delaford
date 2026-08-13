@@ -71,7 +71,9 @@ export default {
 
 <style lang="scss" scoped>
 .quest-journal {
-  width: min(360px, 78vw);
+  box-sizing: border-box;
+  width: min(680px, 100%);
+  margin: 0 auto;
   color: #ddd1b5;
   font: 0.72rem 'ChatFont', sans-serif;
 }
