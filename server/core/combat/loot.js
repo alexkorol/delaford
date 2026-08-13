@@ -2,6 +2,7 @@ import ItemFactory from '#server/core/items/factory.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
+import { isCurrentQuestObjective } from '#server/core/services/quest-service.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
 export const GEAR_DROP_CHANCES = {
@@ -87,7 +88,12 @@ export const dropMonsterLoot = (monster, options = {}) => {
   const gearChance = GEAR_DROP_CHANCES[rarityId] !== undefined
     ? GEAR_DROP_CHANCES[rarityId]
     : GEAR_DROP_CHANCES.common;
-  if (rng() < gearChance) {
+  // Proof of Temper must remain completable without farming a 50% elite roll.
+  // The guardian still chooses a random native form; only the first drop is
+  // guaranteed while that exact objective is current.
+  const guaranteesQuestVessel = rarityId === 'elite'
+    && isCurrentQuestObjective(player, 'slay-elite');
+  if (guaranteesQuestVessel || rng() < gearChance) {
     const gearId = GEAR_DROP_POOL[Math.floor(rng() * GEAR_DROP_POOL.length)];
     const monsterLevel = Number.isFinite(monster.level)
       ? monster.level

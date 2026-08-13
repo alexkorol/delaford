@@ -82,7 +82,7 @@ describe('authoritative quest progression', () => {
     expect(maybeStartQuest(player)).toBe(false);
   });
 
-  it('advances in order and awards passive points, renown, and a deed once', () => {
+  it('advances in order, chains commissions, and awards each reward once', () => {
     const player = makePlayer();
     maybeStartQuest(player);
 
@@ -92,7 +92,7 @@ describe('authoritative quest progression', () => {
     });
 
     expect(player.quests).toEqual(expect.objectContaining({
-      activeQuestId: null,
+      activeQuestId: 'proof-of-temper',
       objectiveIndex: 0,
       questPoints: 1,
       completed: [expect.objectContaining({ id: 'aldwyns-charge' })],
@@ -110,6 +110,30 @@ describe('authoritative quest progression', () => {
     vi.clearAllMocks();
     expect(notifyQuest(player, 'move')).toBe(false);
     expect(player.quests.questPoints).toBe(1);
+    expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
+
+    QUEST_DEFINITIONS[1].objectives.forEach((objective) => {
+      expect(notifyQuest(player, objective.trigger)).toBe(true);
+    });
+
+    expect(player.quests).toEqual(expect.objectContaining({
+      activeQuestId: null,
+      objectiveIndex: 0,
+      questPoints: 2,
+      completed: [
+        expect.objectContaining({ id: 'aldwyns-charge' }),
+        expect.objectContaining({ id: 'proof-of-temper' }),
+      ],
+    }));
+    expect(chroniclesStoreMock.recordScionDeed).toHaveBeenCalledWith(
+      player.uuid,
+      player.chronicles,
+      { deed: 'Proved their temper in the old realms', renown: 10 },
+    );
+
+    vi.clearAllMocks();
+    expect(notifyQuest(player, 'equip-vessel')).toBe(false);
+    expect(player.quests.questPoints).toBe(2);
     expect(chroniclesStoreMock.recordScionDeed).not.toHaveBeenCalled();
   });
 });

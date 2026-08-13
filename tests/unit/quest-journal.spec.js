@@ -17,6 +17,16 @@ describe('quest journal', () => {
     expect(quest.rewards).toEqual({ passivePoints: 1, houseRenown: 5 });
   });
 
+  it('continues into an elite hunt and native Vessel equipment commission', () => {
+    const quest = QUEST_DEFINITIONS[1];
+
+    expect(quest.id).toBe('proof-of-temper');
+    expect(quest.objectives.map(objective => objective.trigger)).toEqual([
+      'slay-elite', 'loot-vessel', 'equip-vessel',
+    ]);
+    expect(quest.rewards).toEqual({ passivePoints: 1, houseRenown: 10 });
+  });
+
   it('renders live objectives instead of the legacy placeholder', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../../src/components/slots/Quests.vue', import.meta.url)),

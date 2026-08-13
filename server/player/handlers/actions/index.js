@@ -26,6 +26,7 @@ import {
 } from '#shared/inventory-footprints.js';
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
+import { vesselEligible } from '#server/core/items/vesselforge/adapter.js';
 import world from '#server/core/world.js';
 import { notifyProgression } from '#server/core/progression-events.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
@@ -40,6 +41,13 @@ const refreshInventory = (player) => {
     player: { socket_id: player.socket_id },
     data: player.inventory.slots,
   });
+};
+
+const notifyLootProgression = (player, item) => {
+  notifyProgression(player, 'loot');
+  if (vesselEligible(item)) {
+    notifyProgression(player, 'loot-vessel');
+  }
 };
 
 const sendInventoryError = (player, text) => {
@@ -606,6 +614,11 @@ const actionEvents = {
     } else {
       pipe.player.equippedAnItem(equipData);
     }
+
+    const equippedItem = player.wear[getItem.slot];
+    if (equippedItem?.uuid === inventoryItem.uuid && vesselEligible(equippedItem)) {
+      notifyProgression(player, 'equip-vessel');
+    }
   },
 
   /**
@@ -1021,7 +1034,7 @@ const actionEvents = {
       data: world.players[playerIndex].inventory.slots,
     });
 
-    notifyProgression(world.players[playerIndex], 'loot');
+    notifyLootProgression(world.players[playerIndex], worldItem);
   },
 
   /**
@@ -1093,7 +1106,7 @@ const actionEvents = {
     }
 
     refreshInventory(player);
-    notifyProgression(player, 'loot');
+    notifyLootProgression(player, worldItem);
   },
 
   /**

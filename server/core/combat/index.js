@@ -325,6 +325,9 @@ const applyHitToMonster = (player, monster, skill, now) => {
     sendMessage(player, `You have slain ${monster.name}.`);
     dropMonsterLoot(monster, { player });
     notifyProgression(player, 'slay');
+    if ((monster.rarityId || monster.rarity) === 'elite') {
+      notifyProgression(player, 'slay-elite');
+    }
   }
 
   return {

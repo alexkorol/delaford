@@ -112,7 +112,7 @@ export default async function quest({ connect, assert }) {
     await p.enterZone('crypt', 'gauntlet');
     const completed = await p.waitFor(async () => {
       const next = await p.state();
-      return next.quests.activeQuestId === null
+      return next.quests.activeQuestId === 'proof-of-temper'
         && next.quests.completed.some(entry => entry.id === 'aldwyns-charge')
         ? next
         : false;
@@ -125,13 +125,84 @@ export default async function quest({ connect, assert }) {
     assert(completedScion.deeds.includes("Answered Aldwyn's Charge"),
       "the living Scion records Aldwyn's deed");
 
+    const guardianScene = await p.state();
+    const guardian = guardianScene.monsters.find(monster => monster.rarity === 'elite');
+    assert(guardian, 'Proof of Temper finds an elite Adventure guardian');
+    const guardianDropsBefore = new Set(guardianScene.groundItems.map(item => item.uuid));
+    p.devSetLevel(20);
+    p.devGive('vessel-khopesh', 1);
+    const trainingWeapon = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.inventoryDetails.find(item => item.id === 'vessel-khopesh') || false;
+    }, { label: 'prepare guardian training weapon' });
+    p.equipItem(trainingWeapon, 'right_hand');
+    await p.waitFor(async () => {
+      const next = await p.state();
+      return next.wearDetails.right_hand?.uuid === trainingWeapon.uuid ? next : false;
+    }, { label: 'equip guardian training weapon' });
+    p.devHeal();
+    p.devTeleport(guardian.x + 1, guardian.y);
+    await p.attack(guardian);
+
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      const livingGuardian = next.monsters.find(monster => monster.uuid === guardian.uuid);
+      if (!livingGuardian && next.quests.objectiveIndex >= 1) {
+        return next;
+      }
+      if (livingGuardian) {
+        if (Math.abs(livingGuardian.x - next.x) > 1 || Math.abs(livingGuardian.y - next.y) > 1) {
+          p.devTeleport(livingGuardian.x + 1, livingGuardian.y);
+        }
+        await p.attack(livingGuardian);
+      }
+      return false;
+    }, { timeoutMs: 30000, intervalMs: 350, label: 'Proof of Temper guardian' });
+    assert(state.quests.objectiveIndex === 1, 'slaying an elite advances Proof of Temper');
+
+    const questVessel = state.groundItems.find(item => (
+      !guardianDropsBefore.has(item.uuid) && item.id.startsWith('vessel-')
+    ));
+    assert(questVessel, 'the quest guardian guarantees a native Vessel drop');
+    p.devTeleport(questVessel.x, questVessel.y);
+    await p.waitFor(async () => {
+      const next = await p.state();
+      return next.x === questVessel.x && next.y === questVessel.y;
+    }, { label: 'reach Proof of Temper Vessel' });
+    await p.takeItem(questVessel);
+    state = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.quests.objectiveIndex === 2 ? next : false;
+    }, { label: 'claim Proof of Temper Vessel' });
+    assert(state.inventoryDetails.some(item => item.uuid === questVessel.uuid),
+      'the exact native Vessel enters the inventory');
+
+    const carriedVessel = state.inventoryDetails.find(item => item.uuid === questVessel.uuid);
+    p.equipItem(carriedVessel, carriedVessel.equipSlot);
+    const tempered = await p.waitFor(async () => {
+      const next = await p.state();
+      return next.quests.activeQuestId === null
+        && next.quests.completed.some(entry => entry.id === 'proof-of-temper')
+        ? next
+        : false;
+    }, { label: 'equip Proof of Temper Vessel' });
+    assert(tempered.quests.questPoints === 2, 'two commissions grant two passive points');
+    const temperedHouse = tempered.chroniclesRecord.state.houses
+      .find(entry => entry.id === house.id);
+    const temperedScion = temperedHouse.scions.find(entry => entry.id === living.id);
+    assert(temperedHouse.renown === 15, 'the two commissions grant fifteen House renown');
+    assert(temperedScion.deeds.includes('Proved their temper in the old realms'),
+      'the Scion records the elite Vessel deed');
+
     p.close();
     await new Promise(resolve => { setTimeout(resolve, 900); });
     p = await connect();
     const reloaded = await p.state();
-    assert(reloaded.quests.questPoints === 1, 'quest point survives relogging');
+    assert(reloaded.quests.questPoints === 2, 'both quest points survive relogging');
     assert(reloaded.quests.completed.some(entry => entry.id === 'aldwyns-charge'),
-      'quest completion survives relogging');
+      "Aldwyn's Charge survives relogging");
+    assert(reloaded.quests.completed.some(entry => entry.id === 'proof-of-temper'),
+      'Proof of Temper survives relogging');
   } finally {
     p.close();
   }

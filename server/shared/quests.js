@@ -19,6 +19,21 @@ export const QUEST_DEFINITIONS = [
     },
     deed: "Answered Aldwyn's Charge",
   },
+  {
+    id: 'proof-of-temper',
+    title: 'Proof of Temper',
+    description: 'Bring down an Adventure guardian, claim the Vessel it yields, and make its strength your own.',
+    objectives: [
+      { id: 'slay-elite', trigger: 'slay-elite', label: 'Defeat an elite Adventure guardian' },
+      { id: 'loot-vessel', trigger: 'loot-vessel', label: "Claim the guardian's Vessel" },
+      { id: 'equip-vessel', trigger: 'equip-vessel', label: 'Equip the recovered Vessel' },
+    ],
+    rewards: {
+      passivePoints: 1,
+      houseRenown: 10,
+    },
+    deed: 'Proved their temper in the old realms',
+  },
 ];
 
 export const getQuestDefinition = questId => (

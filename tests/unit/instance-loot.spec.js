@@ -143,6 +143,29 @@ describe('monster loot drops', () => {
     expect(drops[1].stats).toEqual(drops[1].vessel.combat.ratings);
   });
 
+  it('guarantees the elite Vessel needed by Proof of Temper', () => {
+    const sceneId = 'scene-quest-vessel';
+    const scene = { id: sceneId, items: [], players: [] };
+    world.scenes.set(sceneId, scene);
+    const player = {
+      quests: {
+        activeQuestId: 'proof-of-temper',
+        objectiveIndex: 0,
+        completed: [{ id: 'aldwyns-charge', completedAt: 1 }],
+        questPoints: 1,
+      },
+    };
+
+    const drops = dropMonsterLoot(
+      makeSlainMonster(sceneId, { rarityId: 'elite' }),
+      { player, rng: makeRngQueue([0.99, 0]) },
+    );
+
+    expect(drops).toHaveLength(2);
+    expect(GEAR_DROP_POOL).toContain(drops[1].id);
+    expect(drops[1].vessel.item.formId).toBeTruthy();
+  });
+
   it('returns a queued House heirloom from an elite with exact identity', () => {
     const sceneId = 'scene-relic-drop';
     const scene = { id: sceneId, items: [], players: [] };

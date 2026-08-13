@@ -102,6 +102,16 @@ export const maybeStartQuest = (player) => {
   return true;
 };
 
+export const currentQuestObjective = (player) => {
+  const state = ensureQuestState(player);
+  const definition = getQuestDefinition(state.activeQuestId);
+  return definition?.objectives?.[state.objectiveIndex] || null;
+};
+
+export const isCurrentQuestObjective = (player, trigger) => (
+  currentQuestObjective(player)?.trigger === trigger
+);
+
 const completeQuest = (player, definition) => {
   const state = ensureQuestState(player);
   if (state.completed.some(entry => entry.id === definition.id)) {
@@ -126,6 +136,7 @@ const completeQuest = (player, definition) => {
     });
   }
 
+  maybeStartQuest(player);
   playerPersistence.markDirty(player);
   playerPersistence.savePlayer(player, { force: true }).catch(() => {});
   Socket.emit('game:send:message', {
@@ -159,6 +170,8 @@ export const notifyQuest = (player, trigger) => {
 export default {
   emitQuestLog,
   ensureQuestState,
+  currentQuestObjective,
+  isCurrentQuestObjective,
   maybeStartQuest,
   normaliseQuestState,
   notifyQuest,
