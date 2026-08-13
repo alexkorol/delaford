@@ -3,7 +3,8 @@ import { now } from '../config/movement.js';
 import { centerOfTile } from '../utilities/movement-controller.js';
 import PerspectiveCamera from './perspective-camera.js';
 import TerrainRenderer from './terrain-renderer.js';
-import LightingRenderer, { sampleAmbient } from './lighting-renderer.js';
+import LightingRenderer, { getNightFactor, sampleAmbient } from './lighting-renderer.js';
+import AtmosphereRenderer from './atmosphere-renderer.js';
 
 const ACTOR_SCALE = 1.45;
 const ITEM_SCALE = 0.92;
@@ -22,6 +23,16 @@ class PerspectiveRenderer {
       heightAt: (worldX, worldY) => this.terrainHeight(worldX, worldY),
     });
     this.lightingRenderer = new LightingRenderer();
+    this.atmosphereRenderer = new AtmosphereRenderer();
+    this.userZoom = 1;
+    this.pinchDistance = 0;
+    this.pinchZoom = 1;
+    this.handleWheel = this.handleWheel.bind(this);
+    this.handleTouchStart = this.handleTouchStart.bind(this);
+    this.handleTouchMove = this.handleTouchMove.bind(this);
+    this.map.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    this.map.canvas.addEventListener('touchstart', this.handleTouchStart, { passive: true });
+    this.map.canvas.addEventListener('touchmove', this.handleTouchMove, { passive: false });
   }
 
   terrainHeight() {
@@ -49,6 +60,7 @@ class PerspectiveRenderer {
       height: canvas ? canvas.height : 0,
       x: foot.x,
       y: foot.y,
+      userZoom: this.userZoom,
     });
   }
 
@@ -86,6 +98,7 @@ class PerspectiveRenderer {
     this.drawProjectiles(ctx);
     this.drawCombatFeedback(ctx);
     this.drawMouse(ctx);
+    this.atmosphereRenderer.drawMist(ctx, this.camera, elapsedSeconds);
     this.lightingRenderer.apply(ctx, {
       width: canvas.width,
       height: canvas.height,
@@ -93,6 +106,14 @@ class PerspectiveRenderer {
       ambient,
       lights: this.collectDynamicLights(timestamp),
     });
+    const nightFactor = getNightFactor(ambient);
+    this.atmosphereRenderer.drawForeground(
+      ctx,
+      this.camera,
+      elapsedSeconds,
+      nightFactor,
+    );
+    this.lightingRenderer.drawVignette(ctx, canvas.width, canvas.height);
   }
 
   alignLegacyGround(ctx, canvas) {
@@ -270,7 +291,14 @@ class PerspectiveRenderer {
     }
 
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    const blur = this.camera.circleOfConfusion(projected.depth) * 3.6;
+    if (blur > 0.3) {
+      const quantizedBlur = Math.round(blur * 4) / 4;
+      ctx.filter = `blur(${quantizedBlur}px)`;
+      ctx.imageSmoothingEnabled = true;
+    } else {
+      ctx.imageSmoothingEnabled = false;
+    }
     ctx.drawImage(
       image,
       sourceX,
@@ -590,9 +618,49 @@ class PerspectiveRenderer {
     return lights;
   }
 
+  setUserZoom(value) {
+    this.userZoom = clamp(value, 0.72, 1.6);
+  }
+
+  handleWheel(event) {
+    if (!this.map.isPerspectiveMode()) {
+      return;
+    }
+    this.setUserZoom(this.userZoom * (event.deltaY > 0 ? 0.92 : 1.08));
+    event.preventDefault();
+  }
+
+  handleTouchStart(event) {
+    if (event.touches.length !== 2) {
+      this.pinchDistance = 0;
+      return;
+    }
+    this.pinchDistance = Math.hypot(
+      event.touches[0].clientX - event.touches[1].clientX,
+      event.touches[0].clientY - event.touches[1].clientY,
+    );
+    this.pinchZoom = this.userZoom;
+  }
+
+  handleTouchMove(event) {
+    if (!this.map.isPerspectiveMode() || event.touches.length !== 2 || !this.pinchDistance) {
+      return;
+    }
+    const distance = Math.hypot(
+      event.touches[0].clientX - event.touches[1].clientX,
+      event.touches[0].clientY - event.touches[1].clientY,
+    );
+    this.setUserZoom(this.pinchZoom * (distance / this.pinchDistance));
+    event.preventDefault();
+  }
+
   destroy() {
+    this.map.canvas.removeEventListener('wheel', this.handleWheel);
+    this.map.canvas.removeEventListener('touchstart', this.handleTouchStart);
+    this.map.canvas.removeEventListener('touchmove', this.handleTouchMove);
     this.terrainRenderer.destroy();
     this.lightingRenderer.destroy();
+    this.atmosphereRenderer.destroy();
     this.legacyGroundCanvas.width = 1;
     this.legacyGroundCanvas.height = 1;
   }

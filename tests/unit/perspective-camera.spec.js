@@ -69,6 +69,20 @@ describe('PerspectiveCamera', () => {
     });
   });
 
+  it('changes depth of field continuously and strengthens it while zoomed in', () => {
+    const wide = makeCamera({ userZoom: 0.72 });
+    const close = makeCamera({ userZoom: 1.6 });
+    const wideDepth = wide.depthToFocus * 1.22;
+    const closeDepth = close.depthToFocus * 1.22;
+
+    expect(wide.circleOfConfusion(wide.depthToFocus)).toBe(0);
+    expect(close.circleOfConfusion(close.depthToFocus)).toBe(0);
+    expect(wide.circleOfConfusion(wideDepth)).toBeGreaterThan(0);
+    expect(close.circleOfConfusion(closeDepth)).toBeGreaterThan(
+      wide.circleOfConfusion(wideDepth),
+    );
+  });
+
   it('rejects zero-sized startup viewports without producing projection state', () => {
     const camera = new PerspectiveCamera();
 

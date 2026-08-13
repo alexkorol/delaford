@@ -102,12 +102,17 @@ class TerrainRenderer {
       precision mediump float;
       uniform sampler2D uTexture;
       uniform float uDepthToFocus;
+      uniform float uDofStrength;
       uniform vec3 uSky;
       varying vec2 vUv;
       varying float vDepth;
 
       void main() {
-        vec3 colour = texture2D(uTexture, vUv).rgb;
+        float focusDistance = abs(vDepth - uDepthToFocus) / uDepthToFocus * uDofStrength;
+        float circleOfConfusion = clamp((focusDistance - 0.12) / 0.40, 0.0, 1.0);
+        vec3 sharp = texture2D(uTexture, vUv).rgb;
+        vec3 soft = texture2D(uTexture, vUv, 3.5).rgb;
+        vec3 colour = mix(sharp, soft, circleOfConfusion);
         float haze = clamp((vDepth / uDepthToFocus - 1.12) / 1.02, 0.0, 1.0) * 0.96;
         gl_FragColor = vec4(mix(colour, uSky, haze), 1.0);
       }
@@ -140,6 +145,7 @@ class TerrainRenderer {
       'uWorldOrigin',
       'uWorldSize',
       'uDepthToFocus',
+      'uDofStrength',
       'uSky',
       'uTexture',
     ].forEach((name) => {
@@ -304,6 +310,7 @@ class TerrainRenderer {
       this.worldSize.height,
     );
     gl.uniform1f(this.locations.uDepthToFocus, camera.depthToFocus);
+    gl.uniform1f(this.locations.uDofStrength, camera.dofStrength);
     gl.uniform3f(
       this.locations.uSky,
       skyColour[0] / 255,

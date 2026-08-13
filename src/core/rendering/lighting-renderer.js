@@ -169,6 +169,10 @@ class LightingRenderer {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.lightmap, 0, 0, width, height);
     ctx.restore();
+  }
+
+  drawVignette(ctx, width, height) {
+    this.ensureSize(width, height);
     ctx.drawImage(this.vignette, 0, 0, width, height);
   }
 

@@ -3,6 +3,8 @@ const MIN_ZOOM = 0.05;
 const MIN_DEPTH = 40;
 
 const defaultHeightAt = () => 0;
+const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+const interpolate = (start, end, amount) => start + ((end - start) * amount);
 
 class PerspectiveCamera {
   constructor(options = {}) {
@@ -21,6 +23,7 @@ class PerspectiveCamera {
     this.depthToFocus = 1;
     this.projectionArea = 1;
     this.cameraFootY = 0;
+    this.dofStrength = 1;
   }
 
   update({
@@ -50,6 +53,8 @@ class PerspectiveCamera {
     this.depthToFocus = (this.focus - this.horizon) / this.zoom;
     this.projectionArea = (this.focus - this.horizon) * this.depthToFocus;
     this.cameraFootY = this.y + this.depthToFocus;
+    const zoomProgress = clamp((this.userZoom - 0.72) / 0.88, 0, 1);
+    this.dofStrength = interpolate(1, 2.2, zoomProgress);
     this.valid = Number.isFinite(this.cameraFootY)
       && Number.isFinite(this.projectionArea)
       && this.depthToFocus > 0;
@@ -113,6 +118,15 @@ class PerspectiveCamera {
       x: ((normalizedX + 1) * this.width) / 2,
       y: ((1 - normalizedY) * this.height) / 2,
     };
+  }
+
+  circleOfConfusion(depth) {
+    if (!this.valid || !Number.isFinite(depth)) {
+      return 0;
+    }
+    const distance = (Math.abs(depth - this.depthToFocus) / this.depthToFocus)
+      * this.dofStrength;
+    return clamp((distance - 0.12) / 0.40, 0, 1);
   }
 }
 
