@@ -508,6 +508,14 @@ export default {
       const data = JSON.parse(evt.data);
       const eventName = data.event;
 
+      // The socket wrapper drops every non-login send until the server has
+      // accepted this session. All three acceptance signals count: world
+      // admission, the Chronicles selection hold, and the chronicle-auth
+      // account state.
+      if (['player:login', 'player:chronicles:ready', 'chronicles:state'].includes(eventName)) {
+        Socket.setAuthenticated(true);
+      }
+
       const canRefresh = ['world', 'player', 'item'].some((e) => eventName.split(':').includes(e));
       // Did the game canvas change that we need
       // to refresh the first context action?
@@ -558,6 +566,7 @@ export default {
     const wireSocket = (ws) => {
       ws.onmessage = handleMessage;
       ws.onclose = () => {
+        Socket.setAuthenticated(false);
         if (this.intentionalDisconnect) {
           return;
         }
@@ -1526,7 +1535,13 @@ export default {
     },
 
     handleEnterZone(selection) {
-      const { template, layout } = selection || {};
+      const { template, layout, road } = selection || {};
+      // Roads open that road's Wayfinder's Chart; Adventure zones enter a
+      // solo instance directly.
+      if (road) {
+        Socket.emit('world:road:chart', { roadId: road });
+        return;
+      }
       Socket.emit('instance:enterSolo', { template, layout });
     },
 

@@ -248,6 +248,11 @@ app.post('/api/accounts', (req, res) => {
   return res.status(201).json({ accountId: result.accountId, username: result.username });
 });
 
+// Human-readable status page over the same sanitized data.
+app.get('/stats', (_req, res) => {
+  res.sendFile(path.join(serverDir, 'public', 'stats.html'));
+});
+
 // Public server status — the community website reads this for its live
 // stats panel. Sanitized: no player positions, inventories, or tokens.
 const serverStartedAt = Date.now();

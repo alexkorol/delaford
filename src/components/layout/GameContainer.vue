@@ -90,7 +90,14 @@
               <button
                 type="button"
                 class="game-container__party-toggle"
-                @click="adventureOpen = !adventureOpen"
+                @click="toggleAdventure"
+              >
+                Adventure
+              </button>
+              <button
+                type="button"
+                class="game-container__party-toggle"
+                @click="toggleRoads"
               >
                 Roads
               </button>
@@ -104,6 +111,23 @@
               </button>
               <div
                 v-if="adventureOpen"
+                class="game-container__zone-menu"
+                aria-label="Choose a zone"
+              >
+                <p class="game-container__zone-title">Descend into…</p>
+                <button
+                  v-for="zone in adventureZones"
+                  :key="zone.id"
+                  type="button"
+                  class="game-container__zone"
+                  @click="enterZone(zone)"
+                >
+                  <span class="game-container__zone-name">{{ zone.name }}</span>
+                  <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                </button>
+              </div>
+              <div
+                v-if="roadsOpen"
                 class="game-container__zone-menu"
                 aria-label="Choose a road"
               >
@@ -427,6 +451,7 @@ export default {
     const legacyPaneOpen = ref(false);
     const partyOpen = ref(false);
     const adventureOpen = ref(false);
+    const roadsOpen = ref(false);
     const hasDockedPane = computed(() => Boolean(
       props.defaultLeftPane
       || props.defaultRightPane
@@ -443,8 +468,34 @@ export default {
     ];
 
     const openRoad = (road) => {
-      adventureOpen.value = false;
+      roadsOpen.value = false;
       emit('enter-zone', { road: road.id });
+    };
+
+    // Solo Adventure zones must match the server's ADVENTURE_ZONES; each
+    // pairs an art template with a layout shape, both validated server-side.
+    const adventureZones = [
+      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
+      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
+      { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
+      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
+      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
+      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
+    ];
+
+    const enterZone = (zone) => {
+      adventureOpen.value = false;
+      emit('enter-zone', { template: zone.template, layout: zone.layout });
+    };
+
+    const toggleAdventure = () => {
+      adventureOpen.value = !adventureOpen.value;
+      if (adventureOpen.value) roadsOpen.value = false;
+    };
+
+    const toggleRoads = () => {
+      roadsOpen.value = !roadsOpen.value;
+      if (roadsOpen.value) adventureOpen.value = false;
     };
 
     const activeChatDock = () => (props.chatExpanded ? chatOverlayRef.value : chatPeekRef.value);
@@ -714,6 +765,11 @@ export default {
       hasDockedPane,
       partyOpen,
       adventureOpen,
+      roadsOpen,
+      adventureZones,
+      enterZone,
+      toggleAdventure,
+      toggleRoads,
       roads,
       openRoad,
       beginChatDrag,

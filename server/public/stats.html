@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verdigris — Server Status</title>
+<style>
+  :root {
+    --bg: #10140e;
+    --panel: #181f14;
+    --edge: #2c3a24;
+    --ink: #d8e6c8;
+    --dim: #8fa07e;
+    --accent: #7fb069;
+    --accent-dim: #4a6a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Courier New', ui-monospace, monospace;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  main { width: 100%; max-width: 640px; }
+  h1 {
+    font-size: 1.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(127, 176, 105, 0.35);
+    margin-bottom: 0.25rem;
+  }
+  .sub { color: var(--dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .tile {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 0.9rem;
+  }
+  .tile .num { font-size: 1.7rem; color: var(--accent); }
+  .tile .label {
+    color: var(--dim);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 0.2rem;
+  }
+  h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    border-bottom: 1px solid var(--edge);
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.6rem;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 0.45rem 0.5rem; font-size: 0.9rem; }
+  th { color: var(--dim); font-weight: normal; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  tr + tr td { border-top: 1px solid rgba(44, 58, 36, 0.6); }
+  .empty { color: var(--dim); font-style: italic; padding: 0.8rem 0.5rem; }
+  .foot { margin-top: 1.6rem; color: var(--dim); font-size: 0.75rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+  .foot a { color: var(--accent); }
+  .stale { color: #c98a5a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Verdigris</h1>
+  <div class="sub" id="version">server status</div>
+
+  <div class="tiles">
+    <div class="tile"><div class="num" id="players">–</div><div class="label">Players online</div></div>
+    <div class="tile"><div class="num" id="instances">–</div><div class="label">Active instances</div></div>
+    <div class="tile"><div class="num" id="scenes">–</div><div class="label">Loaded scenes</div></div>
+    <div class="tile"><div class="num" id="uptime">–</div><div class="label">Uptime</div></div>
+  </div>
+
+  <h2>Who's on the ground</h2>
+  <table>
+    <thead><tr><th>Scion</th><th>Level</th><th>Scene</th></tr></thead>
+    <tbody id="roster"><tr><td class="empty" colspan="3">Loading…</td></tr></tbody>
+  </table>
+
+  <div class="foot">
+    <span id="refreshed">refreshing…</span>
+    <span><a href="/?play">Play now</a> · <a href="/api/stats">raw JSON</a></span>
+  </div>
+</main>
+<script>
+  const el = id => document.getElementById(id);
+  const esc = (value) => {
+    const div = document.createElement('div');
+    div.textContent = String(value == null ? '' : value);
+    return div.innerHTML;
+  };
+  const fmtUptime = (seconds) => {
+    const s = Math.max(0, Math.floor(seconds));
+    if (s < 3600) return Math.floor(s / 60) + 'm';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+    return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
+  };
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/stats', { cache: 'no-store' });
+      const data = await res.json();
+      el('version').textContent = 'v' + (data.version || '?') + ' · server status';
+      el('players').textContent = data.playersOnline;
+      el('instances').textContent = data.scenes.activeInstances;
+      el('scenes').textContent = data.scenes.total;
+      el('uptime').textContent = fmtUptime(data.uptimeSeconds);
+      el('roster').innerHTML = data.players.length
+        ? data.players.map(p => '<tr><td>' + esc(p.username) + '</td><td>'
+            + esc(p.level) + '</td><td>' + esc(p.scene || '—') + '</td></tr>').join('')
+        : '<tr><td class="empty" colspan="3">The ground is quiet. No scions abroad.</td></tr>';
+      el('refreshed').textContent = 'updated ' + new Date().toLocaleTimeString();
+      el('refreshed').classList.remove('stale');
+    } catch (error) {
+      el('refreshed').textContent = 'server unreachable — retrying…';
+      el('refreshed').classList.add('stale');
+    }
+  }
+  refresh();
+  setInterval(refresh, 5000);
+</script>
+</body>
+</html>

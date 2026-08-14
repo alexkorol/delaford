@@ -210,8 +210,10 @@ export default {
       }
 
       this.displaySceneName = formatSceneName(this.game);
+      // Continuous movement yields fractional live positions; the readout
+      // reports the occupied tile.
       this.displayCoords = player && Number.isFinite(player.x) && Number.isFinite(player.y)
-        ? `${player.x}, ${player.y}`
+        ? `${Math.round(player.x)}, ${Math.round(player.y)}`
         : '';
     },
   },

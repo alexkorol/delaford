@@ -15,6 +15,7 @@ export const useUiStore = defineStore('ui', {
       username: '',
       password: '',
     },
+    guestAccount: false,
     rememberMe: false,
     settings: {
       fps: 60,
@@ -49,6 +50,9 @@ export const useUiStore = defineStore('ui', {
         object: payload.object,
       };
     },
+    setGuestAccount(payload) {
+      this.guestAccount = Boolean(payload);
+    },
     setRememberMe(payload) {
       this.rememberMe = Boolean(payload);
       if (!this.rememberMe) {
@@ -64,6 +68,11 @@ export const useUiStore = defineStore('ui', {
         username: this.rememberMe ? (payload.username || '') : '',
         password: '',
       };
+    },
+    // Login.vue calls this on every submit. The persisted store must never
+    // hold a password; keep the dev-convenience name but store username only.
+    rememberDevAccount(payload = {}) {
+      this.rememberAccountUsername(payload);
     },
     setSettings(payload = {}) {
       this.settings = {
@@ -122,6 +131,6 @@ export const useUiStore = defineStore('ui', {
     },
   },
   persist: {
-    paths: ['account', 'rememberMe', 'settings', 'passives.flowerOfLife'],
+    paths: ['account', 'guestAccount', 'rememberMe', 'settings', 'passives.flowerOfLife'],
   },
 });

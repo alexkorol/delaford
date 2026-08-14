@@ -60,6 +60,7 @@
 
 <script>
 import UI from '@shared/ui.js';
+import { useInventoryStore } from '@/stores/inventory.js';
 import bus from '../../core/utilities/bus.js';
 import ClientUI from '../../core/utilities/client-ui.js';
 import EquipmentSlot from '../sub/EquipmentSlot.vue';
@@ -95,6 +96,19 @@ export default {
     EquipmentSlot,
   },
   emits: ['commit'],
+  setup() {
+    // The equipment slots inject the shared drag store. When this pane is
+    // mounted outside the Inventory pane's provider tree (docked wear pane),
+    // provide the same Pinia singleton from here so pointer equip/unequip
+    // always has a live drag pipeline.
+    const inventoryStore = useInventoryStore();
+    return { inventoryStore };
+  },
+  provide() {
+    return {
+      inventoryDragStore: this.inventoryStore,
+    };
+  },
   props: {
     game: {
       type: Object,
