@@ -31,6 +31,17 @@ const INITIAL_CENTER = {
   y: Math.floor(INITIAL_VIEWPORT.y / 2),
 };
 
+const directionAngle = (direction = 'down') => ({
+  right: 0,
+  'down-right': Math.PI * 0.25,
+  down: Math.PI * 0.5,
+  'down-left': Math.PI * 0.75,
+  left: Math.PI,
+  'up-left': Math.PI * 1.25,
+  up: Math.PI * 1.5,
+  'up-right': Math.PI * 1.75,
+}[direction] ?? Math.PI * 0.5);
+
 class Map {
   constructor(data, images) {
     this.foreground = data.map.foreground;
@@ -53,6 +64,7 @@ class Map {
     this.combatFeedback = [];
     this.attackEffects = [];
     this.groundTelegraphs = [];
+    this.skillEffects = [];
 
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
@@ -1278,6 +1290,146 @@ class Map {
     });
   }
 
+  /** Record a successful server-authoritative cast for authored client VFX. */
+  addSkillEffect(data = {}) {
+    if (!data.skillId || !Number.isFinite(data.fromX) || !Number.isFinite(data.fromY)) return;
+    if (data.skillId === 'ability-3') {
+      this.skillEffects = this.skillEffects.filter(effect => (
+        effect.skillId !== data.skillId || effect.sourceId !== data.sourceId
+      ));
+    }
+    this.skillEffects.push({
+      ...data,
+      durationMs: Math.max(180, Number(data.durationMs) || 500),
+      startedAt: now(),
+    });
+    if (this.skillEffects.length > 32) this.skillEffects.splice(0, this.skillEffects.length - 32);
+  }
+
+  skillEffectActor(effect) {
+    if (!effect?.sourceId) return null;
+    if (this.player?.uuid === effect.sourceId) return this.player;
+    return (this.players || []).find(player => player.uuid === effect.sourceId) || null;
+  }
+
+  /** Draw readable cast silhouettes in legacy/top-down renderer mode. */
+  drawSkillEffects() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !this.skillEffects.length) return;
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+
+    this.skillEffects = this.skillEffects.filter((effect) => {
+      const age = timestamp - effect.startedAt;
+      if (age >= effect.durationMs) return false;
+      const progress = Math.max(0, Math.min(1, age / effect.durationMs));
+      const fade = effect.skillId === 'ability-3'
+        ? Math.min(1, (1 - progress) * 4)
+        : 1 - progress;
+      const actor = this.skillEffectActor(effect);
+      const worldX = actor && effect.skillId === 'ability-3' ? actor.x : effect.fromX;
+      const worldY = actor && effect.skillId === 'ability-3' ? actor.y : effect.fromY;
+      const center = this.worldToScreen(centerOfTile(worldX, worldY, tileSize), metrics);
+      const angle = directionAngle(effect.direction);
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.lineCap = 'round';
+      if (effect.skillId === 'primary-attack') {
+        const radius = tileSize * (0.65 + (progress * 0.75));
+        ctx.strokeStyle = '#ffc65c';
+        ctx.shadowColor = '#df7b28';
+        ctx.shadowBlur = 9;
+        ctx.lineWidth = Math.max(3, tileSize * 0.1 * (1 - (progress * 0.45)));
+        for (let band = 0; band < 3; band += 1) {
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, radius - (band * 5), angle - 0.9, angle + 0.9);
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'dash') {
+        const from = this.worldToScreen(centerOfTile(effect.fromX, effect.fromY, tileSize), metrics);
+        const to = this.worldToScreen(centerOfTile(effect.toX, effect.toY, tileSize), metrics);
+        ctx.strokeStyle = '#62efca';
+        ctx.shadowColor = '#31bda0';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 3;
+        for (let trail = 0; trail < 3; trail += 1) {
+          const offset = (trail - 1) * 5;
+          ctx.globalAlpha = Math.max(0, fade * (0.78 - (trail * 0.12)));
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y + offset);
+          ctx.lineTo(to.x - (Math.cos(angle) * progress * 12), to.y + offset);
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'ability-1') {
+        ctx.strokeStyle = '#ff8b2e';
+        ctx.shadowColor = '#ff4b16';
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 3;
+        for (let ray = -1; ray <= 1; ray += 1) {
+          const rayAngle = angle + (ray * 0.25);
+          ctx.beginPath();
+          ctx.moveTo(center.x + (Math.cos(rayAngle) * tileSize * 0.2), center.y + (Math.sin(rayAngle) * tileSize * 0.2));
+          ctx.lineTo(center.x + (Math.cos(rayAngle) * tileSize * (0.8 + progress)), center.y + (Math.sin(rayAngle) * tileSize * (0.8 + progress)));
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'ability-2') {
+        const radius = tileSize * Math.max(0.4, Number(effect.radius) || 2) * (0.25 + (progress * 0.75));
+        ctx.strokeStyle = '#9bddff';
+        ctx.shadowColor = '#4ba8ff';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = Math.max(2, tileSize * 0.09 * (1 - (progress * 0.5)));
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let shard = 0; shard < 8; shard += 1) {
+          const shardAngle = (Math.PI * 2 * shard) / 8;
+          const inner = radius * 0.72;
+          ctx.beginPath();
+          ctx.moveTo(center.x + (Math.cos(shardAngle) * inner), center.y + (Math.sin(shardAngle) * inner));
+          ctx.lineTo(center.x + (Math.cos(shardAngle) * (radius + 7)), center.y + (Math.sin(shardAngle) * (radius + 7)));
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'ability-3') {
+        const pulse = 1 + (Math.sin(age / 150) * 0.08);
+        ctx.strokeStyle = '#72d4aa';
+        ctx.fillStyle = 'rgba(66, 113, 82, 0.28)';
+        ctx.shadowColor = '#43bd91';
+        ctx.shadowBlur = 9;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, tileSize * 0.78 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        for (let stone = 0; stone < 6; stone += 1) {
+          const stoneAngle = (age / 1600) + ((Math.PI * 2 * stone) / 6);
+          const radius = tileSize * 0.72;
+          ctx.fillStyle = stone % 2 ? '#7da37f' : '#b49b65';
+          ctx.fillRect(center.x + (Math.cos(stoneAngle) * radius) - 2, center.y + (Math.sin(stoneAngle) * radius) - 3, 5, 7);
+        }
+      } else if (effect.skillId === 'ability-4') {
+        const radius = tileSize * (0.45 + (progress * 0.9));
+        ctx.strokeStyle = '#ffe27a';
+        ctx.shadowColor = '#f3a93c';
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let ray = 0; ray < 8; ray += 1) {
+          const rayAngle = ((Math.PI * 2 * ray) / 8) - (progress * 0.8);
+          ctx.beginPath();
+          ctx.moveTo(center.x + (Math.cos(rayAngle) * radius * 0.45), center.y + (Math.sin(rayAngle) * radius * 0.45));
+          ctx.lineTo(center.x + (Math.cos(rayAngle) * radius), center.y + (Math.sin(rayAngle) * radius));
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      return true;
+    });
+  }
+
   /**
    * Register a projectile broadcast for rendering (ranged attacks used to
    * land invisibly). Entries expire after their travel time.
@@ -1328,7 +1480,7 @@ class Map {
         }
 
         const impact = this.worldToScreen(centerOfTile(p.toX, p.toY, tileSize), metrics);
-        const colour = colours[p.kind] || colours.monster;
+        const colour = p.skillId === 'ability-1' ? '#ff7a24' : (colours[p.kind] || colours.monster);
         const fade = 1 - ((timestamp - p.startedAt - p.travelMs) / 120);
         ctx.save();
         ctx.globalAlpha = Math.max(0, fade);
@@ -1355,7 +1507,7 @@ class Map {
 
       const head = this.worldToScreen({ x, y }, metrics);
       const back = this.worldToScreen({ x: tx, y: ty }, metrics);
-      const colour = colours[p.kind] || colours.monster;
+      const colour = p.skillId === 'ability-1' ? '#ff7a24' : (colours[p.kind] || colours.monster);
 
       ctx.save();
       ctx.globalAlpha = 0.85;

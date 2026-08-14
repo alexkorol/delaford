@@ -230,6 +230,7 @@ describe('combat hit detection', () => {
       expect.objectContaining({
         fromX: 10,
         toX: 11.5,
+        skillId: 'ability-1',
         blocked: true,
       }),
       expect.anything(),
@@ -400,7 +401,7 @@ describe('tryUseSkill', () => {
     expect(outcome.hits[0].died).toBe(true);
     expect(outcome.hits[0]).toEqual(expect.objectContaining({
       targetName: 'Test Fiend',
-      skillName: 'Blade Sweep',
+      skillName: 'Bronze Arc',
       experience: expect.objectContaining({
         skillId: 'attack',
         amount: 80,
@@ -479,6 +480,11 @@ describe('tryUseSkill', () => {
     expect(outcome.triggered).toBe(true);
     expect(player.stats.resources.mana.current).toBe(40 - 12);
     expect(player.combat.cooldowns['ability-1']).toBeGreaterThan(Date.now());
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'world:skill:effect',
+      expect.objectContaining({ skillId: 'ability-1', sourceId: player.uuid }),
+      expect.anything(),
+    );
   });
 
   it('ends respawn protection when the player uses a skill', () => {
@@ -519,6 +525,15 @@ describe('tryUseSkill', () => {
       steps: 2,
     }));
     expect(Player.broadcastMovement).toHaveBeenCalledWith(player);
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'world:skill:effect',
+      expect.objectContaining({
+        skillId: 'dash',
+        fromX: 10,
+        toX: 12,
+      }),
+      expect.anything(),
+    );
   });
 
   it('damages and slows only monsters inside Frost Nova radius', () => {
@@ -560,6 +575,11 @@ describe('tryUseSkill', () => {
     }));
     expect(player.combat.buffs['ability-3']).toBe(outcome.buff);
     expect(player.stats.resources.mana.current).toBe(30);
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'world:skill:effect',
+      expect.objectContaining({ skillId: 'ability-3', durationMs: 6000, armourBonus: 12 }),
+      expect.anything(),
+    );
   });
 
   it('heals the player with Celestial Mend and broadcasts stat changes', () => {
@@ -584,6 +604,11 @@ describe('tryUseSkill', () => {
     expect(player.stats.resources.health.current).toBe(41);
     expect(player.stats.resources.mana.current).toBe(18);
     expect(broadcastStats).toHaveBeenCalledWith(player);
+    expect(Socket.broadcast).toHaveBeenCalledWith(
+      'world:skill:effect',
+      expect.objectContaining({ skillId: 'ability-4', healing: 21 }),
+      expect.anything(),
+    );
   });
 
   it('initialises missing combat state before using a skill', () => {

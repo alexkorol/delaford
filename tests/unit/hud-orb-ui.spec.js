@@ -133,7 +133,11 @@ describe('WIZARD HUD orbs', () => {
     // PoE-style rebuild: full fixed bar, corner hotkey, and cooldown sweep.
     expect(quickbar).toContain('slotEntries()');
     expect(quickbar).toContain('@media (width <= 1100px)');
-    expect(quickbar).toContain('height: 44px;');
+    expect(quickbar).toContain('height: 46px;');
+    expect(quickbar).toContain("import bladeSweepIcon from '@/assets/skills/blade-sweep.webp';");
+    expect(quickbar).toContain("'primary-attack': 'Space'");
+    expect(quickbar).toContain("'ability-1': 'Q'");
+    expect(quickbar).toContain('quickbar__tooltip');
     expect(quickbar).toContain('quickbar__slot--empty');
     expect(quickbar).toContain('quickbar__sweep');
     expect(quickbar).not.toContain('request-remap');

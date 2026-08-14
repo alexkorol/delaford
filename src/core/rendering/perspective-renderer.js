@@ -26,6 +26,16 @@ const WALL_GIDS = globalGidsForGroup('wall');
 const TREE_GIDS = globalGidsForGroup('tree');
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+const directionAngle = (direction = 'down') => ({
+  right: 0,
+  'down-right': Math.PI * 0.25,
+  down: Math.PI * 0.5,
+  'down-left': Math.PI * 0.75,
+  left: Math.PI,
+  'up-left': Math.PI * 1.25,
+  up: Math.PI * 1.5,
+  'up-right': Math.PI * 1.75,
+}[direction] ?? Math.PI * 0.5);
 
 class PerspectiveRenderer {
   constructor(map) {
@@ -120,6 +130,7 @@ class PerspectiveRenderer {
     draws.sort((left, right) => left.depthY - right.depthY);
     draws.forEach(entry => entry.draw());
 
+    this.drawSkillEffects(ctx);
     this.drawAttackEffects(ctx);
     this.drawProjectiles(ctx);
     this.drawCombatFeedback(ctx);
@@ -645,7 +656,9 @@ class PerspectiveRenderer {
         return true;
       }
 
-      const colour = colours[projectile.kind] || colours.monster;
+      const colour = projectile.skillId === 'ability-1'
+        ? '#ff7a24'
+        : (colours[projectile.kind] || colours.monster);
       ctx.save();
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = colour;
@@ -839,6 +852,139 @@ class PerspectiveRenderer {
     });
   }
 
+  drawSkillEffects(ctx) {
+    if (!Array.isArray(this.map.skillEffects) || !this.map.skillEffects.length) return;
+    const tileSize = this.map.config.map.tileset.tile.width;
+    const timestamp = now();
+
+    this.map.skillEffects = this.map.skillEffects.filter((effect) => {
+      const age = timestamp - effect.startedAt;
+      if (age >= effect.durationMs) return false;
+      const progress = clamp(age / effect.durationMs, 0, 1);
+      const fade = effect.skillId === 'ability-3'
+        ? Math.min(1, (1 - progress) * 4)
+        : 1 - progress;
+      const actor = typeof this.map.skillEffectActor === 'function'
+        ? this.map.skillEffectActor(effect)
+        : null;
+      const worldX = actor && effect.skillId === 'ability-3' ? actor.x : effect.fromX;
+      const worldY = actor && effect.skillId === 'ability-3' ? actor.y : effect.fromY;
+      const centerWorld = centerOfTile(worldX, worldY, tileSize);
+      const center = this.camera.projectTerrain(centerWorld.x, centerWorld.y);
+      if (!center) return true;
+
+      const angle = directionAngle(effect.direction);
+      const baseRadius = tileSize * center.scale;
+      const ellipse = (radius, start = 0, end = Math.PI * 2) => {
+        ctx.beginPath();
+        ctx.ellipse(center.x, center.y, radius, radius * 0.34, 0, start, end);
+        ctx.stroke();
+      };
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.lineCap = 'round';
+      if (effect.skillId === 'primary-attack') {
+        const radius = baseRadius * (0.7 + (progress * 0.9));
+        ctx.strokeStyle = '#ffca63';
+        ctx.shadowColor = '#ed7f28';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = Math.max(3, center.scale * 4);
+        for (let band = 0; band < 3; band += 1) {
+          ctx.beginPath();
+          ctx.arc(center.x, center.y - (baseRadius * 0.3), radius - (band * 5), angle - 0.9, angle + 0.9);
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'dash') {
+        const fromWorld = centerOfTile(effect.fromX, effect.fromY, tileSize);
+        const toWorld = centerOfTile(effect.toX, effect.toY, tileSize);
+        const from = this.camera.projectTerrain(fromWorld.x, fromWorld.y);
+        const to = this.camera.projectTerrain(toWorld.x, toWorld.y);
+        if (from && to) {
+          ctx.strokeStyle = '#67f0ce';
+          ctx.shadowColor = '#24bd9a';
+          ctx.shadowBlur = 15;
+          ctx.lineWidth = Math.max(2, center.scale * 3);
+          for (let trail = -1; trail <= 1; trail += 1) {
+            ctx.globalAlpha = Math.max(0, fade * (0.7 - (Math.abs(trail) * 0.16)));
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y - (baseRadius * 0.4) + (trail * 5));
+            ctx.lineTo(to.x, to.y - (baseRadius * 0.4) + (trail * 5));
+            ctx.stroke();
+          }
+        }
+      } else if (effect.skillId === 'ability-1') {
+        ctx.strokeStyle = '#ff8a2d';
+        ctx.shadowColor = '#ff4518';
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = Math.max(2, center.scale * 3.4);
+        for (let ray = -1; ray <= 1; ray += 1) {
+          const rayAngle = angle + (ray * 0.25);
+          ctx.beginPath();
+          ctx.moveTo(center.x, center.y - (baseRadius * 0.42));
+          ctx.lineTo(
+            center.x + (Math.cos(rayAngle) * baseRadius * (1 + progress)),
+            center.y - (baseRadius * 0.42) + (Math.sin(rayAngle) * baseRadius * (0.42 + (progress * 0.25))),
+          );
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'ability-2') {
+        const radius = baseRadius * Math.max(0.5, Number(effect.radius) || 2) * (0.25 + (progress * 0.75));
+        ctx.strokeStyle = '#9addff';
+        ctx.shadowColor = '#4a9fff';
+        ctx.shadowBlur = 15;
+        ctx.lineWidth = Math.max(2, center.scale * 3.5);
+        ellipse(radius);
+        for (let shard = 0; shard < 8; shard += 1) {
+          const shardAngle = (Math.PI * 2 * shard) / 8;
+          ctx.beginPath();
+          ctx.moveTo(center.x + (Math.cos(shardAngle) * radius * 0.72), center.y + (Math.sin(shardAngle) * radius * 0.24));
+          ctx.lineTo(center.x + (Math.cos(shardAngle) * (radius + 8)), center.y + (Math.sin(shardAngle) * (radius * 0.34 + 5)));
+          ctx.stroke();
+        }
+      } else if (effect.skillId === 'ability-3') {
+        const radius = baseRadius * (0.82 + (Math.sin(age / 150) * 0.05));
+        ctx.strokeStyle = '#72d4aa';
+        ctx.fillStyle = 'rgba(55, 119, 84, 0.2)';
+        ctx.shadowColor = '#3db98c';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = Math.max(2, center.scale * 2.5);
+        ctx.beginPath();
+        ctx.ellipse(center.x, center.y, radius, radius * 0.34, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+        for (let stone = 0; stone < 6; stone += 1) {
+          const stoneAngle = (age / 1600) + ((Math.PI * 2 * stone) / 6);
+          ctx.fillStyle = stone % 2 ? '#78a17c' : '#b69b64';
+          ctx.fillRect(
+            center.x + (Math.cos(stoneAngle) * radius) - 2,
+            center.y + (Math.sin(stoneAngle) * radius * 0.34) - 4,
+            Math.max(4, center.scale * 5),
+            Math.max(6, center.scale * 8),
+          );
+        }
+      } else if (effect.skillId === 'ability-4') {
+        const radius = baseRadius * (0.48 + (progress * 1.15));
+        ctx.strokeStyle = '#ffe17a';
+        ctx.shadowColor = '#f2a63b';
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = Math.max(2, center.scale * 3.5);
+        ellipse(radius);
+        for (let ray = 0; ray < 8; ray += 1) {
+          const rayAngle = ((Math.PI * 2 * ray) / 8) - (progress * 0.8);
+          ctx.beginPath();
+          ctx.moveTo(center.x + (Math.cos(rayAngle) * radius * 0.45), center.y + (Math.sin(rayAngle) * radius * 0.16));
+          ctx.lineTo(center.x + (Math.cos(rayAngle) * radius), center.y + (Math.sin(rayAngle) * radius * 0.34));
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      return true;
+    });
+  }
+
   drawPlayerDamageVignette(ctx, width, height, timestamp) {
     const latestHit = (this.map.combatFeedback || [])
       .filter(entry => entry.targetType === 'player' && entry.amount > 0)
@@ -915,8 +1061,39 @@ class PerspectiveRenderer {
         x: point.x,
         y: point.y - (tileSize * 0.45 * point.scale),
         radius: Math.max(32, 120 * point.scale),
-        colour: colours[projectile.kind] || colours.monster,
+        colour: projectile.skillId === 'ability-1'
+          ? [255, 112, 34]
+          : (colours[projectile.kind] || colours.monster),
         intensity: 0.95,
+      });
+    });
+
+    const skillColours = {
+      'primary-attack': [255, 194, 82],
+      dash: [80, 236, 194],
+      'ability-1': [255, 105, 28],
+      'ability-2': [108, 190, 255],
+      'ability-3': [87, 190, 137],
+      'ability-4': [255, 218, 98],
+    };
+    (this.map.skillEffects || []).forEach((effect) => {
+      const progress = (timestamp - effect.startedAt) / effect.durationMs;
+      if (progress < 0 || progress >= 1) return;
+      const actor = typeof this.map.skillEffectActor === 'function'
+        ? this.map.skillEffectActor(effect)
+        : null;
+      const x = actor && effect.skillId === 'ability-3' ? actor.x : effect.fromX;
+      const y = actor && effect.skillId === 'ability-3' ? actor.y : effect.fromY;
+      const world = centerOfTile(x, y, tileSize);
+      const point = this.camera.projectTerrain(world.x, world.y);
+      if (!point) return;
+      const persistent = effect.skillId === 'ability-3';
+      lights.push({
+        x: point.x,
+        y: point.y - (tileSize * 0.25 * point.scale),
+        radius: Math.max(42, tileSize * point.scale * (persistent ? 2.2 : 3.4)),
+        colour: skillColours[effect.skillId] || colours.player,
+        intensity: persistent ? 0.38 : Math.max(0.15, (1 - progress) * 0.92),
       });
     });
 

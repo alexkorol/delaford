@@ -98,6 +98,19 @@ describe('quickbar integration', () => {
     });
   });
 
+  it('uses authored icon keys instead of platform emoji', () => {
+    const slots = createQuickbarSlots().filter(slot => slot.skillId);
+
+    expect(slots.map(slot => slot.icon)).toEqual([
+      'blade-sweep',
+      'phantom-step',
+      'ember-volley',
+      'frost-nova',
+      'stoneguard',
+      'celestial-mend',
+    ]);
+  });
+
   it('quickbar template produces independent copies', () => {
     const template1 = listQuickbarTemplate();
     const template2 = listQuickbarTemplate();

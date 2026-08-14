@@ -9,7 +9,7 @@ import {
 
 describe('combat log formatting', () => {
   it('uses shared skill labels for player attacks', () => {
-    expect(formatCombatSkillName({ skillId: 'ability-1' })).toBe('Ember Volley');
+    expect(formatCombatSkillName({ skillId: 'ability-1' })).toBe('Cinder Fan');
   });
 
   it('formats player kill lines with monster names and experience', () => {
@@ -18,7 +18,7 @@ describe('combat log formatting', () => {
       target: 'Ashen Wolf',
       payload: {
         targetType: 'monster',
-        skillName: 'Blade Sweep',
+        skillName: 'Bronze Arc',
         amount: 12,
         died: true,
         experience: {
@@ -30,7 +30,7 @@ describe('combat log formatting', () => {
       },
     });
 
-    expect(text).toBe('You hit Ashen Wolf with Blade Sweep for 12. Ashen Wolf died. +24 Attack XP.');
+    expect(text).toBe('You hit Ashen Wolf with Bronze Arc for 12. Ashen Wolf died. +24 Attack XP.');
   });
 
   it('includes level-up detail when a kill awards a skill level', () => {
@@ -75,9 +75,9 @@ describe('combat log formatting', () => {
       attacker: 'You',
       target: 'Mire Stalker',
       payload: {
-        skillName: 'Blade Sweep', amount: 18, critical: true,
+        skillName: 'Bronze Arc', amount: 18, critical: true,
       },
-    })).toBe('You critically hit Mire Stalker with Blade Sweep for 18.');
+    })).toBe('You critically hit Mire Stalker with Bronze Arc for 18.');
   });
 
   it('names Beastbane hits instead of presenting an unexplained damage bonus', () => {
@@ -85,8 +85,8 @@ describe('combat log formatting', () => {
       attacker: 'You',
       target: 'Ashen Wolf',
       payload: {
-        skillName: 'Blade Sweep', amount: 14, beastbane: true,
+        skillName: 'Bronze Arc', amount: 14, beastbane: true,
       },
-    })).toBe('You hit Ashen Wolf with Blade Sweep for 14 (Beastbane).');
+    })).toBe('You hit Ashen Wolf with Bronze Arc for 14 (Beastbane).');
   });
 });

@@ -116,6 +116,13 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Verdigris' })).toBeVisible();
+  await expect(page.locator('.login-backdrop__canvas')).toBeVisible();
+  await expect(page.getByLabel('Account name')).toBeHidden();
+  const accountToggle = page.getByRole('button', { name: 'Sign in to an existing account' });
+  await accountToggle.click();
+  await expect(page.getByLabel('Account name')).toBeVisible();
+  await accountToggle.click();
+  await expect(page.getByLabel('Account name')).toBeHidden();
   await page.getByRole('button', { name: 'Play as Guest', exact: true }).click();
   await completeChroniclesOnboarding(page);
 
@@ -123,6 +130,10 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   const minimap = page.getByLabel('World minimap');
   await expect(canvas).toBeVisible({ timeout: 15_000 });
   await expect(minimap).toBeVisible();
+  const skillBar = page.getByRole('navigation', { name: 'Skill bar' });
+  await expect(skillBar.locator('.quickbar__icon')).toHaveCount(6);
+  await expect(skillBar.getByRole('button', { name: /Bronze Arc \[Space \/ 1\]/ })).toBeVisible();
+  await expect(skillBar.getByRole('button', { name: /Cinder Fan \[Q \/ 3\]/ })).toBeVisible();
 
   // Movement must keep working after a UI control owns focus.
   const initialCoordinates = await minimapCoordinates(minimap);
@@ -184,8 +195,8 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Dagger"]');
   const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
 
-  // The shared development guest is intentionally persistent. A previous
-  // browser pass may have left the starter dagger equipped, so normalise it
+  // The browser guest is intentionally persistent. A previous browser pass
+  // may have left the starter dagger equipped, so normalise it
   // through the server-authored menu before asserting both pointer directions.
   if (!(await inventoryItem.isVisible())) {
     await expect(rightHand).toHaveAttribute('aria-label', /^Bronze Dagger/);

@@ -148,14 +148,15 @@ class Engine {
         this.game.map.drawProjectiles();
       }
 
+      // Every successful cast has a distinct authored silhouette, including
+      // buffs and heals that do not produce a combat:hit event.
+      if (typeof this.game.map.drawSkillEffects === 'function') {
+        this.game.map.drawSkillEffects();
+      }
+
       // Telegraph melee reach and area before floating damage text obscures it.
       if (typeof this.game.map.drawAttackEffects === 'function') {
         this.game.map.drawAttackEffects();
-      }
-
-      // Draw in-flight projectiles above actors
-      if (typeof this.game.map.drawProjectiles === 'function') {
-        this.game.map.drawProjectiles();
       }
 
       // Draw floating combat feedback above actors

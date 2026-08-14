@@ -448,6 +448,33 @@ const broadcastHits = (player, hits) => {
   }
 };
 
+const broadcastSkillEffect = (player, skill, profile, origin, direction, outcome = {}) => {
+  const behaviour = skill.behaviour || {};
+  const durations = {
+    [DEFAULT_SKILL_IDS.primary]: 360,
+    [DEFAULT_SKILL_IDS.dash]: 520,
+    [DEFAULT_SKILL_IDS.ability1]: 520,
+    [DEFAULT_SKILL_IDS.ability2]: 900,
+    [DEFAULT_SKILL_IDS.ability3]: Math.max(900, behaviour.buff?.durationMs || 0),
+    [DEFAULT_SKILL_IDS.ability4]: 1100,
+  };
+  const current = occupiedTile(player);
+
+  Socket.broadcast('world:skill:effect', {
+    sourceId: player.uuid,
+    skillId: skill.id,
+    direction,
+    fromX: origin.x,
+    fromY: origin.y,
+    toX: current.x,
+    toY: current.y,
+    radius: behaviour.area?.radius || 1,
+    durationMs: durations[skill.id] || Math.max(320, profile.duration || 0),
+    healing: outcome.healing?.amount || 0,
+    armourBonus: outcome.buff?.armourBonus || 0,
+  }, world.getScenePlayers(player.sceneId));
+};
+
 const applyAreaEffect = (player, skill, now, outcome) => {
   const area = skill.behaviour && skill.behaviour.area;
   if (!area) {
@@ -659,21 +686,26 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
   const outcome = { triggered: true, skillId: skill.id, hits: [] };
   const direction = payload.direction || player.facing || 'down';
   const behaviour = skill.behaviour || {};
+  const effectOrigin = occupiedTile(player);
 
   if (applyMovementEffect(player, skill, profile, payload, now, outcome)) {
+    broadcastSkillEffect(player, skill, profile, effectOrigin, direction, outcome);
     return outcome;
   }
 
   if (applyDefensiveBuff(player, skill, now, outcome)) {
+    broadcastSkillEffect(player, skill, profile, effectOrigin, direction, outcome);
     return outcome;
   }
 
   if (applyHealingEffect(player, skill, now, outcome)) {
+    broadcastSkillEffect(player, skill, profile, effectOrigin, direction, outcome);
     return outcome;
   }
 
   if (applyAreaEffect(player, skill, now, outcome)) {
     broadcastHits(player, outcome.hits);
+    broadcastSkillEffect(player, skill, profile, effectOrigin, direction, outcome);
     return outcome;
   }
 
@@ -696,6 +728,7 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
       toY: collision.impact.y,
       travelMs: Math.max(120, projectile.travelTimeMs || 280),
       kind: 'player',
+      skillId: skill.id,
       blocked: collision.blocked,
     }, world.getScenePlayers(player.sceneId));
   } else {
@@ -721,6 +754,7 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
   }
 
   broadcastHits(player, outcome.hits);
+  broadcastSkillEffect(player, skill, profile, effectOrigin, direction, outcome);
 
   return outcome;
 };

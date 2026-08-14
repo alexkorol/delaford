@@ -62,10 +62,17 @@
           class="auth-container__login"
         >
           <div class="auth-container__wordmark">
+            <p class="auth-container__eyebrow">The roads remember</p>
             <h1 class="auth-container__title">Verdigris</h1>
+            <p class="auth-container__tagline">A WASD-first multiplayer ARPG</p>
             <div class="auth-container__rule"><span /></div>
           </div>
           <Login />
+          <p class="auth-container__promise">
+            Persistent Houses <span aria-hidden="true">&middot;</span>
+            Shared roads <span aria-hidden="true">&middot;</span>
+            No download
+          </p>
         </div>
 
         <div v-else>
@@ -135,17 +142,16 @@ export default {
 @use '@/assets/scss/abstracts/tokens' as *;
 
 .auth-container {
-  width: min(640px, 94vw);
+  width: min(700px, 94vw);
   position: relative;
   margin: auto;
 }
 
-/* Fullscreen scene behind the panel: live-rendered dungeon vestibule
- * (LoginBackdrop canvas) under a vignette and a slow warm glow. */
+/* The opening now looks into the same Delaford streets used by play. */
 .auth-container__backdrop {
   position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, #0d0f16 0%, #121014 55%, #16120d 100%);
+  background: linear-gradient(180deg, #07100c 0%, #11160e 55%, #171108 100%);
 
   &::before {
     content: '';
@@ -153,8 +159,8 @@ export default {
     inset: 0;
     z-index: 1;
     background:
-      linear-gradient(180deg, rgba(8, 8, 14, 0.22) 0%, rgba(8, 8, 14, 0.08) 45%, rgba(10, 8, 8, 0.26) 100%),
-      radial-gradient(130% 100% at 50% 50%, transparent 48%, rgba(2, 2, 6, 0.6) 100%);
+      linear-gradient(180deg, rgba(3, 8, 6, 0.12) 0%, rgba(8, 8, 5, 0.04) 45%, rgba(10, 7, 3, 0.2) 100%),
+      radial-gradient(130% 100% at 50% 50%, transparent 42%, rgba(2, 4, 3, 0.5) 100%);
   }
 
   &::after {
@@ -162,7 +168,7 @@ export default {
     position: absolute;
     inset: 0;
     z-index: 2;
-    background: radial-gradient(60% 38% at 50% 108%, rgba(228, 160, 64, 0.14), transparent 70%);
+    background: radial-gradient(60% 42% at 50% 106%, rgba(228, 160, 64, 0.17), transparent 70%);
     opacity: 0.55;
   }
 }
@@ -174,16 +180,17 @@ export default {
   min-height: 520px;
   width: 100%;
   box-sizing: border-box;
-  padding: var(--space-2xl) var(--space-xl) var(--space-xl);
+  padding: clamp(30px, 4.5vh, 48px) clamp(24px, 4vw, 42px) clamp(24px, 3vh, 34px);
   background:
-    linear-gradient(180deg, rgba(40, 33, 25, 0.72) 0%, rgba(14, 11, 9, 0.94) 100%),
+    radial-gradient(circle at 50% -5%, rgba(123, 85, 35, 0.2), transparent 36%),
+    linear-gradient(180deg, rgba(31, 27, 21, 0.9) 0%, rgba(10, 10, 9, 0.97) 100%),
     #14110d;
-  border: 1px solid var(--color-border-strong);
+  border: 16px solid transparent;
+  border-image: url('@/assets/inventory/frame_ornate.png') 118 / 16px stretch;
   box-shadow:
-    0 0 0 4px #0a0806,
-    0 0 0 5px rgba(212, 173, 90, 0.22),
-    0 28px 64px rgba(0, 0, 0, 0.75),
-    inset 0 0 48px rgba(0, 0, 0, 0.6),
+    0 0 0 2px rgba(5, 5, 4, 0.94),
+    0 30px 72px rgba(0, 0, 0, 0.8),
+    inset 0 0 52px rgba(0, 0, 0, 0.64),
     inset 0 1px 0 rgba(240, 230, 210, 0.06);
 }
 
@@ -285,6 +292,15 @@ export default {
   margin: 0 auto var(--space-lg);
 }
 
+.auth-container__eyebrow {
+  margin: 0 0 8px;
+  color: #80bea9;
+  font: 0.68rem 'ChatFont', sans-serif;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px #000;
+}
+
 .auth-container__title {
   margin: 0;
   font-family: 'GameFont', sans-serif;
@@ -300,12 +316,37 @@ export default {
 }
 
 .auth-container__tagline {
-  margin: var(--space-xs) 0 0;
+  margin: 7px 0 0;
   font-family: 'ChatFont', sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: rgba(220, 205, 180, 0.55);
+  color: rgba(232, 218, 190, 0.68);
+}
+
+.auth-container__promise {
+  margin: var(--space-lg) 0 0;
+  color: rgba(198, 187, 164, 0.55);
+  font: 0.65rem 'ChatFont', sans-serif;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+
+  span {
+    margin-inline: 6px;
+    color: rgba(95, 168, 147, 0.72);
+  }
+}
+
+@media (width <= 580px), (height <= 680px) {
+  .auth-container__frame {
+    min-height: min(520px, 92vh);
+    padding: 24px 20px 20px;
+  }
+
+  .auth-container__promise {
+    display: none;
+  }
 }
 
 .auth-container__rule {
