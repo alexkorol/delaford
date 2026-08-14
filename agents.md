@@ -170,7 +170,11 @@ Process hygiene (matters for sandboxed/CLI agents):
 
 ## Conventions
 
-- Commit locally; **NEVER push** (the user pushes).
+- Commit and PUSH: after the verification gates pass, push your commits so
+  other machines and agents can fetch them. The preflight above already
+  requires a fetch and a zero behind-count before any push; never force-push
+  over remote work without the user naming the branch and approving the
+  exact overwrite.
 - Big commits can SIGKILL the lint-staged pre-commit hook — run eslint
   manually first, then retry the commit.
 - Balance/tuning changes must be MEASURED through the real pipeline

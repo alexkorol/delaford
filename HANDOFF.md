@@ -6,7 +6,7 @@ work was once built on a stale checkout and had to be hand-merged back.
 
 ## Where the project stands
 
-`master` (local, ~180 commits ahead of origin — the user pushes) is the
+`master` (pushed to origin) is the
 reunified line: the 2.5D renderer / four-quest campaign / Chronicles
 Houses-and-Scions line merged with the Crossroads world-web / wagons /
 security line. Ore mining/smithing is deliberately removed (ARPG direction;
