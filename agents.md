@@ -8,6 +8,38 @@ Vue 3 + Vite client (`:5173`) and Node WebSocket server (`:6500`, PORT is
 pinned — do not override it, the client hardcodes the WS URL).
 `Z:\Code\WIZARD` is the prototype sandbox whose tools get ported here.
 
+## HARD STOP: synchronize Git before spending work
+
+Before planning, editing, generating assets, running expensive tests, or
+committing anything, every coding agent MUST run this preflight from the
+repository root:
+
+```bash
+git status --short
+git remote -v
+git fetch --prune origin
+git status -sb
+git rev-list --left-right --count HEAD...@{upstream}
+```
+
+This preflight is the only repository work allowed until it passes.
+
+- If `git fetch` fails, the branch has no upstream, or the remote reports that
+  the repository moved, STOP. Fix/confirm the remote and rerun the preflight;
+  never assume the local checkout is current.
+- If the worktree is dirty, preserve the user's changes. Do not pull, rebase,
+  switch branches, or hide them in a stash without explicit approval.
+- If the behind count is nonzero, DO NOT edit files. A clean branch that is
+  only behind may use `git pull --ff-only`; a diverged branch must stop and be
+  reconciled deliberately before implementation begins.
+- Repeat the preflight after a long pause/compaction, when resuming a handoff
+  from another machine or agent, and immediately before publishing work.
+
+Do not spend tokens or compute on a substantive task while these checks are
+unresolved. Report the exact ahead/behind counts to the user instead.
+(This rule exists because a month of work was once built on a stale base and
+had to be hand-merged back together.)
+
 ## THE RULE: prove playability by playing
 
 **Before you claim a gameplay change works — and always before ending a
@@ -128,9 +160,11 @@ Process hygiene (matters for sandboxed/CLI agents):
   lives in handlers/actions/index.js because the Action dispatcher only
   routes there), `wagon:outfit:buy`, `wagon:daily:claim`, `wagon:upgrade`,
   `chronicles:house:deposit` (bank or wagon pane).
-- The town (`town:delaford`, displayed as "The Crossroads") is truce-ground:
-  `metadata.sanctuary` is true, no monsters may exist or deal damage there,
-  and scions log in at their House's wagon pitch.
+- The town (`town:delaford`) is currently the rebuilt Delaford Village with
+  the four world-web road gates and wagon pitches beside its own portals.
+  The full Crossroads conversion (sanctuary truce-ground, wagon-pitch
+  logins, wagon pane in the client shell) is planned follow-up work; the
+  combat controller already honors `metadata.sanctuary` wherever it is set.
 - Vue right-click: use `@contextmenu.prevent`, never `@click.right`
   (browsers do not fire `click` for the right button).
 
