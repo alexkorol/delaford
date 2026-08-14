@@ -10,6 +10,7 @@
       v-for="slotIndex in totalSlots"
       :key="slotIndex"
       class="inventory-grid__cell"
+      :style="cellStyle(slotIndex - 1)"
     />
 
     <transition-group name="inventory-item">
@@ -29,10 +30,29 @@
         @dblclick.prevent="handleDoubleClick(item)"
         @contextmenu.stop.prevent="showContextMenu($event, item)"
       >
+        <img
+          v-if="itemArt(item)"
+          class="inventory-item__art"
+          :src="itemArt(item)"
+          alt=""
+          draggable="false"
+        >
         <div
+          v-else
           class="inventory-item__sprite"
           :style="itemSpriteStyle(item)"
         />
+        <div
+          v-if="itemPips(item).length"
+          class="inventory-item__pips"
+          aria-hidden="true"
+        >
+          <span
+            v-for="(pip, pipIndex) in itemPips(item)"
+            :key="`${pip.kind}-${pipIndex}`"
+            :class="`inventory-item__pip--${pip.kind}`"
+          >{{ pip.symbol }}</span>
+        </div>
         <span
           v-if="item.stackable && item.qty > 1"
           class="inventory-item__quantity"
@@ -59,10 +79,16 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 
-import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
+import {
+  CELL_GAP_PX,
+  CELL_SIZE_PX,
+  LEGACY_ITEM_TILE_SIZE_PX,
+} from '@/core/inventory/constants.js';
 import { buildInventoryContextMenuRequest } from '@/core/inventory/context-menu.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
+import { resolveInventoryItemArt } from '@/core/inventory/item-art.js';
+import { getInventoryVesselPips } from '@/core/inventory/item-presentation.js';
 import { itemTooltipAriaLabel } from '@/core/inventory/item-tooltip.js';
 import bus from '@/core/utilities/bus.js';
 import { canEquipInventoryItemToSlot, useInventoryStore } from '@/stores/inventory.js';
@@ -100,13 +126,27 @@ export default {
     } = storeToRefs(inventoryStore);
 
     const gridStyle = computed(() => ({
-      '--cell-size': `${CELL_SIZE_PX}px`,
+      // The desktop pane occupies 48vw. This keeps the 12-column backpack as
+      // large as that pane allows and reaches the authored 54px size on wide
+      // screens, while retaining a usable floor on narrow viewports.
+      '--cell-size': `clamp(40px, calc((48vw - 128px) / 12), ${CELL_SIZE_PX}px)`,
       '--cell-gap': `${CELL_GAP_PX}px`,
       gridTemplateColumns: `repeat(${props.columns}, var(--cell-size))`,
-      gridAutoRows: 'var(--cell-size)',
+      gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`,
     }));
 
     const totalSlots = computed(() => props.columns * props.rows);
+
+    // Background cells and items deliberately share explicit coordinates.
+    // Auto-placement otherwise dodges occupied item tiles and creates phantom
+    // rows below the 7x12 backpack.
+    const cellStyle = (slotIndex) => {
+      const { x, y } = coordsFromIndex(slotIndex, props.columns);
+      return {
+        gridColumnStart: x + 1,
+        gridRowStart: y + 1,
+      };
+    };
 
     const pointerCellFromEvent = (event) => {
       const element = gridRef.value;
@@ -118,7 +158,10 @@ export default {
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
 
-      const cellSize = CELL_SIZE_PX + CELL_GAP_PX;
+      const firstCell = element.querySelector('.inventory-grid__cell');
+      const renderedCellSize = firstCell?.getBoundingClientRect().width || CELL_SIZE_PX;
+      const renderedGap = Number.parseFloat(window.getComputedStyle(element).columnGap) || CELL_GAP_PX;
+      const cellSize = renderedCellSize + renderedGap;
       const x = Math.floor(offsetX / cellSize);
       const y = Math.floor(offsetY / cellSize);
 
@@ -350,9 +393,12 @@ export default {
 
       return {
         backgroundImage: `url(${backgroundSrc(tileset)})`,
-        backgroundPosition: `left -${column * CELL_SIZE_PX}px top -${row * CELL_SIZE_PX}px`,
+        backgroundPosition: `left -${column * LEGACY_ITEM_TILE_SIZE_PX}px top -${row * LEGACY_ITEM_TILE_SIZE_PX}px`,
       };
     };
+
+    const itemArt = item => resolveInventoryItemArt(item);
+    const itemPips = item => getInventoryVesselPips(item).filter(pip => pip.kind !== 'empty');
 
     const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
 
@@ -435,6 +481,7 @@ export default {
       dragState,
       gridStyle,
       totalSlots,
+      cellStyle,
       handlePointerMove,
       handlePointerLeave,
       beginPointerDrag,
@@ -445,6 +492,8 @@ export default {
       hideTooltip,
       itemStyle,
       itemSpriteStyle,
+      itemArt,
+      itemPips,
       itemClasses,
       itemAriaLabel,
       isItemDragging,
@@ -461,6 +510,8 @@ export default {
 
 <style lang="scss" scoped>
 .inventory-grid {
+  --legacy-sprite-scale: calc(var(--cell-size) / 32px);
+
   position: relative;
   display: grid;
   gap: var(--cell-gap);
@@ -554,16 +605,62 @@ export default {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: var(--cell-size);
-  height: var(--cell-size);
-  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%) scale(var(--legacy-sprite-scale, 1));
   background-repeat: no-repeat;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.85));
   image-rendering: pixelated;
 }
 
+.inventory-item__art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  width: 92%;
+  height: 90%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.72));
+  pointer-events: none;
+  user-select: none;
+}
+
+.inventory-item__pips {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  left: 3px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 1px 2px #000;
+}
+
+.inventory-item__pip--brand {
+  color: #dfb84e;
+}
+
+.inventory-item__pip--bond {
+  color: #65b8a7;
+}
+
+.inventory-item__pip--trophy {
+  color: #b88bea;
+}
+
+.inventory-item__pip--scar {
+  color: #a75d5d;
+}
+
 .inventory-item__quantity {
   position: relative;
+  z-index: 3;
   margin: 4px;
   padding: 2px 4px;
   background: rgba(0, 0, 0, 0.6);

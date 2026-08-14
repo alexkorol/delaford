@@ -399,13 +399,10 @@ export default {
       const viewportWidth = this.viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : width * scale);
       const viewportHeight = this.viewportHeight || (typeof window !== 'undefined' ? window.innerHeight : height * scale);
       const gutter = this.layoutMode === 'mobile' ? MOBILE_PANE_GUTTER : DESKTOP_PANE_GUTTER;
-      const paneWidth = this.resolvePaneWidth(viewportWidth);
-      const centerLeft = this.defaultLeftPane && this.layoutMode !== 'mobile'
-        ? paneWidth + (gutter * 2)
-        : gutter;
-      const centerRight = this.defaultRightPane && this.layoutMode !== 'mobile'
-        ? paneWidth + (gutter * 2)
-        : gutter;
+      // Desktop panes are fixed overlays. They must not mutate the authoritative
+      // map viewport or shrink the game every time a panel opens.
+      const centerLeft = gutter;
+      const centerRight = gutter;
       const centerTop = this.layoutMode === 'mobile' ? MOBILE_PANE_GUTTER : DESKTOP_PANE_GUTTER;
       const centerBottom = centerTop;
       const centerWidth = Math.max(displayTileWidth * 5, viewportWidth - centerLeft - centerRight - 8);
@@ -831,18 +828,6 @@ export default {
         this.viewportWidth = window.innerWidth;
         this.viewportHeight = window.innerHeight;
       });
-    },
-
-    resolvePaneWidth(viewportWidth = this.viewportWidth) {
-      if (this.layoutMode === 'mobile') {
-        return Math.max(0, viewportWidth - (MOBILE_PANE_GUTTER * 2));
-      }
-
-      if (this.layoutMode === 'tablet') {
-        return Math.min(viewportWidth * 0.44, 520);
-      }
-
-      return Math.min(Math.max(viewportWidth * 0.28, 420), 560);
     },
 
     applyWorldViewportToMap() {

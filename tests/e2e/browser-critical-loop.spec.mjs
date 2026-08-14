@@ -155,6 +155,23 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   await page.keyboard.press('KeyI');
   const inventory = page.getByLabel('Inventory panel');
   await expect(inventory).toBeVisible();
+  const canvasBoundsWithInventory = await canvas.boundingBox();
+  expect(canvasBoundsWithInventory).toEqual(expect.objectContaining({
+    width: canvasBounds.width,
+    height: canvasBounds.height,
+  }));
+
+  const backpackCells = inventory.locator('.inventory-grid__cell');
+  await expect(backpackCells).toHaveCount(84);
+  const backpackDistribution = await backpackCells.evaluateAll(cells => {
+    const bounds = cells.map(cell => cell.getBoundingClientRect());
+    return {
+      columns: new Set(bounds.map(rect => Math.round(rect.x))).size,
+      rows: new Set(bounds.map(rect => Math.round(rect.y))).size,
+    };
+  });
+  expect(backpackDistribution).toEqual({ columns: 12, rows: 7 });
+
   const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Pickaxe"]');
   const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
 
@@ -169,6 +186,7 @@ test('the built game supports the browser-critical guest loop', async ({ page })
     await unequipAction.click();
     await expect(inventoryItem).toBeVisible();
   }
+  await expect(inventoryItem.locator('.inventory-item__art')).toBeVisible();
 
   // Find an actually vacant, visible run for the pickaxe's 1x3 footprint.
   // Persistent browser passes can rearrange the shared development backpack.
