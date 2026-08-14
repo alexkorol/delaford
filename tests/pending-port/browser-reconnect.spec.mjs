@@ -67,8 +67,20 @@ const stopGameServer = async () => {
 };
 
 const loginGuest = async (page) => {
-  await page.goto('/?play');
-  await expect(page.locator('canvas#game-map')).toBeVisible({ timeout: 30000 });
+  await page.goto(gameUrl + '/?play');
+  try {
+    await expect(page.locator('canvas#game-map')).toBeVisible({ timeout: 30000 });
+  } catch (error) {
+    const debug = await page.evaluate(() => ({
+      byQuery: Boolean(document.querySelector('canvas#game-map')),
+      canvasCount: document.querySelectorAll('canvas').length,
+      wsState: window.ws ? window.ws.readyState : 'none',
+      banner: document.body.innerText.slice(0, 80),
+      url: window.location.href,
+    }));
+    console.log('LOGIN-DEBUG', JSON.stringify(debug));
+    throw error;
+  }
 };
 
 test.describe('browser session resilience', () => {

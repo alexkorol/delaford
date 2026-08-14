@@ -100,9 +100,13 @@ class Socket {
 
   static emit(event, data) {
     if (event === 'player:login') {
+      // Quick-guest and resume logins drive their own admission through the
+      // chronicle-auth flow; only interactive logins park on the Chronicles
+      // screen (awaitChronicles).
+      const quickFlow = data && (data.quickGuest === true || data.resumeScionId);
       Socket.lastLoginPayload = {
         ...data,
-        awaitChronicles: true,
+        ...(quickFlow ? {} : { awaitChronicles: true }),
       };
       data = Socket.lastLoginPayload;
     }

@@ -115,6 +115,7 @@ import { useUiStore } from '@/stores/ui.js';
 
 import bus from '../../core/utilities/bus.js';
 import Socket from '../../core/utilities/socket.js';
+import { startBrowserGuestSession } from '../../core/auth/guest-session.js';
 
 const uiStore = useUiStore();
 
@@ -170,6 +171,15 @@ const cancel = () => {
   bus.emit('go:main');
 };
 
+// ?play: one URL from zero to playing. Each browser carries its own guest
+// chronicle (crypto-random guestId), entering through the chronicle-auth
+// quick-guest flow straight into a populated world.
+const quickPlay = () => {
+  if (isLoginInProgress.value) return;
+  setLoginProgress(true);
+  startBrowserGuestSession({ quickStart: true });
+};
+
 const incorrectLogin = () => {
   setLoginProgress(false);
   invalid.value = true;
@@ -206,6 +216,16 @@ const handleLoginComplete = () => setLoginProgress(false);
 
 onMounted(() => {
   invalid.value = false;
+
+  if (new URLSearchParams(window.location.search).has('play')
+    && !window.__verdigrisQuickPlayConsumed) {
+    // The component can remount after logout/session replacement. Auto-play
+    // is a page-entry promise, not permission to steal the scion back from a
+    // newer tab. A full reload gets a fresh window and may auto-play again.
+    window.__verdigrisQuickPlayConsumed = true;
+    setTimeout(quickPlay, 50);
+    return;
+  }
 
   const tempGuest = window.location.href.includes('?useGuestAccount');
 

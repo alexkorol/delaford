@@ -270,12 +270,13 @@ export default {
       // the socket authenticates as an ACCOUNT, then negotiates a House and
       // scion through the chronicles:* events before world admission. This is
       // the flow the world-web/wagon systems key their identity off.
+      // quickGuest/resumeScionId are explicit intents and outrank a stray
+      // awaitChronicles flag (the browser socket wrapper decorates logins).
       const wantsChronicleAuthFlow = payload.useGuestAccount === true
-        && !payload.awaitChronicles
         && !payload.scionName
         && (payload.quickGuest === true
           || typeof payload.resumeScionId === 'string'
-          || typeof payload.guestId === 'string');
+          || (!payload.awaitChronicles && typeof payload.guestId === 'string'));
 
       if (wantsChronicleAuthFlow) {
         const guestId = typeof payload.guestId === 'string'
