@@ -5,6 +5,7 @@ import merge from 'lodash/merge.js';
 import socketEvents from './handlers/socket-events/index.js';
 import playerEvent from './handlers/actions/index.js';
 import { isAllowedActionId } from '#server/core/data/action-list.js';
+import { occupiedTile } from '#shared/movement.js';
 
 class Action {
   constructor(player, miscData) {
@@ -166,32 +167,50 @@ class Action {
       { center },
     )); // TODO: Add foreground.
 
-    // If the player clicked on himself make the action be immediate
-    if (clickedTile.x === center.x && clickedTile.y === center.y) {
-      incomingAction.queueable = false;
-      if (queuedAction) {
-        queuedAction.queueable = false;
-      }
-    }
+    // A context action can carry an authoritative world coordinate even when
+    // its viewport-relative tile is omitted or stale (keyboard/controller and
+    // headless clients do this). If that world target is the tile already
+    // occupied by the player, execute immediately instead of pathing away and
+    // leaving the queued action stranded.
+    const playerTile = occupiedTile(this.player);
+    const targetsOccupiedTile = playerTile.x === Math.round(worldCoordinates.x)
+      && playerTile.y === Math.round(worldCoordinates.y);
+    const targetsCurrentTile = (clickedTile.x === center.x && clickedTile.y === center.y)
+      || targetsOccupiedTile;
+
+    const queuedPayload = () => merge({}, queuedAction, {
+      player: {
+        socket_id: this.player.socket_id,
+      },
+      actionToQueue: {
+        ...data.item.action,
+        onTile: this.tile,
+        coordinates: { x: clickedTile.x, y: clickedTile.y },
+        world: worldCoordinates,
+        viewport: viewportState,
+        center: centerState,
+      },
+    });
 
     // If an action needs to be performed
     // after a player reaches their destination
     if (queuedAction && queuedAction.queueable) {
+      if (targetsCurrentTile) {
+        const immediateTodo = queuedPayload();
+        const actionId = immediateTodo.action && immediateTodo.action.actionId;
+        if (isAllowedActionId(actionId) && typeof playerEvent[actionId] === 'function') {
+          playerEvent[actionId]({
+            todo: immediateTodo,
+            playerUuid: this.player.uuid,
+            socketId: this.player.socket_id,
+          });
+        }
+        return;
+      }
+
       // Queue it up and tell the server.
       // IF already in queue... do not add it
-      socketEvents['player:queueAction'](merge(queuedAction, {
-        player: {
-          socket_id: this.player.socket_id,
-        },
-        actionToQueue: {
-          ...data.item.action,
-          onTile: this.tile,
-          coordinates: { x: clickedTile.x, y: clickedTile.y },
-          world: worldCoordinates,
-          viewport: viewportState,
-          center: centerState,
-        },
-      }), { id: this.player.socket_id });
+      socketEvents['player:queueAction'](queuedPayload(), { id: this.player.socket_id });
     }
 
     // Object need to complete an action

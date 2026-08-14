@@ -401,6 +401,43 @@ describe('ContextMenu strategies', () => {
     }, null)).not.toThrow();
   });
 
+  it('executes an explicit current-world-tile action without pathing away', () => {
+    const take = vi.spyOn(actionEvents, 'player:take').mockImplementation(() => {});
+    const action = new Action(player.socket_id, { clickedOn: { 0: 'gameMap' } });
+    const queuedAction = {
+      action: { actionId: 'player:take' },
+      item: { id: 'apple', uuid: 'item-apple' },
+      at: { x: player.x, y: player.y },
+      queueable: true,
+    };
+
+    action.do({
+      tile: {
+        x: 0,
+        y: 0,
+        world: { x: player.x, y: player.y },
+      },
+      item: {
+        id: 'apple',
+        action: {
+          name: 'Take',
+          actionId: 'player:take',
+          queueable: true,
+          nearby: 'edge',
+        },
+      },
+    }, queuedAction);
+
+    expect(queuedAction.queueable).toBe(true);
+    expect(take).toHaveBeenCalledTimes(1);
+    expect(take).toHaveBeenCalledWith(expect.objectContaining({
+      todo: expect.objectContaining({
+        item: expect.objectContaining({ id: 'apple' }),
+        action: { actionId: 'player:take' },
+      }),
+    }));
+  });
+
   it('ignores malformed context-menu action payloads without reaching Action', () => {
     const malformed = [
       {},

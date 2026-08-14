@@ -14,14 +14,6 @@
       "level": 1,
       "exp": 0
     },
-    "mining": {
-      "level": 1,
-      "exp": 0
-    },
-    "smithing": {
-      "level": 1,
-      "exp": 0
-    },
     "fishing": {
       "level": 1,
       "exp": 0
@@ -40,11 +32,13 @@
     "left_hand": null,
     "gloves": null,
     "feet": null,
-    "ring": null
+    "ring": null,
+    "ring2": null,
+    "belt": null
   },
   "inventory": [
     {
-      "id": "bronze-pickaxe",
+      "id": "bronze-dagger",
       "slot": 0,
       "uuid": "1aab021e-3d97-47b0-b1ec-ebba5c2d925c"
     },

@@ -172,14 +172,16 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   });
   expect(backpackDistribution).toEqual({ columns: 12, rows: 7 });
 
-  const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Pickaxe"]');
+  await expect(inventory.locator('.inventory-item[aria-label*="Pickaxe"]')).toHaveCount(0);
+  await expect(inventory.locator('.inventory-item[aria-label*="Bronze Bar"]')).toHaveCount(0);
+  const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Dagger"]');
   const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
 
   // The shared development guest is intentionally persistent. A previous
-  // browser pass may have left the starter pickaxe equipped, so normalise it
+  // browser pass may have left the starter dagger equipped, so normalise it
   // through the server-authored menu before asserting both pointer directions.
   if (!(await inventoryItem.isVisible())) {
-    await expect(rightHand).toHaveAttribute('aria-label', /^Bronze Pickaxe/);
+    await expect(rightHand).toHaveAttribute('aria-label', /^Bronze Dagger/);
     await rightHand.click({ button: 'right' });
     const unequipAction = page.locator('#actions .action', { hasText: 'Unequip' });
     await expect(unequipAction).toBeVisible();
@@ -188,9 +190,9 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   }
   await expect(inventoryItem.locator('.inventory-item__art')).toBeVisible();
 
-  // Find an actually vacant, visible run for the pickaxe's 1x3 footprint.
+  // Find an actually vacant, visible run for the dagger's 1x2 footprint.
   // Persistent browser passes can rearrange the shared development backpack.
-  const emptyInventoryCell = await visibleEmptyInventoryCell(page, inventory, 3);
+  const emptyInventoryCell = await visibleEmptyInventoryCell(page, inventory, 2);
 
   // Pointer drag must use the same authoritative equip/unequip flow as the
   // context menu, including the reverse trip back into an empty grid cell.

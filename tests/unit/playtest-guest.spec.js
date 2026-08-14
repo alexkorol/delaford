@@ -22,6 +22,20 @@ describe('playtest guest identities', () => {
     })).toBe(template);
   });
 
+  it('isolates persistent browser guests in production without exposing playtest controls', () => {
+    const profile = resolveGuestProfile(template, {
+      guestId: 'A1234567-89AB-CDEF-0123-456789ABCDEF',
+    }, {
+      NODE_ENV: 'production',
+    });
+
+    expect(profile).toEqual(expect.objectContaining({
+      uuid: 'browser-guest-a1234567-89ab-cdef-0123-456789abcdef',
+      username: 'Guest-abcdef',
+    }));
+    expect(profile.skills).not.toBe(template.skills);
+  });
+
   it('builds isolated identities without mutating the canonical template', () => {
     const profile = resolveGuestProfile(template, {
       playtestGuestId: 'party-leader',

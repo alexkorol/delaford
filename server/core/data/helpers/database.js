@@ -14,7 +14,9 @@ const presetActions = (items) => {
   items.forEach((item) => {
     switch (item) {
     default:
-      list = [...item];
+      // Retired action presets from the old gathering/crafting loop must not
+      // turn into one-letter actions ("anvil" previously became a,n,v,i,l).
+      list = [];
       break;
       // Every wearable, you can
       // drop, examine, take, .etc.

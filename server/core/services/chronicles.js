@@ -6,6 +6,7 @@ import chroniclesRepository from '#server/core/repositories/chronicles-repositor
 import wagonService from '#server/core/services/wagon-service.js';
 import world from '#server/core/world.js';
 import { sanitiseChronicleName } from '#shared/html.js';
+import { createScionSessionProfile } from '#server/core/entities/player/fresh-scion-profile.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -163,10 +164,11 @@ export const beginScionSession = async (ws, scionId, { resume = false, quickStar
     },
   };
   const data = {
-    ...clone(auth.profile),
-    ...saved,
-    username: scion.name,
-    uuid: scion.id,
+    ...createScionSessionProfile({
+      accountProfile: auth.profile,
+      snapshot: saved,
+      scion,
+    }),
     lifecycle,
     sceneId: world.defaultTownId,
   };

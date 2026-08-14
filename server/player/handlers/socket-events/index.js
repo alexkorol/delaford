@@ -27,6 +27,7 @@ import {
   sendChronicleState,
 } from '#server/core/services/chronicles.js';
 import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
+import { createFreshScionProfile } from '#server/core/entities/player/fresh-scion-profile.js';
 
 // Fast in-process mirror; authoritative scion snapshots also persist this in
 // SQLite through PlayerPersistenceService.
@@ -107,65 +108,14 @@ const cleanChroniclesId = (value) => {
   return cleaned && cleaned.length <= 80 ? cleaned : null;
 };
 
-const resetScionState = (player) => {
-  const lifecycle = player.stats && player.stats.lifecycle;
-  const resources = player.stats && player.stats.resources;
-  if (lifecycle) {
-    lifecycle.state = 'alive';
-    lifecycle.deaths = 0;
-    lifecycle.livesRemaining = 0;
-    lifecycle.lastEvent = {
-      type: 'scion-begin',
-      occurredAt: Date.now(),
-    };
-    if (lifecycle.cheatDeath) {
-      lifecycle.cheatDeath.charges = 1;
-      lifecycle.cheatDeath.lastTriggerAt = null;
-    }
-    if (lifecycle.respawn) {
-      lifecycle.respawn.pending = false;
-      lifecycle.respawn.at = null;
-      lifecycle.respawn.lastAt = null;
-      lifecycle.respawn.location = null;
-    }
-  }
-
-  if (resources && resources.health) {
-    resources.health.current = resources.health.max;
-    player.hp = resources.health;
-  }
-  if (resources && resources.mana) {
-    resources.mana.current = resources.mana.max;
-    player.mana = resources.mana;
-  }
-
-  if (player.combat) {
-    Combat.clearAutoAttack(player, 'scion-change');
-    player.combat.buffs = {};
-    player.combat.cooldowns = {};
-    player.combat.globalCooldown = 0;
-    player.combat.lastSkill = null;
-    player.combat.inputHistory = [];
-  }
-  if (typeof player.cancelPathfinding === 'function') {
-    player.cancelPathfinding();
-  }
-};
-
-const applyScionIdentity = (player, identity = {}) => {
+const applyScionIdentity = (player, identity = {}, sameScion = false) => {
   const payload = typeof identity === 'string' ? { scionName: identity } : (identity || {});
   const validation = validateScionName(payload.scionName);
   if (!validation.valid) {
     return validation;
   }
 
-  const previousScionId = cleanChroniclesId(player.chronicles && player.chronicles.scionId);
   const scionId = cleanChroniclesId(payload.scionId);
-  const sameScion = Boolean(previousScionId && scionId && previousScionId === scionId);
-  if (!sameScion) {
-    resetScionState(player);
-  }
-
   player.username = validation.value;
   player.chronicles = {
     houseId: cleanChroniclesId(payload.houseId),
@@ -177,29 +127,52 @@ const applyScionIdentity = (player, identity = {}) => {
     player.lifecycle = player.stats.lifecycle;
   }
 
-  return { ...validation, sameScion };
+  return { ...validation, sameScion, player };
+};
+
+const freshPlayerForScion = (player, identity) => {
+  const payload = typeof identity === 'string' ? { scionName: identity } : (identity || {});
+  const fresh = new Player(createFreshScionProfile({
+    username: payload.scionName,
+    uuid: player.uuid,
+    friendList: player.friend_list,
+  }), player.token, player.socket_id);
+  fresh.accountUsername = player.accountUsername || player.username;
+  return fresh;
 };
 
 const resolveScionIdentity = (player, identity = {}) => {
   const snapshot = chroniclesStore.snapshot(player.uuid);
-  if (!snapshot.exists) {
-    return applyScionIdentity(player, identity);
-  }
-
-  const match = chroniclesStore.findLivingScion(player.uuid, identity);
-  if (!match) {
-    return {
-      valid: false,
-      reason: 'That Scion is not living in this account Chronicle.',
+  let resolvedIdentity = identity;
+  if (snapshot.exists) {
+    const match = chroniclesStore.findLivingScion(player.uuid, identity);
+    if (!match) {
+      return {
+        valid: false,
+        reason: 'That Scion is not living in this account Chronicle.',
+      };
+    }
+    resolvedIdentity = {
+      houseId: match.house.id,
+      scionId: match.scion.id,
+      scionName: match.scion.name,
+      mortal: match.scion.mortal,
     };
   }
 
-  return applyScionIdentity(player, {
-    houseId: match.house.id,
-    scionId: match.scion.id,
-    scionName: match.scion.name,
-    mortal: match.scion.mortal,
-  });
+  const payload = typeof resolvedIdentity === 'string'
+    ? { scionName: resolvedIdentity }
+    : (resolvedIdentity || {});
+  const validation = validateScionName(payload.scionName);
+  if (!validation.valid) {
+    return validation;
+  }
+  const previousScionId = cleanChroniclesId(player.chronicles && player.chronicles.scionId);
+  const scionId = cleanChroniclesId(payload.scionId);
+  const sameScion = Boolean(previousScionId && scionId && previousScionId === scionId);
+  const selectedPlayer = sameScion ? player : freshPlayerForScion(player, payload);
+
+  return applyScionIdentity(selectedPlayer, payload, sameScion);
 };
 
 const chroniclesPayload = (player, extra = {}) => {
@@ -270,8 +243,10 @@ export default {
       // the socket authenticates as an ACCOUNT, then negotiates a House and
       // scion through the chronicles:* events before world admission. This is
       // the flow the world-web/wagon systems key their identity off.
-      // quickGuest/resumeScionId are explicit intents and outrank a stray
-      // awaitChronicles flag (the browser socket wrapper decorates logins).
+      // quickGuest/resumeScionId are explicit account-scoped intents and
+      // outrank a stray awaitChronicles flag. An interactive guestId carrying
+      // awaitChronicles stays on the mounted legacy Chronicles screen, but
+      // resolveGuestProfile still isolates it from the shared dev profile.
       const wantsChronicleAuthFlow = payload.useGuestAccount === true
         && !payload.scionName
         && (payload.quickGuest === true
@@ -340,6 +315,9 @@ export default {
         ws.pendingPlayer = player;
         return;
       }
+      if (scionValidation?.player) {
+        player = scionValidation.player;
+      }
 
       if (payload.awaitChronicles && !payload.scionName) {
         ws.pendingPlayer = player;
@@ -370,8 +348,8 @@ export default {
    * directly and never enter this pending state.
    */
   'player:chronicles:select': ({ data }, ws) => {
-    const player = ws && ws.pendingPlayer;
-    if (!player) {
+    const pendingPlayer = ws && ws.pendingPlayer;
+    if (!pendingPlayer) {
       emitChroniclesError(ws, 'This Chronicles session is no longer awaiting a scion.');
       return;
     }
@@ -381,11 +359,12 @@ export default {
       return;
     }
 
-    const validation = resolveScionIdentity(player, data);
+    const validation = resolveScionIdentity(pendingPlayer, data);
     if (!validation.valid) {
       emitChroniclesError(ws, validation.reason);
       return;
     }
+    const player = validation.player;
 
     const record = chroniclesStore.snapshot(player.uuid);
     if (record.exists) {

@@ -1,6 +1,4 @@
-export default [{
-  id: 'bronze-pickaxe',
-  respawnIn: '8s',
-  x: 20,
-  y: 112,
-}];
+// Weapon progression now comes from Scion loadouts, vendors, and adventure
+// loot. Keep the retired mining pickaxe definition for old-save tolerance,
+// but do not respawn one into the live town.
+export default [];

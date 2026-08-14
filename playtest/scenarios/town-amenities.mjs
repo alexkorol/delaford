@@ -13,6 +13,10 @@ export default async function townAmenities({ connect, assert }) {
     assert(state.sceneType === 'town', 'new scion begins in Delaford town');
     assert(!state.inventory.some(item => item.id === 'hammer'), 'starter backpack omits the smithing hammer');
     assert(!state.inventory.some(item => item.id === 'bronze-bar'), 'starter backpack omits bronze ingots');
+    assert(!state.inventory.some(item => item.id.includes('pickaxe')), 'starter backpack omits retired mining pickaxes');
+    const starterDagger = state.inventory.find(item => item.id === 'bronze-dagger');
+    assert(starterDagger, 'new scion receives a proper starter dagger');
+    assert(starterDagger.size?.width === 1 && starterDagger.size?.height === 2, 'starter dagger occupies its authored 1x2 footprint');
     assert(state.inventory.some(item => item.id === 'coins' && item.qty >= 100), 'starter gold remains available');
 
     ['bronze-med-helm', 'bronze-gloves', 'bronze-boots'].forEach(itemId => p.devGive(itemId));

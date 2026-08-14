@@ -12,7 +12,7 @@ describe('stale player snapshot tolerance', () => {
 
     expect(fresh.bank).toEqual([]);
     expect(Object.values(fresh.skills).every(skill => skill.level === 1 && skill.exp === 0)).toBe(true);
-    expect(fresh.inventory.slots.map(item => item.id)).toEqual(['bronze-pickaxe', 'coins']);
+    expect(fresh.inventory.slots.map(item => item.id)).toEqual(['bronze-dagger', 'coins']);
     expect(playerTemplate).not.toHaveProperty('x_ORIG');
     expect(playerTemplate).not.toHaveProperty('y_ORIG');
     expect(playerTemplate).not.toHaveProperty('sign_in');

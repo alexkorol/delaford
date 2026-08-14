@@ -202,13 +202,15 @@ const login = () => {
   Socket.emit('player:login', data);
 };
 
-// One click from the title screen to playing: skip the credential form
-// entirely and log in with the shared guest account.
+// One click from the title screen to Chronicles. Each browser owns a secure
+// guest identity; the explicit developer "Guest account?" checkbox below is
+// the only path that should load the old shared dev profile.
 const playAsGuest = () => {
   if (isLoginInProgress.value) return;
   guestAccount.value = true;
   uiStore.setGuestAccount(true);
-  login();
+  setLoginProgress(true);
+  startBrowserGuestSession();
 };
 
 const handleLoginError = () => incorrectLogin();

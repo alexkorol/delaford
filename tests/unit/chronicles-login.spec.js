@@ -158,6 +158,32 @@ describe('Chronicles login admission', () => {
     expect(Authentication.addPlayer.mock.calls[0][0].accountUsername).toBe('dev');
   });
 
+  it('holds a browser-specific guest on an isolated legacy Chronicle profile', async () => {
+    const ws = { id: 'socket-browser-guest', authenticated: false };
+
+    await socketEvents['player:login']({
+      data: {
+        useGuestAccount: true,
+        guestId: 'browser-guest-1234',
+        awaitChronicles: true,
+      },
+    }, ws);
+
+    expect(ws.authenticated).toBe(true);
+    expect(ws.chronicleAuth).toBeUndefined();
+    expect(ws.pendingPlayer).toEqual(expect.objectContaining({
+      uuid: 'browser-guest-browser-guest-1234',
+      username: 'Guest-st1234',
+    }));
+    expect(Authentication.addPlayer).not.toHaveBeenCalled();
+    expect(Socket.emit).toHaveBeenCalledWith('player:chronicles:ready', expect.objectContaining({
+      player: { socket_id: 'socket-browser-guest' },
+      chroniclesAccountId: 'browser-guest-browser-guest-1234',
+      accountName: 'Guest-st1234',
+    }));
+    expect(Socket.emit).not.toHaveBeenCalledWith('chronicles:state', expect.anything());
+  });
+
   it('persists a browser Chronicle and acknowledges the canonical revision', async () => {
     const player = { uuid: 'account-1', socket_id: 'socket-save' };
     const ws = { id: 'socket-save', authenticated: true, pendingPlayer: player };
@@ -197,6 +223,11 @@ describe('Chronicles login admission', () => {
       socket_id: 'socket-canonical',
       username: 'account',
       accountUsername: 'account',
+      level: 27,
+      inventory: [{ id: 'bronze-bar', uuid: 'inherited-bars', qty: 4 }],
+      wear: { right_hand: { id: 'bronze-pickaxe', uuid: 'inherited-pickaxe' } },
+      bank: [{ id: 'gold-ring', uuid: 'inherited-bank-item' }],
+      passiveTree: { nodes: ['inherited-build'] },
       chronicles: null,
       stats: {
         resources: {
@@ -233,12 +264,62 @@ describe('Chronicles login admission', () => {
       },
     }, ws);
 
-    expect(player.username).toBe('Vesper');
-    expect(player.chronicles).toEqual({
+    const admitted = Authentication.addPlayer.mock.calls[0][0];
+    expect(admitted).not.toBe(player);
+    expect(admitted.username).toBe('Vesper');
+    expect(admitted.chronicles).toEqual({
       houseId: 'house-real',
       scionId: 'scion-real',
       mortal: true,
     });
+    expect(admitted.level).toBe(1);
+    expect(admitted.inventory.map(item => item.id)).toEqual(['bronze-dagger', 'coins']);
+    expect(admitted.bank).toEqual([]);
+    expect(admitted.passiveTree).toBeNull();
+    expect(Object.values(admitted.wear).every(item => item === null)).toBe(true);
+  });
+
+  it('preserves progression when reconnecting to the same server-owned Scion', () => {
+    const player = {
+      uuid: 'account-same',
+      socket_id: 'socket-same',
+      username: 'Vesper',
+      accountUsername: 'account',
+      level: 11,
+      inventory: [{ id: 'vessel-handaxe', uuid: 'earned-axe' }],
+      bank: [{ id: 'gold-ring', uuid: 'earned-ring' }],
+      passiveTree: { nodes: ['0,0'] },
+      friend_list: [],
+      chronicles: { houseId: 'house-real', scionId: 'scion-real', mortal: true },
+      stats: {
+        resources: {
+          health: { current: 7, max: 110 },
+          mana: { current: 20, max: 90 },
+        },
+        lifecycle: { mode: 'hard', state: 'alive', respawn: {}, cheatDeath: {} },
+      },
+    };
+    const ws = { id: 'socket-same', authenticated: true, pendingPlayer: player };
+    chroniclesStoreMock.snapshot.mockReturnValue({
+      exists: true,
+      revision: 2,
+      state: { version: 3, houses: [], activeHouseId: null, activeScionId: 'scion-real' },
+    });
+    chroniclesStoreMock.findLivingScion.mockReturnValue({
+      house: { id: 'house-real' },
+      scion: { id: 'scion-real', name: 'Vesper', mortal: true },
+    });
+
+    socketEvents['player:chronicles:select']({
+      data: { scionId: 'scion-real', scionName: 'forged-name' },
+    }, ws);
+
+    const admitted = Authentication.addPlayer.mock.calls[0][0];
+    expect(admitted).toBe(player);
+    expect(admitted.level).toBe(11);
+    expect(admitted.inventory).toEqual([{ id: 'vessel-handaxe', uuid: 'earned-axe' }]);
+    expect(admitted.bank).toEqual([{ id: 'gold-ring', uuid: 'earned-ring' }]);
+    expect(admitted.passiveTree).toEqual({ nodes: ['0,0'] });
   });
 
   it('keeps the raw headless login contract unchanged', async () => {
@@ -333,14 +414,18 @@ describe('Chronicles login admission', () => {
     }, ws);
 
     expect(Authentication.addPlayer).toHaveBeenCalledTimes(2);
-    expect(Authentication.addPlayer.mock.calls[1][0]).toBe(mortal);
-    expect(mortal.username).toBe('Sable');
-    expect(mortal.stats.lifecycle).toEqual(expect.objectContaining({
+    const successor = Authentication.addPlayer.mock.calls[1][0];
+    expect(successor).not.toBe(mortal);
+    expect(mortal.username).toBe('Morrow');
+    expect(mortal.stats.lifecycle.state).toBe('permadead');
+    expect(successor.username).toBe('Sable');
+    expect(successor.inventory.map(item => item.id)).toEqual(['bronze-dagger', 'coins']);
+    expect(successor.stats.lifecycle).toEqual(expect.objectContaining({
       mode: 'soft',
       state: 'alive',
       deaths: 0,
     }));
-    expect(mortal.stats.resources.health.current).toBe(110);
-    expect(mortal.sceneId).toBe('town-1');
+    expect(successor.stats.resources.health.current).toBe(110);
+    expect(successor.sceneId).toBe('town-1');
   });
 });
