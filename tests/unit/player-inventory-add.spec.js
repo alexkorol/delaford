@@ -94,7 +94,7 @@ describe('authoritative inventory grants', () => {
     const player = makePlayer(fillers(84));
     world.addPlayer(player);
 
-    const result = await player.inventory.add('bronze-sword', 1);
+    const result = await player.inventory.add('bronze-sword', 1, { overflow: 'drop' });
 
     expect(result).toMatchObject({ requested: 1, added: 0, dropped: 1, rejected: 0 });
     expect(player.inventory.slots).toHaveLength(84);

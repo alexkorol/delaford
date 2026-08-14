@@ -46,7 +46,7 @@ describe('server inventory additions', () => {
 
     const result = inventory.add('coins', 37);
 
-    expect(result).toEqual({ ok: true, added: 37, remainder: 0 });
+    expect(result).toMatchObject({ ok: true, added: 37, remainder: 0 });
     expect(inventory.slots).toHaveLength(85);
     expect(inventory.slots.find(item => item.uuid === 'coin-stack').qty).toBe(137);
   });
@@ -61,7 +61,7 @@ describe('server inventory additions', () => {
     const inventory = new Inventory(fillers, 'inventory-socket', 'inventory-player');
     attachInventory(inventory);
 
-    expect(inventory.add('coins', 37)).toEqual({ ok: true, added: 37, remainder: 0 });
+    expect(inventory.add('coins', 37)).toMatchObject({ ok: true, added: 37, remainder: 0 });
     expect(inventory.slots.find(item => item.id === 'coins')).toMatchObject({
       qty: 37,
       slot: null,
@@ -80,7 +80,7 @@ describe('server inventory additions', () => {
     const inventory = new Inventory(fillers, 'inventory-socket', 'inventory-player');
     attachInventory(inventory);
 
-    expect(inventory.add('bronze-sword', 1)).toEqual({
+    expect(inventory.add('bronze-sword', 1)).toMatchObject({
       ok: false,
       added: 0,
       remainder: 1,

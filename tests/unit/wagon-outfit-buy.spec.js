@@ -73,7 +73,7 @@ describe('wagon outfit purchase atomicity (cand-009)', () => {
 
     await buy();
 
-    expect(add).toHaveBeenCalledWith(itemId, 1);
+    expect(add).toHaveBeenCalledWith(itemId, 1, { overflow: 'reject' });
     expect(treasuryOf(lineage.accountId)).toBe(before - price);
     expect(Socket.emit).toHaveBeenCalledWith('core:refresh:inventory', expect.objectContaining({
       player: { socket_id: player.socket_id },
@@ -90,7 +90,7 @@ describe('wagon outfit purchase atomicity (cand-009)', () => {
 
     await buy();
 
-    expect(add).toHaveBeenCalledWith(itemId, 1);
+    expect(add).toHaveBeenCalledWith(itemId, 1, { overflow: 'reject' });
     expect(treasuryOf(lineage.accountId)).toBe(before);
     expect(Socket.emit).not.toHaveBeenCalledWith('core:refresh:inventory', expect.anything());
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({

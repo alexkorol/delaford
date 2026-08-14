@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import DUNGEON_TILESET, { DUNGEON_FIRST_GID, dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
 import UI from '#shared/ui.js';
 import GameMap from '#server/core/map.js';
+import { INSTANCE_MONSTER_COLUMNS } from '#shared/actor-graphics.js';
 
 const zero = gid => gid - 1;
 
@@ -155,11 +156,14 @@ describe('generateInstance themes', () => {
 
   it('gives generated monster roles distinct silhouettes', async () => {
     const themes = ['dungeon', 'crypt', 'sand', 'volcanic', 'marsh', 'grove', 'wilds'];
+    const atlasColumns = new Set(
+      Object.values(INSTANCE_MONSTER_COLUMNS).flatMap(theme => Object.values(theme)),
+    );
     await Promise.all(themes.map(async (template) => {
       const { monsters } = await GameMap.generateInstance({ seed: 7, template });
       const columns = new Set(monsters.map(monster => monster.graphic?.column));
       expect(columns.size, `${template} silhouette count`).toBeGreaterThanOrEqual(3);
-      expect([...columns].every(column => Number.isInteger(column) && column >= 0 && column < 18)).toBe(true);
+      expect([...columns].every(column => atlasColumns.has(column))).toBe(true);
     }));
   });
 

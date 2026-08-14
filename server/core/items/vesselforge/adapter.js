@@ -33,13 +33,23 @@ const DEFAULT_ITEM_LEVEL = 10;
 
 const forge = createForge(verdigrisPack);
 
-export const vesselEligible = item => Boolean(
-  item
-  && !item.stackable
-  && item.vesselforge
-  && typeof item.vesselforge.formId === 'string'
-  && verdigrisPack.forms[item.vesselforge.formId],
-);
+// Two catalogue shapes request a vessel roll: the native Vessel catalogue
+// carries { vesselforge: { formId, materialId } }; curated Verdigris bases
+// carry top-level vesselForm / vesselMaterial hints.
+const vesselHints = (item) => {
+  if (item?.vesselforge && typeof item.vesselforge.formId === 'string') {
+    return item.vesselforge;
+  }
+  if (typeof item?.vesselForm === 'string') {
+    return { formId: item.vesselForm, materialId: item.vesselMaterial };
+  }
+  return null;
+};
+
+export const vesselEligible = (item) => {
+  const hints = item && !item.stackable ? vesselHints(item) : null;
+  return Boolean(hints && verdigrisPack.forms[hints.formId]);
+};
 
 const zeroCombatStats = () => ({
   attack: { stab: 0, slash: 0, crush: 0, range: 0 },
@@ -225,7 +235,12 @@ export const createVesselBlock = (baseItem, options = {}) => {
   const rng = typeof options.rng === 'function' ? options.rng : Math.random;
   forge.reseed(Math.floor(rng() * 2 ** 32));
 
-  const { formId, materialId } = baseItem.vesselforge;
+  const hints = vesselHints(baseItem);
+  const { formId } = hints;
+  const form = verdigrisPack.forms[formId];
+  const materialId = hints.materialId && form.materials.includes(hints.materialId)
+    ? hints.materialId
+    : undefined;
   const ilvl = Number.isFinite(options.ilvl) && options.ilvl > 0
     ? Math.min(80, Math.floor(options.ilvl))
     : DEFAULT_ITEM_LEVEL;

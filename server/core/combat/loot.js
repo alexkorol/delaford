@@ -3,6 +3,8 @@ import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
 import { drawCirculatingRelic } from '#server/core/services/chronicles.js';
+import config from '#server/config.js';
+import UI from '#shared/ui.js';
 import {
   isActiveQuest,
   isCurrentQuestObjective,
@@ -55,6 +57,75 @@ export const applyGoodsFoundToGearChance = (chance, player) => Math.min(
   Math.max(0, Number(chance) || 0) * (1 + (goodsFoundPercent(player) / 100)),
 );
 
+const sameTile = (left, right) => (
+  left
+  && right
+  && left.x === right.x
+  && left.y === right.y
+);
+
+const transitionTiles = (scene) => {
+  const metadata = scene && scene.metadata ? scene.metadata : {};
+  return [
+    metadata.stairsUp,
+    metadata.stairsDown,
+    ...(Array.isArray(metadata.portals) ? metadata.portals : []),
+  ].filter(Boolean);
+};
+
+const isSafeLootTile = (scene, x, y) => {
+  const map = scene && scene.map;
+  const width = config.map.size.x;
+  const height = config.map.size.y;
+  if (!map || !Array.isArray(map.background) || !Array.isArray(map.foreground)) {
+    return true;
+  }
+  if (x < 0 || y < 0 || x >= width || y >= height) {
+    return false;
+  }
+  if (transitionTiles(scene).some(tile => sameTile(tile, { x, y }))) {
+    return false;
+  }
+
+  const index = (y * width) + x;
+  const background = map.background[index];
+  const foreground = map.foreground[index];
+  const backgroundWalkable = Number.isFinite(background)
+    && UI.tileWalkable(background - 1, 'background');
+  const foregroundWalkable = !foreground || UI.tileWalkable(foreground - 1, 'foreground');
+  return backgroundWalkable && foregroundWalkable;
+};
+
+/**
+ * Loot must never land on stairs or portals (walking onto it to pick it up
+ * would transition the floor). Spiral outward until a safe walkable tile is
+ * found; fall back to the origin if the whole neighbourhood is blocked.
+ */
+export const resolveLootLocation = (scene, x, y) => {
+  const origin = { x: Math.round(x), y: Math.round(y) };
+  if (isSafeLootTile(scene, origin.x, origin.y)) {
+    return origin;
+  }
+
+  for (let radius = 1; radius <= 6; radius += 1) {
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const candidates = [
+        { x: origin.x + offset, y: origin.y - radius },
+        { x: origin.x + offset, y: origin.y + radius },
+        { x: origin.x - radius, y: origin.y + offset },
+        { x: origin.x + radius, y: origin.y + offset },
+      ];
+      for (const candidate of candidates) {
+        if (isSafeLootTile(scene, candidate.x, candidate.y)) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  return origin;
+};
+
 /**
  * Drop a slain monster's rewards onto its tile: its coin bounty always,
  * plus a rarity-gated chance of a piece of gear. Drops land in the
@@ -75,9 +146,11 @@ export const dropMonsterLoot = (monster, options = {}) => {
   }
 
   // Monsters roam at continuous positions; loot must land on the tile grid
-  // so pickup (exact tile match) and rendering line up.
-  const dropX = Math.round(monster.x);
-  const dropY = Math.round(monster.y);
+  // so pickup (exact tile match) and rendering line up — and never on a
+  // stair/portal tile where walking to it would transition the floor.
+  const dropLocation = resolveLootLocation(scene, monster.x, monster.y);
+  const dropX = dropLocation.x;
+  const dropY = dropLocation.y;
 
   const rng = typeof options.rng === 'function' ? options.rng : Math.random;
   const drops = [];
@@ -109,22 +182,6 @@ export const dropMonsterLoot = (monster, options = {}) => {
     }
   }
 
-  // SQLite Chronicles circulation: fallen scions of Houses present in the
-  // scene can surface their heirlooms on any kill (dev:release-relic forces
-  // this with relicChance: 1).
-  const relicChance = Number.isFinite(options.relicChance)
-    ? Math.max(0, Math.min(1, options.relicChance))
-    : RELIC_DROP_CHANCE;
-  if (rng() < relicChance) {
-    const eligiblePlayers = [options.killer, ...world.getScenePlayers(scene.id)].filter(Boolean);
-    const relic = typeof options.relicProvider === 'function'
-      ? options.relicProvider(eligiblePlayers)
-      : drawCirculatingRelic(eligiblePlayers);
-    if (relic) {
-      drops.push(ItemFactory.toWorldInstance(relic, { x: dropX, y: dropY }));
-    }
-  }
-
   const baseGearChance = GEAR_DROP_CHANCES[rarityId] !== undefined
     ? GEAR_DROP_CHANCES[rarityId]
     : GEAR_DROP_CHANCES.common;
@@ -146,6 +203,22 @@ export const dropMonsterLoot = (monster, options = {}) => {
     });
     if (gear) {
       drops.push(ItemFactory.toWorldInstance(gear, { x: dropX, y: dropY }));
+    }
+  }
+
+  // SQLite Chronicles circulation: fallen scions of Houses present in the
+  // scene can surface their heirlooms on any kill (dev:release-relic forces
+  // this with relicChance: 1).
+  const relicChance = Number.isFinite(options.relicChance)
+    ? Math.max(0, Math.min(1, options.relicChance))
+    : RELIC_DROP_CHANCE;
+  if (rng() < relicChance) {
+    const eligiblePlayers = [options.killer, ...world.getScenePlayers(scene.id)].filter(Boolean);
+    const relic = typeof options.relicProvider === 'function'
+      ? options.relicProvider(eligiblePlayers)
+      : drawCirculatingRelic(eligiblePlayers);
+    if (relic) {
+      drops.push(ItemFactory.toWorldInstance(relic, { x: dropX, y: dropY }));
     }
   }
 

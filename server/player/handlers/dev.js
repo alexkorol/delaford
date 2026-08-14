@@ -304,6 +304,9 @@ const devEvents = {
     const seed = Number(payload.seed);
     const requestedItemLevel = Number(payload.itemLevel);
     player.inventory.add(payload.itemId, quantity, {
+      // Reward-style grant: overflow spills at the player's feet instead of
+      // being refused (playtest overflow scenario relies on this).
+      overflow: 'drop',
       ...(Number.isFinite(seed) ? { rng: seededRng(seed) } : {}),
       ...(Number.isFinite(requestedItemLevel) ? { itemLevel: requestedItemLevel } : {}),
     });

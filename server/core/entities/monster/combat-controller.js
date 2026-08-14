@@ -298,6 +298,9 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   const source = isGroundSlam || isProjectile
     ? { x: payload.originX, y: payload.originY }
     : monster;
+  // The attack's effective range also selects which equipped defense rating
+  // mitigates the hit (melee vs ranged) in getArmourMitigation below.
+  const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
 
   if (isProjectile) {
     const impact = { x: payload.targetX, y: payload.targetY };
@@ -308,7 +311,6 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
       return false;
     }
   } else {
-    const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
     const distance = euclideanDistance(source, target);
     if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
       return false;

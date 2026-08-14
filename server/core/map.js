@@ -293,11 +293,13 @@ const RARE_MODIFIERS = [
   { id: 'frenzied', label: 'Frenzied', attackIntervalMultiplier: 0.88 },
 ];
 
-// Treasure-room gear pools; deeper floors roll better bases.
+// Treasure-room gear pools draw from the native Vessel catalogue so hoard
+// gear carries an honest rolled identity whose item level scales with depth;
+// deeper floors weight toward the martial and jewelry forms.
 const INSTANCE_LOOT_TIERS = [
-  { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
-  { minDepth: 3, gear: ['iron-sword', 'iron-battleaxe', 'iron-chainmail', 'bronze-shield', 'hard-leather-body', 'shortbow'] },
-  { minDepth: 5, gear: ['steel-sword', 'steel-battleaxe', 'steel-warhammer', 'ranger-body', 'longbow', 'gold-ring'] },
+  { minDepth: 1, gear: ['vessel-handaxe', 'vessel-spear', 'vessel-wrap', 'vessel-shield', 'vessel-sandals', 'vessel-crest'] },
+  { minDepth: 3, gear: ['vessel-macuahuitl', 'vessel-sling', 'vessel-grips', 'vessel-gorget', 'vessel-khopesh', 'vessel-shield'] },
+  { minDepth: 5, gear: ['vessel-khopesh', 'vessel-atlatl', 'vessel-ring', 'vessel-crest', 'vessel-macuahuitl', 'vessel-spear'] },
 ];
 
 const gearPoolForDepth = (depth) => {

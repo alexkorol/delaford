@@ -342,7 +342,7 @@ describe('Vesselforge game integration', () => {
 
     expect(wrap.resourceBonuses.health).toBeGreaterThanOrEqual(15);
     expect(wrap.vessel.lines.some(line => line.section === 'implicit'
-      && /Maximum Life/.test(line.text))).toBe(true);
+      && /Maximum Health/.test(line.text))).toBe(true);
     expect(shield.combatBonuses.blockChance).toBe(4);
     expect(shield.vessel.combat.modifiers.blockChance).toBe(4);
     expect(shield.vessel.lines.some(line => line.section === 'implicit'
@@ -383,8 +383,8 @@ describe('Vesselforge game integration', () => {
 
     expect(refreshed.combat.modifiers.goodsFound).toBe(20);
     expect(refreshed.lines.some(line => line.section === 'brand'
-      && /Goods Found/.test(line.text))).toBe(true);
-    expect(refreshed.lines.some(line => /Dormant.*Goods Found/.test(line.text))).toBe(false);
+      && /Item Find/.test(line.text))).toBe(true);
+    expect(refreshed.lines.some(line => /Dormant.*Item Find/.test(line.text))).toBe(false);
   });
 
   it('makes Beastbane a capped live damage modifier', () => {

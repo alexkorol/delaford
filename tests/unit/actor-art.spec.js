@@ -91,9 +91,13 @@ describe('generated actor atlas contract', () => {
         expect(role).toBeTruthy();
         expect(monster.graphic).toEqual({ column: columns[role], row: 0 });
       });
-      expect(new Set(generation.monsters.map(monster => monster.graphic.column))).toEqual(
-        new Set(Object.values(columns)),
-      );
+      // Theme role cycles weight biomes differently (a crypt floor may spawn
+      // no ranged trash), so a floor surfaces a subset of the theme's four
+      // silhouettes — but every column it uses must come from that set.
+      const seenColumns = new Set(generation.monsters.map(monster => monster.graphic.column));
+      const themeColumns = new Set(Object.values(columns));
+      seenColumns.forEach(column => expect(themeColumns).toContain(column));
+      expect(seenColumns.size).toBeGreaterThanOrEqual(3);
     }
   });
 

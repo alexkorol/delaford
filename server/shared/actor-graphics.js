@@ -37,6 +37,8 @@ export const surfaceMonsterGraphic = (id) => {
 
 export const instanceMonsterGraphic = (theme, role) => {
   const themeColumns = INSTANCE_MONSTER_COLUMNS[theme] || INSTANCE_MONSTER_COLUMNS.stone;
-  const column = themeColumns[role];
+  // Aura buffers share the support silhouette: both read as the pack's
+  // caster, and the atlas maps four bodies (melee/ranged/support/boss).
+  const column = themeColumns[role === 'buffer' ? 'support' : role];
   return graphicAt(Number.isFinite(column) ? column : themeColumns.melee);
 };

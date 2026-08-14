@@ -14,6 +14,19 @@ import { ROADS } from '#server/core/world-web.js';
 import '#server/core/services/zone-service.js';
 
 const localId = gid => (gid >= DUNGEON_FIRST_GID ? gid - DUNGEON_FIRST_GID : -1);
+const allScenes = layout => [layout.town, ...layout.scenes];
+const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+const defaultViewport = { x: 24, y: 15 };
+const entityViewportPadding = 1;
+const isVisibleFromArrival = (arrival, point) => {
+  const cropX = arrival.x - Math.floor(0.5 * defaultViewport.x);
+  const cropY = arrival.y - Math.floor(0.5 * defaultViewport.y);
+
+  return point.x >= cropX - entityViewportPadding
+    && point.x <= cropX + defaultViewport.x + entityViewportPadding
+    && point.y >= cropY - entityViewportPadding
+    && point.y <= cropY + defaultViewport.y + entityViewportPadding;
+};
 const blockedBackground = new Set(DUNGEON_TILESET.blockedBg || []);
 const walkableForeground = new Set(DUNGEON_TILESET.walkableFg || []);
 

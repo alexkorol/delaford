@@ -278,7 +278,7 @@ describe('inventory commit identity validation', () => {
     };
     scene.items = [coins, gear];
     player.inventory.slots = [];
-    player.inventory.add = vi.fn();
+    player.inventory.add = vi.fn(() => ({ ok: true, added: 7, remainder: 0 }));
     world.assignPlayerToScene(player, scene.id);
 
     actionEvents['player:take:underfoot']({}, { id: player.socket_id });
@@ -312,7 +312,7 @@ describe('inventory commit identity validation', () => {
     };
     scene.items = [heirloom];
     player.inventory.slots = [];
-    player.inventory.add = vi.fn();
+    player.inventory.add = vi.fn(() => ({ ok: true, added: 7, remainder: 0 }));
     world.assignPlayerToScene(player, scene.id);
     const save = vi.spyOn(playerPersistence, 'savePlayer').mockResolvedValue({ saved: true });
     const recover = vi.spyOn(chroniclesStore, 'recoverRelic').mockReturnValue({ ok: true });
@@ -407,7 +407,7 @@ describe('inventory commit identity validation', () => {
       makeStack('existing-coins', 0, 5),
       ...Array.from({ length: 83 }, (_, index) => makeFiller(index + 1)),
     ];
-    player.inventory.add = vi.fn();
+    player.inventory.add = vi.fn(() => ({ ok: true, added: 7, remainder: 0 }));
     world.assignPlayerToScene(player, scene.id);
 
     actionEvents['player:take']({
