@@ -257,6 +257,24 @@ describe('player damage rolls', () => {
     }
   });
 
+  it('makes a visible weapon-power upgrade materially improve real damage', () => {
+    const midpointRoll = vi.spyOn(UI, 'getRandomInt').mockImplementation((min, max) => (
+      Math.round((min + max) / 2)
+    ));
+    const low = makePlayer({
+      combat: { attack: { stab: 0, slash: 13, crush: 0, range: 0 } },
+    });
+    const high = makePlayer({
+      combat: { attack: { stab: 0, slash: 17, crush: 0, range: 0 } },
+    });
+
+    const lowDamage = Combat.rollPlayerDamage(low, {});
+    const highDamage = Combat.rollPlayerDamage(high, {});
+    midpointRoll.mockRestore();
+
+    expect(highDamage).toBeGreaterThanOrEqual(Math.ceil(lowDamage * 1.15));
+  });
+
   it('uses intelligence for mana-costed skills', () => {
     const caster = makePlayer({
       stats: {

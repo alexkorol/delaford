@@ -8,8 +8,9 @@
 
 const nearestTrash = state => state.monsters
   .filter(monster => monster.rarity !== 'elite' && !/chorister|keeper/i.test(monster.name))
-  .sort((a, b) => (Math.abs(a.x - state.x) + Math.abs(a.y - state.y))
-    - (Math.abs(b.x - state.x) + Math.abs(b.y - state.y)))[0];
+  .sort((a, b) => (a.hp.max - b.hp.max)
+    || (Math.abs(a.x - state.x) + Math.abs(a.y - state.y))
+      - (Math.abs(b.x - state.x) + Math.abs(b.y - state.y)))[0];
 
 const secondsSince = startedAt => Number(((Date.now() - startedAt) / 1000).toFixed(2));
 
@@ -52,11 +53,11 @@ const killOne = async (player) => {
     player.devHeal();
     const live = state.monsters.find(monster => monster.uuid === target.uuid) || nearestTrash(state);
     if (!live) return false;
-    if (Math.max(Math.abs(live.x - state.x), Math.abs(live.y - state.y)) <= 1.6) {
-      await player.attack(live);
-    } else {
-      player.devTeleport(Math.round(live.x) + 1, Math.round(live.y));
-    }
+    // Retarget after the authoritative teleport on every sample. Previously a
+    // moving trash monster could step away between polls forever: the harness
+    // teleported but did not swing, then repeated the same miss for 30s.
+    player.devTeleport(Math.round(live.x) + 1, Math.round(live.y));
+    await player.attack(live);
     return false;
   }, { timeoutMs: 30000, intervalMs: 300, label: 'timed pack kill' });
 };

@@ -200,7 +200,7 @@ export default {
       };
     },
     overlayCardClasses() {
-      const compact = ['logout', 'settings', 'quests'].includes(this.overlayPane?.id);
+      const compact = ['escapeMenu', 'logout', 'settings', 'quests'].includes(this.overlayPane?.id);
       return {
         'pane-host__overlay-card': true,
         'pane-host__overlay-card--fullscreen': this.overlayOptions.fullscreen,

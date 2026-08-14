@@ -227,6 +227,31 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   expect(await skillTree.locator('.point-grid').textContent()).toBe(treeSummary);
   await page.keyboard.press('Escape');
 
+  // Escape opens a complete, keyboard-focused game menu once higher-priority
+  // panels are closed. Menu actions replace it instead of stacking overlays.
+  await page.keyboard.press('Escape');
+  const escapeMenu = page.locator('.escape-menu');
+  await expect(escapeMenu).toBeVisible();
+  await expect(escapeMenu.getByRole('button')).toHaveCount(7);
+  await expect(escapeMenu.getByRole('button', { name: /Resume/ })).toBeFocused();
+  await escapeMenu.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page.getByLabel('Settings overlay');
+  await expect(settings).toBeVisible();
+  await expect(escapeMenu).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(settings).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(escapeMenu).toBeVisible();
+  await page.keyboard.press('KeyI');
+  await expect(escapeMenu).toBeHidden();
+  await expect(inventory).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(inventory).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(escapeMenu).toBeVisible();
+  await escapeMenu.getByRole('button', { name: /Resume/ }).click();
+  await expect(escapeMenu).toBeHidden();
+
   // Adventure must transition through the real WebSocket protocol and update UI state.
   const zoneMenu = page.getByLabel('Choose a zone');
   if (!(await zoneMenu.isVisible())) {
@@ -234,4 +259,27 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   }
   await zoneMenu.getByRole('button', { name: /Verdant Grove/ }).click();
   await expect(minimap).toContainText('Verdant Grove', { timeout: 15_000 });
+
+  // Compact panes stay inside a narrow viewport instead of resizing the world
+  // shell or widening the document beyond the device screen.
+  await page.setViewportSize({ width: 480, height: 800 });
+  await page.keyboard.press('Escape');
+  await expect(escapeMenu).toBeVisible();
+  const escapeBounds = await page.getByLabel('Verdigris overlay').boundingBox();
+  expect(escapeBounds).not.toBeNull();
+  expect(escapeBounds.x).toBeGreaterThanOrEqual(0);
+  expect(escapeBounds.x + escapeBounds.width).toBeLessThanOrEqual(480);
+  expect(escapeBounds.y).toBeGreaterThanOrEqual(0);
+  expect(escapeBounds.y + escapeBounds.height).toBeLessThanOrEqual(800);
+  await escapeMenu.getByRole('button', { name: /Resume/ }).click();
+  await page.keyboard.press('KeyI');
+  await expect(inventory).toBeVisible();
+  const narrowInventoryBounds = await inventory.boundingBox();
+  expect(narrowInventoryBounds).not.toBeNull();
+  expect(narrowInventoryBounds.x).toBeGreaterThanOrEqual(0);
+  expect(narrowInventoryBounds.x + narrowInventoryBounds.width).toBeLessThanOrEqual(480);
+  expect(narrowInventoryBounds.y).toBeGreaterThanOrEqual(0);
+  expect(narrowInventoryBounds.y + narrowInventoryBounds.height).toBeLessThanOrEqual(800);
+  const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(documentWidth).toBeLessThanOrEqual(480);
 });

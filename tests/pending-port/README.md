@@ -6,8 +6,6 @@ wiring and legacy socket-handler payload shapes. The merged client kept the
 it — at which point each spec should be adapted and moved back into
 `tests/unit/`:
 
-- `escape-menu-ui.spec.js` — Escape game menu registered in the pane host
-  (`src/components/ui/EscapeMenu.vue` exists; needs mounting in Delaford.vue).
 - `hud-orb-ui.spec.js` — HUD orbs hosted by the pane host, WearPane retired.
 - `inventory-store.spec.js` — Pinia drag-store wiring in InventoryGrid.
 - `quest-pane-ui.spec.js` — quest pane rendering the live first-goal snapshot.

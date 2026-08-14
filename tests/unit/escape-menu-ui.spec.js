@@ -33,6 +33,7 @@ describe('Escape game menu', () => {
     expect(delaford).toContain("this.openPane('escapeMenu');");
     expect(delaford).toContain("element.querySelector('[data-pane-autofocus]')");
     expect(delaford).toContain('window.requestAnimationFrame(() => this.focusActivePane())');
+    expect(delaford).toContain('this.requestPane(paneHotkeys[key]);');
     expect(delaford.indexOf("if (this.layout.activePane)"))
       .toBeLessThan(delaford.indexOf("this.openPane('escapeMenu');"));
   });

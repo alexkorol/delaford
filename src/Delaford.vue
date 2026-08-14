@@ -93,6 +93,7 @@ import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
 import GeometricSkillTreePane from './components/passives/GeometricSkillTreePane.vue';
+import EscapeMenu from './components/ui/panes/EscapeMenu.vue';
 
 import UI from '@shared/ui.js';
 import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/index.js';
@@ -127,6 +128,7 @@ const paneRegistry = {
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },
   flowerOfLife: { component: GeometricSkillTreePane, title: 'Skill Tree', options: { fullscreen: true } },
+  escapeMenu: { component: EscapeMenu, title: 'Verdigris' },
 };
 
 const defaultPaneAssignments = {
@@ -905,6 +907,9 @@ export default {
       if (!pane) {
         return;
       }
+      if (this.layout.activePane === 'escapeMenu') {
+        this.layout.activePane = null;
+      }
       this.openPane(pane);
     },
 
@@ -960,6 +965,10 @@ export default {
 
       this.layout.activePane = pane;
       this.$nextTick(() => {
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(() => this.focusActivePane());
+          return;
+        }
         this.focusActivePane();
       });
     },
@@ -1178,7 +1187,8 @@ export default {
       for (let i = 0; i < focusTargets.length; i += 1) {
         const element = getHostElement(focusTargets[i]);
         if (element) {
-          const focusable = element.querySelector(selectors);
+          const focusable = element.querySelector('[data-pane-autofocus]')
+            || element.querySelector(selectors);
           if (focusable && typeof focusable.focus === 'function') {
             focusable.focus();
             break;
@@ -1193,28 +1203,37 @@ export default {
       }
 
       if (event.key === 'Escape' || event.key === 'Esc') {
+        if (!this.showGameScreen) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (this.$refs.gameContainer?.closeLegacyPane?.()) {
+          return;
+        }
+
         if (this.layout.activePane) {
-          event.stopPropagation();
           this.closePane();
           return;
         }
 
         if (this.layout.rightPane) {
-          event.stopPropagation();
           this.layout.rightPane = null;
           return;
         }
 
         if (this.layout.leftPane) {
-          event.stopPropagation();
           this.layout.leftPane = null;
           return;
         }
 
         if (this.chatExpanded && !this.layout.chat.isPinned) {
-          event.stopPropagation();
           this.closeChat();
+          return;
         }
+
+        this.openPane('escapeMenu');
         return;
       }
 
@@ -1227,7 +1246,7 @@ export default {
           q: 'quests',
         };
         if (paneHotkeys[key]) {
-          this.openPane(paneHotkeys[key]);
+          this.requestPane(paneHotkeys[key]);
           event.preventDefault();
           return;
         }
