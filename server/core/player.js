@@ -4,7 +4,6 @@ import config from '#server/config.js';
 import * as emoji from 'node-emoji';
 import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from './world.js';
-import Wear from './utilities/wear.js';
 import createPlayerCombatController from '#server/core/entities/player/combat-controller.js';
 import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
 import createPlayerMovementHandler, {
@@ -16,6 +15,21 @@ import createPlayerMovementHandler, {
 import createPlayerStatsManager, {
   broadcastStats as broadcastPlayerStats,
 } from '#server/core/entities/player/stats-manager.js';
+import Wear from '#server/core/utilities/wear.js';
+import { resolvePersistedVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
+
+const PLAYER_SKILL_IDS = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
+
+export const normalisePlayerSkills = (skills) => {
+  const source = skills && typeof skills === 'object' && !Array.isArray(skills) ? skills : {};
+  return Object.fromEntries(PLAYER_SKILL_IDS.map((skillId) => {
+    const persisted = source[skillId] && typeof source[skillId] === 'object'
+      ? source[skillId]
+      : {};
+    const exp = Number.isFinite(persisted.exp) ? Math.max(0, persisted.exp) : 0;
+    return [skillId, { ...persisted, exp, level: UI.getLevel(exp) }];
+  }));
+};
 
 class Player {
   constructor(data, token, socketId) {
@@ -38,12 +52,16 @@ class Player {
     this.x = data.x;
     this.y = data.y;
     this.level = data.level;
-    this.skills = data.skills;
+    this.skills = normalisePlayerSkills(data.skills);
+    this.quests = data.quests && typeof data.quests === 'object' ? data.quests : {};
+    this.questPoints = Math.max(0, Math.min(23, Math.floor(Number(data.questPoints) || 0)));
 
     this.buildInitialStats(data);
 
     // A player's bank
-    this.bank = data.bank;
+    this.bank = Array.isArray(data.bank)
+      ? data.bank.filter(item => item && typeof item === 'object' && item.id)
+      : [];
 
     // Worn items statistics
     this.combat = {
@@ -78,7 +96,7 @@ class Player {
     this.sceneId = data.sceneId || world.defaultTownId;
 
     // Tabs
-    this.friend_list = data.friend_list;
+    this.friend_list = Array.isArray(data.friend_list) ? data.friend_list : [];
     this.wear = Player.constructWear(data.wear);
     const equippedCombat = Wear.calculateCombat(this.wear);
     this.combat.attack = equippedCombat.attack;
@@ -90,7 +108,9 @@ class Player {
 
     // Skill-tree allocations (restored to the client when the pane opens;
     // persisted via player:skilltree:save).
-    this.passiveTree = data.passiveTree || null;
+    const restoredTree = resolvePersistedVerdigrisTree(data.passiveTree, this.level, this.questPoints);
+    this.passiveTree = restoredTree?.ok ? restoredTree.snapshot : null;
+    this.passiveTreeStats = restoredTree?.ok ? restoredTree.stats : null;
 
     // Server-authored quest progress supplies the quest portion of the
     // passive-point economy and survives both guest and account relogs.
@@ -105,7 +125,9 @@ class Player {
       ? { ...data.chronicles }
       : null;
 
-    this.refreshDerivedStats();
+    this.refreshDerivedStats(restoredTree?.ok
+      ? { passiveAttributes: restoredTree.attributes }
+      : {});
 
     // Pathfinding
     this.path = {
@@ -137,9 +159,6 @@ class Player {
 
     // What action are they performing at the moment?
     this.action = false;
-
-    // Socket for Player
-    // this.socket = new PlayerSocket(this.socket_id);
 
     // Pathway blocked
     this.blocked = {
@@ -175,8 +194,7 @@ class Player {
     });
 
     // Fix Skill Levels according to XP on Player constructor
-    const skillsName = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
-    skillsName.forEach((skillName) => {
+    PLAYER_SKILL_IDS.forEach((skillName) => {
       const skill = this.skills[skillName];
       skill.exp = skill.exp > 0 ? skill.exp : 0;
       skill.level = UI.getLevel(skill.exp);
@@ -248,10 +266,10 @@ class Player {
   }
 
   /**
-   * Move the player in a direction per a tile
+   * Move the player continuously in a direction (or one tile for pathfinding).
    *
    * @param {string} direction The direction which the player is moving
-   * @param {boolean} pathfind Whether pathfinding is being used to move player
+   * @param {object} options Movement timing and pathfinding metadata
    */
   move(direction, options = {}) {
     return this.movement.move(direction, options);
@@ -279,8 +297,8 @@ class Player {
    * @param {object} path The information to be used of the pathfind
    * @param {object} map The map object associated with player
    */
-  walkPath(playerIndex) {
-    return this.movement.walkPath(playerIndex);
+  walkPath() {
+    return this.movement.walkPath();
   }
 
   /**
@@ -334,15 +352,6 @@ class Player {
   }
 
   /**
-   * Player will perform an action
-   *
-   * @param {string} item Action to do
-   */
-  do(item) {
-    console.log(this.x, this.y, `Doing ${item}`);
-  }
-
-  /**
    * Checks if player queue is  empty
    *
    * @returns {boolean}
@@ -352,7 +361,7 @@ class Player {
   }
 
   /**
-   * Persist the player profile via the repository layer
+   * Persist the player profile through the local persistence service
    *
    * @param {object} options Additional persistence options
    * @returns {Promise<object|null>}

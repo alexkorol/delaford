@@ -2,12 +2,17 @@ import ItemFactory from '#server/core/items/factory.js';
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
+import { drawCirculatingRelic } from '#server/core/services/chronicles.js';
 import {
   isActiveQuest,
   isCurrentQuestObjective,
 } from '#server/core/services/quest-service.js';
 
 // Chance a slain monster drops a piece of gear, by rarity tier
+// House-relic circulation (SQLite Chronicles): chance per kill that a fallen
+// scion's heirloom re-enters the world near an eligible House member.
+export const RELIC_DROP_CHANCE = 0.12;
+
 export const GEAR_DROP_CHANCES = {
   common: 0.05,
   uncommon: 0.1,
@@ -80,7 +85,7 @@ export const dropMonsterLoot = (monster, options = {}) => {
   const baseCoins = monster.rewards && Number.isFinite(monster.rewards.coins)
     ? Math.max(0, Math.floor(monster.rewards.coins))
     : 0;
-  const player = options.player;
+  const player = options.player || options.killer;
   const coins = applyGoodsFoundToCoins(baseCoins, player);
   if (coins > 0) {
     const coinItem = ItemFactory.createById('coins', { quantity: coins });
@@ -101,6 +106,22 @@ export const dropMonsterLoot = (monster, options = {}) => {
           text: `${released.fallen.name}'s heirloom has returned to the world.`,
         });
       }
+    }
+  }
+
+  // SQLite Chronicles circulation: fallen scions of Houses present in the
+  // scene can surface their heirlooms on any kill (dev:release-relic forces
+  // this with relicChance: 1).
+  const relicChance = Number.isFinite(options.relicChance)
+    ? Math.max(0, Math.min(1, options.relicChance))
+    : RELIC_DROP_CHANCE;
+  if (rng() < relicChance) {
+    const eligiblePlayers = [options.killer, ...world.getScenePlayers(scene.id)].filter(Boolean);
+    const relic = typeof options.relicProvider === 'function'
+      ? options.relicProvider(eligiblePlayers)
+      : drawCirculatingRelic(eligiblePlayers);
+    if (relic) {
+      drops.push(ItemFactory.toWorldInstance(relic, { x: dropX, y: dropY }));
     }
   }
 

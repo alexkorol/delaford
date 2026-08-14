@@ -2,6 +2,7 @@ import Query from '#server/core/data/query.js';
 import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import world from '#server/core/world.js';
+import { isInventoryCurrency } from '#shared/inventory-footprints.js';
 
 export default class Bank {
   constructor(playerUuid, itemId, quantity, type) {
@@ -43,7 +44,8 @@ export default class Bank {
    */
   checkCorrectSpace(type) {
     const slotsAvailable = {
-      inventory: (config.player.slots.inventory - this.inventory.slots.length),
+      inventory: (config.player.slots.inventory
+        - this.inventory.slots.filter(item => !isInventoryCurrency(item)).length),
       bank: (config.player.slots.bank - this.bankSlots.length),
     };
 
@@ -70,7 +72,8 @@ export default class Bank {
     const availableSlots = this.checkCorrectSpace(type);
     const canMergeDestination = this.canMergeIntoDestination(type);
 
-    if (availableSlots <= 0 && !canMergeDestination) {
+    const withdrawsCarriedGold = type === 'withdraw' && this.itemId === 'coins';
+    if (availableSlots <= 0 && !canMergeDestination && !withdrawsCarriedGold) {
       return 0;
     }
 

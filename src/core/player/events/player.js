@@ -157,7 +157,12 @@ export default {
         );
 
         context.game.map.players = data.data
-          .filter((p) => p.socket_id !== context.game.player.socket_id)
+          // Scene projections deliberately omit socket_id, so UUID is the
+          // stable way to keep the local actor out of the remote-player
+          // collection. Including it here paints a second, stationary copy
+          // at the last authoritative position while the camera follows the
+          // locally predicted actor.
+          .filter((p) => p.uuid !== context.game.player.uuid)
           .map((player) => {
             const existing = existingPlayers.get(player.uuid);
             const controller = existing && existing.movement
@@ -364,5 +369,12 @@ export default {
       applyToActor(monster);
       context.game.map.monsters.splice(monsterIndex, 1, monster);
     }
+  },
+  'quest:update': (message, context) => {
+    if (!context.game?.player) return;
+    const payload = message.data || {};
+    context.game.player.quests = payload.quests || {};
+    context.game.player.questPoints = payload.questPoints || 0;
+    if (payload.passiveTree) context.game.player.passiveTree = payload.passiveTree;
   },
 };

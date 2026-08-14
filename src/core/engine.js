@@ -4,7 +4,9 @@ class Engine {
   constructor(game) {
     this.game = game;
 
-    this.maxFps = 20;
+    // Continuous player samples are short; 60fps keeps local prediction and
+    // authoritative corrections visually fluid beside smoothly moving AI.
+    this.maxFps = 60;
     this.fps = {
       current: 0,
       accumulator: 0,
@@ -119,6 +121,11 @@ class Engine {
       // Draw the tile map
       this.game.map.drawMap();
 
+      // Telegraph danger zones under actors before anything draws over them.
+      if (typeof this.game.map.drawGroundTelegraphs === 'function') {
+        this.game.map.drawGroundTelegraphs();
+      }
+
       // Draw dropped items
       this.game.map.drawItems();
 
@@ -135,6 +142,16 @@ class Engine {
 
       // Draw the player
       this.game.map.drawPlayer();
+
+      // Draw in-flight projectiles above actors
+      if (typeof this.game.map.drawProjectiles === 'function') {
+        this.game.map.drawProjectiles();
+      }
+
+      // Telegraph melee reach and area before floating damage text obscures it.
+      if (typeof this.game.map.drawAttackEffects === 'function') {
+        this.game.map.drawAttackEffects();
+      }
 
       // Draw in-flight projectiles above actors
       if (typeof this.game.map.drawProjectiles === 'function') {

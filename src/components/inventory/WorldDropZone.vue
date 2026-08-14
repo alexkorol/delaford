@@ -58,10 +58,8 @@ export default {
 .world-drop-zone {
   min-height: 54px;
   padding: 9px 12px;
-  border-radius: 6px;
-  background:
-    linear-gradient(180deg, rgba(34, 36, 40, 0.86), rgba(10, 11, 13, 0.88)),
-    rgba(0, 0, 0, 0.3);
+  border-radius: 0;
+  background: var(--color-bg-inset);
   border: 1px dashed rgba(180, 145, 86, 0.36);
   text-align: center;
   font-size: 12px;
@@ -80,7 +78,7 @@ export default {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 1px solid rgba(215, 180, 103, 0.38);
   color: #f2d391;
   background: rgba(0, 0, 0, 0.34);

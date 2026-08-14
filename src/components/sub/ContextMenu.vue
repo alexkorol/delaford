@@ -186,6 +186,10 @@ export default {
      * @param {object} data The coordinates of the player and MouseEvent
      */
     buildMenu(data) {
+      if (!data || !data.coordinates || !data.event || !data.event.target) {
+        return;
+      }
+
       // Tile coordinates and mouse event
       this.mouseEvent = data.event;
       this.tile.x = data.coordinates.x;
@@ -280,40 +284,67 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$menu_bg_color: #8d8d8d;
-$menu_font_color: #fff;
-$menu_min_width: 100px;
-$menu_max_width: 195px;
-$menu_font_hover_color: #ffd829;
-
-div {
+#context-menu {
   position: absolute;
   z-index: 500;
 
   ul#actions {
-    font-family: "GameFont", sans-serif;
-    box-shadow: 2.5px 2.5px 0 0 rgba(0, 0, 0, 0.75);
-    outline: none;
-    background: $menu_bg_color;
     display: block;
+    min-width: 156px;
+    max-width: 280px;
     list-style: none;
     margin: 0;
-    padding: 0 0 3px 0;
-    max-width: $menu_max_width;
-    min-width: $menu_min_width;
-    font-size: 12px;
+    padding: 5px;
     z-index: 501;
+    overflow: hidden;
+    font: 12px/1.35 'GameFont', sans-serif;
+    background:
+      linear-gradient(90deg, rgba(113, 34, 38, 0.1), transparent 42%, rgba(39, 69, 90, 0.08)),
+      var(--panel-surface);
+    border: 1px solid var(--color-border-strong);
+    outline: 1px solid #080706;
+    outline-offset: -4px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.68), inset 0 0 22px rgba(0, 0, 0, 0.55);
 
     li.action {
+      position: relative;
       cursor: pointer;
-      color: $menu_font_color;
+      color: var(--color-text-primary);
       text-align: left;
-      padding: 2px 5px;
-      text-shadow: 1px 1px 0 #000;
+      padding: 6px 10px 6px 12px;
+      border: 1px solid transparent;
+      text-shadow: 0 1px 0 #000;
       margin: 0;
+      transition: color 90ms ease-out, background 90ms ease-out, border-color 90ms ease-out;
 
-      &:hover {
-        color: $menu_font_hover_color;
+      &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 4px;
+        width: 3px;
+        height: 3px;
+        background: var(--color-text-dim);
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      &:hover,
+      &:focus-visible {
+        color: #fff0c1;
+        border-color: rgba(201, 158, 78, 0.42);
+        background: linear-gradient(90deg, rgba(116, 37, 41, 0.42), rgba(31, 24, 17, 0.78) 58%, rgba(40, 70, 91, 0.18));
+
+        &::before {
+          background: var(--color-accent-strong);
+          box-shadow: 0 0 6px rgba(217, 169, 74, 0.55);
+        }
+      }
+
+      &:last-child {
+        margin-top: 3px;
+        padding-top: 7px;
+        color: var(--color-text-secondary);
+        border-top-color: rgba(183, 146, 79, 0.2);
       }
     }
   }

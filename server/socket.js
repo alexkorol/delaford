@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import world from '#server/core/world.js';
+import { recordRuntimeEvent } from '#server/core/services/runtime-diagnostics.js';
 
 /**
  * IDEA: Create seperate socket classes,
@@ -19,6 +20,16 @@ class Socket {
     this.ws = new WebSocketServer({ server, maxPayload: MAX_PAYLOAD_BYTES });
     this.clients = world.clients;
     this.heartbeatHandle = null;
+
+    // Belt-and-braces liveness wiring: Delaford's connection handler also
+    // marks sockets alive, but wiring here keeps the heartbeat self-contained
+    // for sockets created before the game loop attaches its own listeners.
+    this.ws.on('connection', (client) => {
+      client.isAlive = true;
+      client.on('pong', () => {
+        client.isAlive = true;
+      });
+    });
   }
 
   startHeartbeat() {
@@ -33,14 +44,33 @@ class Socket {
 
       for (const client of this.ws.clients) {
         if (client.isAlive === false) {
-          client.terminate();
+          recordRuntimeEvent('socket:heartbeat-timeout', { socketId: client.id || null });
+          try {
+            client.terminate();
+          } catch (error) {
+            recordRuntimeEvent('socket:terminate-error', {
+              socketId: client.id || null,
+              message: error.message,
+            });
+          }
           continue;
         }
         client.isAlive = false;
         try {
           client.ping();
         } catch (error) {
-          process.stderr.write(`[socket] Failed to ping client. ${error}\n`);
+          recordRuntimeEvent('socket:heartbeat-error', {
+            socketId: client.id || null,
+            message: error.message,
+          });
+          try {
+            client.terminate();
+          } catch (terminateError) {
+            recordRuntimeEvent('socket:terminate-error', {
+              socketId: client.id || null,
+              message: terminateError.message,
+            });
+          }
         }
       }
     }, HEARTBEAT_INTERVAL_MS);
@@ -55,6 +85,11 @@ class Socket {
 
     if (!this.ws) {
       return;
+    }
+
+    if (this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = null;
     }
 
     for (const client of this.ws.clients) {
@@ -74,6 +109,24 @@ class Socket {
     }
   }
 
+  static safeSend(client, serializedPayload, event) {
+    if (!client || client.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    try {
+      client.send(serializedPayload);
+      return true;
+    } catch (error) {
+      recordRuntimeEvent('socket:send-error', {
+        socketId: client.id || null,
+        event,
+        message: error.message,
+      });
+      console.warn(`[socket] Failed to send ${event} to ${client.id || 'unknown socket'}: ${error.message}`);
+      return false;
+    }
+  }
+
   /**
    * Emit an event to a single client
    *
@@ -83,7 +136,7 @@ class Socket {
   static emit(event, data, options = {}) {
     if (!data || !data.player || !data.player.socket_id) {
       console.warn(`[socket] Unable to emit ${event}: missing player socket id.`);
-      return;
+      return false;
     }
 
     // Find player wanting the emit request
@@ -91,12 +144,12 @@ class Socket {
 
     if (!player) {
       console.warn(`[socket] Unable to emit ${event}: socket ${data.player.socket_id} not found.`);
-      return;
+      return false;
     }
 
     if (player.readyState !== WebSocket.OPEN) {
       console.warn(`[socket] Unable to emit ${event}: socket ${data.player.socket_id} not open (state ${player.readyState}).`);
-      return;
+      return false;
     }
 
     // Send the player back their needed data
@@ -114,7 +167,7 @@ class Socket {
       payload.meta = meta;
     }
 
-    player.send(JSON.stringify(payload));
+    return Socket.safeSend(player, JSON.stringify(payload), event);
   }
 
   /**
@@ -140,7 +193,7 @@ class Socket {
     const disconnectedClientIds = [];
 
     world.clients.forEach(client => {
-      if (client.readyState === WebSocket.CLOSED) {
+      if (client.readyState === WebSocket.CLOSED || client.readyState === WebSocket.CLOSING) {
         disconnectedClientIds.push(client.id);
         return;
       }
@@ -155,8 +208,9 @@ class Socket {
         return;
       }
 
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(serializedPayload);
+      if (client.readyState === WebSocket.OPEN
+        && !Socket.safeSend(client, serializedPayload, event)) {
+        disconnectedClientIds.push(client.id);
       }
     });
 
@@ -167,7 +221,11 @@ class Socket {
   }
 
   static sendMessageToPlayer(playerIndex, message) {
-    const player = world.players[playerIndex];
+    const player = playerIndex && typeof playerIndex === 'object'
+      ? playerIndex
+      : typeof playerIndex === 'string'
+        ? world.players.find(entry => entry.uuid === playerIndex || entry.socket_id === playerIndex)
+        : world.players[playerIndex];
     if (!player || !player.socket_id) {
       return;
     }

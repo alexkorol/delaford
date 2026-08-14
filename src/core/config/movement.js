@@ -1,5 +1,7 @@
+import { PLAYER_TILE_TRAVEL_MS } from '@shared/movement.js';
+
 export const TILE_SIZE = 32; // px
-export const DEFAULT_MOVE_DURATION_MS = 150; // matches server-side Player.walkPath speed
+export const DEFAULT_MOVE_DURATION_MS = PLAYER_TILE_TRAVEL_MS;
 export const DEFAULT_ENGINE_FPS = 20;
 export const MAX_ENGINE_FPS = 60;
 

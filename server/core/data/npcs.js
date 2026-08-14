@@ -1,25 +1,26 @@
 export default [
   {
     id: 1,
-    name: 'Baynard',
-    examine: 'Local town bum. Phew!',
+    name: 'Aldwyn the Guide',
+    examine: 'A weathered wayfinder who watches over the Crossroads\' newest scions.',
     graphic: {
       row: 0,
       column: 0,
     },
     actions: [
+      'talk',
       'examine',
     ],
     spawn: {
       x: 34,
       y: 116,
-      range: 3,
+      range: 0,
     },
   },
   {
     id: 2,
-    name: 'Shop keeper',
-    examine: 'Sells and buys items in exchange for coins.',
+    name: 'Mara, General Trader',
+    examine: 'Keeps the general stall at the Crossroads bazaar. Buys most things, sells the rest.',
     graphic: {
       row: 0,
       column: 1,
@@ -30,14 +31,14 @@ export default [
     ],
     spawn: {
       x: 49,
-      y: 109,
-      range: 2,
+      y: 103,
+      range: 1,
     },
   },
   {
     id: 3,
-    name: 'Ludovicus',
-    examine: 'Woodhurst\'s cheerful town shopkeeper.',
+    name: 'Ludovicus, Weapons Trader',
+    examine: 'Sells iron for the road. Claims every axe on his boards outlived its first three owners.',
     graphic: {
       row: 0,
       column: 2,
@@ -49,13 +50,13 @@ export default [
     spawn: {
       x: 19,
       y: 113,
-      range: 4,
+      range: 2,
     },
   },
   {
     id: 4,
-    name: 'Bank gnome',
-    examine: 'Helps with your finances and assets, I believe.',
+    name: 'Rhea of the Countinghouse',
+    examine: 'Keeps the countinghouse tent: personal storage, honest scales, no questions.',
     graphic: {
       row: 0,
       column: 3,
@@ -67,7 +68,7 @@ export default [
     spawn: {
       x: 31,
       y: 121,
-      range: 2,
+      range: 0,
     },
   },
 ];

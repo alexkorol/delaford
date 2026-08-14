@@ -6,19 +6,21 @@ export const EQUIPMENT_SLOTS = [
   { id: 'armor', label: 'Body', empty: 'Unarmoured' },
   { id: 'head', label: 'Head', empty: 'Bare head' },
   { id: 'back', label: 'Cloak', empty: 'No cloak' },
+  { id: 'belt', label: 'Belt', empty: 'No belt' },
   { id: 'gloves', label: 'Gloves', empty: 'Bare hands' },
   { id: 'feet', label: 'Feet', empty: 'Bare feet' },
   { id: 'ring', label: 'Ring', empty: 'No ring' },
+  { id: 'ring2', label: 'Ring', empty: 'No ring' },
   { id: 'necklace', label: 'Amulet', empty: 'No amulet' },
 ];
 
 export const RESISTANCE_ROWS = [
-  { id: 'fire', label: 'rF' },
-  { id: 'cold', label: 'rC' },
-  { id: 'poison', label: 'rPois' },
-  { id: 'electric', label: 'rElec' },
-  { id: 'negative', label: 'rN' },
-  { id: 'willpower', label: 'Will' },
+  { id: 'fire', label: 'Fire' },
+  { id: 'cold', label: 'Cold' },
+  { id: 'poison', label: 'Poison' },
+  { id: 'electric', label: 'Lightning' },
+  { id: 'negative', label: 'Necrotic' },
+  { id: 'willpower', label: 'Willpower' },
 ];
 
 export const DCSS_TILE_SIZE = 32;
@@ -45,9 +47,11 @@ export const DCSS_EQUIPMENT_SLOT_TILES = {
   armor: dcssTile('objects', 4, 25, 'Body armour'),
   head: dcssTile('objects', 0, 28, 'Headgear'),
   back: dcssTile('objects', 0, 25, 'Cloak'),
+  belt: dcssTile('objects', 4, 25, 'Belt'),
   gloves: dcssTile('objects', 6, 27, 'Gloves'),
   feet: dcssTile('objects', 8, 27, 'Footwear'),
   ring: dcssTile('objects', 8, 26, 'Ring'),
+  ring2: dcssTile('objects', 8, 26, 'Ring'),
   necklace: dcssTile('objects', 1, 28, 'Amulet'),
 };
 

@@ -1,13 +1,5 @@
 <template>
   <div class="inventory-pane">
-    <header class="inventory-pane__summary">
-      <div>
-        <span class="inventory-pane__eyebrow">Backpack</span>
-        <strong>{{ occupiedCells }} / {{ totalCells }}</strong>
-      </div>
-      <span class="inventory-pane__grid-size">{{ grid.columns }} x {{ grid.rows }}</span>
-    </header>
-
     <div class="inventory-pane__body">
       <EquipmentRagdoll
         :game="game"
@@ -17,6 +9,13 @@
       />
 
       <div class="inventory-pane__grid">
+        <div class="inventory-pane__backpack-meta">
+          <span class="inventory-pane__gold" :aria-label="`Gold: ${formattedGold}`">
+            <span class="inventory-pane__gold-mark" aria-hidden="true">&#9670;</span>
+            {{ formattedGold }} gold
+          </span>
+          <span aria-label="Backpack capacity">{{ occupiedCells }} / {{ totalCells }}</span>
+        </div>
         <InventoryGrid
           :images="resolvedImages"
           :columns="grid.columns"
@@ -26,7 +25,6 @@
 
         <div class="inventory-pane__utility-row">
           <WorldDropZone />
-          <ContainerStack />
         </div>
       </div>
     </div>
@@ -39,12 +37,10 @@ import { watch } from 'vue';
 import { useInventoryStore } from '@/stores/inventory.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
 import { indexFromCoords } from '@/core/inventory/grid-math.js';
-import bus from '@/core/utilities/bus.js';
 import Socket from '@/core/utilities/socket.js';
 import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
 import InventoryGrid from '../inventory/InventoryGrid.vue';
 import WorldDropZone from '../inventory/WorldDropZone.vue';
-import ContainerStack from '../inventory/ContainerStack.vue';
 
 const INVENTORY_COLUMNS = 12;
 const INVENTORY_ROWS = 7;
@@ -55,7 +51,6 @@ export default {
     EquipmentRagdoll,
     InventoryGrid,
     WorldDropZone,
-    ContainerStack,
   },
   props: {
     game: {
@@ -97,6 +92,10 @@ export default {
     },
     inventoryItems() {
       return Array.isArray(this.inventoryStore.items) ? this.inventoryStore.items : [];
+    },
+    formattedGold() {
+      const amount = Number(this.inventoryStore.gold) || 0;
+      return Math.max(0, amount).toLocaleString();
     },
     occupiedCells() {
       return this.inventoryItems.reduce((total, item) => {
@@ -221,11 +220,6 @@ export default {
       } else {
         this.emitInventoryCommit(result);
       }
-
-      bus.$emit('inventory:interaction', {
-        source: 'inventory-pane',
-        result,
-      });
     },
   },
 };
@@ -239,47 +233,21 @@ export default {
   width: 100%;
   height: 100%;
   min-height: 0;
+  padding: 10px 8px 8px;
   box-sizing: border-box;
   color: var(--color-text-primary);
-
-  &__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 10px;
-    border: 1px solid rgba(215, 180, 103, 0.24);
-    border-radius: var(--radius-sm);
-    background:
-      linear-gradient(90deg, rgba(82, 18, 24, 0.22), rgba(20, 25, 31, 0.72), rgba(18, 45, 70, 0.18)),
-      rgba(0, 0, 0, 0.24);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
-  }
-
-  &__summary strong {
-    display: block;
-    margin-top: 2px;
-    font-size: 15px;
-    color: #f4d28a;
-  }
-
-  &__eyebrow,
-  &__grid-size {
-    font-size: 11px;
-    color: rgba(231, 218, 190, 0.78);
-    text-transform: uppercase;
-    letter-spacing: 0;
-  }
-
-  &__grid-size {
-    color: rgba(148, 180, 214, 0.86);
-  }
+  background:
+    radial-gradient(circle at 50% 0, rgba(94, 66, 25, 0.1), transparent 36%),
+    linear-gradient(180deg, rgba(20, 18, 15, 0.97), rgba(8, 8, 8, 0.96));
+  border: 14px solid transparent;
+  border-image: url('@/assets/inventory/frame_ornate.png') 118 / 14px stretch;
+  box-shadow: 0 15px 38px rgba(0, 0, 0, 0.5);
 
   &__body {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
     width: 100%;
     min-width: 0;
@@ -297,10 +265,38 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
     min-width: 0;
     max-width: 100%;
     overflow-x: auto;
+  }
+
+  &__backpack-meta {
+    align-self: flex-end;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 0 4px;
+    box-sizing: border-box;
+    color: rgba(190, 172, 137, 0.7);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    line-height: 1.4;
+    text-align: right;
+    text-transform: uppercase;
+  }
+
+  &__gold {
+    color: #e4c36a;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-shadow: 0 1px 2px #000;
+  }
+
+  &__gold-mark {
+    color: #f5d77b;
   }
 
   &__utility-row {

@@ -238,6 +238,34 @@ export const createVesselBlock = (baseItem, options = {}) => {
   return vessel;
 };
 
+/**
+ * Project a vessel's weapon contribution onto a legacy stats block: the
+ * dominant attack style gains the vessel's per-hit power. Non-weapon vessels
+ * and statless items pass through unchanged. (Used by the brand-searing pane
+ * to preview before/after combat stats.)
+ */
+export const applyVesselCombatStats = (stats = {}, vesselBlock = null) => {
+  const vesselItem = vesselBlock?.item;
+  const form = vesselItem ? verdigrisPack.forms[vesselItem.formId] : null;
+  if (!vesselItem || !form?.weapon) return stats;
+
+  const attack = stats.attack || {};
+  const dominantStyle = ['stab', 'slash', 'crush', 'range']
+    .sort((a, b) => (attack[b] || 0) - (attack[a] || 0))[0];
+  if (!dominantStyle || (attack[dominantStyle] || 0) <= 0) return stats;
+
+  const { sheet } = forge.aggregate([vesselItem]);
+  const perHitPower = sheet.damage / Math.max(0.1, form.weapon.aps || 1);
+  const vesselBonus = Math.max(0, Math.round(perHitPower));
+  return {
+    ...stats,
+    attack: {
+      ...attack,
+      [dominantStyle]: (attack[dominantStyle] || 0) + vesselBonus,
+    },
+  };
+};
+
 export const vesselTooltip = (vesselItem, ctx = {}) => forge.tooltip(vesselItem, ctx);
 
 export const getForge = () => forge;

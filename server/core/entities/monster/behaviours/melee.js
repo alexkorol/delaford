@@ -50,6 +50,13 @@ const createMeleeBehaviourSystem = (entity, monster) => (world, _delta, context 
     dirty = monster.resolvePendingAttack(now) || dirty;
   }
 
+  // Ground-slam danger is anchored where it was telegraphed. The boss must
+  // commit to that circle instead of sliding after a player during the windup.
+  if (monster.state.pendingAttack?.skillId === 'boss:ground-slam') {
+    markDirty(entity, dirty);
+    return;
+  }
+
   const target = monster.resolveTarget(now);
   if (target) {
     monster.state.mode = 'engaged';

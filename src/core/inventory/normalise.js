@@ -88,9 +88,7 @@ const enrichFromCatalogue = (item = {}) => {
 export const normaliseInventoryItem = (item, grid, orientationMap = new Map()) => {
   const enrichedItem = enrichFromCatalogue(item);
   const uuid = deriveUuid(enrichedItem);
-  const baseSize = normaliseSize(
-    enrichedItem.size || enrichedItem.baseSize || resolveItemSize(enrichedItem),
-  );
+  const baseSize = normaliseSize(resolveItemSize(enrichedItem));
   const orientation = orientationMap.get(uuid) || enrichedItem.orientation || ORIENTATION_DEFAULT;
   const position = derivePosition(enrichedItem, grid);
   const slot = deriveSlot(enrichedItem, grid);

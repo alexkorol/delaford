@@ -55,15 +55,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
 p {
-  font-size: .6em;
-  margin: 1em 0;
+  margin: 0;
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font: .72rem "ChatFont", sans-serif;
 }
 
 .furnaceGrid {
@@ -73,28 +69,17 @@ p {
 }
 
 .furnaceView {
-  background-color: $color;
+  height: 100%;
+  padding: 5px;
+  background: var(--panel-surface);
   font-family: "GameFont", sans-serif;
-  border: 5px solid color.adjust($color, $lightness: -10%);
-
-  .header {
-    background: color.adjust($color, $lightness: 10%);
-    height: 30px;
-
-    .close {
-      float: right;
-      width: 30px;
-      box-sizing: border-box;
-      height: 30px;
-      background-color: color.adjust(red, $lightness: -10%);
-      color: white;
-      font-size: 1em;
-      padding: 5px 2px 5px 5px;
-    }
-  }
+  border: 1px solid var(--color-frame-dark);
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: -4px;
+  box-shadow: var(--shadow-strong);
 
   .main {
-    padding: .5em;
+    margin: 0 5px 5px;
   }
 }
 </style>

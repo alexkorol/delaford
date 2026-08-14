@@ -29,6 +29,7 @@ vi.mock('#server/core/data/query.js', () => ({
 import ContextMenu, { actionCatalog } from '#server/core/context-menu.js';
 import Config from '#server/config.js';
 import Action from '#server/player/action.js';
+import actionEvents from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
 
 const DEFAULT_ACTIONS = [
@@ -143,6 +144,34 @@ describe('ContextMenu strategies', () => {
     expect(dropAction.type).toBe('item');
   });
 
+  it('surfaces the town brand service for vessel items with capacity', async () => {
+    player.inventory.slots = [{
+      slot: 0,
+      id: 'bronze-pike',
+      name: 'Bronze Pike',
+      uuid: 'vessel-pike',
+      vessel: {
+        item: {
+          vessel: 4,
+          patience: 3,
+          brands: [],
+          bonds: [],
+          trophies: [],
+          scars: 0,
+        },
+      },
+    }];
+
+    const menu = new ContextMenu(player, tile, {
+      clickedOn: { 0: 'inventorySlot' },
+      slot: 0,
+    });
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:vesselforge:add-brand'))
+      .toMatchObject({ label: 'Add a random brand (100 coins)', uuid: 'vessel-pike' });
+  });
+
   it('produces take options for ground items at the clicked location', async () => {
     world.items = [{
       id: 2,
@@ -161,6 +190,50 @@ describe('ContextMenu strategies', () => {
     expect(takeActions[0].id).toBe(2);
     expect(takeActions[0].uuid).toBe('ground-uuid');
     expect(takeActions[0].type).toBe('item');
+  });
+
+  it('offers fountain healing at the Crossroads fountain', async () => {
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, {
+      x: 0,
+      y: 0,
+      world: { x: 38, y: 115 },
+    }, miscData);
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:fountain:drink')).toMatchObject({
+      label: 'Drink from the Crossroads Fountain',
+      id: 'crossroads-fountain',
+    });
+  });
+
+  it('opens shop displays for trade without offering Take', async () => {
+    world.items = [{
+      id: 'bronze-sword',
+      x: player.x,
+      y: player.y,
+      uuid: 'display-sword',
+      shopDisplay: true,
+      shopNpcId: 2,
+    }];
+    world.shops = [{ npcId: 2, name: 'General Store', inventory: [] }];
+    const miscData = { clickedOn: { 0: 'gameMap' } };
+    const menu = new ContextMenu(player, tile, miscData);
+    const actions = await menu.build();
+
+    expect(actions.find(entry => entry.action.actionId === 'player:screen:shop-display')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
+    expect(actions.find(entry => entry.action.actionId === 'player:shop-display:buy')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
+    expect(actions.find(entry => entry.action.actionId === 'player:shop-display:appraise')).toMatchObject({
+      id: 2,
+      shopItemId: 'bronze-sword',
+    });
+    expect(actions.some(entry => entry.action.actionId === 'player:take')).toBe(false);
   });
 
   it('produces take options from the active scene instead of default town items', async () => {
@@ -328,5 +401,24 @@ describe('ContextMenu strategies', () => {
         },
       },
     }, null)).not.toThrow();
+  });
+
+  it('ignores malformed context-menu action payloads without reaching Action', () => {
+    const malformed = [
+      {},
+      { data: {} },
+      { data: { player: { socket_id: player.socket_id }, data: {} } },
+      {
+        data: {
+          player: { socket_id: player.socket_id },
+          data: { tile, item: { action: null } },
+        },
+      },
+    ];
+
+    malformed.forEach((payload) => {
+      expect(() => actionEvents['player:context-menu:action'](payload)).not.toThrow();
+    });
+    expect(player.queue).toBeUndefined();
   });
 });

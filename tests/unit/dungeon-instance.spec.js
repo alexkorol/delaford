@@ -124,6 +124,45 @@ describe('generateInstance themes', () => {
     }));
   });
 
+  it('gives biomes distinct combat-role profiles and explicit rare modifiers', async () => {
+    const crypt = await GameMap.generateInstance({ seed: 20260711, template: 'crypt', depth: 1 });
+    const marsh = await GameMap.generateInstance({ seed: 20260711, template: 'marsh', depth: 1 });
+    const count = (generation, role) => generation.monsters
+      .filter(monster => monster.rarity !== 'elite' && monster.behaviour.type === role).length;
+
+    expect(count(crypt, 'melee')).toBeGreaterThan(count(crypt, 'ranged'));
+    expect(count(marsh, 'ranged')).toBeGreaterThan(count(crypt, 'ranged'));
+    expect(count(crypt, 'buffer')).toBeGreaterThan(0);
+    expect(count(marsh, 'buffer')).toBeGreaterThan(0);
+
+    const rares = [...crypt.monsters, ...marsh.monsters]
+      .filter(monster => monster.rarity === 'rare');
+    expect(rares.length).toBeGreaterThan(0);
+    rares.forEach((monster) => {
+      expect(monster.modifiers).toHaveLength(1);
+      expect(['thick-hide', 'frenzied']).toContain(monster.modifiers[0].id);
+    });
+  });
+
+  it('raises the rare-enemy share with endless depth', async () => {
+    const shallow = await GameMap.generateInstance({ seed: 8675309, template: 'dungeon', depth: 1 });
+    const deep = await GameMap.generateInstance({ seed: 8675309, template: 'dungeon', depth: 6 });
+    const rareCount = generation => generation.monsters
+      .filter(monster => monster.rarity === 'rare').length;
+
+    expect(rareCount(deep)).toBeGreaterThan(rareCount(shallow));
+  });
+
+  it('gives generated monster roles distinct silhouettes', async () => {
+    const themes = ['dungeon', 'crypt', 'sand', 'volcanic', 'marsh', 'grove', 'wilds'];
+    await Promise.all(themes.map(async (template) => {
+      const { monsters } = await GameMap.generateInstance({ seed: 7, template });
+      const columns = new Set(monsters.map(monster => monster.graphic?.column));
+      expect(columns.size, `${template} silhouette count`).toBeGreaterThanOrEqual(3);
+      expect([...columns].every(column => Number.isInteger(column) && column >= 0 && column < 18)).toBe(true);
+    }));
+  });
+
   // Every room centre reachable on foot from the entry stairs. Returns the
   // count of unreachable room centres (0 == fully connected).
   const unreachableRoomCount = (map, metadata, width = 200) => {

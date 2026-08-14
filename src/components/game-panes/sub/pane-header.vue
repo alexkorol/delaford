@@ -4,18 +4,10 @@
       class="text-header"
       v-text="text"
     />
-    <div
-      class="close"
-      @click="close"
-    >
-      X
-    </div>
   </div>
 </template>
 
 <script>
-import bus from '../../../core/utilities/bus.js';
-
 export default {
   props: {
     text: {
@@ -23,42 +15,27 @@ export default {
       required: true,
     },
   },
-  methods: {
-    close() {
-      bus.$emit('screen:close');
-    },
-  },
 };
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-
 .header {
-  background: color.adjust($color, $lightness: 10%);
-  height: 30px;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  background: var(--panel-header);
+  border-bottom: 1px solid var(--color-border-strong);
   position: relative;
 
   .text-header {
     cursor: default;
-    text-shadow: 2px 2px 0 black;
-    line-height: 27px;
-  }
-
-  .close {
-    width: 30px;
-    cursor: pointer;
-    box-sizing: border-box;
-    height: 30px;
-    background-color: color.adjust(red, $lightness: -10%);
-    color: white;
-    font-size: 1em;
-    padding: 5px 2px 5px 5px;
-    position: absolute;
-    top: 0;
-    right: 0;
+    color: var(--color-accent-strong);
+    text-shadow: 0 2px 0 #000;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
   }
 }
 </style>

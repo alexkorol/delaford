@@ -19,6 +19,10 @@
  */
 
 import WebSocket from 'ws';
+import {
+  PLAYER_MOVE_DISTANCE,
+  PLAYER_MOVE_SAMPLE_MS,
+} from '#shared/movement.js';
 
 const DEFAULT_URL = process.env.PLAYTEST_WS_URL || 'ws://localhost:6500';
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -26,16 +30,21 @@ const DEFAULT_TIMEOUT_MS = 8000;
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 export class HeadlessPlayer {
-  constructor(ws) {
+  constructor(ws, options = {}) {
     this.ws = ws;
     this.player = null; // login block player
     this.scene = null; // latest scene payload (login or transition)
     this.messages = []; // game:send:message texts
     this.hits = []; // combat:hit payloads
+    this.telegraphs = []; // monster:telegraph payloads
     this.inventory = [];
     this.stats = null; // latest player:stats:update for us
     this.lastMovement = null;
     this.events = []; // raw event log (ring buffer)
+    this.scionFalls = [];
+    this.party = null;
+    this.partyInvites = [];
+    this.screens = [];
     this.pendingState = new Map(); // requestId -> resolver
     this.stateCounter = 0;
     this.loginCount = 0;
@@ -44,14 +53,15 @@ export class HeadlessPlayer {
     this.chroniclesUpdateCount = 0;
     this.chroniclesUpdate = null;
     this.partyUpdateCount = 0;
-    this.party = null;
-    this.partyInvites = [];
     this.partyLoading = null;
     this.partyCompleteCount = 0;
     this.partyCompletion = null;
     this.screenOpenCount = 0;
     this.currentScreen = null;
     this.currentScreenPayload = null;
+    this.chronicle = null;
+    this.houseName = options.houseName || 'Playtest House';
+    this.scionName = options.scionName || 'Harness';
 
     ws.on('message', (raw) => this.handleMessage(raw));
     ws.on('close', () => { this.closed = true; });
@@ -60,7 +70,11 @@ export class HeadlessPlayer {
   static async connect({
     url = DEFAULT_URL,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    loginPayload = { useGuestAccount: true },
+    loginPayload = null,
+    guestId = null,
+    houseName,
+    scionName,
+    quickGuest = false,
   } = {}) {
     const ws = new WebSocket(url);
     await new Promise((resolve, reject) => {
@@ -69,9 +83,18 @@ export class HeadlessPlayer {
       ws.once('error', (error) => { clearTimeout(timer); reject(error); });
     });
 
-    const player = new HeadlessPlayer(ws);
-    player.emit('player:login', loginPayload);
-    if (loginPayload.awaitChronicles && !loginPayload.scionName) {
+    const player = new HeadlessPlayer(ws, { houseName, scionName });
+    // Two login flows share player:login. A payload carrying guestId or
+    // quickGuest routes into the Chronicle-auth flow (SQLite houses/scions,
+    // world-web identity); a plain guest payload takes the direct-admission
+    // flow the core-loop scenarios were proven on.
+    const payload = loginPayload || {
+      useGuestAccount: true,
+      ...(guestId ? { guestId } : {}),
+      ...(quickGuest ? { quickGuest } : {}),
+    };
+    player.emit('player:login', payload);
+    if (payload.awaitChronicles && !payload.scionName) {
       await player.waitFor(() => player.chroniclesReadyCount > 0, {
         label: 'Chronicles admission',
         timeoutMs,
@@ -102,7 +125,27 @@ export class HeadlessPlayer {
         this.player = data.player;
         this.scene = data.scene || null;
         this.inventory = (data.player && data.player.inventory && data.player.inventory.slots) || [];
+        if (data.quickStart === true) {
+          // Mirrors the client: quick guests drop into the first stretch of
+          // their House's Tin Road (tier 1 is always charted).
+          this.emit('world:zone:enter', { nodeId: 'tin:1:0' });
+        }
         break;
+      case 'chronicles:state': {
+        this.chronicle = data.chronicle || { houses: [] };
+        const houses = this.chronicle.houses || [];
+        const house = houses.find(entry => entry.id === this.chronicle.activeHouseId) || houses[0];
+        if (!house) {
+          this.emit('chronicles:house:found', { name: this.houseName });
+        } else if (!(house.scions || []).length) {
+          this.emit('chronicles:scion:create', { houseId: house.id, name: this.scionName });
+        } else {
+          this.emit('chronicles:scion:set-out', {
+            scionId: data.createdScionId || house.scions[0].id,
+          });
+        }
+        break;
+      }
       case 'player:chronicles:ready':
         this.chroniclesReadyCount += 1;
         this.chroniclesReady = data;
@@ -139,8 +182,21 @@ export class HeadlessPlayer {
       case 'combat:hit':
         this.hits.push(data);
         break;
+      case 'monster:telegraph':
+        this.telegraphs.push(data);
+        break;
       case 'core:refresh:inventory':
         this.inventory = data.data || data || [];
+        break;
+      case 'open:screen':
+        this.screens.push({ screen: data.screen, payload: data.payload });
+        this.screenOpenCount += 1;
+        this.currentScreen = data ? data.screen : null;
+        this.currentScreenPayload = data ? data.payload : null;
+        break;
+      case 'core:pane:close':
+        this.currentScreen = null;
+        this.currentScreenPayload = null;
         break;
       case 'player:session-replaced':
         this.sessionReplaced = true;
@@ -165,14 +221,12 @@ export class HeadlessPlayer {
         this.partyCompleteCount += 1;
         this.partyCompletion = data || null;
         break;
-      case 'open:screen':
-        this.screenOpenCount += 1;
-        this.currentScreen = data ? data.screen : null;
-        this.currentScreenPayload = data ? data.payload : null;
+      case 'chronicles:scion-fallen':
+        this.scionFalls.push(data);
+        this.chronicle = data.chronicle || this.chronicle;
         break;
-      case 'core:pane:close':
-        this.currentScreen = null;
-        this.currentScreenPayload = null;
+      case 'chronicles:scion-witnessed':
+        this.scionFalls.push(data);
         break;
       case 'dev:state': {
         const resolver = this.pendingState.get(data.requestId);
@@ -196,15 +250,22 @@ export class HeadlessPlayer {
     this.stateCounter += 1;
     const requestId = `state-${this.stateCounter}`;
     return new Promise((resolve, reject) => {
+      // This read still uses a bounded development-rate bucket. Retry the
+      // idempotent request below that bucket's refill rate instead of failing
+      // the whole playtest on one dropped diagnostic frame.
+      const request = () => this.emit('dev:state', { requestId });
+      const retry = setInterval(request, 1000);
       const timer = setTimeout(() => {
+        clearInterval(retry);
         this.pendingState.delete(requestId);
         reject(new Error('dev:state timed out — is the server running with NODE_ENV!==production?'));
       }, timeoutMs);
       this.pendingState.set(requestId, (value) => {
+        clearInterval(retry);
         clearTimeout(timer);
         resolve(value);
       });
-      this.emit('dev:state', { requestId });
+      request();
     });
   }
 
@@ -225,15 +286,16 @@ export class HeadlessPlayer {
 
   // ── Player verbs ──────────────────────────────────────────────────────
 
-  /** Take one movement step ('up'/'down'/'left'/'right'/diagonals). */
+  /** Send one continuous movement sample ('up'/'down'/'left'/'right'/diagonals). */
   step(direction) {
     this.emit('player:move', { id: this.player.uuid, direction });
   }
 
-  /** Walk N steps in a direction, pacing like a held key. */
-  async move(direction, steps = 1, { stepMs = 180 } = {}) {
-     
-    for (let i = 0; i < steps; i += 1) {
+  /** Move N tile-lengths in a direction, pacing samples like a held key. */
+  async move(direction, steps = 1, { stepMs = PLAYER_MOVE_SAMPLE_MS } = {}) {
+    const samples = Math.max(1, Math.ceil(steps / PLAYER_MOVE_DISTANCE));
+
+    for (let i = 0; i < samples; i += 1) {
       this.step(direction);
       await sleep(stepMs);
     }
@@ -351,6 +413,33 @@ export class HeadlessPlayer {
     return menuPromise;
   }
 
+  async inventoryMenu(item, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+    const menuPromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('inventory context menu build timed out')), timeoutMs);
+      const onMessage = (raw) => {
+        try {
+          const message = JSON.parse(raw.toString());
+          if (message.event === 'game:context-menu:items') {
+            clearTimeout(timer);
+            this.ws.off('message', onMessage);
+            resolve(message.data.data || []);
+          }
+        } catch (error) { /* ignore */ }
+      };
+      this.ws.on('message', onMessage);
+    });
+
+    this.emit('player:context-menu:build', {
+      miscData: {
+        clickedOn: { 0: 'inventory-item', 1: 'inventorySlot' },
+        slot: item.slot,
+      },
+      tile: { x: 0, y: 0 },
+      player: { socket_id: this.player.socket_id },
+    });
+    return menuPromise;
+  }
+
   /** Choose a context-menu entry (as returned by rightClick). */
   choose(menuItem, tile = {}) {
     this.emit('player:context-menu:action', {
@@ -398,6 +487,22 @@ export class HeadlessPlayer {
     this.emit('player:skilltree:save', { snapshot });
   }
 
+  /** Equip an inventory item through the production socket handler. */
+  equipItem(item, targetSlot) {
+    this.emit('item:equip', {
+      item: {
+        id: item.id,
+        uuid: item.uuid,
+        slot: item.slot,
+        targetSlot,
+        miscData: {
+          slot: item.slot,
+          targetSlot,
+        },
+      },
+    });
+  }
+
   /** Grab the item under/beside your feet (the 'z'/'g' key). */
   pickupUnderfoot() {
     this.emit('player:take:underfoot', {});
@@ -437,6 +542,26 @@ export class HeadlessPlayer {
     return this.chroniclesReady;
   }
 
+  createParty() {
+    this.emit('party:create', {});
+  }
+
+  invitePlayer(username) {
+    this.emit('party:invite', { username });
+  }
+
+  acceptPartyInvite(partyId) {
+    this.emit('party:invite:accept', { partyId });
+  }
+
+  togglePartyReady() {
+    this.emit('party:ready', {});
+  }
+
+  startPartyInstance() {
+    this.emit('party:startInstance', {});
+  }
+
   // ── Wiz/dev commands ─────────────────────────────────────────────────
 
   devTeleport(x, y, sceneId = undefined) {
@@ -447,18 +572,16 @@ export class HeadlessPlayer {
     this.emit('dev:give', { itemId, qty, ...options });
   }
 
-  equipItem(item, targetSlot) {
-    this.emit('item:equip', {
-      item: {
-        id: item.id,
-        uuid: item.uuid,
-        targetSlot,
-        miscData: {
-          slot: item.slot,
-          targetSlot,
-        },
-      },
-    });
+  devDrop(itemId, options = {}) {
+    this.emit('dev:drop', { itemId, ...options });
+  }
+
+  devResetMonster(monsterUuid, options = {}) {
+    this.emit('dev:monster:reset', { monsterUuid, ...options });
+  }
+
+  devClearFloor() {
+    this.emit('dev:clear-floor', {});
   }
 
   devSetLevel(level) {
@@ -475,6 +598,18 @@ export class HeadlessPlayer {
 
   devKill({ allowCheatDeath = false } = {}) {
     this.emit('dev:kill', { allowCheatDeath });
+  }
+
+  devHurt(amount = 5) {
+    this.emit('dev:hurt', { amount });
+  }
+
+  devPrepareFinalDeath() {
+    this.emit('dev:prepare-final-death', {});
+  }
+
+  devReleaseRelic() {
+    this.emit('dev:release-relic', {});
   }
 
   close() {

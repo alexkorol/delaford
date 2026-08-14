@@ -37,7 +37,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'delve',
     trigger: 'delve',
-    prompt: 'You are ready for the depths. Open the ADVENTURE menu above the map and choose a zone — the true treasures wait below.',
+    prompt: 'You are ready for the depths. Open the ADVENTURE menu above the map and choose a zone, alone or with a party — the true treasures wait below.',
     completion: 'The dungeon swallows you whole. This is where legends are made — and where they end. Tread carefully.',
   },
 ];
@@ -123,7 +123,7 @@ export const notifyTutorial = (player, trigger) => {
   if (player.inventory && typeof player.inventory.add === 'function') {
     Promise.resolve(player.inventory.add('coins', TUTORIAL_REWARD.coins)).catch(() => {});
   }
-  say(player, `Your training is complete. Take this purse of ${TUTORIAL_REWARD.coins} coins — you have earned it. Delaford is yours to explore.`);
+  say(player, `Your training is complete. Take this purse of ${TUTORIAL_REWARD.coins} coins — you have earned it. Rhea at the House bank can transfer carried coins into your House treasury.`);
   say(player, 'One last lesson: press C for your character sheet, I for your backpack, and P for the Flower of Life — your skill tree. Spend your points wisely.');
   return true;
 };

@@ -21,19 +21,6 @@ export default {
   },
 
   /**
-   * Mine a rock
-   */
-  'player:resource:rock:mine': () => {
-    // Show rock picking event going on...
-  },
-
-  'game:ui:smelt': (data) => {
-    console.log('Someone wants to smelt some ore.');
-    // SHOW SMELTING UI POPUP2
-    console.log(data);
-  },
-
-  /**
    * Update skills
    */
   'resource:skills:update': (incoming, context) => {

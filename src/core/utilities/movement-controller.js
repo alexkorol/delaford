@@ -14,21 +14,11 @@ const centerOfTile = (tileX, tileY, tileSize = TILE_SIZE) => ({
 });
 
 const computeDurationFromDelta = (deltaX, deltaY, baseDuration) => {
-  const absX = Math.abs(deltaX);
-  const absY = Math.abs(deltaY);
-
-  if (absX === 0 && absY === 0) {
+  const distance = Math.hypot(deltaX, deltaY);
+  if (distance <= MOVEMENT_EPSILON) {
     return 0;
   }
-
-  if (absX <= 1 && absY <= 1) {
-    const diagonal = absX === 1 && absY === 1;
-    const multiplier = diagonal ? Math.SQRT2 : 1;
-    return Math.round(baseDuration * multiplier);
-  }
-
-  const steps = Math.max(absX, absY);
-  return Math.round(baseDuration * steps);
+  return Math.round(baseDuration * distance);
 };
 
 /**

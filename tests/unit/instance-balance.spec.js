@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import GameMap from '#server/core/map.js';
+import GameMap, { INSTANCE_SPAWN_SAFE_RADIUS } from '#server/core/map.js';
 import Monster from '#server/core/monster.js';
 import { rollPlayerDamage } from '#server/core/combat/index.js';
 import UI from '#shared/ui.js';
@@ -93,8 +93,8 @@ const measureFloor = (map, monsters, items) => {
   };
 };
 
-const buildFloor = async (seed) => {
-  const generation = await GameMap.generateInstance({ seed, template: 'dungeon', depth: 1 });
+const buildFloor = async (seed, layout = 'warren') => {
+  const generation = await GameMap.generateInstance({ seed, template: 'dungeon', layout, depth: 1 });
   const monsters = generation.monsters.map(def => new Monster({ ...def, sceneId: 'balance-scene' }));
   return { generation, monsters };
 };
@@ -106,6 +106,23 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     for (const seed of seeds) {
       const { monsters } = await buildFloor(seed);
       expect(monsters.length, `seed ${seed}`).toBeGreaterThanOrEqual(18);
+    }
+  });
+
+  it('keeps every procedural landing zone clear of monsters', async () => {
+    for (const layout of ['warren', 'gauntlet', 'clearings']) {
+      for (const seed of seeds) {
+        const { generation } = await buildFloor(seed, layout);
+        const entry = generation.metadata.stairsUp;
+        generation.monsters.forEach((monster) => {
+          const distance = Math.max(
+            Math.abs(monster.spawn.x - entry.x),
+            Math.abs(monster.spawn.y - entry.y),
+          );
+          expect(distance, `${layout} seed ${seed}: ${monster.id}`)
+            .toBeGreaterThan(INSTANCE_SPAWN_SAFE_RADIUS);
+        });
+      }
     }
   });
 
@@ -130,6 +147,34 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     const avgRemaining = remaining.reduce((s, v) => s + v, 0) / remaining.length;
     expect(avgRemaining).toBeLessThan(0.75); // loses meaningful HP
     expect(avgRemaining).toBeGreaterThan(0.15); // but usually survives with a buffer
+  });
+
+  it('keeps aura-empowered marsh packs killable through the measured damage pipeline', async () => {
+    let survived = 0;
+    for (const seed of seeds) {
+      const generation = await GameMap.generateInstance({ seed, template: 'marsh', depth: 1 });
+      const pack = generation.monsters
+        .map(definition => new Monster({ ...definition, sceneId: `aura-${seed}` }))
+        .filter(monster => monster.rarityId !== 'elite')
+        .slice(0, 5);
+      pack.forEach((monster) => {
+        monster.state.effects = {
+          measuredAura: {
+            damageMultiplier: 1.12,
+            expiresAt: Date.now() + 60000,
+          },
+        };
+      });
+      const player = makeLevelOnePlayer(0);
+      const left = simulatePackFocusFire(
+        pack,
+        averagePlayerDamage(player) / PLAYER_ATTACK_INTERVAL,
+        player.stats.resources.health.max,
+      );
+      if (left >= 0) survived += 1;
+    }
+
+    expect(survived).toBeGreaterThanOrEqual(seeds.length - 2);
   });
 
   it('used to be lethal: the pre-tune config would kill the player on the same packs', async () => {
@@ -163,6 +208,24 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     expect(bossTtk).toBeLessThan(20); // but killable within a fight, not a 26s grind
   });
 
+  it('gives every procedural biome boss the readable ground-slam mechanic', async () => {
+    for (const template of ['dungeon', 'grove', 'crypt', 'wilds', 'marsh']) {
+      const generation = await GameMap.generateInstance({
+        seed: 20260710,
+        template,
+        depth: 1,
+      });
+      const boss = generation.monsters.find(monster => monster.rarity === 'elite');
+      expect(boss, `${template} boss`).toBeTruthy();
+      expect(boss.behaviour.attack, `${template} boss attack`).toMatchObject({
+        skillId: 'boss:ground-slam',
+        skillName: 'Ground Slam',
+        radius: 2.5,
+        windupMs: 1000,
+      });
+    }
+  });
+
   it('keeps floors from being mostly empty corridor', async () => {
     const deadFractions = [];
     for (const seed of seeds) {
@@ -175,5 +238,54 @@ describe('instance combat + floor balance (measured, ARPG feel)', () => {
     // Was ~0.91 before the room/corridor rework; corridors still exist so this
     // is not zero, but the floor should read as populated.
     expect(avgDead).toBeLessThan(0.8);
+  });
+
+  it('keeps a full first-floor clear inside the early progression band', async () => {
+    for (const layout of ['warren', 'gauntlet', 'clearings']) {
+      for (const seed of seeds) {
+        const { generation } = await buildFloor(seed, layout);
+        const killExperience = generation.monsters
+          .reduce((total, monster) => total + monster.rewards.experience, 0);
+        const completionExperience = generation.metadata.rewards.experience.amount;
+        const resultingLevel = UI.getLevel(killExperience + completionExperience);
+
+        expect(resultingLevel, `${layout} seed ${seed}`).toBeGreaterThanOrEqual(6);
+        expect(resultingLevel, `${layout} seed ${seed}`).toBeLessThanOrEqual(10);
+      }
+    }
+  });
+
+  it('forms an infinite ladder whose real combat pressure rises into a wall', async () => {
+    const measurements = [];
+    for (const depth of [1, 3, 6, 10]) {
+      const generation = await GameMap.generateInstance({ seed: 20260710, template: 'dungeon', depth });
+      const monsters = generation.monsters
+        .map(definition => new Monster({ ...definition, sceneId: `depth-${depth}` }))
+        .filter(monster => monster.rarityId !== 'elite')
+        .slice(0, 5);
+      measurements.push({
+        averageHp: monsters.reduce((sum, monster) => sum + monster.stats.resources.health.max, 0) / monsters.length,
+        averageDamage: monsters.reduce((sum, monster) => sum + averageMonsterDamage(monster), 0) / monsters.length,
+        monsters,
+      });
+    }
+
+    for (let index = 1; index < measurements.length; index += 1) {
+      expect(measurements[index].averageHp).toBeGreaterThan(measurements[index - 1].averageHp);
+      expect(measurements[index].averageDamage).toBeGreaterThan(measurements[index - 1].averageDamage);
+    }
+
+    const fresh = makeLevelOnePlayer(0);
+    const freshDps = averagePlayerDamage(fresh) / PLAYER_ATTACK_INTERVAL;
+    expect(simulatePackFocusFire(
+      measurements[0].monsters,
+      freshDps,
+      fresh.stats.resources.health.max,
+    )).toBeGreaterThan(0);
+    expect(simulatePackFocusFire(
+      measurements[2].monsters,
+      freshDps,
+      fresh.stats.resources.health.max,
+    )).toBe(-1);
   });
 });

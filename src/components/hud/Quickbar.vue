@@ -20,7 +20,6 @@
         :title="slotTitle(entry.slot, entry.index)"
         :disabled="!entry.slot.skillId"
         @click="$emit('slot-activate', entry.slot, entry.index)"
-        @contextmenu.prevent="$emit('request-remap', entry.slot, entry.index)"
       >
         <span
           class="quickbar__hotkey"
@@ -65,7 +64,7 @@ export default {
       default: () => ({}),
     },
   },
-  emits: ['slot-activate', 'request-remap'],
+  emits: ['slot-activate'],
   data() {
     return {
       now: Date.now(),
@@ -151,7 +150,7 @@ export default {
       const hotkey = slot.hotkey ? ` [${slot.hotkey}]` : '';
       const cooldown = this.cooldownSeconds(slot) ? ` · ${slot.skill.cooldown}s cooldown` : '';
       const description = slot.skill && slot.skill.description ? `\n${slot.skill.description}` : '';
-      return `${label}${hotkey}${cooldown}${description}\nRight-click to remap`;
+      return `${label}${hotkey}${cooldown}${description}`;
     },
   },
 };

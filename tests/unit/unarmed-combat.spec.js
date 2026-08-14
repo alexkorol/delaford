@@ -5,10 +5,12 @@ import {
 } from 'vitest';
 
 const scenePlayers = [];
+const sceneMetadata = {};
 
 vi.mock('#server/core/world.js', () => ({
   default: {
     getScenePlayers: () => scenePlayers,
+    getScene: () => ({ id: 'scene-1', type: 'zone', metadata: sceneMetadata }),
   },
 }));
 
@@ -142,5 +144,20 @@ describe('auto-retaliation', () => {
     expect(result).toBe(false);
     expect(player.applyDamage).not.toHaveBeenCalled();
     expect(monster.state.pendingAttack).toBeNull();
+  });
+
+  it('deals no damage on sanctuary ground (the Crossroads truce)', () => {
+    const player = makeNakedPlayer({ x: 10, y: 10 });
+    scenePlayers.length = 0;
+    scenePlayers.push(player);
+    sceneMetadata.sanctuary = true;
+
+    const monster = makeMonster(player, { x: 10, y: 10 });
+    const result = monster.combatController.resolvePendingAttack(1000);
+    delete sceneMetadata.sanctuary;
+
+    expect(result).toBe(false);
+    expect(player.applyDamage).not.toHaveBeenCalled();
+    expect(player.stats.resources.health.current).toBe(50);
   });
 });

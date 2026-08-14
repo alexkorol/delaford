@@ -4,10 +4,22 @@ import { DEFAULT_FACING_DIRECTION, DEFAULT_SKILL_IDS } from '#shared/combat.js';
 import { DEFAULT_BEHAVIOUR } from '#server/core/entities/monster/stats-manager.js';
 import { euclideanDistance, manhattanDistance, resolveDirection } from '#server/core/entities/monster/movement-handler.js';
 import UI from '#shared/ui.js';
+import { entombFallenScion } from '#server/core/services/chronicles.js';
+import { hasProjectileLineOfSight } from '#shared/projectile-collision.js';
 
 // Continuous positions: melee pursuit stands off ~1 tile from the target
 // (never on its tile), so reach checks are radii with diagonal headroom.
 const REACH_TOLERANCE = 0.6;
+// Projectiles are rendered as a point travelling to the target position that
+// was captured when the attack began. A half-tile radius matches the visible
+// player body without turning the missile into an invisible range-wide hit.
+const PROJECTILE_HIT_RADIUS = 0.55;
+
+const getSceneMap = monster => monster.activeScene?.map || world.getScene(monster.sceneId)?.map || world.map;
+
+const hasLineOfSight = (monster, target) => (
+  Boolean(target) && hasProjectileLineOfSight(getSceneMap(monster), monster, target)
+);
 
 const isTargetablePlayer = (player, now = Date.now()) => {
   const health = player?.stats?.resources?.health;
@@ -57,9 +69,17 @@ const rollDamage = (monster) => {
   const rarityMultiplier = rarity.damageMultiplier || 1;
   // Optional per-monster damage scale (instance trash hits softer than bosses).
   const monsterMultiplier = Number.isFinite(monster.damageMultiplier) ? monster.damageMultiplier : 1;
+  const now = Date.now();
+  const effectMultiplier = Object.entries(monster.state?.effects || {}).reduce((total, [id, effect]) => {
+    if (!effect || !Number.isFinite(effect.expiresAt) || effect.expiresAt <= now) {
+      delete monster.state.effects[id];
+      return total;
+    }
+    return total * (Number.isFinite(effect.damageMultiplier) ? effect.damageMultiplier : 1);
+  }, 1);
 
-  min *= damageMultiplier * rarityMultiplier * monsterMultiplier;
-  max *= damageMultiplier * rarityMultiplier * monsterMultiplier;
+  min *= damageMultiplier * rarityMultiplier * monsterMultiplier * effectMultiplier;
+  max *= damageMultiplier * rarityMultiplier * monsterMultiplier * effectMultiplier;
 
   const rolled = UI.getRandomInt(Math.max(1, Math.floor(min)), Math.max(1, Math.ceil(max)));
   return Math.max(1, rolled);
@@ -126,9 +146,14 @@ const tryAttack = (monster, target, now = Date.now()) => {
     return false;
   }
 
+  const skillId = attack.skillId || 'monster:attack';
+  const isGroundSlam = skillId === 'boss:ground-slam';
   const range = Math.max(1, attack.range || 1);
   const distance = euclideanDistance(monster, target);
-  if (distance > range + REACH_TOLERANCE) {
+  if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
+    return false;
+  }
+  if (range > 1 && !isGroundSlam && !hasLineOfSight(monster, target)) {
     return false;
   }
 
@@ -143,14 +168,36 @@ const tryAttack = (monster, target, now = Date.now()) => {
     duration: attack.windupMs,
     startedAt: now,
     holdState: 'idle',
-    skillId: 'monster:attack',
+    skillId,
   });
 
   monster.state.pendingAttack = {
     targetId: target.uuid,
     resolveAt,
     damage,
+    skillId,
+    skillName: attack.skillName || 'Attack',
+    originX: monster.x,
+    originY: monster.y,
+    targetX: target.x,
+    targetY: target.y,
+    projectile: range > 1 && !isGroundSlam,
+    radius: isGroundSlam ? Math.max(1, Number(attack.radius) || 2) : null,
   };
+
+  if (isGroundSlam) {
+    Socket.broadcast('monster:telegraph', {
+      attackerId: monster.uuid,
+      attackerName: monster.name,
+      skillId,
+      skillName: attack.skillName || 'Ground Slam',
+      x: monster.x,
+      y: monster.y,
+      radius: monster.state.pendingAttack.radius,
+      durationMs: attack.windupMs,
+      startedAt: now,
+    }, world.getScenePlayers(monster.sceneId));
+  }
 
   monster.state.lastAttackAt = now;
 
@@ -222,6 +269,15 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     return false;
   }
 
+  // Truce-ground: nothing may deal damage in a sanctuary scene (the
+  // Crossroads). No monster should exist there, but the rule holds even if
+  // one wanders in (docs/crossroads-world-web.md).
+  const scene = world.getScene(monster.sceneId);
+  if (scene?.metadata?.sanctuary === true) {
+    monster.state.pendingAttack = null;
+    return false;
+  }
+
   const scenePlayers = world.getScenePlayers(monster.sceneId);
   const target = scenePlayers.find(player => player.uuid === payload.targetId);
   monster.state.pendingAttack = null;
@@ -235,10 +291,31 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
   }
 
   const attack = monster.behaviour.attack || DEFAULT_BEHAVIOUR.attack;
-  const range = Math.max(1, attack.range || 1);
-  const distance = euclideanDistance(monster, target);
-  if (distance > range + REACH_TOLERANCE) {
-    return false;
+  const isGroundSlam = payload.skillId === 'boss:ground-slam';
+  const isProjectile = payload.projectile === true
+    && Number.isFinite(payload.targetX)
+    && Number.isFinite(payload.targetY);
+  const source = isGroundSlam || isProjectile
+    ? { x: payload.originX, y: payload.originY }
+    : monster;
+
+  if (isProjectile) {
+    const impact = { x: payload.targetX, y: payload.targetY };
+    if (euclideanDistance(impact, target) > PROJECTILE_HIT_RADIUS) {
+      return false;
+    }
+    if (!hasProjectileLineOfSight(getSceneMap(monster), source, impact)) {
+      return false;
+    }
+  } else {
+    const range = isGroundSlam ? payload.radius : Math.max(1, attack.range || 1);
+    const distance = euclideanDistance(source, target);
+    if (distance > range + (isGroundSlam ? 0 : REACH_TOLERANCE)) {
+      return false;
+    }
+    if (range > 1 && !isGroundSlam && !hasProjectileLineOfSight(getSceneMap(monster), source, target)) {
+      return false;
+    }
   }
 
   const nowTs = now;
@@ -276,6 +353,10 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     if (result.type === 'death' || result.type === 'permadeath') {
       monster.state.mode = 'idle';
       monster.state.targetId = null;
+
+      if (result.permadeath || target.stats?.lifecycle?.state === 'permadead') {
+        entombFallenScion(target, { cause: `Slain by ${monster.name || 'a monster'}` });
+      }
     }
   }
 
@@ -286,12 +367,15 @@ const resolvePendingAttack = (monster, now = Date.now()) => {
     rawDamage: payload.damage,
     mitigation,
     blocked,
+    skillId: payload.skillId || 'monster:attack',
+    skillName: payload.skillName || 'Attack',
   } : false;
 };
 
 const createMonsterCombatController = (monster) => ({
   rollDamage: () => rollDamage(monster),
   resolveTarget: now => resolveTarget(monster, now),
+  hasLineOfSight: target => hasLineOfSight(monster, target),
   tryAttack: (target, now) => tryAttack(monster, target, now),
   resolvePendingAttack: now => resolvePendingAttack(monster, now),
 });

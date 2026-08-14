@@ -1,13 +1,24 @@
 import UI from '#shared/ui.js';
+import Query from '#server/core/data/query.js';
+import { escapeHtml } from '#shared/html.js';
 
 const openScreenStrategy = {
-  actionIds: ['player:screen:bank', 'player:screen:npc:trade'],
+  actionIds: [
+    'player:screen:bank',
+    'player:screen:wagon',
+    'player:screen:npc:trade',
+    'player:screen:shop-display',
+    'player:shop-display:buy',
+    'player:shop-display:appraise',
+  ],
   description: 'Open banking or trading panes from world interactions.',
-  canExecute: ({ menu, foregroundData, npcs }) => (
+  canExecute: ({ menu, foregroundData, npcs, groundItems }) => (
     menu.isFromGameCanvas()
-      && (Boolean(foregroundData) || (Array.isArray(npcs) && npcs.length > 0))
+      && (Boolean(foregroundData)
+        || (Array.isArray(npcs) && npcs.length > 0)
+        || (Array.isArray(groundItems) && groundItems.some(item => item.shopDisplay)))
   ),
-  execute: ({ action, menu, foregroundData, npcs }) => {
+  execute: ({ action, menu, foregroundData, npcs, groundItems }) => {
     if (!menu.isFromGameCanvas()) {
       return [];
     }
@@ -17,7 +28,7 @@ const openScreenStrategy = {
     if (foregroundData && menu.canDoAction(foregroundData.actions, action)) {
       const fgColor = UI.getContextSubjectColor(foregroundData.context);
       results.push({
-        label: `${action.name} <span style='color:${fgColor}'>${foregroundData.name}</span>`,
+        label: `${action.name} <span style='color:${fgColor}'>${escapeHtml(foregroundData.name)}</span>`,
         action,
         examine: foregroundData.examine,
         type: 'foreground',
@@ -32,11 +43,27 @@ const openScreenStrategy = {
         }
         const color = UI.getContextSubjectColor(npc.context);
         results.push({
-          label: `${action.name} <span style='color:${color}'>${npc.name}</span>`,
+          label: `${action.name} <span style='color:${color}'>${escapeHtml(npc.name)}</span>`,
           action,
           examine: npc.examine,
           type: 'npc',
           id: npc.id,
+        });
+      });
+    }
+
+    if (Array.isArray(groundItems) && (action.actionId.startsWith('player:shop-display:')
+      || action.actionId === 'player:screen:shop-display')) {
+      groundItems.filter(item => item.shopDisplay && item.shopNpcId).forEach((item) => {
+        const itemData = Query.getItemData(item.id) || item;
+        const shop = menu.shops.find(entry => entry.npcId === item.shopNpcId);
+        const color = UI.getContextSubjectColor('item');
+        results.push({
+          label: `${action.name} <span style='color:${color}'>${itemData.name || item.id}</span>${shop ? ` · ${shop.name}` : ''}`,
+          action,
+          type: 'shop-display',
+          id: item.shopNpcId,
+          shopItemId: item.id,
         });
       });
     }

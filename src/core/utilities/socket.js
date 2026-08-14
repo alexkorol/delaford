@@ -1,72 +1,79 @@
+const QUEUEABLE_EVENTS = new Set([
+  'player:login',
+  'player:skilltree:save',
+]);
+
 class Socket {
   static queue = [];
 
   static waitForOpen = false;
 
-  static socketsWithListeners = new WeakSet();
-
   static MAX_QUEUE_SIZE = 100;
 
-  static enqueue(message) {
-    Socket.queue.push(message);
+  static authenticated = false;
 
+  static lastLoginPayload = null;
+
+  static enqueue(event, data) {
+    if (!QUEUEABLE_EVENTS.has(event)) {
+      console.warn(`[socket] Dropping ${event} while disconnected; stale gameplay actions are not replayed.`);
+      return false;
+    }
+
+    Socket.queue.push({ event, data });
     if (Socket.queue.length > Socket.MAX_QUEUE_SIZE) {
       Socket.queue.shift();
+      console.warn('[socket] Queue full; discarded the oldest persisted-state message.');
+    }
+    return true;
+  }
+
+  static setAuthenticated(value) {
+    Socket.authenticated = Boolean(value);
+  }
+
+  static canSend(event) {
+    return event === 'player:login' || Socket.authenticated;
+  }
+
+  static sendNow(event, data) {
+    if (typeof window === 'undefined' || typeof WebSocket === 'undefined') {
+      return false;
+    }
+    if (!window.ws || window.ws.readyState !== WebSocket.OPEN || !Socket.canSend(event)) {
+      return false;
+    }
+
+    try {
+      window.ws.send(JSON.stringify({ event, data }));
+      return true;
+    } catch (error) {
+      console.error(`[socket] Failed to send ${event}:`, error);
+      return false;
     }
   }
 
   static flushQueue = () => {
-    if (typeof window === 'undefined') {
-      return;
+    if (typeof window === 'undefined' || typeof WebSocket === 'undefined') {
+      return 0;
     }
-
-    if (typeof WebSocket === 'undefined') {
-      return;
-    }
-
     if (!window.ws || window.ws.readyState !== WebSocket.OPEN) {
-      return;
+      return 0;
     }
 
-    Socket.waitForOpen = false;
-
-    while (Socket.queue.length > 0) {
-      const message = Socket.queue.shift();
-      window.ws.send(message);
-    }
-  };
-
-  static ensureListeners() {
-    if (typeof window === 'undefined' || !window.ws) {
-      return;
-    }
-
-    if (!Socket.socketsWithListeners) {
-      Socket.socketsWithListeners = new WeakSet();
-    }
-
-    if (Socket.socketsWithListeners.has(window.ws)) {
-      return;
-    }
-
-    const socket = window.ws;
-    socket.addEventListener('open', Socket.flushQueue);
-    socket.addEventListener('close', () => {
-      Socket.waitForOpen = false;
-      if (Socket.socketsWithListeners) {
-        Socket.socketsWithListeners.delete(socket);
+    let sent = 0;
+    const retained = [];
+    Socket.queue.forEach(({ event, data }) => {
+      if (!Socket.canSend(event) || !Socket.sendNow(event, data)) {
+        retained.push({ event, data });
+        return;
       }
+      sent += 1;
     });
-    Socket.socketsWithListeners.add(socket);
-  }
-
-  /**
-   * Send an event to the server
-   *
-   * @param {string} event The event to send out
-   * @param {object} data The data regarding the event
-   */
-  static lastLoginPayload = null;
+    Socket.queue = retained;
+    Socket.waitForOpen = Socket.queue.length > 0;
+    return sent;
+  };
 
   static chroniclesAccountId = null;
 
@@ -92,9 +99,6 @@ class Socket {
   }
 
   static emit(event, data) {
-    // Remember the credentials so a reconnect can log straight back in
-    // after a server restart instead of dumping the player at the login
-    // screen.
     if (event === 'player:login') {
       Socket.lastLoginPayload = {
         ...data,
@@ -103,35 +107,33 @@ class Socket {
       data = Socket.lastLoginPayload;
     }
 
-    const payload = JSON.stringify({
-      event,
-      data,
-    });
+    if (Socket.sendNow(event, data)) {
+      return true;
+    }
 
     if (typeof window === 'undefined' || typeof WebSocket === 'undefined') {
       console.warn(`[socket] Unable to emit ${event}: WebSocket not available in this environment.`);
-      return;
+      return false;
     }
 
-    if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-      window.ws.send(payload);
-      return;
-    }
+    const queued = Socket.enqueue(event, data);
+    Socket.waitForOpen = queued;
+    return queued;
+  }
 
-    if (!window.ws) {
-      console.warn(`[socket] Queuing ${event}, waiting for websocket to initialise.`);
-      Socket.enqueue(payload);
-      Socket.waitForOpen = true;
-      return;
-    }
+  static setResumeScion(scionId) {
+    if (!Socket.lastLoginPayload) return;
+    Socket.lastLoginPayload = {
+      ...Socket.lastLoginPayload,
+      resumeScionId: scionId || null,
+    };
+  }
 
-    Socket.enqueue(payload);
-    Socket.waitForOpen = true;
-
-    if (window.ws) {
-      Socket.ensureListeners();
-      Socket.flushQueue();
-    }
+  static reset() {
+    Socket.queue = [];
+    Socket.waitForOpen = false;
+    Socket.authenticated = false;
+    Socket.lastLoginPayload = null;
   }
 }
 

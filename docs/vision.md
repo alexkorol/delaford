@@ -2,6 +2,15 @@
 
 ## Status (updated 2026-08-13)
 
+**The Crossroads & the world web** (docs/crossroads-world-web.md): the static
+Delaford Village + wilderness ring was replaced by a trading-hub town (the
+Crossroads — truce-ground, House wagon pitches, four road gates) and a
+procedurally generated, House-charted web of zones (four roads, branching
+tiers, a Warden per zone gating the next, ~15-minute zone persistence, zones
+private to a player/party). Wagon pane covers the daily road purse, deposits,
+prestige/forge-gated outfitting, and House improvements in-game. Lore doc and
+in-game text follow one rule: walked ground holds; forsaken ground weathers.
+
 Landed from the WIZARD prototypes (skill tree, Vesselforge inventory engine,
 Chronicles account creator):
 
@@ -28,9 +37,9 @@ Chronicles account creator):
   10/10/10 base attributes shaped by tree/gear/quests. The Warrior/Rogue/Mage
   picker was reverted; the intended identity layer is Chronicles
   **Houses & Scions** (account = House meta, characters = permadeath scions),
-  tracked in `docs/fix-plan-2026-07-04.md` Phase 6.
+  tracked in `docs/archive/fix-plan-2026-07-04.md` Phase 6.
 
-Sprint of 2026-07-04 (`docs/fix-plan-2026-07-04.md`) delivered: combat feel
+Sprint of 2026-07-04 (`docs/archive/fix-plan-2026-07-04.md`) delivered: combat feel
 (hit tint, unarmed retaliation, bottom xp bar, crisp orbs), pane close
 buttons, skill-tree corrections (plain names, correct conduit bias, level-
 scaled points), PoE-style quickbar, inventory slot texture + varied drops,

@@ -1,0 +1,596 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
+import { normaliseHouseName } from '#shared/house-name.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_DB_FILE = path.resolve(here, '..', '..', 'data', 'verdigris.sqlite');
+
+const isoNow = () => new Date().toISOString();
+const clone = value => JSON.parse(JSON.stringify(value));
+
+export const HOUSE_UPGRADES = Object.freeze({
+  hall: { label: 'Great Hall', baseCost: 250, maxLevel: 5 },
+  forge: { label: 'House Forge', baseCost: 400, maxLevel: 3 },
+  archives: { label: 'Relic Archives', baseCost: 300, maxLevel: 3 },
+});
+
+const normaliseUpgrades = value => ({
+  hall: Math.max(0, Math.floor(Number(value?.hall) || 0)),
+  forge: Math.max(0, Math.floor(Number(value?.forge) || 0)),
+  archives: Math.max(0, Math.floor(Number(value?.archives) || 0)),
+});
+
+const parseJson = (value, fallback) => {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+// Names flow into server-built HTML context-menu labels (relic titles and
+// the shared wagon NPC), so markup metacharacters stay out of the alphabet
+// as defence in depth behind the label-level HTML escaping.
+const NAME_PATTERN = /^[A-Za-z0-9 '\-]+$/;
+
+const validateName = (name, minimum, maximum, label) => {
+  const value = String(name || '').trim();
+  if (value.length < minimum) {
+    return { valid: false, reason: `${label} name must be at least ${minimum} characters.` };
+  }
+  if (value.length > maximum) {
+    return { valid: false, reason: `${label} name must be ${maximum} characters or fewer.` };
+  }
+  if (!NAME_PATTERN.test(value)) {
+    return { valid: false, reason: `${label} name may only use letters, numbers, spaces, apostrophes and hyphens.` };
+  }
+  return { valid: true, value };
+};
+
+export const validateHouseName = name => validateName(normaliseHouseName(name), 3, 20, 'House');
+export const validateScionName = name => validateName(name, 2, 20, 'Scion');
+
+const rowToScion = row => ({
+  id: row.id,
+  name: row.name,
+  level: Number.isFinite(row.level) ? row.level : 1,
+  bestDepth: Number.isFinite(row.best_depth) ? row.best_depth : 0,
+  bornAt: row.born_at,
+  diedAt: row.died_at || null,
+  cause: row.cause || null,
+  deeds: parseJson(row.deeds_json, []),
+});
+
+export class ChroniclesRepository {
+  constructor({
+    dbFile = process.env.VITEST ? ':memory:' : (process.env.CHRONICLES_DB_FILE || DEFAULT_DB_FILE),
+  } = {}) {
+    this.dbFile = dbFile;
+    if (dbFile !== ':memory:') {
+      fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+    }
+    this.db = new Database(dbFile);
+    this.db.pragma('foreign_keys = ON');
+    if (dbFile !== ':memory:') {
+      try {
+        this.db.pragma('journal_mode = WAL');
+      } catch (error) {
+        // Read-only/networked dev folders may reject WAL sidecars. SQLite's
+        // default journal still gives authoritative persistence.
+        console.warn(`[chronicles] WAL unavailable for ${dbFile}: ${error.message}`);
+      }
+    }
+    this.migrate();
+    // A server restart discards its in-world drops. Put unclaimed relics back
+    // into circulation instead of losing a dead scion's history to a crash.
+    this.db.prepare("UPDATE chronicle_relics SET status = 'circulating' WHERE status = 'dropped'").run();
+  }
+
+  migrate() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS chronicle_accounts (
+        account_id TEXT PRIMARY KEY,
+        active_house_id TEXT,
+        run_count INTEGER NOT NULL DEFAULT 0,
+        best_depth INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS chronicle_houses (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        renown INTEGER NOT NULL DEFAULT 0,
+        best_depth INTEGER NOT NULL DEFAULT 0,
+        founded_at TEXT NOT NULL,
+        FOREIGN KEY(account_id) REFERENCES chronicle_accounts(account_id) ON DELETE CASCADE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS chronicle_house_name_per_account
+        ON chronicle_houses(account_id, name COLLATE NOCASE);
+      CREATE TABLE IF NOT EXISTS chronicle_scions (
+        id TEXT PRIMARY KEY,
+        house_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'living',
+        level INTEGER NOT NULL DEFAULT 1,
+        best_depth INTEGER NOT NULL DEFAULT 0,
+        born_at TEXT NOT NULL,
+        died_at TEXT,
+        cause TEXT,
+        deeds_json TEXT NOT NULL DEFAULT '[]',
+        snapshot_json TEXT,
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS chronicle_living_scion_name_per_house
+        ON chronicle_scions(house_id, name COLLATE NOCASE) WHERE status = 'living';
+      CREATE TABLE IF NOT EXISTS chronicle_relics (
+        id TEXT PRIMARY KEY,
+        house_id TEXT NOT NULL,
+        source_scion_id TEXT NOT NULL,
+        origin_scion_name TEXT NOT NULL,
+        item_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'circulating',
+        eligible_run INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        dropped_at TEXT,
+        claimed_at TEXT,
+        claimed_by_scion_id TEXT,
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS chronicle_relic_circulation
+        ON chronicle_relics(status, eligible_run, created_at);
+      CREATE TABLE IF NOT EXISTS chronicle_house_links (
+        account_id TEXT NOT NULL,
+        house_id TEXT NOT NULL,
+        eligible_run INTEGER NOT NULL,
+        PRIMARY KEY(account_id, house_id),
+        FOREIGN KEY(account_id) REFERENCES chronicle_accounts(account_id) ON DELETE CASCADE,
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS house_world_progress (
+        house_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        cleared_at TEXT NOT NULL,
+        PRIMARY KEY(house_id, node_id),
+        FOREIGN KEY(house_id) REFERENCES chronicle_houses(id) ON DELETE CASCADE
+      );
+    `);
+    const houseColumns = new Set(this.db.pragma('table_info(chronicle_houses)').map(column => column.name));
+    if (!houseColumns.has('treasury')) {
+      this.db.exec('ALTER TABLE chronicle_houses ADD COLUMN treasury INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!houseColumns.has('upgrades_json')) {
+      this.db.exec("ALTER TABLE chronicle_houses ADD COLUMN upgrades_json TEXT NOT NULL DEFAULT '{}'");
+    }
+    if (!houseColumns.has('last_daily_claim')) {
+      this.db.exec('ALTER TABLE chronicle_houses ADD COLUMN last_daily_claim TEXT');
+    }
+  }
+
+  close() {
+    this.db.close();
+  }
+
+  ensureAccount(accountId) {
+    const id = String(accountId || '');
+    if (!id) return null;
+    this.db.prepare(`
+      INSERT INTO chronicle_accounts (account_id, created_at)
+      VALUES (?, ?)
+      ON CONFLICT(account_id) DO NOTHING
+    `).run(id, isoNow());
+    return id;
+  }
+
+  getChronicle(accountId) {
+    const id = this.ensureAccount(accountId);
+    if (!id) return { houses: [], activeHouseId: null };
+    const account = this.db.prepare('SELECT * FROM chronicle_accounts WHERE account_id = ?').get(id);
+    const houseRows = this.db.prepare(`
+      SELECT * FROM chronicle_houses WHERE account_id = ? ORDER BY founded_at ASC
+    `).all(id);
+    const livingQuery = this.db.prepare(`
+      SELECT * FROM chronicle_scions WHERE house_id = ? AND status = 'living' ORDER BY born_at ASC
+    `);
+    const cryptQuery = this.db.prepare(`
+      SELECT * FROM chronicle_scions WHERE house_id = ? AND status = 'dead' ORDER BY died_at DESC
+    `);
+    const relicNames = this.db.prepare(`
+      SELECT item_json FROM chronicle_relics WHERE source_scion_id = ? ORDER BY created_at ASC
+    `);
+    const heirloomCount = this.db.prepare(`
+      SELECT COUNT(*) AS count FROM chronicle_relics WHERE house_id = ?
+    `);
+
+    const houses = houseRows.map((row) => {
+      const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+      return {
+      id: row.id,
+      name: normaliseHouseName(row.name),
+      renown: row.renown,
+      treasury: Math.max(0, Number(row.treasury) || 0),
+      upgrades,
+      dailyClaimAvailable: row.last_daily_claim !== isoNow().slice(0, 10),
+      dailyGold: 100 + (upgrades.hall * 25),
+      craftingBases: [
+        ...(upgrades.forge >= 1 ? ['House weapon blanks'] : []),
+        ...(upgrades.forge >= 2 ? ['House armour blanks'] : []),
+        ...(upgrades.forge >= 3 ? ['Named heirloom bases'] : []),
+      ],
+      heirloomCount: heirloomCount.get(row.id).count,
+      bestDepth: row.best_depth,
+      foundedAt: row.founded_at,
+      scions: livingQuery.all(row.id).map(rowToScion),
+      crypt: cryptQuery.all(row.id).map((scionRow) => ({
+        ...rowToScion(scionRow),
+        relics: relicNames.all(scionRow.id)
+          .map(entry => parseJson(entry.item_json, null))
+          .filter(Boolean)
+          .map(item => item.displayName || item.name || item.baseName || item.id),
+      })),
+      };
+    });
+
+    const activeHouseId = houses.some(house => house.id === account.active_house_id)
+      ? account.active_house_id
+      : (houses[0]?.id || null);
+
+    return {
+      houses,
+      activeHouseId,
+      bestDepth: account.best_depth,
+      runCount: account.run_count,
+      leaderboard: this.getLeaderboard(),
+      houseUpgrades: HOUSE_UPGRADES,
+    };
+  }
+
+  getLeaderboard(limit = 10) {
+    return this.db.prepare(`
+      SELECT id AS houseId, name AS houseName, best_depth AS bestDepth, renown
+      FROM chronicle_houses
+      WHERE best_depth > 0
+      ORDER BY best_depth DESC, renown DESC, founded_at ASC
+      LIMIT ?
+    `).all(Math.max(1, Math.min(50, Math.floor(limit || 10))))
+      .map(entry => ({ ...entry, houseName: normaliseHouseName(entry.houseName) }));
+  }
+
+  recordDepth(accountId, houseId, scionId, depth) {
+    const value = Math.max(1, Math.floor(Number(depth) || 1));
+    const scion = this.getLivingScion(accountId, scionId);
+    if (!scion || scion.houseId !== houseId) return null;
+    const previousDepth = Math.max(0, Number(scion.bestDepth) || 0);
+    const treasuryGain = Math.max(0, value - previousDepth) * 25;
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicle_scions SET best_depth = MAX(best_depth, ?) WHERE id = ?')
+        .run(value, scionId);
+      this.db.prepare('UPDATE chronicle_houses SET best_depth = MAX(best_depth, ?) WHERE id = ?')
+        .run(value, houseId);
+      if (treasuryGain > 0) {
+        this.db.prepare('UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ?')
+          .run(treasuryGain, houseId);
+      }
+      this.db.prepare('UPDATE chronicle_accounts SET best_depth = MAX(best_depth, ?) WHERE account_id = ?')
+        .run(value, accountId);
+    })();
+    return value;
+  }
+
+  claimDailyGold(accountId, houseId) {
+    const today = isoNow().slice(0, 10);
+    const row = this.db.prepare(`
+      SELECT * FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    if (row.last_daily_claim === today) {
+      return { ok: false, reason: 'Today\'s House stipend has already been claimed.' };
+    }
+    const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+    const amount = 100 + (upgrades.hall * 25);
+    this.db.prepare(`
+      UPDATE chronicle_houses
+      SET treasury = treasury + ?, last_daily_claim = ?
+      WHERE id = ? AND account_id = ?
+    `).run(amount, today, houseId, accountId);
+    return { ok: true, amount, chronicle: this.getChronicle(accountId) };
+  }
+
+  depositScionGold(accountId, houseId, scionId, amount, snapshot) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Choose some carried gold to deposit.' };
+    if (!snapshot || typeof snapshot !== 'object') {
+      return { ok: false, reason: 'The scion snapshot could not be saved.' };
+    }
+    const scion = this.db.prepare(`
+      SELECT s.id
+      FROM chronicle_scions s
+      JOIN chronicle_houses h ON h.id = s.house_id
+      WHERE s.id = ? AND s.house_id = ? AND h.account_id = ? AND s.status = 'living'
+    `).get(scionId, houseId, accountId);
+    if (!scion) return { ok: false, reason: 'That living scion does not belong to this House.' };
+
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ? AND account_id = ?')
+        .run(value, houseId, accountId);
+      this.db.prepare('UPDATE chronicle_scions SET snapshot_json = ? WHERE id = ?')
+        .run(JSON.stringify(snapshot), scionId);
+    })();
+
+    const chronicle = this.getChronicle(accountId);
+    const house = chronicle.houses.find(entry => entry.id === houseId);
+    return {
+      ok: true,
+      amount: value,
+      treasury: house?.treasury || 0,
+      chronicle,
+    };
+  }
+
+  /** Spend House gold (wagon outfitting): the House pays, not the scion. */
+  spendHouseTreasury(accountId, houseId, amount) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Nothing to spend.' };
+    const row = this.db.prepare(`
+      SELECT treasury FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    const balance = Math.max(0, Number(row.treasury) || 0);
+    if (balance < value) {
+      return { ok: false, reason: `The House ledger holds only ${balance} gold.` };
+    }
+    this.db.prepare(`
+      UPDATE chronicle_houses SET treasury = treasury - ? WHERE id = ? AND account_id = ?
+    `).run(value, houseId, accountId);
+    return { ok: true, treasury: balance - value };
+  }
+
+  /** Compensating credit reversing a spend when goods could not be delivered. */
+  creditHouseTreasury(accountId, houseId, amount) {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (value < 1) return { ok: false, reason: 'Nothing to refund.' };
+    const result = this.db.prepare(`
+      UPDATE chronicle_houses SET treasury = treasury + ? WHERE id = ? AND account_id = ?
+    `).run(value, houseId, accountId);
+    return result.changes ? { ok: true } : { ok: false, reason: 'House not found.' };
+  }
+
+  upgradeHouse(accountId, houseId, upgradeId) {
+    const definition = HOUSE_UPGRADES[upgradeId];
+    if (!definition) return { ok: false, reason: 'Unknown House improvement.' };
+    const row = this.db.prepare(`
+      SELECT * FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!row) return { ok: false, reason: 'House not found.' };
+    const upgrades = normaliseUpgrades(parseJson(row.upgrades_json, {}));
+    const current = upgrades[upgradeId];
+    if (current >= definition.maxLevel) return { ok: false, reason: `${definition.label} is complete.` };
+    const cost = definition.baseCost * (current + 1);
+    if ((Number(row.treasury) || 0) < cost) return { ok: false, reason: `The House needs ${cost} gold.` };
+    upgrades[upgradeId] = current + 1;
+    this.db.prepare(`
+      UPDATE chronicle_houses
+      SET treasury = treasury - ?, upgrades_json = ?
+      WHERE id = ? AND account_id = ?
+    `).run(cost, JSON.stringify(upgrades), houseId, accountId);
+    return { ok: true, cost, chronicle: this.getChronicle(accountId) };
+  }
+
+  foundHouse(accountId, name) {
+    const validation = validateHouseName(name);
+    if (!validation.valid) return { ok: false, reason: validation.reason };
+    const id = this.ensureAccount(accountId);
+    const houseId = randomUUID();
+    const foundedAt = isoNow();
+    try {
+      const create = this.db.transaction(() => {
+        this.db.prepare(`
+          INSERT INTO chronicle_houses (id, account_id, name, founded_at)
+          VALUES (?, ?, ?, ?)
+        `).run(houseId, id, validation.value, foundedAt);
+        this.db.prepare(`
+          UPDATE chronicle_accounts SET active_house_id = ? WHERE account_id = ?
+        `).run(houseId, id);
+      });
+      create();
+      return { ok: true, houseId, chronicle: this.getChronicle(id) };
+    } catch (error) {
+      if (String(error.message).includes('UNIQUE')) {
+        return { ok: false, reason: 'That House name is already recorded.' };
+      }
+      throw error;
+    }
+  }
+
+  createScion(accountId, houseId, name) {
+    const validation = validateScionName(name);
+    if (!validation.valid) return { ok: false, reason: validation.reason };
+    const house = this.db.prepare(`
+      SELECT id FROM chronicle_houses WHERE id = ? AND account_id = ?
+    `).get(houseId, accountId);
+    if (!house) return { ok: false, reason: 'House not found.' };
+    const scionId = randomUUID();
+    try {
+      this.db.prepare(`
+        INSERT INTO chronicle_scions (id, house_id, name, born_at)
+        VALUES (?, ?, ?, ?)
+      `).run(scionId, houseId, validation.value, isoNow());
+      return { ok: true, scionId, chronicle: this.getChronicle(accountId) };
+    } catch (error) {
+      if (String(error.message).includes('UNIQUE')) {
+        return { ok: false, reason: 'A living scion already bears that name.' };
+      }
+      throw error;
+    }
+  }
+
+  getLivingScion(accountId, scionId) {
+    const row = this.db.prepare(`
+      SELECT s.*, h.account_id, h.name AS house_name
+      FROM chronicle_scions s
+      JOIN chronicle_houses h ON h.id = s.house_id
+      WHERE s.id = ? AND h.account_id = ? AND s.status = 'living'
+    `).get(scionId, accountId);
+    if (!row) return null;
+    return {
+      ...rowToScion(row),
+      houseId: row.house_id,
+      houseName: normaliseHouseName(row.house_name),
+      snapshot: parseJson(row.snapshot_json, null),
+    };
+  }
+
+  beginRun(accountId, houseId) {
+    const result = this.db.prepare(`
+      UPDATE chronicle_accounts SET run_count = run_count + 1, active_house_id = ?
+      WHERE account_id = ?
+    `).run(houseId, accountId);
+    if (!result.changes) return 0;
+    return this.db.prepare('SELECT run_count FROM chronicle_accounts WHERE account_id = ?')
+      .get(accountId).run_count;
+  }
+
+  saveScionSnapshot(accountId, scionId, snapshot) {
+    const level = Number.isFinite(snapshot?.level) ? Math.max(1, Math.floor(snapshot.level)) : 1;
+    const result = this.db.prepare(`
+      UPDATE chronicle_scions
+      SET level = ?, snapshot_json = ?
+      WHERE id = ? AND status = 'living'
+        AND house_id IN (SELECT id FROM chronicle_houses WHERE account_id = ?)
+    `).run(level, JSON.stringify(snapshot || {}), scionId, accountId);
+    return result.changes ? clone(snapshot) : null;
+  }
+
+  entombScion({ accountId, houseId, scionId, level, cause, relicItems = [], deeds = [] }) {
+    const account = this.db.prepare('SELECT run_count FROM chronicle_accounts WHERE account_id = ?').get(accountId);
+    const scion = this.getLivingScion(accountId, scionId);
+    if (!account || !scion || scion.houseId !== houseId) return null;
+    const diedAt = isoNow();
+    const eligibleRun = account.run_count + 3;
+    const uniqueRelics = [...new Map(relicItems
+      .filter(item => item && item.id)
+      .map(item => [item.uuid || `${item.id}:${item.slot ?? ''}`, item])).values()];
+    const commit = this.db.transaction(() => {
+      const updated = this.db.prepare(`
+        UPDATE chronicle_scions
+        SET status = 'dead', level = ?, died_at = ?, cause = ?, deeds_json = ?, snapshot_json = NULL
+        WHERE id = ? AND status = 'living'
+      `).run(Math.max(1, Math.floor(level || 1)), diedAt, cause || 'Fell in battle', JSON.stringify(deeds), scionId);
+      if (!updated.changes) return false;
+      const renown = Math.max(100, Math.floor(level || 1) * 100) + (uniqueRelics.length * 50);
+      this.db.prepare('UPDATE chronicle_houses SET renown = renown + ? WHERE id = ?').run(renown, houseId);
+      const insertRelic = this.db.prepare(`
+        INSERT INTO chronicle_relics (
+          id, house_id, source_scion_id, origin_scion_name, item_json,
+          status, eligible_run, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'circulating', ?, ?)
+      `);
+      uniqueRelics.forEach((item) => {
+        insertRelic.run(
+          randomUUID(), houseId, scionId, scion.name,
+          JSON.stringify(item), eligibleRun, diedAt,
+        );
+      });
+      return true;
+    });
+    if (!commit()) return null;
+    return {
+      fallen: { ...scion, level, diedAt, cause: cause || 'Fell in battle' },
+      relicCount: uniqueRelics.length,
+      eligibleRun,
+      chronicle: this.getChronicle(accountId),
+    };
+  }
+
+  drawEligibleRelic(accountIds = []) {
+    const ids = [...new Set(accountIds.filter(Boolean).map(String))];
+    if (!ids.length) return null;
+    const placeholders = ids.map(() => '?').join(', ');
+    const row = this.db.prepare(`
+      SELECT r.*, a.run_count
+      FROM chronicle_relics r
+      JOIN chronicle_houses h ON h.id = r.house_id
+      JOIN chronicle_accounts a ON a.account_id = h.account_id
+      WHERE r.status = 'circulating'
+        AND (
+          (h.account_id IN (${placeholders}) AND r.eligible_run <= a.run_count)
+          OR EXISTS (
+            SELECT 1
+            FROM chronicle_house_links l
+            JOIN chronicle_accounts viewer ON viewer.account_id = l.account_id
+            WHERE l.house_id = h.id
+              AND l.account_id IN (${placeholders})
+              AND l.eligible_run <= viewer.run_count
+          )
+        )
+      ORDER BY r.created_at ASC
+      LIMIT 1
+    `).get(...ids, ...ids);
+    if (!row) return null;
+    this.db.prepare(`
+      UPDATE chronicle_relics SET status = 'dropped', dropped_at = ? WHERE id = ? AND status = 'circulating'
+    `).run(isoNow(), row.id);
+    return {
+      id: row.id,
+      originScionName: row.origin_scion_name,
+      sourceScionId: row.source_scion_id,
+      item: parseJson(row.item_json, null),
+    };
+  }
+
+  grantHouseRelicAccess(accountId, houseId, delayRuns = 3) {
+    const account = this.db.prepare('SELECT run_count FROM chronicle_accounts WHERE account_id = ?')
+      .get(accountId);
+    const house = this.db.prepare('SELECT id FROM chronicle_houses WHERE id = ?').get(houseId);
+    if (!account || !house) return null;
+    const eligibleRun = account.run_count + Math.max(0, Math.floor(delayRuns));
+    this.db.prepare(`
+      INSERT INTO chronicle_house_links (account_id, house_id, eligible_run)
+      VALUES (?, ?, ?)
+      ON CONFLICT(account_id, house_id) DO UPDATE SET
+        eligible_run = MIN(eligible_run, excluded.eligible_run)
+    `).run(accountId, houseId, eligibleRun);
+    return eligibleRun;
+  }
+
+  /**
+   * World-web progress: which zone nodes this House has cleared (Warden
+   * slain). Node identity itself is deterministic (world-web.js), so this is
+   * the only stored world state.
+   */
+  getClearedZoneNodes(houseId) {
+    if (!houseId) return [];
+    return this.db.prepare('SELECT node_id FROM house_world_progress WHERE house_id = ?')
+      .all(houseId)
+      .map(row => row.node_id);
+  }
+
+  markZoneNodeCleared(houseId, nodeIdValue) {
+    if (!houseId || !nodeIdValue) return false;
+    const house = this.db.prepare('SELECT id FROM chronicle_houses WHERE id = ?').get(houseId);
+    if (!house) return false;
+    const result = this.db.prepare(`
+      INSERT INTO house_world_progress (house_id, node_id, cleared_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(house_id, node_id) DO NOTHING
+    `).run(houseId, nodeIdValue, isoNow());
+    return Boolean(result.changes);
+  }
+
+  claimRelic(relicId, player) {
+    if (!relicId || !player?.scionId) return false;
+    const result = this.db.prepare(`
+      UPDATE chronicle_relics
+      SET status = 'claimed', claimed_at = ?, claimed_by_scion_id = ?
+      WHERE id = ? AND status = 'dropped'
+    `).run(isoNow(), player.scionId, relicId);
+    return Boolean(result.changes);
+  }
+}
+
+const chroniclesRepository = new ChroniclesRepository();
+
+export default chroniclesRepository;

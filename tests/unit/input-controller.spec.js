@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import InputController from '../../src/core/utilities/input-controller.js';
+import { PLAYER_MOVE_SAMPLE_MS } from '#shared/movement.js';
 
 const keyEvent = (key, extra = {}) => ({
   key,
@@ -9,6 +16,10 @@ const keyEvent = (key, extra = {}) => ({
 });
 
 describe('InputController', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('maps displayed quickbar number keys to their skills while the canvas has focus', () => {
     const onSkill = vi.fn();
     const controller = new InputController({ onSkill });
@@ -58,5 +69,25 @@ describe('InputController', () => {
     expect(controller.handleKeyDown(keyEvent('3', { repeat: true }))).toBe(true);
 
     expect(onSkill).toHaveBeenCalledTimes(1);
+  });
+
+  it('samples held cardinal and diagonal movement at the same continuous cadence', () => {
+    vi.useFakeTimers();
+    const onMove = vi.fn();
+    const controller = new InputController({ onMove });
+
+    controller.handleKeyDown(keyEvent('w'));
+    expect(onMove).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(PLAYER_MOVE_SAMPLE_MS);
+    expect(onMove).toHaveBeenCalledTimes(2);
+
+    controller.handleKeyDown(keyEvent('d'));
+    expect(onMove).toHaveBeenLastCalledWith('up-right', { initial: true });
+    const callsAtDiagonalStart = onMove.mock.calls.length;
+    vi.advanceTimersByTime(PLAYER_MOVE_SAMPLE_MS);
+    expect(onMove).toHaveBeenCalledTimes(callsAtDiagonalStart + 1);
+    expect(onMove).toHaveBeenLastCalledWith('up-right', { repeated: true });
+
+    controller.destroy();
   });
 });

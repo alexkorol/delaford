@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import VesselForge, { createForge, validatePack } from '#server/core/items/vesselforge/engine.js';
 import pack from '#server/core/items/vesselforge/verdigris-pack.js';
 import {
+  applyVesselCombatStats,
   createVesselBlock,
   deriveVesselCombat,
   refreshVesselBlock,
@@ -18,6 +19,23 @@ describe('Vesselforge pack validation', () => {
   it('validates the Verdigris pack clean', () => {
     expect(validatePack(pack)).toEqual([]);
     expect(VesselForge.validatePack(pack)).toEqual([]);
+  });
+
+  it('uses plain mechanical language in player-facing item labels', () => {
+    const labels = [
+      ...Object.values(pack.forms).map(form => form.implicit?.label),
+      ...Object.values(pack.brandMods).map(mod => mod.label),
+      ...Object.values(pack.themes).flatMap(theme => Object.values(theme.mods).map(mod => mod.label)),
+      ...Object.values(pack.trophies).flatMap(trophy => [
+        ...trophy.mods.map(mod => mod.label),
+        trophy.completionBonus?.label,
+      ]),
+    ].filter(Boolean).join('\n');
+
+    expect(labels).not.toMatch(/Ember (?:Damage|Resistance)|River Resistance/);
+    expect(labels).not.toMatch(/Maximum Spirit|Rite Power|Goods Found|\bWard\b/);
+    expect(pack.brandMods.emberward.label).toContain('Fire Resistance');
+    expect(pack.brandMods.riverblessed.label).toContain('Cold Resistance');
   });
 
   it('catches a broken pack', () => {
@@ -385,6 +403,25 @@ describe('Vesselforge game integration', () => {
     expect(refreshed.lines.some(line => line.section === 'brand'
       && /Damage against Beasts/.test(line.text))).toBe(true);
     expect(refreshed.lines.some(line => /Dormant.*Damage against Beasts/.test(line.text))).toBe(false);
+  });
+
+  it('projects Vesselforge weapon power into the dominant live combat style', () => {
+    const stats = {
+      attack: { stab: -2, slash: 19, crush: 13, range: 0 },
+      defense: { stab: 0, slash: 1, crush: 2, range: 2 },
+    };
+    const vessel = {
+      item: forge.generateItem({
+        ilvl: 65,
+        formId: 'sling',
+        materialId: 'quilted',
+        brands: 2,
+      }),
+    };
+
+    const result = applyVesselCombatStats(stats, vessel);
+    expect(result.attack.slash).toBeGreaterThan(stats.attack.slash);
+    expect(result.attack.crush).toBe(stats.attack.crush);
   });
 
   it('keeps legacy catalogue gear out of the Vesselforge identity path', () => {

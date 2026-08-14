@@ -1,13 +1,10 @@
 {
   "x": 38,
   "y": 115,
-  "x_ORIG": 65,
-  "y_ORIG": 128,
   "username": "dev",
   "uuid": "83v7c9cec-aae2-4f98-a209-01b0ace5454g",
   "level": 1,
   "online": true,
-  "sign_in": 1622502685,
   "skills": {
     "attack": {
       "level": 1,
@@ -18,12 +15,12 @@
       "exp": 0
     },
     "mining": {
-      "level": 82,
-      "exp": 8213120
+      "level": 1,
+      "exp": 0
     },
     "smithing": {
-      "level": 52,
-      "exp": 1233312
+      "level": 1,
+      "exp": 0
     },
     "fishing": {
       "level": 1,
@@ -52,57 +49,11 @@
       "uuid": "1aab021e-3d97-47b0-b1ec-ebba5c2d925c"
     },
     {
-      "id": "bronze-bar",
-      "slot": 1,
-      "uuid": "770e08d6-0a86-4a31-9635-77e58c58d6ef"
-    },
-    {
-      "id": "bronze-bar",
-      "slot": 2,
-      "uuid": "170e08d6-0a86-4a31-9635-77e58c58d6ef"
-    },
-    {
-      "id": "bronze-bar",
-      "slot": 3,
-      "uuid": "270e08d6-0a86-4a31-9635-77e58c58d6ef"
-    },
-    {
-      "id": "bronze-bar",
-      "slot": 4,
-      "uuid": "370e08d6-0a86-4a31-9635-77e58c58d6ef"
-    },
-    {
-      "id": "hammer",
-      "slot": 5,
-      "uuid": "q70e08d6-0a86-4a31-9635-77e58c58d6ef"
-    },
-    {
       "id": "coins",
-      "slot": 6,
+      "slot": 1,
       "qty": 100,
       "uuid": "c40e08d6-0a86-4a31-9635-77e58c58d6ef"
     }
   ],
-  "bank": [
-    {
-      "id": "coins",
-      "qty": 35000,
-      "slot": 0
-    },
-    {
-      "id": "tin-ore",
-      "qty": 2,
-      "slot": 1
-    },
-    {
-      "id": "copper-ore",
-      "qty": 3,
-      "slot": 2
-    },
-    {
-      "id": "bronze-bar",
-      "qty": 1,
-      "slot": 3
-    }
-  ]
+  "bank": []
 }

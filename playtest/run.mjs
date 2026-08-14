@@ -15,6 +15,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import HeadlessPlayer from './harness.mjs';
+import { recordCriticMetrics } from './critic.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
@@ -42,6 +43,7 @@ const startServer = () => new Promise((resolve, reject) => {
       // Hermetic saves: never inherit or clobber the developer's character.
       GUEST_SAVE_DIR: path.join(os.tmpdir(), `verdigris-playtest-${Date.now()}`),
       CHRONICLES_STORE_FILE: path.join(os.tmpdir(), `verdigris-chronicles-${Date.now()}.json`),
+      CHRONICLES_DB_FILE: path.join(os.tmpdir(), `verdigris-playtest-${Date.now()}.sqlite`),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -114,7 +116,7 @@ const main = async () => {
     await waitForSocket(url);
     log(`Playing against ${url}\n`);
 
-    const connect = options => HeadlessPlayer.connect({ ...(options || {}), url });
+    const connect = options => HeadlessPlayer.connect({ url, ...(options || {}) });
     const results = [];
 
      
@@ -123,7 +125,13 @@ const main = async () => {
       const startedAt = Date.now();
       try {
         const scenario = (await import(`./scenarios/${name}.mjs`)).default;
-        await scenario({ connect, assert });
+        let metricsRecorded = false;
+        const recordMetrics = (metrics) => {
+          if (metricsRecorded) throw new Error(`${name} recorded critic metrics more than once`);
+          metricsRecorded = true;
+          return recordCriticMetrics({ projectRoot, scenario: name, metrics, log });
+        };
+        await scenario({ connect, assert, recordMetrics });
         results.push({ name, ok: true, ms: Date.now() - startedAt });
         log(`  PASS ${name} (${Date.now() - startedAt}ms)\n`);
       } catch (error) {

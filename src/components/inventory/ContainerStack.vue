@@ -65,12 +65,10 @@ export default {
 .container-stack {
   min-height: 54px;
   padding: 9px 12px;
-  background:
-    linear-gradient(180deg, rgba(34, 36, 40, 0.86), rgba(10, 11, 13, 0.88)),
-    rgba(0, 0, 0, 0.25);
-  border-radius: 6px;
-  border: 1px solid rgba(180, 145, 86, 0.28);
-  color: rgba(255, 255, 255, 0.86);
+  background: var(--color-bg-inset);
+  border-radius: 0;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.62);
 }
 
@@ -105,7 +103,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 8px 10px;
-  border-radius: 4px;
+  border-radius: 0;
   background: rgba(0, 0, 0, 0.35);
   border: 1px dashed rgba(180, 145, 86, 0.24);
 }

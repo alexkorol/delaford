@@ -98,6 +98,36 @@ const resetScenes = () => {
     .forEach(sceneId => world.scenes.delete(sceneId));
 };
 
+const SENSITIVE_PLAYER_FIELDS = [
+  'socket_id',
+  'token',
+  'accountId',
+  'inventory',
+  'bank',
+  'passiveTree',
+  'quests',
+];
+
+const expectPublicPlayerBroadcast = (event, player) => {
+  expect(Socket.broadcast).toHaveBeenCalledWith(
+    event,
+    expect.objectContaining({
+      uuid: player.uuid,
+      username: player.username,
+      x: player.x,
+      y: player.y,
+      wear: player.wear,
+    }),
+    [player],
+  );
+  const call = Socket.broadcast.mock.calls.find(([name]) => name === event);
+  expect(call).toBeDefined();
+  const [, payload] = call;
+  SENSITIVE_PLAYER_FIELDS.forEach((field) => {
+    expect(payload).not.toHaveProperty(field);
+  });
+};
+
 describe('equipment replacement inventory safety', () => {
   beforeEach(() => {
     vi.spyOn(Socket, 'broadcast').mockImplementation(() => {});
@@ -146,6 +176,7 @@ describe('equipment replacement inventory safety', () => {
       position: { x: 0, y: 0 },
     });
     expect(player.inventory.slots.some(item => item.slot === false)).toBe(false);
+    expectPublicPlayerBroadcast('player:equippedAnItem', player);
   });
 
   it('rejects replacement when the old equipped item cannot fit in a full backpack', async () => {
@@ -318,6 +349,7 @@ describe('equipment replacement inventory safety', () => {
       position: positionFromSlot(5),
     });
     expect(player.refreshDerivedStats).toHaveBeenCalled();
+    expectPublicPlayerBroadcast('player:unequippedAnItem', player);
   });
 
   it('drops equipped paperdoll items into the active scene', () => {
@@ -359,6 +391,6 @@ describe('equipment replacement inventory safety', () => {
     });
     expect(Socket.broadcast).toHaveBeenCalledWith('world:itemDropped', scene.items, [player]);
     expect(Socket.broadcast).toHaveBeenCalledWith('item:change', scene.items, [player]);
-    expect(Socket.broadcast).toHaveBeenCalledWith('player:unequippedAnItem', player);
+    expectPublicPlayerBroadcast('player:unequippedAnItem', player);
   });
 });

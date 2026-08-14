@@ -14,7 +14,6 @@
         :active-index="quickbarActiveIndex"
         :cooldowns="quickbarCooldowns"
         @slot-activate="handleSlotActivate"
-        @request-remap="handleRequestRemap"
       />
       <HudOrb
         class="hud-shell__orb hud-shell__orb--right"
@@ -73,14 +72,10 @@ export default {
   },
   emits: [
     'quick-slot',
-    'request-remap',
   ],
   methods: {
     handleSlotActivate(slot, index) {
       this.$emit('quick-slot', slot, index);
-    },
-    handleRequestRemap(slot, index) {
-      this.$emit('request-remap', slot, index);
     },
   },
 };

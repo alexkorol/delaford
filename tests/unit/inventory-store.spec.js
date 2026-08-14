@@ -13,7 +13,7 @@ const readSource = relativePath => readFileSync(
 );
 
 const makeStack = (uuid, slot, qty, maxStack = 99) => ({
-  id: 'coins',
+  id: 'potion',
   uuid,
   slot,
   position: positionFromSlot(slot),
@@ -29,6 +29,19 @@ afterEach(() => {
 describe('inventory drag store stacking commits', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+  });
+
+  it('extracts carried gold from backpack items into a dedicated balance', () => {
+    const store = useInventoryStore();
+    store.setInventoryItems([
+      { id: 'coins', uuid: 'coins-a', slot: 0, qty: 1200 },
+      { id: 'coins', uuid: 'coins-b', slot: 1, qty: 35 },
+      { id: 'bronze-sword', uuid: 'sword-a', slot: 2 },
+    ]);
+
+    expect(store.gold).toBe(1235);
+    expect(store.items.map(item => item.id)).toEqual(['bronze-sword']);
+    expect(store.items[0].slot).toBe(2);
   });
 
   it('cancels stack drops when the target disappeared before commit', () => {
@@ -227,10 +240,25 @@ describe('inventory drag store equipment commits', () => {
 
 describe('inventory drag target component wiring', () => {
   it('reads injected Pinia drag-store values after proxy unwrapping', () => {
+    const inventoryPane = readSource('src/components/slots/Inventory.vue');
+    const equipmentRagdoll = readSource('src/components/inventory/EquipmentRagdoll.vue');
     const equipmentSlot = readSource('src/components/sub/EquipmentSlot.vue');
     const inventoryGrid = readSource('src/components/inventory/InventoryGrid.vue');
     const worldDropZone = readSource('src/components/inventory/WorldDropZone.vue');
     const containerStack = readSource('src/components/inventory/ContainerStack.vue');
+
+    expect(inventoryPane).not.toContain('<ContainerStack');
+    expect(inventoryPane).not.toContain("import ContainerStack");
+
+    expect(equipmentRagdoll).not.toMatch(/arrows|quiver/i);
+    expect(equipmentRagdoll).toContain("{ id: 'feet', label: 'Feet'");
+    expect(equipmentRagdoll).toContain("{ id: 'right_hand', label: 'Main hand', column: 1, row: 1, width: 2, height: 4 }");
+    expect(equipmentRagdoll).toContain("{ id: 'back', label: 'Cloak', column: 3, row: 1, width: 2, height: 3 }");
+    expect(equipmentRagdoll).toContain("{ id: 'armor', label: 'Body', column: 5, row: 3, width: 2, height: 3 }");
+    expect(equipmentRagdoll).toContain("class=\"equipment-ragdoll__aux-toggle\"");
+    expect(equipmentRagdoll).toContain("{{ openAuxiliaryId === panel.id ? '>>' : '<<' }}");
+    expect(equipmentRagdoll).toContain("unlock: 'war_call_slot'");
+    expect(equipmentRagdoll).toContain("unlock: 'reliquary_pack'");
 
     expect(equipmentSlot).toContain(':data-equipment-slot="slotId"');
     expect(equipmentSlot).toContain('@pointerup.left.stop.prevent="handlePointerUp"');
@@ -241,8 +269,12 @@ describe('inventory drag target component wiring', () => {
     expect(equipmentSlot).not.toContain('inventoryDragStore.isDragging.value');
     expect(equipmentSlot).not.toContain('inventoryDragStore.activeItem.value');
     expect(equipmentSlot).not.toContain('inventoryDragStore.dragState.value');
+    expect(equipmentSlot).toContain('background-image: none !important;');
 
     expect(inventoryGrid).toContain('const externalDropTargetFromEvent = (event) => {');
+    expect(inventoryGrid).toContain(':style="cellStyle(slotIndex - 1)"');
+    expect(inventoryGrid).toContain('gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`');
+    expect(inventoryGrid).not.toContain("gridAutoRows: 'var(--cell-size)'");
     expect(inventoryGrid).toContain('document.elementFromPoint(event.clientX, event.clientY)');
     expect(inventoryGrid).toContain("const equipmentSlot = closest('[data-equipment-slot]');");
     expect(inventoryGrid).toContain('valid: canEquipInventoryItemToSlot(activeItem.value, slotId)');

@@ -6,13 +6,22 @@ import playerEvent from '#server/player/handlers/actions/index.js';
 import { isAllowedActionId } from '#server/core/data/action-list.js';
 import world from '#server/core/world.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import { autoPickupCurrency } from '#server/core/items/pickup.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
 } from '#shared/combat.js';
+import {
+  PLAYER_MOVE_SAMPLE_MS,
+  PLAYER_TILE_TRAVEL_MS,
+  directionVector,
+  occupiedTile,
+  playerMovementDelta,
+  roundPosition,
+} from '#shared/movement.js';
 
-export const BASE_MOVE_DURATION = 150;
+export const BASE_MOVE_DURATION = PLAYER_TILE_TRAVEL_MS;
 
 export const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DURATION) => {
   const diagonal = Math.abs(deltaX) === 1 && Math.abs(deltaY) === 1;
@@ -21,18 +30,7 @@ export const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DUR
 };
 
 export const directionDelta = (direction) => {
-  const mapping = {
-    right: { x: 1, y: 0 },
-    left: { x: -1, y: 0 },
-    up: { x: 0, y: -1 },
-    down: { x: 0, y: 1 },
-    'up-right': { x: 1, y: -1 },
-    'down-right': { x: 1, y: 1 },
-    'up-left': { x: -1, y: -1 },
-    'down-left': { x: -1, y: 1 },
-  };
-
-  return mapping[direction] || null;
+  return directionVector(direction);
 };
 
 const resolveFacing = (direction, fallback = DEFAULT_FACING_DIRECTION) => {
@@ -230,15 +228,18 @@ const hasLivingMonsterAt = (player, tileX, tileY) => {
 const canMoveTo = (player, tileX, tileY) => {
   const { size } = config.map;
 
-  if (tileX < 0 || tileY < 0 || tileX >= size.x || tileY >= size.y) {
+  if (tileX < 0 || tileY < 0 || tileX > size.x - 1 || tileY > size.y - 1) {
     return false;
   }
 
-  if (hasLivingMonsterAt(player, tileX, tileY)) {
+  const occupiedX = Math.round(tileX);
+  const occupiedY = Math.round(tileY);
+
+  if (hasLivingMonsterAt(player, occupiedX, occupiedY)) {
     return false;
   }
 
-  const tileIndex = (tileY * size.x) + tileX;
+  const tileIndex = (occupiedY * size.x) + occupiedX;
   const scene = world.getSceneForPlayer(player);
   const mapLayers = scene && scene.map ? scene.map : world.map;
   const steppedOn = {
@@ -254,23 +255,23 @@ const canMoveTo = (player, tileX, tileY) => {
   return MapUtils.gridWalkable(tiles, player, tileIndex, 0, 0, mapLayers) === 0;
 };
 
-const isBlocked = (player, direction, delta = null) => {
+const isBlocked = (player, direction, delta = null, origin = player) => {
   const vector = delta || directionDelta(direction);
 
   if (!vector) {
     return true;
   }
 
-  const targetX = player.x + vector.x;
-  const targetY = player.y + vector.y;
+  const targetX = origin.x + vector.x;
+  const targetY = origin.y + vector.y;
 
   if (!canMoveTo(player, targetX, targetY)) {
     return true;
   }
 
   if (vector.x !== 0 && vector.y !== 0) {
-    const horizontal = canMoveTo(player, player.x + vector.x, player.y);
-    const vertical = canMoveTo(player, player.x, player.y + vector.y);
+    const horizontal = canMoveTo(player, origin.x + vector.x, origin.y);
+    const vertical = canMoveTo(player, origin.x, origin.y + vector.y);
 
     if (!horizontal && !vertical) {
       return true;
@@ -290,8 +291,20 @@ const stopMovement = (player, data) => {
   broadcastAnimation(player);
 };
 
-export const queueEmpty = (playerIndex) => {
-  const playerAtIndex = world.players[playerIndex];
+const resolvePlayerReference = (reference) => {
+  if (reference && typeof reference === 'object') {
+    return reference;
+  }
+  if (typeof reference === 'string') {
+    return world.players.find(player => (
+      player.uuid === reference || player.socket_id === reference
+    )) || null;
+  }
+  return Number.isInteger(reference) ? world.players[reference] || null : null;
+};
+
+export const queueEmpty = (playerReference) => {
+  const playerAtIndex = resolvePlayerReference(playerReference);
 
   if (!playerAtIndex || !Array.isArray(playerAtIndex.queue)) {
     return true;
@@ -319,7 +332,7 @@ const move = (player, direction, options = {}) => {
     player.moving = true;
   }
 
-  const delta = directionDelta(direction);
+  const delta = pathfind ? directionDelta(direction) : playerMovementDelta(direction);
   const facing = setFacing(player, direction);
 
   if (!delta) {
@@ -329,9 +342,10 @@ const move = (player, direction, options = {}) => {
   const attemptedWalkId = pathfind ? walkId : null;
   const duration = typeof durationOverride === 'number'
     ? durationOverride
-    : computeStepDuration(delta.x, delta.y);
+    : (pathfind ? computeStepDuration(delta.x, delta.y) : PLAYER_MOVE_SAMPLE_MS);
+  const origin = pathfind ? occupiedTile(player) : { x: player.x, y: player.y };
 
-  if (isBlocked(player, direction, delta)) {
+  if (isBlocked(player, direction, delta, origin)) {
     registerMovementStep(player, {
       duration: 0,
       walkId: attemptedWalkId,
@@ -345,8 +359,9 @@ const move = (player, direction, options = {}) => {
     return false;
   }
 
-  player.x += delta.x;
-  player.y += delta.y;
+  const previousTile = occupiedTile(player);
+  player.x = roundPosition(origin.x + delta.x);
+  player.y = roundPosition(origin.y + delta.y);
 
   registerMovementStep(player, {
     duration,
@@ -358,42 +373,55 @@ const move = (player, direction, options = {}) => {
     blocked: false,
   });
   setAnimationState(player, 'run', { direction: facing, duration });
-  transitionPlayerIfOnPortal(player);
+  const currentTile = occupiedTile(player);
+  if (currentTile.x !== previousTile.x || currentTile.y !== previousTile.y) {
+    transitionPlayerIfOnPortal(player);
+  }
+  autoPickupCurrency(player);
 
   return true;
 };
 
-// Queued actions carry a client-supplied actionId; dispatch only catalogue
-// actions and drop anything else before it reaches a handler.
-const runQueuedAction = (player, playerIndex, todo) => {
-  const actionId = todo && todo.action ? todo.action.actionId : null;
-  if (!isAllowedActionId(actionId) || typeof playerEvent[actionId] !== 'function') {
-    console.warn(`[queue] Dropped queued action with unknown actionId "${actionId}" for ${player.username || player.uuid}.`);
-    return;
-  }
-
-  playerEvent[actionId]({
-    todo,
-    playerIndex,
-  });
-};
-
-const walkPath = (player, playerIndex) => {
+const walkPath = (player) => {
   const { path } = player;
   const baseSpeed = BASE_MOVE_DURATION;
+
+  const isCurrentSession = () => world.players.some(candidate => (
+    candidate === player
+    && candidate.uuid === player.uuid
+    && candidate.socket_id === player.socket_id
+  ));
+
+  const executeQueuedAction = () => {
+    if (queueEmpty(player)) {
+      return;
+    }
+
+    // Queued actions carry a client-supplied actionId; dispatch only
+    // catalogue actions and drop anything else before it reaches a handler.
+    const todo = player.queue[0];
+    const actionId = todo && todo.action ? todo.action.actionId : null;
+    if (!isAllowedActionId(actionId) || typeof playerEvent[actionId] !== 'function') {
+      console.warn(`[queue] Dropped queued action with unknown actionId "${actionId}" for ${player.username || player.uuid}.`);
+    } else {
+      const result = playerEvent[actionId]({
+        todo,
+        playerUuid: player.uuid,
+        socketId: player.socket_id,
+      });
+      if (result && typeof result.catch === 'function') {
+        result.catch(error => console.error('[movement] Queued action failed:', error));
+      }
+    }
+    player.queue.shift();
+  };
 
   if (!path || !path.current || !Array.isArray(path.current.path.walking)) {
     return;
   }
 
   if (path.current.path.walking.length <= 1) {
-    if (!queueEmpty(playerIndex)) {
-      const todo = world.players[playerIndex].queue[0];
-
-      runQueuedAction(player, playerIndex, todo);
-
-      player.queue.shift();
-    }
+    executeQueuedAction();
 
     stopMovement(player, { player: { socket_id: player.socket_id } });
     return;
@@ -404,20 +432,18 @@ const walkPath = (player, playerIndex) => {
   path.current.interrupted = false;
 
   const scheduleNextStep = () => {
+    if (!isCurrentSession()) {
+      return;
+    }
+
     if (path.current.walkId !== activeWalkId) {
       return;
     }
 
     if (path.current.step + 1 >= path.current.path.walking.length) {
-      if (!queueEmpty(playerIndex)) {
-        const todo = world.players[playerIndex].queue[0];
+      executeQueuedAction();
 
-        runQueuedAction(player, playerIndex, todo);
-
-        player.queue.shift();
-      }
-
-      stopMovement(player, { player: { socket_id: world.players[playerIndex].socket_id } });
+      stopMovement(player, { player: { socket_id: player.socket_id } });
       return;
     }
 
@@ -442,6 +468,10 @@ const walkPath = (player, playerIndex) => {
     const totalSteps = Math.max(0, path.current.path.walking.length - 1);
 
     setTimeout(() => {
+      if (!isCurrentSession()) {
+        return;
+      }
+
       if (path.current.walkId !== activeWalkId) {
         return;
       }
@@ -457,10 +487,7 @@ const walkPath = (player, playerIndex) => {
         direction: movement,
       });
 
-      const playerChanging = world.players[playerIndex];
-      if (playerChanging) {
-        broadcastMovement(playerChanging);
-      }
+      broadcastMovement(player);
 
       if (player.movementStep && player.movementStep.blocked) {
         path.current.interrupted = true;
@@ -491,12 +518,12 @@ const createPlayerMovementHandler = (player) => ({
   registerMovementStep: step => registerMovementStep(player, step),
   cancelPathfinding: () => cancelPathfinding(player),
   canMoveTo: (tileX, tileY) => canMoveTo(player, tileX, tileY),
-  isBlocked: (direction, delta) => isBlocked(player, direction, delta),
+  isBlocked: (direction, delta, origin) => isBlocked(player, direction, delta, origin),
   backgroundBlocked: () => backgroundBlocked(player),
   foregroundBlocked: () => foregroundBlocked(player),
   stopMovement: data => stopMovement(player, data),
   move: (direction, options) => move(player, direction, options),
-  walkPath: playerIndex => walkPath(player, playerIndex),
+  walkPath: () => walkPath(player),
 });
 
 export default createPlayerMovementHandler;

@@ -78,6 +78,7 @@ class WorldManager {
     this._players = [];
     this.towns = new Map();
     this.instances = new Map();
+    this.zones = new Map();
     this.scenes = new Map();
 
     const townScene = new WorldScene({
@@ -428,6 +429,60 @@ class WorldManager {
     if (options.monsters) scene.monsters = options.monsters;
     if (options.metadata) scene.metadata = options.metadata;
     return scene;
+  }
+
+  /**
+   * World-web zones: persistent-for-a-while instances keyed by
+   * `zone:<houseId>:<nodeId>` rather than by party. They outlive the party
+   * that opened them (docs/crossroads-world-web.md: the land holds your
+   * footprints for a quarter hour), so lifecycle is driven by the zone
+   * sweeper, not by party teardown.
+   */
+  createZoneScene(zoneKey, options = {}) {
+    if (!zoneKey) {
+      throw new Error('Cannot create zone scene without a key.');
+    }
+
+    const scene = new WorldScene({
+      id: zoneKey,
+      type: 'instance',
+      name: options.name || zoneKey,
+      persistent: false,
+      map: options.map,
+      npcs: options.npcs,
+      items: options.items,
+      respawns: options.respawns,
+      monsters: options.monsters,
+      metadata: options.metadata || {},
+    });
+
+    this.zones.set(zoneKey, scene);
+    this.registerScene(scene);
+    return scene;
+  }
+
+  getZoneScene(zoneKey) {
+    if (!zoneKey) {
+      return null;
+    }
+    return this.zones.get(zoneKey) || null;
+  }
+
+  destroyZoneScene(zoneKey) {
+    const scene = this.zones.get(zoneKey);
+    if (!scene) {
+      return;
+    }
+    scene.players = [];
+    this.zones.delete(zoneKey);
+    this.scenes.delete(scene.id);
+  }
+
+  forEachZoneScene(iterator) {
+    if (typeof iterator !== 'function') {
+      return;
+    }
+    this.zones.forEach((scene, key) => iterator(scene, key));
   }
 
   createInstance(partyId, options = {}) {

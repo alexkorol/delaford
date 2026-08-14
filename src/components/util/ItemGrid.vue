@@ -15,7 +15,11 @@
           backgroundPosition: `left -${(getItem(i).column * 32)}px top -${(getItem(i).row * 32)}px`
         }"
         :class="`slot ${getItemFromSlot(i).isLocked} ${getItemFromSlot(i).id} ${gridData(screen).classId} ${isItemSelected(i)}`"
-        @click.left="selectItem($event)"
+        :aria-label="itemAriaLabel(i)"
+        :role="primaryAction ? 'button' : undefined"
+        :tabindex="primaryAction ? 0 : undefined"
+        @click.left="selectItem($event, i)"
+        @keydown.enter.prevent="selectItem($event, i)"
         @mouseover="showContextMenu($event, i, true)"
         @contextmenu.prevent="showContextMenu($event, i)"
       >
@@ -24,6 +28,7 @@
           :class="`qty ${gridData(screen).classId}`"
           v-text="getItemFromSlot(i).qty"
         />
+        <span v-if="screen === 'shop'" class="price">{{ itemPrice(i) }}</span>
       </div>
       <div
         v-else
@@ -58,6 +63,10 @@ export default {
     screen: {
       type: String,
       required: true,
+    },
+    primaryAction: {
+      type: String,
+      default: '',
     },
   },
   data() {
@@ -157,8 +166,16 @@ export default {
      *
      * @param {integer} slot The item in the slot we are selecting
      */
-    selectItem(event) {
+    selectItem(event, slot) {
       // Allow 'selecting' an item only on the Inventory or if its not already selected
+
+      if (this.primaryAction) {
+        this.$emit('item-primary', {
+          action: this.primaryAction,
+          item: this.getItemFromSlot(slot),
+        });
+        return;
+      }
 
       bus.$emit('canvas:select-action', {
         event,
@@ -185,7 +202,7 @@ export default {
           classId: 'inventorySlot',
         },
         bank: {
-          columns: 11,
+          columns: 8,
           rows: 6,
           classId: 'bankSlot',
         },
@@ -258,6 +275,17 @@ export default {
     getItemFromSlot(slotNumber) {
       return this.items.find((s) => s.slot === slotNumber);
     },
+    itemPrice(slotNumber) {
+      return Math.max(0, Number(UI.getItemData(this.getItemFromSlot(slotNumber).id)?.price) || 0);
+    },
+    itemAriaLabel(slotNumber) {
+      const item = this.getItemFromSlot(slotNumber);
+      const definition = UI.getItemData(item.id);
+      if (this.screen === 'shop') {
+        return `Buy ${definition?.name || item.id} for ${this.itemPrice(slotNumber)} coins`;
+      }
+      return definition?.name || item.id;
+    },
     /**
      * Get the correct background URL to show in inventory
      *
@@ -290,21 +318,21 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
 div.grid_container {
   display: grid;
   height: auto;
   max-height: 320px;
+  padding: 8px;
   overflow-y: auto;
   box-sizing: border-box;
   font-family: "GameFont", sans-serif;
-  grid-gap: 5px;
+  grid-gap: 3px;
   overflow-x: hidden;
+  background:
+    linear-gradient(135deg, rgba(183, 146, 79, 0.025) 25%, transparent 25%) 0 0 / 8px 8px,
+    var(--color-bg-inset);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.72);
 
   .grid_cell {
     width: 35px;
@@ -320,7 +348,7 @@ div.grid_container {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: color.adjust($background_color, $lightness: -35%);
+    background-color: rgba(183, 146, 79, 0.46);
   }
 
   .locked-item {
@@ -334,21 +362,34 @@ div.grid_container {
     margin: 1px 0 0 1px;
     text-align: center;
     background-color: transparent;
+    border: 1px solid transparent;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7);
 
     &.empty {
-      background: rgba(0, 0, 0, 0.15);
-      border: 1px dashed rgba(255, 255, 255, 0.05);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.018), rgba(0, 0, 0, 0.24));
+      border: 1px solid rgba(130, 105, 62, 0.18);
     }
 
     .qty {
       font-size: 10px;
-      color: yellow;
+      color: var(--color-accent-strong);
       text-shadow: 1px 1px 0 black;
       float: left;
     }
 
+    .price {
+      display: block;
+      float: right;
+      margin-top: 20px;
+      padding: 0 2px;
+      background: rgba(20, 15, 8, .9);
+      color: var(--color-accent-strong);
+      font-size: 8px;
+      line-height: 11px;
+    }
+
     &.selected {
-      filter: drop-shadow(1px 0 0 yellow) drop-shadow(-1px 0 0 yellow) drop-shadow(0 1px 0 yellow) drop-shadow(0 -1px 0 yellow);
+      filter: drop-shadow(1px 0 0 var(--color-accent-strong)) drop-shadow(-1px 0 0 var(--color-accent-strong)) drop-shadow(0 1px 0 var(--color-accent-strong)) drop-shadow(0 -1px 0 var(--color-accent-strong));
     }
   }
 }

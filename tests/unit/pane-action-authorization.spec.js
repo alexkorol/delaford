@@ -15,6 +15,7 @@ const resetWorld = () => {
   town.players = [];
   town.npcs = [];
   town.items = [];
+  town.npcs = [];
   town.respawns = {
     items: [],
     monsters: [],
@@ -85,11 +86,22 @@ const makeGeneralStore = (player, inventory = []) => {
     originalStock: inventory.map(item => item.id),
     inventory,
   }];
+  // Trade actions re-verify current presence: the shopkeeper stands beside
+  // the seat the beforeEach gives the player (31,122), and a market display
+  // covers the stall-adjacency path.
+  world.getDefaultTown().items = [{
+    id: 'general-store-stall',
+    x: 31,
+    y: 123,
+    shopDisplay: true,
+    shopNpcId: 2,
+  }];
   actionEvents['player:screen:npc:trade']({
     playerIndex: world.players.indexOf(player),
+    player: { uuid: player.uuid, socket_id: player.socket_id },
     todo: {
       item: { id: 2 },
-      actionToQueue: { world: { x: 11, y: 10 } },
+      actionToQueue: { world: { x: 30, y: 122 } },
     },
   });
 };
@@ -99,15 +111,15 @@ const addServiceNpcs = () => {
     {
       id: 2,
       name: 'Shop keeper',
-      x: 11,
-      y: 10,
+      x: 30,
+      y: 122,
       actions: ['trade', 'examine'],
     },
     {
       id: 4,
       name: 'Bank gnome',
-      x: 10,
-      y: 10,
+      x: 31,
+      y: 121,
       actions: ['bank', 'examine'],
     },
   ];
@@ -116,9 +128,10 @@ const addServiceNpcs = () => {
 const openBank = (player) => {
   actionEvents['player:screen:bank']({
     playerIndex: world.players.indexOf(player),
+    player: { uuid: player.uuid, socket_id: player.socket_id },
     todo: {
       item: { id: 4 },
-      actionToQueue: { world: { x: 10, y: 10 } },
+      actionToQueue: { world: { x: 31, y: 121 } },
     },
   });
 };
@@ -130,6 +143,14 @@ describe('pane action authorization', () => {
     vi.spyOn(Socket, 'emit').mockImplementation(() => {});
     resetWorld();
     player = makePlayer();
+    // Bank transfers now verify current presence: seat the player beside the
+    // countinghouse banker, exactly where a real client that just opened the
+    // pane would be standing.
+    player.sceneId = world.defaultTownId;
+    player.x = 31;
+    player.y = 122;
+    world.getDefaultTown().type = 'town';
+    world.getDefaultTown().npcs = [{ id: 4, x: 31, y: 121 }];
     world.addPlayer(player);
     addServiceNpcs();
     openBank(player);
@@ -339,6 +360,32 @@ describe('pane action authorization', () => {
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
       qty: 5,
     });
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: 'Bought 5 Copper Ore for 45 coins.',
+    }));
+  });
+
+  it('accepts the full socket envelope used by the shop buy-one button', () => {
+    attachInventory(player, [
+      { id: 'coins', qty: 500, slot: 0 },
+    ]);
+    makeGeneralStore(player, [
+      { id: 'bronze-sword', qty: 10, slot: 0 },
+    ]);
+
+    actionEvents['player:screen:npc:trade:action']({
+      data: {
+        player: { socket_id: player.socket_id },
+        doing: 'buy',
+        item: { id: 'bronze-sword', params: { quantity: 1 } },
+      },
+    });
+
+    expect(player.inventory.slots.some(item => item.id === 'bronze-sword')).toBe(true);
+    expect(world.shops[0].inventory[0].qty).toBe(9);
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: expect.stringMatching(/^Bought 1 Bronze Sword for \d+ coins\.$/),
+    }));
   });
 
   it('rejects shop purchases after the player leaves the service point', async () => {
@@ -464,9 +511,12 @@ describe('pane action authorization', () => {
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
       qty: 6,
     });
+    expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
+      text: 'Sold 5 Copper Ore for 45 coins.',
+    }));
   });
 
-  it('rejects partial stack sales when full inventory has no coin slot for payment', async () => {
+  it('allows sales into the carried-gold balance when the backpack grid is full', async () => {
     withStackableCopperOre();
     attachInventory(player, [
       { id: 'copper-ore', qty: 10, slot: 0 },
@@ -489,15 +539,19 @@ describe('pane action authorization', () => {
     });
 
     expect(player.inventory.slots.find(item => item.id === 'copper-ore')).toMatchObject({
-      qty: 10,
+      qty: 5,
     });
-    expect(player.inventory.slots.some(item => item.id === 'coins')).toBe(false);
+    expect(player.inventory.slots.find(item => item.id === 'coins')).toMatchObject({
+      qty: 45,
+      slot: null,
+      position: null,
+    });
     expect(world.shops[0].inventory.find(item => item.id === 'copper-ore')).toMatchObject({
-      qty: 1,
+      qty: 6,
     });
     expect(Socket.emit).toHaveBeenCalledWith('game:send:message', expect.objectContaining({
       player: { socket_id: player.socket_id },
-      text: 'Not enough space in inventory.',
+      text: 'Sold 5 Copper Ore for 45 coins.',
     }));
   });
 });

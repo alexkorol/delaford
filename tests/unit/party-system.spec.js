@@ -391,4 +391,32 @@ describe('PartyService', () => {
     expect(party.state).toBe('instance');
     expect(party.sceneId).toContain('instance-');
   });
+
+  it('accepting an invite abandons a party joined while it was in flight (single-party invariant)', () => {
+    const partyA = service.createParty(leader);
+    service.invitePlayer(partyA, leader, member);
+
+    // The invited player founds their own party during the invite window...
+    const soloParty = service.createParty(member);
+    expect(service.getPartyForPlayer(member.uuid)).toBe(soloParty);
+
+    // ...then accepts the original invite. The stale seat must be removed,
+    // not held in parallel: dual membership paid instance rewards twice.
+    const accepted = service.acceptInvite(partyA, member);
+    expect(accepted).toBe(true);
+    expect(partyA.members.has(member.uuid)).toBe(true);
+    expect(service.getPartyForPlayer(member.uuid)).toBe(partyA);
+    expect(soloParty.members.has(member.uuid)).toBe(false);
+    expect(service.getParty(soloParty.id)).toBeNull();
+  });
+
+  it('keeps the valid invite flow working when the player is party-less', () => {
+    const partyA = service.createParty(leader);
+    service.invitePlayer(partyA, leader, member);
+
+    expect(service.acceptInvite(partyA, member)).toBe(true);
+    expect(partyA.members.has(member.uuid)).toBe(true);
+    expect(partyA.members.has(leader.uuid)).toBe(true);
+    expect(service.getPartyForPlayer(member.uuid)).toBe(partyA);
+  });
 });

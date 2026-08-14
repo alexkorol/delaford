@@ -4,6 +4,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import { shops } from '#server/core/data/foreground/index.js';
 import world from '#server/core/world.js';
+import { isInventoryCurrency } from '#shared/inventory-footprints.js';
 
 const { player } = config;
 
@@ -37,7 +38,8 @@ class Shop {
     this.inventory = world.players[this.playerIndex].inventory;
 
     // How many spaces available in the player's inventory?
-    this.slotsAvailable = player.slots.inventory - this.inventory.slots.length;
+    this.slotsAvailable = player.slots.inventory
+      - this.inventory.slots.filter(item => !isInventoryCurrency(item)).length;
 
     // What item we are buying/selling?
     this.itemId = itemId;
@@ -88,9 +90,18 @@ class Shop {
    * @return {object}
    */
   static load() {
-    return shops.map((s) => {
-      // Format to more consise properties
-      s.inventory = s.inventory.map(Shop.formatData);
+    return shops.map((definition) => {
+      const s = {
+        ...definition,
+        displays: Array.isArray(definition.displays)
+          ? definition.displays.map(display => ({ ...display }))
+          : [],
+      };
+      // Accept both source definitions and already formatted stale data.
+      s.inventory = definition.inventory.map((item, index) => Shop.formatData({
+        item: item.item || item.id,
+        stock: Number.isFinite(item.stock) ? item.stock : item.qty,
+      }, index));
       // Take stock of original items sold in general stores
       s.originalStock = s.inventory.map(q => q.id);
       return s;
@@ -276,6 +287,7 @@ class Shop {
    * Sell an item to the shop
    */
   sell() {
+    let transaction = null;
     if (this.canWeSell()) {
       const quantitySold = this.removeSoldItemsFromInventory();
       if (quantitySold <= 0) {
@@ -303,11 +315,18 @@ class Shop {
         // If not, lets give them their coins to the inventory
         this.inventory.add('coins', saleValue);
       }
+      transaction = {
+        type: 'sell',
+        itemId: this.itemId,
+        quantity: quantitySold,
+        coins: saleValue,
+      };
     }
 
     return {
       inventory: this.inventory.slots,
       shopItems: this.shop,
+      transaction,
     };
   }
 
@@ -369,6 +388,7 @@ class Shop {
     }
 
     // If we completed one round of purchasing
+    let transaction = null;
     if (quantityBought > 0) {
       const toSpend = this.price * quantityBought;
       const moneyLeft = playerGold - toSpend;
@@ -395,6 +415,12 @@ class Shop {
         // when item's origin is from a player.
         this.shop.splice(this.shopItemIndex, 1);
       }
+      transaction = {
+        type: 'buy',
+        itemId: this.itemId,
+        quantity: quantityBought,
+        coins: toSpend,
+      };
     }
 
     // Check to see if purchases can be
@@ -404,6 +430,7 @@ class Shop {
     return {
       inventory: this.inventory.slots,
       shopItems: this.shop,
+      transaction,
     };
   }
 
@@ -456,9 +483,9 @@ class Shop {
    * @return {boolean}
    */
   spaceInInventory() {
-    return this.hasCoinsInInventory()
-      || this.slotsAvailable > 0
-      || this.saleFreesInventorySlot();
+    // Sale proceeds go into the carried-gold balance, which never consumes a
+    // backpack cell. Inventory fullness cannot prevent a sale on that basis.
+    return true;
   }
 
   /**

@@ -70,6 +70,9 @@ WS client or the browser console:
 | `party` | two logins → invite/accept → ready → shared instance → leave/return cleanup |
 | `zones` | every Adventure zone: right layout, stairs, populated, named; stairs-up returns you to your pre-entry tile |
 | `skilltree` | a saved build survives a full relog |
+| `crossroads` | scion spawns at their House wagon; town is sanctuary + monster-free; road purse, deposits, treasury-funded outfitting |
+| `gates` | each of the four road gates opens its own Wayfinder's Chart without moving you |
+| `world-web` | chart → zone travel, Warden bars the onward gate, Warden death unlocks children + persists, cleared zone stays cleared on re-entry |
 
 Add a scenario per new feature: one file in `playtest/scenarios/`, default
 export `async ({ connect, assert }) => {…}`. Throw (or fail an assert) to fail.

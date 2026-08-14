@@ -227,176 +227,196 @@ export default {
 
 <style scoped>
 .party-panel {
-  background: rgba(6, 8, 16, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0.5rem;
-  border-radius: 8px;
-  color: var(--color-text-primary, #f5f5f5);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
+  padding: 8px;
+  color: var(--color-text-primary);
+  background:
+    linear-gradient(90deg, rgba(113, 34, 38, 0.08), transparent 48%, rgba(39, 69, 90, 0.1)),
+    var(--panel-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  outline: 1px solid #080706;
+  outline-offset: -4px;
+  box-shadow: var(--shadow-strong), inset 0 0 24px rgba(0, 0, 0, 0.52);
+  font-family: 'GameFont', sans-serif;
 }
 
 .party-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.85rem;
+  min-height: 27px;
+  padding: 2px 6px 6px;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  color: var(--color-accent-strong);
+  border-bottom: 1px solid rgba(183, 146, 79, 0.38);
 }
 
-.party-panel__title {
-  font-weight: 600;
-}
+.party-panel__title { font-weight: normal; }
 
 .party-panel__status {
-  font-size: 0.75rem;
-  color: #ffd27f;
+  font-size: 0.62rem;
+  color: var(--color-sapphire-light);
 }
 
-.party-panel__invites {
+.party-panel__invites,
+.party-panel__body,
+.party-panel__members {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .party-panel__invite {
-  background: rgba(18, 20, 32, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.5rem;
-  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 8px;
+  padding: 7px;
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border);
 }
 
-.party-panel__invite-text {
-  font-size: 0.8rem;
-}
+.party-panel__invite-text,
+.party-panel__members { font-size: 0.72rem; }
 
 .party-panel__invite-actions {
   display: flex;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .party-panel__status-message {
-  font-size: 0.75rem;
-  color: #ff9f68;
-}
-
-.party-panel__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  padding: 5px 7px;
+  font-size: 0.7rem;
+  color: var(--color-ruby-light);
+  background: rgba(102, 30, 35, 0.2);
+  border-left: 2px solid var(--color-ruby);
 }
 
 .party-panel__members {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.8rem;
 }
 
 .party-panel__member {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.25rem 0.35rem;
-  background: rgba(14, 16, 26, 0.6);
-  border-radius: 4px;
+  min-height: 26px;
+  padding: 4px 7px;
+  background: var(--color-bg-inset);
+  border: 1px solid rgba(183, 146, 79, 0.18);
 }
 
 .party-panel__member--ready {
-  border: 1px solid rgba(108, 211, 128, 0.6);
+  color: #d8ead9;
+  border-color: rgba(94, 147, 104, 0.62);
+  box-shadow: inset 2px 0 0 rgba(94, 147, 104, 0.72);
 }
 
 .party-panel__member--leader::before {
-  content: '★';
-  color: #ffd27f;
-  margin-right: 0.25rem;
+  content: '◆';
+  color: var(--color-accent-strong);
+  margin-right: 5px;
+  font-size: 0.58rem;
 }
 
-.party-panel__member-name {
-  font-weight: 500;
-}
+.party-panel__member-name { font-weight: normal; }
 
 .party-panel__member-status {
-  font-size: 0.7rem;
-  opacity: 0.8;
+  font-size: 0.62rem;
+  color: var(--color-text-dim);
 }
 
 .party-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .party-panel__button {
-  background: rgba(48, 86, 136, 0.85);
-  color: #f5f5f5;
-  border: none;
-  padding: 0.35rem 0.6rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  min-height: 28px;
+  padding: 5px 8px;
+  background: var(--control-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(218, 184, 112, 0.34);
+  border-radius: 0;
+  font: 0.67rem 'GameFont', sans-serif;
   cursor: pointer;
-  transition: background 0.2s ease;
 }
 
 .party-panel__button:hover {
-  background: rgba(64, 108, 158, 0.95);
+  color: #fff0c2;
+  border-color: var(--color-frame-light);
+  background: var(--control-surface-hover);
 }
 
 .party-panel__button:disabled {
-  opacity: 0.5;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
 .party-panel__button--negative {
-  background: rgba(168, 58, 70, 0.85);
+  color: #dcb0aa;
+  border-color: rgba(139, 48, 52, 0.52);
+  background: linear-gradient(180deg, #452126, #1d1012);
 }
 
 .party-panel__button--negative:hover {
-  background: rgba(184, 72, 84, 0.95);
+  color: #f1c1b8;
+  border-color: var(--color-ruby-light);
+  background: linear-gradient(180deg, #59292f, #241214);
 }
 
 .party-panel__button--positive {
-  background: rgba(70, 150, 92, 0.85);
+  color: #d4ead8;
+  border-color: rgba(94, 147, 104, 0.54);
+  background: linear-gradient(180deg, #29452e, #142318);
 }
 
 .party-panel__button--positive:hover {
-  background: rgba(92, 176, 116, 0.95);
+  color: #e3f4e6;
+  border-color: #76a87f;
+  background: linear-gradient(180deg, #34583a, #182b1d);
 }
 
 .party-panel__invite-form {
-  display: flex;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
 }
 
 .party-panel__input {
-  flex: 1;
-  background: rgba(14, 16, 26, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 0.3rem 0.45rem;
-  border-radius: 4px;
-  color: inherit;
-  font-size: 0.75rem;
+  min-width: 0;
+  padding: 5px 7px;
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font: 0.68rem 'ChatFont', sans-serif;
+}
+
+.party-panel__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .party-panel__empty {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
   align-items: flex-start;
 }
 
 .party-panel__empty-text {
   margin: 0;
-  font-size: 0.8rem;
-  opacity: 0.75;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
 }
 </style>

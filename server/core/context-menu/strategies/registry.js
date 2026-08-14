@@ -1,5 +1,6 @@
 import bankActionStrategy from './bank-action.js';
 import cancelStrategy from './cancel.js';
+import drinkFountainStrategy from './drink-fountain.js';
 import equipStrategy from './equip.js';
 import examineStrategy from './examine.js';
 import inventoryDropStrategy from './inventory-drop.js';
@@ -8,15 +9,19 @@ import openScreenStrategy from './open-screen.js';
 import resourcePaneStrategy from './resource-pane.js';
 import smeltActionStrategy from './smelt-action.js';
 import takeStrategy from './take.js';
+import talkStrategy from './talk.js';
 import tradeActionStrategy from './trade-action.js';
 import unequipStrategy from './unequip.js';
 import walkHereStrategy from './walk-here.js';
+import vesselforgeBrandStrategy from './vesselforge-brand.js';
 
 const strategies = [
   cancelStrategy,
+  drinkFountainStrategy,
   walkHereStrategy,
   inventoryDropStrategy,
   takeStrategy,
+  talkStrategy,
   equipStrategy,
   unequipStrategy,
   examineStrategy,
@@ -26,6 +31,7 @@ const strategies = [
   openScreenStrategy,
   bankActionStrategy,
   tradeActionStrategy,
+  vesselforgeBrandStrategy,
 ];
 
 const registry = new Map();

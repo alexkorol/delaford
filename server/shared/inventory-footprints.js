@@ -2,17 +2,30 @@ export const INVENTORY_COLUMNS = 12;
 export const INVENTORY_ROWS = 7;
 export const INVENTORY_SLOT_COUNT = INVENTORY_COLUMNS * INVENTORY_ROWS;
 export const MAX_ITEM_CELLS = 8;
+export const INVENTORY_CURRENCY_ID = 'coins';
+
+export const isInventoryCurrency = item => item?.id === INVENTORY_CURRENCY_ID;
 
 const SLOT_SIZE_BY_EQUIPMENT_SLOT = Object.freeze({
   ring: { width: 1, height: 1 },
   necklace: { width: 1, height: 1 },
   head: { width: 2, height: 2 },
-  gloves: { width: 2, height: 1 },
-  feet: { width: 2, height: 1 },
+  gloves: { width: 2, height: 2 },
+  feet: { width: 2, height: 2 },
   back: { width: 2, height: 3 },
   armor: { width: 2, height: 3 },
   left_hand: { width: 2, height: 2 },
 });
+
+const FIXED_SQUARE_ARMOR_SLOTS = new Set(['head', 'gloves', 'feet']);
+
+const resolveEquipmentSlot = (item = {}) => [
+  item.equipSlot,
+  item.slotType,
+  item.wearSlot,
+  item.equipmentSlot,
+  typeof item.slot === 'string' ? item.slot : null,
+].find(slot => typeof slot === 'string') || null;
 
 const clampInteger = (value, min, max) => (
   Math.max(min, Math.min(max, Number.isFinite(value) ? Math.floor(value) : min))
@@ -78,6 +91,8 @@ const resolveWeaponSize = (item) => {
 };
 
 const resolveArmorSize = (item) => {
+  const equipmentSlot = resolveEquipmentSlot(item);
+
   if (idContains(item, ['pavise'])) {
     return { width: 2, height: 3 };
   }
@@ -99,13 +114,18 @@ const resolveArmorSize = (item) => {
   }
 
   if (idContains(item, ['boots', 'gloves'])) {
-    return { width: 2, height: 1 };
+    return { width: 2, height: 2 };
   }
 
-  return SLOT_SIZE_BY_EQUIPMENT_SLOT[item?.slot] || { width: 1, height: 1 };
+  return SLOT_SIZE_BY_EQUIPMENT_SLOT[equipmentSlot] || { width: 1, height: 1 };
 };
 
 export const resolveItemSize = (item = {}) => {
+  const equipmentSlot = resolveEquipmentSlot(item);
+  if (FIXED_SQUARE_ARMOR_SLOTS.has(equipmentSlot)) {
+    return { width: 2, height: 2 };
+  }
+
   if (item.size || item.baseSize || item.dimensions || item.graphicSize) {
     return normaliseItemSize(item.size || item.baseSize || item.dimensions || item.graphicSize);
   }
@@ -122,7 +142,7 @@ export const resolveItemSize = (item = {}) => {
     return resolveWeaponSize(item);
   }
 
-  if (item.type === 'armor' || SLOT_SIZE_BY_EQUIPMENT_SLOT[item.slot]) {
+  if (item.type === 'armor' || SLOT_SIZE_BY_EQUIPMENT_SLOT[equipmentSlot]) {
     return resolveArmorSize(item);
   }
 
@@ -192,7 +212,7 @@ export const findOpenInventorySlot = (inventory = [], item = {}, options = {}) =
   const occupied = new Set();
 
   inventory.forEach((entry) => {
-    if (!entry) {
+    if (!entry || isInventoryCurrency(entry)) {
       return;
     }
     const position = entry.position || positionFromSlot(entry.slot, grid.columns);
@@ -227,7 +247,7 @@ export const canPlaceInventoryItem = (inventory = [], item = {}, position = null
   }
 
   inventory.forEach((entry) => {
-    if (!entry) {
+    if (!entry || isInventoryCurrency(entry)) {
       return;
     }
 
@@ -282,8 +302,21 @@ export const packInventoryItems = (items = [], options = {}) => {
 
     const candidate = {
       ...item,
-      size: normaliseItemSize(item.size || item.baseSize || resolveItemSize(item)),
+      size: resolveItemSize(item),
     };
+
+    // Carried gold is an account balance represented by a legacy stack for
+    // transaction compatibility. It has no backpack position and consumes
+    // no grid cells.
+    if (isInventoryCurrency(candidate)) {
+      packed.push({
+        ...candidate,
+        slot: null,
+        position: null,
+      });
+      return;
+    }
+
     const desiredPosition = item.position || positionFromSlot(item.slot, grid.columns);
     const openSlot = canPlace(occupied, desiredPosition, candidate, grid, candidate.orientation)
       ? slotFromPosition(desiredPosition, grid.columns)

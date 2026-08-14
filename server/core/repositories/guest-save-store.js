@@ -44,9 +44,11 @@ export const buildDurableItemSnapshot = (item) => {
 
 const wearInstances = (wear = {}) => Object.fromEntries(
   Object.entries(wear)
+    // Keep retired quiver data from being written back by stale guest saves.
     .filter(([slot]) => slot !== 'arrows')
     .map(([slot, item]) => [slot, item && typeof item === 'object'
       ? buildDurableItemSnapshot(item)
+
       : item]),
 );
 
@@ -78,6 +80,7 @@ export const buildGuestSnapshot = (player) => ({
   bank: Array.isArray(player.bank) ? player.bank : [],
   passiveTree: player.passiveTree || null,
   quests: player.quests || null,
+  questPoints: player.questPoints || 0,
   chronicles: player.chronicles || null,
   lifecycle: player.stats && player.stats.lifecycle ? player.stats.lifecycle : null,
   resources: player.stats && player.stats.resources ? player.stats.resources : null,

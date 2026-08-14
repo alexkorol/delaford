@@ -14,6 +14,7 @@
       :right-pane="defaultRightPane"
       :overlay-pane="activeOverlayDescriptor"
       @overlay-close="$emit('overlay-close', $event)"
+      @request-pane="$emit('request-pane', $event)"
     >
       <div class="game-container__center">
         <div
@@ -29,15 +30,40 @@
               ref="canvasRef"
               :game="game"
               :world-viewport="worldViewport"
+              @pane-state="legacyPaneOpen = $event"
             />
             <WorldMinimap
-              v-if="!uiHidden"
+              v-if="!uiHidden && !legacyPaneOpen && !hasDockedPane"
               :game="game"
             />
             <div
               v-if="!uiHidden"
               class="game-container__party-overlay"
             >
+              <nav class="game-container__pane-menu" aria-label="Game panels">
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  title="Quests (Q)"
+                  @click="$emit('request-pane', 'quests')"
+                >
+                  Quests
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="$emit('request-pane', 'settings')"
+                >
+                  Settings
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="$emit('request-pane', 'logout')"
+                >
+                  Exit
+                </button>
+              </nav>
               <button
                 type="button"
                 class="game-container__party-toggle"
@@ -66,7 +92,7 @@
                 class="game-container__party-toggle"
                 @click="adventureOpen = !adventureOpen"
               >
-                Adventure
+                Roads
               </button>
               <button
                 type="button"
@@ -79,23 +105,23 @@
               <div
                 v-if="adventureOpen"
                 class="game-container__zone-menu"
-                aria-label="Choose a zone"
+                aria-label="Choose a road"
               >
-                <p class="game-container__zone-title">Descend into…</p>
+                <p class="game-container__zone-title">Read the chart of…</p>
                 <button
-                  v-for="zone in adventureZones"
-                  :key="zone.id"
+                  v-for="road in roads"
+                  :key="road.id"
                   type="button"
                   class="game-container__zone"
-                  @click="enterZone(zone)"
+                  @click="openRoad(road)"
                 >
-                  <span class="game-container__zone-name">{{ zone.name }}</span>
-                  <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                  <span class="game-container__zone-name">{{ road.name }}</span>
+                  <span class="game-container__zone-level">{{ road.direction }}</span>
                 </button>
               </div>
             </div>
             <div
-              v-if="!uiHidden && !chatExpanded"
+              v-if="!uiHidden && !legacyPaneOpen && !chatExpanded"
               ref="chatPeekRef"
               class="game-container__chat-peek"
               :class="{ 'game-container__chat-peek--dragging': isChatDragging }"
@@ -136,7 +162,7 @@
               </button>
             </div>
             <div
-              v-if="!uiHidden"
+              v-if="!uiHidden && !legacyPaneOpen"
               ref="chatOverlayRef"
               class="game-container__chat-overlay"
               :class="{ 'game-container__chat-overlay--collapsed': !chatExpanded }"
@@ -187,7 +213,6 @@
             :quickbar-active-index="quickbarActiveIndex"
             :quickbar-cooldowns="quickbarCooldowns"
             @quick-slot="handleQuickSlot"
-            @request-remap="handleQuickbarRemap"
           />
         </div>
       </div>
@@ -331,7 +356,7 @@ export default {
     'right-click',
     'overlay-close',
     'quick-slot',
-    'request-remap',
+    'request-pane',
     'party-create',
     'party-leave',
     'party-toggle-ready',
@@ -378,10 +403,6 @@ export default {
       emit('quick-slot', slot, index);
     };
 
-    const handleQuickbarRemap = (slot, index) => {
-      emit('request-remap', slot, index);
-    };
-
     const triggerSkill = (skillId, options = {}) => {
       if (!skillId) {
         return false;
@@ -396,25 +417,34 @@ export default {
       return false;
     };
 
+    const closeLegacyPane = () => {
+      if (!legacyPaneOpen.value) return false;
+      canvasRef.value?.closePane?.();
+      return true;
+    };
+
     const uiHidden = ref(false);
+    const legacyPaneOpen = ref(false);
     const partyOpen = ref(false);
     const adventureOpen = ref(false);
+    const hasDockedPane = computed(() => Boolean(
+      props.defaultLeftPane
+      || props.defaultRightPane
+      || props.activeOverlayDescriptor?.id,
+    ));
 
-    // Zone menu must match the server's ADVENTURE_ZONES; each zone pairs an art
-    // template with a layout shape (warren/clearings/gauntlet). The server
-    // validates both and falls back to sensible defaults if unknown.
-    const adventureZones = [
-      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
-      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
-      { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
-      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
-      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
-      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
+    // The four roads out of the Crossroads (server: world-web.js ROADS).
+    // Each opens that road's Wayfinder's Chart; travel happens from the chart.
+    const roads = [
+      { id: 'tin', name: 'The Tin Road', direction: 'north' },
+      { id: 'salt', name: 'The Salt Road', direction: 'east' },
+      { id: 'chalk', name: 'The Chalk Road', direction: 'south' },
+      { id: 'copper', name: 'The Copper Road', direction: 'west' },
     ];
 
-    const enterZone = (zone) => {
+    const openRoad = (road) => {
       adventureOpen.value = false;
-      emit('enter-zone', { template: zone.template, layout: zone.layout });
+      emit('enter-zone', { road: road.id });
     };
 
     const activeChatDock = () => (props.chatExpanded ? chatOverlayRef.value : chatPeekRef.value);
@@ -659,7 +689,14 @@ export default {
       }
     });
 
-    expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill, refocusGame });
+    expose({
+      paneHostRef,
+      chatboxRef,
+      canvasRef,
+      triggerSkill,
+      refocusGame,
+      closeLegacyPane,
+    });
 
     return {
       paneHostRef,
@@ -671,13 +708,14 @@ export default {
       hudRef,
       handleRightClick,
       handleQuickSlot,
-      handleQuickbarRemap,
       triggerSkill,
       uiHidden,
+      legacyPaneOpen,
+      hasDockedPane,
       partyOpen,
       adventureOpen,
-      adventureZones,
-      enterZone,
+      roads,
+      openRoad,
       beginChatDrag,
       resetChatDock,
       cycleChatDock,
@@ -829,25 +867,43 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-xs);
+  gap: 3px;
   width: min(300px, 40%);
   pointer-events: auto;
 }
 
 .game-container__party-toggle {
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.4);
-  background: rgba(12, 16, 28, 0.85);
-  color: #f5d68a;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  min-height: 29px;
+  padding: 5px 12px;
+  border-radius: 0;
+  border: 1px solid var(--color-frame-dark);
+  border-top-color: rgba(218, 184, 112, 0.35);
+  background: var(--control-surface);
+  color: var(--color-accent-strong);
+  font: 0.67rem 'GameFont', sans-serif;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(183, 146, 79, 0.08), 0 3px 10px rgba(0, 0, 0, 0.38);
 }
 
-.game-container__party-toggle:hover {
-  background: rgba(40, 36, 28, 0.95);
+.game-container__party-toggle:hover,
+.game-container__party-toggle:focus-visible {
+  color: #fff0c2;
+  border-color: var(--color-frame-light);
+  background: var(--control-surface-hover);
+  outline: none;
+}
+
+.game-container__pane-menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(5, 6, 7, 0.78);
+  border: 1px solid rgba(120, 95, 54, 0.28);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
 }
 
 .game-container__party-overlay :deep(.party-panel) {
@@ -859,11 +915,14 @@ export default {
   flex-direction: column;
   gap: 4px;
   margin-top: 4px;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.4);
-  background: rgba(10, 12, 20, 0.94);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  min-width: 250px;
+  padding: 10px;
+  border-radius: 0;
+  border: 1px solid var(--color-border-strong);
+  outline: 1px solid #090806;
+  outline-offset: -4px;
+  background: var(--panel-surface);
+  box-shadow: var(--shadow-strong);
 }
 
 .game-container__zone-title {
@@ -871,7 +930,7 @@ export default {
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: rgba(231, 218, 190, 0.7);
+  color: var(--color-text-dim);
 }
 
 .game-container__zone {
@@ -879,17 +938,18 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(180, 145, 86, 0.28);
-  background: linear-gradient(180deg, rgba(58, 30, 26, 0.85), rgba(24, 14, 12, 0.9));
-  color: #f2d391;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 0;
+  border: 1px solid var(--color-frame-dark);
+  background: var(--control-surface);
+  color: var(--color-accent-strong);
   font-family: 'GameFont', sans-serif;
   cursor: pointer;
 
   &:hover {
     border-color: var(--color-accent-strong, #e0b45c);
-    background: linear-gradient(180deg, rgba(78, 40, 34, 0.9), rgba(34, 20, 16, 0.95));
+    background: var(--control-surface-hover);
   }
 }
 
@@ -1098,16 +1158,18 @@ export default {
 .game-container__chat-overlay :deep(.chatbox) {
   --chat-width: 100%;
 
-  background: rgba(4, 5, 7, 0.34);
-  border-color: rgba(180, 145, 86, 0.16);
+  background:
+    linear-gradient(90deg, rgba(91, 26, 29, 0.08), transparent 46%, rgba(35, 65, 84, 0.08)),
+    rgba(6, 7, 8, 0.9);
+  border-color: rgba(183, 146, 79, 0.38);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  box-shadow: none;
-  backdrop-filter: blur(1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48), inset 0 0 22px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(3px);
 }
 
 .game-container__chat-overlay :deep(.chatbox__header) {
-  background: rgba(4, 5, 7, 0.28);
+  background: rgba(14, 12, 10, 0.78);
 }
 
 .game-container__chat-overlay :deep(.chatbox__messages) {

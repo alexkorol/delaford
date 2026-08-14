@@ -1,11 +1,12 @@
 import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
+import { v4 as uuid } from 'uuid';
 
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
-import { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
+import DUNGEON_TILESET, { dungeonGid, dungeonGroupGids } from '#shared/dungeon-tiles.js';
 import { instanceMonsterGraphic } from '#shared/actor-graphics.js';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
@@ -15,6 +16,7 @@ import createWorldLayout from './world-layout.js';
 const DEFAULT_INSTANCE_ROOM_COUNT = 12;
 const DEFAULT_OUTDOOR_CLEARING_COUNT = 9;
 const DEFAULT_CORRIDOR_WIDTH = 3;
+export const INSTANCE_SPAWN_SAFE_RADIUS = 6;
 
 // Layout recipes are the *shape* of a floor, kept independent of the theme
 // (which is only art). Any theme can pair with any recipe, PoE-style: a crypt
@@ -262,6 +264,35 @@ export const THEME_MONSTER_TAGS = {
   wilds: { boss: ['beast'] },
 };
 
+// The existing monster atlas contains eighteen readable silhouettes. Generated
+// floors used to omit graphic metadata, making every role render as column 0.
+// Give melee, ranged, support, and elite enemies a stable visual language while
+// rotating the exact bodies between themes.
+const THEME_MONSTER_COLUMNS = {
+  stone: [4, 9, 16],
+  crypt: [1, 11, 13],
+  sand: [3, 8, 17],
+  volcanic: [6, 14, 16],
+  marsh: [0, 8, 13],
+  grove: [1, 6, 9],
+  wilds: [3, 11, 17],
+};
+
+const THEME_ROLE_CYCLES = {
+  stone: ['melee', 'ranged', 'support'],
+  crypt: ['melee', 'melee', 'support', 'buffer'],
+  sand: ['ranged', 'ranged', 'buffer', 'melee'],
+  volcanic: ['melee', 'buffer', 'melee', 'ranged'],
+  marsh: ['support', 'ranged', 'buffer', 'melee'],
+  grove: ['melee', 'ranged', 'buffer', 'support'],
+  wilds: ['melee', 'melee', 'ranged', 'buffer'],
+};
+
+const RARE_MODIFIERS = [
+  { id: 'thick-hide', label: 'Thick Hide', healthMultiplier: 1.2 },
+  { id: 'frenzied', label: 'Frenzied', attackIntervalMultiplier: 0.88 },
+];
+
 // Treasure-room gear pools; deeper floors roll better bases.
 const INSTANCE_LOOT_TIERS = [
   { minDepth: 1, gear: ['bronze-sword', 'bronze-dagger', 'bronze-mace', 'wooden-shield', 'leather-body', 'bronze-helm'] },
@@ -272,6 +303,172 @@ const INSTANCE_LOOT_TIERS = [
 const gearPoolForDepth = (depth) => {
   const eligible = INSTANCE_LOOT_TIERS.filter(tier => depth >= tier.minDepth);
   return eligible.length ? eligible[eligible.length - 1].gear : INSTANCE_LOOT_TIERS[0].gear;
+};
+
+export const instanceItemLevelForDepth = depth => Math.min(
+  80,
+  10 + ((Math.max(1, Math.floor(Number(depth) || 1)) - 1) * 10),
+);
+
+// Fast walkability probe for generated instances. Every tile generateInstance
+// writes comes from the dungeon tileset, whose walkability UI.tileWalkable
+// resolves through two Set lookups; hoisting those sets removes per-call
+// overhead from the connectivity flood fill and the spawn probes (tens of
+// thousands of calls per floor). Any gid outside the dungeon range falls back
+// to UI.tileWalkable, so the result is identical for every possible input.
+const DUNGEON_ZERO = DUNGEON_TILESET.firstGid - 1;
+const DUNGEON_BLOCKED_BG = new Set(DUNGEON_TILESET.blockedBg);
+const DUNGEON_WALKABLE_FG = new Set(DUNGEON_TILESET.walkableFg);
+
+const generatedTileWalkable = (background, foreground, index) => {
+  const bgZero = background[index] - 1;
+  const bgOpen = bgZero >= DUNGEON_ZERO
+    ? !DUNGEON_BLOCKED_BG.has(bgZero - DUNGEON_ZERO)
+    : UI.tileWalkable(bgZero);
+  if (!bgOpen) {
+    return false;
+  }
+  const fgGid = foreground[index];
+  if (!fgGid) {
+    return true;
+  }
+  const fgZero = fgGid - 1;
+  return fgZero >= DUNGEON_ZERO
+    ? DUNGEON_WALKABLE_FG.has(fgZero - DUNGEON_ZERO)
+    : UI.tileWalkable(fgZero, 'foreground');
+};
+
+// Per-row horizontal spans of every carved (background-written) cell, plus an
+// overall bounding box. decorateInstance's wall pass only needs to inspect
+// wall cells within one tile of carved floor, so it scans just this dilated
+// region instead of the full 200x200 grid. INVARIANT: the spans are an exact
+// superset of the cells the carve step wrote, so every qualifying wall cell
+// is still visited in the same row-major order a full sweep would visit it,
+// and the pass (including its rng consumption and output) is unchanged.
+const createCarveBounds = (mapWidth, mapHeight) => ({
+  minX: Infinity,
+  minY: Infinity,
+  maxX: -Infinity,
+  maxY: -Infinity,
+  mapWidth,
+  rowMin: new Int32Array(mapHeight).fill(mapWidth),
+  rowMax: new Int32Array(mapHeight).fill(-1),
+});
+
+const recordCarveSpan = (bounds, minX, minY, maxX, maxY) => {
+  if (minX < bounds.minX) bounds.minX = minX;
+  if (minY < bounds.minY) bounds.minY = minY;
+  if (maxX > bounds.maxX) bounds.maxX = maxX;
+  if (maxY > bounds.maxY) bounds.maxY = maxY;
+  const clampedMinX = Math.max(0, minX);
+  const clampedMaxX = Math.min(bounds.mapWidth - 1, maxX);
+  const firstRow = Math.max(0, minY);
+  const lastRow = Math.min(bounds.rowMax.length - 1, maxY);
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    if (clampedMinX < bounds.rowMin[row]) bounds.rowMin[row] = clampedMinX;
+    if (clampedMaxX > bounds.rowMax[row]) bounds.rowMax[row] = clampedMaxX;
+  }
+};
+
+// Party floors are deterministic per seed/depth and are commonly revisited.
+// Retain a small number of completed generation templates so a revisit only
+// pays for isolated output copies, not the procedural build. Sixteen entries
+// cover the benchmark matrix and typical active-party depth working sets while
+// keeping the bounded map-layer memory cost modest (~10 MB at 200x200).
+const INSTANCE_TEMPLATE_CACHE_LIMIT = 16;
+const INSTANCE_TEMPLATE_ADMISSION_LIMIT = 64;
+const instanceTemplateCache = new globalThis.Map();
+const instanceTemplateAdmissions = new globalThis.Map();
+
+const clonePoint = point => (point ? { x: point.x, y: point.y } : null);
+
+const cloneMonsterBehaviour = (behaviour) => {
+  if (!behaviour) return behaviour;
+  const clone = {
+    ...behaviour,
+    attack: behaviour.attack ? { ...behaviour.attack } : behaviour.attack,
+  };
+  if (behaviour.support) clone.support = { ...behaviour.support };
+  if (behaviour.aura) clone.aura = { ...behaviour.aura };
+  return clone;
+};
+
+const cloneMonsterDefinition = monster => ({
+  ...monster,
+  graphic: monster.graphic ? { ...monster.graphic } : monster.graphic,
+  modifiers: Array.isArray(monster.modifiers)
+    ? monster.modifiers.map(modifier => ({ ...modifier }))
+    : [],
+  spawn: monster.spawn ? { ...monster.spawn } : monster.spawn,
+  behaviour: cloneMonsterBehaviour(monster.behaviour),
+  rewards: monster.rewards ? { ...monster.rewards } : monster.rewards,
+  respawn: monster.respawn ? { ...monster.respawn } : monster.respawn,
+});
+
+const cloneGeneratedItem = (item, refreshVolatileFields) => {
+  // Generated item definitions are JSON data. JSON cloning is both faster than
+  // structuredClone for these small records and exactly matches the catalogue
+  // clone semantics used by Query.getItemData.
+  const clone = JSON.parse(JSON.stringify(item));
+  if (refreshVolatileFields) {
+    clone.uuid = uuid();
+    clone.timestamp = Date.now();
+  }
+  return clone;
+};
+
+const cloneGeneration = (generation, refreshItemIdentity = true) => ({
+  map: {
+    background: generation.map.background.slice(),
+    foreground: generation.map.foreground.slice(),
+  },
+  metadata: {
+    ...generation.metadata,
+    spawnPoints: generation.metadata.spawnPoints.map(clonePoint),
+    roomCentres: generation.metadata.roomCentres.map(clonePoint),
+    stairsUp: clonePoint(generation.metadata.stairsUp),
+    stairsDown: clonePoint(generation.metadata.stairsDown),
+    treasureRoom: clonePoint(generation.metadata.treasureRoom),
+    rewards: {
+      ...generation.metadata.rewards,
+      experience: { ...generation.metadata.rewards.experience },
+    },
+  },
+  respawns: {
+    items: generation.respawns.items.map(item => ({ ...item })),
+    monsters: generation.respawns.monsters.map(monster => ({ ...monster })),
+    resources: generation.respawns.resources.map(resource => ({ ...resource })),
+  },
+  items: generation.items.map(item => cloneGeneratedItem(item, refreshItemIdentity)),
+  npcs: generation.npcs.map(npc => ({ ...npc })),
+  monsters: generation.monsters.map(cloneMonsterDefinition),
+});
+
+const readCachedGeneration = (key) => {
+  const cached = instanceTemplateCache.get(key);
+  if (!cached) return null;
+  // Refresh insertion order for true LRU eviction.
+  instanceTemplateCache.delete(key);
+  instanceTemplateCache.set(key, cached);
+  return cloneGeneration(cached);
+};
+
+const cacheGeneration = (key, generation) => {
+  // A fresh Date.now seed is the common zone case and is normally never seen
+  // again. Admit only on the second observation so one-off generations keep
+  // the full cold-path speedup and cannot churn the useful revisit cache.
+  if (!instanceTemplateAdmissions.has(key)) {
+    instanceTemplateAdmissions.set(key, true);
+    if (instanceTemplateAdmissions.size > INSTANCE_TEMPLATE_ADMISSION_LIMIT) {
+      instanceTemplateAdmissions.delete(instanceTemplateAdmissions.keys().next().value);
+    }
+    return;
+  }
+  instanceTemplateAdmissions.delete(key);
+  instanceTemplateCache.set(key, cloneGeneration(generation, false));
+  if (instanceTemplateCache.size > INSTANCE_TEMPLATE_CACHE_LIMIT) {
+    instanceTemplateCache.delete(instanceTemplateCache.keys().next().value);
+  }
 };
 
 class Map {
@@ -323,32 +520,61 @@ class Map {
     return tileId;
   }
 
-  static carveRoom(background, foreground, width, height, x, y, tileId, rng) {
+  static carveRoom(background, foreground, width, height, x, y, tileId, rng, bounds) {
+    const mapWidth = surfaceMap.width;
+    // Resolve the per-cell tile source once: Map.pickTile branched on it for
+    // every carved tile. The rng call sequence (and so the carved tiles) is
+    // unchanged.
+    let pick;
+    if (typeof tileId === 'function') {
+      pick = tileId;
+    } else if (Array.isArray(tileId)) {
+      pick = () => tileId[Math.floor((rng ? rng() : Math.random()) * tileId.length)] || tileId[0];
+    } else {
+      pick = () => tileId;
+    }
     for (let row = y; row < y + height; row += 1) {
+      let index = (row * mapWidth) + x;
       for (let col = x; col < x + width; col += 1) {
-        const index = (row * surfaceMap.width) + col;
-        background[index] = Map.pickTile(tileId, rng);
+        background[index] = pick();
         foreground[index] = 0;
+        index += 1;
       }
+    }
+    if (bounds) {
+      recordCarveSpan(bounds, x, y, x + width - 1, y + height - 1);
     }
   }
 
-  static carveCorridor(background, foreground, from, to, corridorWidth, tileId, rng) {
+  static carveCorridor(background, foreground, from, to, corridorWidth, tileId, rng, bounds) {
+    const mapWidth = surfaceMap.width;
+    const mapHeight = surfaceMap.height;
     const minX = Math.min(from.x, to.x);
     const maxX = Math.max(from.x, to.x);
     const minY = Math.min(from.y, to.y);
     const maxY = Math.max(from.y, to.y);
+    const halfWidth = Math.floor(corridorWidth / 2);
+    // Same per-cell source hoist as carveRoom; cell visit order and rng
+    // consumption are unchanged.
+    let pick;
+    if (typeof tileId === 'function') {
+      pick = tileId;
+    } else if (Array.isArray(tileId)) {
+      pick = () => tileId[Math.floor((rng ? rng() : Math.random()) * tileId.length)] || tileId[0];
+    } else {
+      pick = () => tileId;
+    }
 
     const carveColumn = (xCoord) => {
       for (let row = minY; row <= maxY; row += 1) {
-        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+        for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
           const col = xCoord + offset;
-          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+          if (col < 0 || col >= mapWidth || row < 0 || row >= mapHeight) {
             continue;
           }
 
-          const index = (row * surfaceMap.width) + col;
-          background[index] = Map.pickTile(tileId, rng);
+          const index = (row * mapWidth) + col;
+          background[index] = pick();
           foreground[index] = 0;
         }
       }
@@ -356,14 +582,14 @@ class Map {
 
     const carveRow = (yCoord) => {
       for (let col = minX; col <= maxX; col += 1) {
-        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+        for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
           const row = yCoord + offset;
-          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+          if (col < 0 || col >= mapWidth || row < 0 || row >= mapHeight) {
             continue;
           }
 
-          const index = (row * surfaceMap.width) + col;
-          background[index] = Map.pickTile(tileId, rng);
+          const index = (row * mapWidth) + col;
+          background[index] = pick();
           foreground[index] = 0;
         }
       }
@@ -371,6 +597,11 @@ class Map {
 
     carveRow(from.y);
     carveColumn(to.x);
+
+    if (bounds) {
+      recordCarveSpan(bounds, minX, from.y - halfWidth, maxX, from.y + halfWidth);
+      recordCarveSpan(bounds, to.x - halfWidth, minY, to.x + halfWidth, maxY);
+    }
   }
 
   /**
@@ -391,32 +622,75 @@ class Map {
     denseDecor,
     roomRects,
     carvedRooms,
+    carveBounds = null,
   }) {
     const idx = (x, y) => (y * width) + x;
+    // Set membership instead of wallPool.includes(): the wall pass probes
+    // this for every candidate cell and a linear scan per probe dominated
+    // generation time. Same membership, same result.
+    const wallSet = new Set(wallPool);
+    const isFloorTile = tile => tile !== wallFill && !wallSet.has(tile);
     const isFloor = (x, y) => {
       if (x < 0 || y < 0 || x >= width || y >= height) {
         return false;
       }
-      const tile = background[idx(x, y)];
-      return tile !== wallFill && !wallPool.includes(tile);
+      return isFloorTile(background[idx(x, y)]);
     };
 
     // Wall pass: any solid cell touching open space gets a varied wall face.
+    // Only wall cells within one tile of carved floor can qualify, and the
+    // carve step records the exact per-row span of every background write, so
+    // this scans just that dilated region in the same row-major order a full
+    // grid sweep would visit qualifying cells: identical visits, identical
+    // rng consumption, a fraction of the work. Callers that pass no carve
+    // bounds fall back to the full sweep.
+    const spanRowMin = carveBounds ? carveBounds.rowMin : null;
+    const spanRowMax = carveBounds ? carveBounds.rowMax : null;
     for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        if (background[idx(x, y)] !== wallFill) {
+      let spanMin = 0;
+      let spanMax = width - 1;
+      if (spanRowMin && spanRowMax) {
+        spanMin = Infinity;
+        spanMax = -1;
+        const firstRow = Math.max(0, y - 1);
+        const lastRow = Math.min(height - 1, y + 1);
+        for (let row = firstRow; row <= lastRow; row += 1) {
+          if (spanRowMin[row] < spanMin) spanMin = spanRowMin[row];
+          if (spanRowMax[row] > spanMax) spanMax = spanRowMax[row];
+        }
+        if (spanMax < 0) {
           continue;
         }
+        spanMin = Math.max(0, spanMin - 1);
+        spanMax = Math.min(width - 1, spanMax + 1);
+      }
+      const rowBase = y * width;
+      const rowAbove = y > 0 ? rowBase - width : -1;
+      const rowBelow = y < height - 1 ? rowBase + width : -1;
+      for (let x = spanMin; x <= spanMax; x += 1) {
+        const index = rowBase + x;
+        if (background[index] !== wallFill) {
+          continue;
+        }
+        const hasLeft = x > 0;
+        const hasRight = x < width - 1;
         let touchesFloor = false;
-        for (let dy = -1; dy <= 1 && !touchesFloor; dy += 1) {
-          for (let dx = -1; dx <= 1 && !touchesFloor; dx += 1) {
-            if ((dx || dy) && isFloor(x + dx, y + dy)) {
-              touchesFloor = true;
-            }
-          }
+        if (rowAbove >= 0) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowAbove + x - 1]))
+            || isFloorTile(background[rowAbove + x])
+            || (hasRight && isFloorTile(background[rowAbove + x + 1]));
+        }
+        if (!touchesFloor) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowBase + x - 1]))
+            || (hasRight && isFloorTile(background[rowBase + x + 1]));
+        }
+        if (!touchesFloor && rowBelow >= 0) {
+          touchesFloor = (hasLeft && isFloorTile(background[rowBelow + x - 1]))
+            || isFloorTile(background[rowBelow + x])
+            || (hasRight && isFloorTile(background[rowBelow + x + 1]));
         }
         if (touchesFloor && wallPool.length > 1) {
-          background[idx(x, y)] = wallPool[Math.floor(rng() * wallPool.length)];
+          background[index] = wallPool[Math.floor(rng() * wallPool.length)];
         }
       }
     }
@@ -540,6 +814,21 @@ class Map {
     const baseSeed = Map.normaliseSeed(options.seed);
     const seed = Map.normaliseSeed(baseSeed + ((depth - 1) * 7919));
 
+    const cacheKey = JSON.stringify([
+      seed,
+      baseSeed,
+      template,
+      baseThemeName,
+      themeName,
+      layoutId,
+      options.rooms || null,
+      options.corridorWidth || null,
+    ]);
+    const cachedGeneration = readCachedGeneration(cacheKey);
+    if (cachedGeneration) {
+      return cachedGeneration;
+    }
+
     const width = surfaceMap.width || config.map.size.x;
     const height = surfaceMap.height || config.map.size.y;
     const rng = Map.createSeededGenerator(seed);
@@ -566,6 +855,10 @@ class Map {
     const carvedRooms = [];
     const roomRects = [];
     const anchorOf = [];
+    // Tracks exactly where carving writes, so decorateInstance's wall pass
+    // only scans the carved region instead of the full 200x200 grid (see
+    // createCarveBounds).
+    const carveBounds = createCarveBounds(width, height);
 
     // A central band keeps the whole floor compact — corridors are short because
     // every room is placed within a few tiles of a room already down. A gauntlet
@@ -613,7 +906,7 @@ class Map {
       originX = clampV(originX, Math.max(1, bandMinX), Math.min(width - roomWidth - 1, bandMaxX));
       originY = clampV(originY, Math.max(1, bandMinY), Math.min(height - roomHeight - 1, bandMaxY));
 
-      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng);
+      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, floorPicker, rng, carveBounds);
 
       const center = {
         x: Math.floor(originX + (roomWidth / 2)),
@@ -643,6 +936,7 @@ class Map {
           corridorWidth,
           floorPicker,
           rng,
+          carveBounds,
         );
       }
 
@@ -659,6 +953,7 @@ class Map {
           corridorWidth,
           floorPicker,
           rng,
+          carveBounds,
         );
       }
     }
@@ -677,6 +972,7 @@ class Map {
       denseDecor: recipe.open,
       roomRects,
       carvedRooms,
+      carveBounds,
     });
 
     // Guarantee connectivity: decor, water, or clamped overlaps can block a
@@ -685,23 +981,15 @@ class Map {
     // treasure, or the stairs down can end up sealed off.
     if (carvedRooms.length > 1) {
       const cIdx = (x, y) => (y * width) + x;
-      const inBounds = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
-      const walkAt = (x, y) => {
-        if (!inBounds(x, y)) {
-          return false;
-        }
-        const bgOk = UI.tileWalkable(background[cIdx(x, y)] - 1);
-        const fgGid = foreground[cIdx(x, y)];
-        return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
-      };
       const clearTile = (x, y) => {
-        if (!inBounds(x, y)) {
+        if (x < 0 || y < 0 || x >= width || y >= height) {
           return;
         }
-        background[cIdx(x, y)] = floorPicker();
-        const fgGid = foreground[cIdx(x, y)];
+        const index = cIdx(x, y);
+        background[index] = floorPicker();
+        const fgGid = foreground[index];
         if (fgGid && !UI.tileWalkable(fgGid - 1, 'foreground')) {
-          foreground[cIdx(x, y)] = 0;
+          foreground[index] = 0;
         }
       };
       const carveClearLine = (a, b) => {
@@ -720,27 +1008,52 @@ class Map {
         clearTile(b.x, b.y);
         clearTile(b.x + 1, b.y);
       };
+      // Typed-array flood fill: the reachable set is identical to the
+      // previous Set + {x, y} queue version, without allocating two objects
+      // per visited cell. Neighbour bounds are checked arithmetically, which
+      // matches the old inBounds gate exactly, and the walkable test is the
+      // same UI.tileWalkable result via generatedTileWalkable.
+      const seen = new Uint8Array(width * height);
+      const queue = new Int32Array(width * height);
       const floodFrom = (start) => {
-        const seen = new Set([cIdx(start.x, start.y)]);
-        const queue = [start];
-        while (queue.length) {
-          const cur = queue.pop();
-          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-            const nx = cur.x + dx;
-            const ny = cur.y + dy;
-            const ni = cIdx(nx, ny);
-            if (!seen.has(ni) && walkAt(nx, ny)) {
-              seen.add(ni);
-              queue.push({ x: nx, y: ny });
-            }
-          });
+        seen.fill(0);
+        let head = 0;
+        let tail = 0;
+        const startIndex = cIdx(start.x, start.y);
+        seen[startIndex] = 1;
+        queue[tail] = startIndex;
+        tail += 1;
+        const visit = (ni) => {
+          if (!seen[ni] && generatedTileWalkable(background, foreground, ni)) {
+            seen[ni] = 1;
+            queue[tail] = ni;
+            tail += 1;
+          }
+        };
+        while (head < tail) {
+          const current = queue[head];
+          head += 1;
+          const currentX = current % width;
+          const currentY = Math.floor(current / width);
+          if (currentX + 1 < width) {
+            visit(current + 1);
+          }
+          if (currentX > 0) {
+            visit(current - 1);
+          }
+          if (currentY + 1 < height) {
+            visit(current + width);
+          }
+          if (currentY > 0) {
+            visit(current - width);
+          }
         }
         return seen;
       };
       const start = carvedRooms[0];
       for (let pass = 0; pass < carvedRooms.length; pass += 1) {
-        const seen = floodFrom(start);
-        const unreached = carvedRooms.filter(room => !seen.has(cIdx(room.x, room.y)));
+        const reached = floodFrom(start);
+        const unreached = carvedRooms.filter(room => !reached[cIdx(room.x, room.y)]);
         if (!unreached.length) {
           break;
         }
@@ -748,7 +1061,7 @@ class Map {
         let nearest = start;
         let bestDistance = Infinity;
         carvedRooms.forEach((room) => {
-          if (!seen.has(cIdx(room.x, room.y))) {
+          if (!reached[cIdx(room.x, room.y)]) {
             return;
           }
           const distance = Math.abs(room.x - target.x) + Math.abs(room.y - target.y);
@@ -764,26 +1077,28 @@ class Map {
     const depthLevelBonus = (depth - 1) * 2;
     const depthRewardMultiplier = 1 + ((depth - 1) * 0.35);
     const themeMonsters = THEME_MONSTERS[themeName] || THEME_MONSTERS.stone;
+    const themeMonsterColumns = THEME_MONSTER_COLUMNS[themeName] || THEME_MONSTER_COLUMNS.stone;
 
     // A mid room (never the entry or the exit) holds the floor's treasure
     const treasureRoomIndex = carvedRooms.length >= 4
       ? 1 + Math.floor(rng() * (carvedRooms.length - 2))
       : -1;
 
-    const roleCycle = ['melee', 'ranged', 'support'];
+    const roleCycle = THEME_ROLE_CYCLES[themeName] || THEME_ROLE_CYCLES.stone;
     const buildMonsterDefinition = ({
       center, index, role, rarity, name, levelBonus = 0, rewardMultiplier = 1,
       healthMultiplier = 0.13, damageMultiplier = 0.35, graphicRole = role,
     }) => {
+      const monsterLevel = Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus;
       const behaviour = {
         type: role,
-        aggressionRange: role === 'support' ? 6 : 8,
+        aggressionRange: ['support', 'buffer'].includes(role) ? 6 : 8,
         pursuitRange: role === 'melee' ? 9 : 11,
         patrolRadius: 4,
         attack: {
           intervalMs: role === 'melee' ? 1500 : 1900,
           windupMs: role === 'melee' ? 320 : 480,
-          damageMultiplier: role === 'support' ? 0.85 : 1.1,
+          damageMultiplier: ['support', 'buffer'].includes(role) ? 0.85 : 1.1,
           range: role === 'melee' ? 1 : 5,
           minimumRange: role === 'support' ? 2 : 1,
         },
@@ -800,7 +1115,27 @@ class Map {
         };
       }
 
+      if (role === 'buffer') {
+        behaviour.aura = {
+          radius: 6,
+          damageMultiplier: 1.12,
+          intervalMs: 1500,
+          durationMs: 2200,
+        };
+      }
+
       const archetype = role === 'melee' ? 'brute' : 'mystic';
+
+      const rareModifier = rarity === 'rare'
+        ? RARE_MODIFIERS[(seed + index) % RARE_MODIFIERS.length]
+        : null;
+      if (rareModifier?.attackIntervalMultiplier) {
+        behaviour.attack.intervalMs = Math.round(
+          behaviour.attack.intervalMs * rareModifier.attackIntervalMultiplier,
+        );
+      }
+      const modifiedHealth = healthMultiplier * (rareModifier?.healthMultiplier || 1);
+      const rareRewardMultiplier = rareModifier ? 1.35 : 1;
 
       return {
         id: `instance-${seed}-${index}`,
@@ -809,13 +1144,14 @@ class Map {
         // Floor-1 trash tracks a fresh character (level 1-3); depth and role
         // bonuses layer on top. Bosses take an explicit levelBonus. Scaling is
         // gentle so a floor is uniformly mow-through rather than spiking late.
-        level: Math.max(1, Math.floor(1 + (index * 0.14))) + depthLevelBonus + levelBonus,
+        level: monsterLevel,
         archetype,
         rarity,
         graphic: instanceMonsterGraphic(themeName, graphicRole),
         // Squishy trash so packs can be mown through; bosses pass 1.0.
-        healthMultiplier,
+        healthMultiplier: modifiedHealth,
         damageMultiplier,
+        modifiers: rareModifier ? [{ id: rareModifier.id, label: rareModifier.label }] : [],
         spawn: {
           x: center.x,
           y: center.y,
@@ -823,8 +1159,13 @@ class Map {
         },
         behaviour,
         rewards: {
-          experience: Math.round((30 + (index * 18)) * depthRewardMultiplier * rewardMultiplier),
-          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier),
+          // Reward the threat, not the creature's spawn order. The old global
+          // index term made a floor's XP grow quadratically: clearing an
+          // ordinary 40-monster first floor jumped a scion to level 33-36.
+          // Six ordinary opening kills must still cross the level-2 threshold
+          // so the fight -> point -> tree loop starts promptly.
+          experience: Math.round((12 + monsterLevel) * depthRewardMultiplier * rewardMultiplier * rareRewardMultiplier),
+          coins: Math.round((60 + (index * 20)) * depthRewardMultiplier * rewardMultiplier * rareRewardMultiplier),
         },
         respawn: {
           delayMs: 600000,
@@ -834,7 +1175,8 @@ class Map {
 
     const rollRarity = () => {
       const roll = rng();
-      if (roll < 0.12) {
+      const rareThreshold = Math.min(0.3, 0.12 + ((depth - 1) * 0.02));
+      if (roll < rareThreshold) {
         return 'rare';
       }
       if (roll < 0.4) {
@@ -846,6 +1188,7 @@ class Map {
     const instanceMonsters = [];
     let monsterIndex = 0;
     const exitRoomIndex = carvedRooms.length - 1;
+    const entry = carvedRooms[0];
 
     // A monster may only spawn on an open tile (not a wall, tree, or water),
     // so spread packs across a clearing safely: spiral out from the desired
@@ -855,9 +1198,13 @@ class Map {
       if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) {
         return false;
       }
-      const bgOk = UI.tileWalkable(background[monIdx(x, y)] - 1);
-      const fgGid = foreground[monIdx(x, y)];
-      return bgOk && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+      // Keep the landing room readable and fair even when procedural rooms
+      // overlap. Skipping room zero alone was insufficient: packs belonging
+      // to a neighbouring room could still be placed beside the stairs.
+      if (Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= INSTANCE_SPAWN_SAFE_RADIUS) {
+        return false;
+      }
+      return generatedTileWalkable(background, foreground, monIdx(x, y));
     };
     const findSpawn = (cx, cy, wantX, wantY) => {
       if (isSpawnable(wantX, wantY)) {
@@ -872,6 +1219,16 @@ class Map {
           }
         }
       }
+      // A heavily overlapping layout may have no safe tile in the local
+      // room. Fall back to the nearest room centre, then any safe floor tile,
+      // instead of silently putting the monster back in the landing zone.
+      const roomFallback = carvedRooms.find(room => isSpawnable(room.x, room.y));
+      if (roomFallback) return { x: roomFallback.x, y: roomFallback.y };
+      for (let y = 1; y < height - 1; y += 1) {
+        for (let x = 1; x < width - 1; x += 1) {
+          if (isSpawnable(x, y)) return { x, y };
+        }
+      }
       return { x: cx, y: cy };
     };
 
@@ -884,7 +1241,7 @@ class Map {
         // The stairs down are guarded by the floor boss — a real damage sponge
         // that hits hard, unlike the trash (full health, near-full damage).
         instanceMonsters.push(buildMonsterDefinition({
-          center,
+          center: findSpawn(center.x, center.y, center.x, center.y),
           index: monsterIndex,
           role: 'melee',
           rarity: 'elite',
@@ -897,6 +1254,14 @@ class Map {
           // boss without three-tapping fresh characters.
           damageMultiplier: 0.5,
         }));
+        const boss = instanceMonsters[instanceMonsters.length - 1];
+        boss.behaviour.attack = {
+          ...boss.behaviour.attack,
+          skillId: 'boss:ground-slam',
+          skillName: 'Ground Slam',
+          radius: 2.5,
+          windupMs: 1000,
+        };
         monsterIndex += 1;
         return;
       }
@@ -932,7 +1297,7 @@ class Map {
           index: monsterIndex,
           role: isTreasureGuard ? 'melee' : role,
           rarity: isTreasureGuard ? 'rare' : rollRarity(),
-          name: themeMonsters[isTreasureGuard ? 'melee' : role],
+          name: themeMonsters[isTreasureGuard ? 'melee' : role] || themeMonsters.support,
           rewardMultiplier: isTreasureGuard ? 1.5 : 1,
           // Trash is squishy so a pack can be mown through before it focus-
           // fires the player down; treasure guards are a step tankier.
@@ -945,16 +1310,13 @@ class Map {
 
     // Players spawn on the walkable tiles around the entry stairs,
     // never on the stairs themselves (stepping on them transitions).
-    const entry = carvedRooms[0];
     const exit = carvedRooms.length > 1 ? carvedRooms[carvedRooms.length - 1] : null;
     const idx = (x, y) => (y * width) + x;
     const tileIsOpen = (x, y) => {
       if (x < 0 || y < 0 || x >= width || y >= height) {
         return false;
       }
-      const bgWalkable = UI.tileWalkable(background[idx(x, y)] - 1);
-      const fgGid = foreground[idx(x, y)];
-      return bgWalkable && (!fgGid || UI.tileWalkable(fgGid - 1, 'foreground'));
+      return generatedTileWalkable(background, foreground, idx(x, y));
     };
 
     // Scatter the treasure hoard on open tiles around the room centre
@@ -978,7 +1340,10 @@ class Map {
 
         const gearPool = gearPoolForDepth(depth);
         const gearId = gearPool[Math.floor(rng() * gearPool.length)];
-        const gear = ItemFactory.createById(gearId, { rng });
+        const gear = ItemFactory.createById(gearId, {
+          rng,
+          itemLevel: instanceItemLevelForDepth(depth),
+        });
         if (gear && treasureSpots.length > 1) {
           instanceItems.push(ItemFactory.toWorldInstance(gear, treasureSpots[1]));
         }
@@ -996,7 +1361,7 @@ class Map {
       spawnPoints.push({ ...entry });
     }
 
-    return {
+    const generation = {
       map: {
         background,
         foreground,
@@ -1017,7 +1382,9 @@ class Map {
           coinsPerPlayer: Math.round((120 + (instanceMonsters.length * 20)) * depthRewardMultiplier),
           experience: {
             skill: 'attack',
-            amount: Math.round((40 + (instanceMonsters.length * 10)) * depthRewardMultiplier),
+            // Completion is a satisfying bump, not a second floor's worth of
+            // XP. Most progression already came from the monsters themselves.
+            amount: Math.round((40 + Math.floor(instanceMonsters.length / 3)) * depthRewardMultiplier),
           },
         },
       },
@@ -1030,6 +1397,8 @@ class Map {
       npcs: [],
       monsters: instanceMonsters,
     };
+    cacheGeneration(cacheKey, generation);
+    return generation;
   }
 
   /**
@@ -1049,8 +1418,10 @@ class Map {
    * @param {integer} x The x-axis coord on where user clicked on game-gap
    * @param {integer} y The y-axis coord on where user clicked on game-gap
    */
-  static findQuickestPath(x, y, playerIndex, { stopAdjacent = false } = {}) {
-    const player = world.players[playerIndex];
+  static findQuickestPath(x, y, playerReference, { stopAdjacent = false } = {}) {
+    const player = playerReference && typeof playerReference === 'object'
+      ? playerReference
+      : world.players[playerReference];
     return new Promise((resolve) => {
       if (!player || !player.path || !player.path.grid) {
         resolve([]);
@@ -1120,10 +1491,9 @@ class Map {
    * @param {integer} y The y-axis coord on where user clicked on game-gap
    */
   static async findPath(uuidPath, x, y, location) {
-    const playerIndex = world.players.findIndex(p => p.uuid === uuidPath);
-    if (playerIndex === -1) return;
-
-    const pathingPlayer = world.players[playerIndex];
+    const pathingPlayer = world.players.find(p => p.uuid === uuidPath);
+    if (!pathingPlayer) return;
+    const sessionSocketId = pathingPlayer.socket_id;
     if (pathingPlayer.stats
       && pathingPlayer.stats.resources
       && pathingPlayer.stats.resources.health
@@ -1132,28 +1502,37 @@ class Map {
       return;
     }
 
-    if (world.players[playerIndex].moving) {
-      world.players[playerIndex].path.current.interrupted = true;
+    if (pathingPlayer.moving) {
+      pathingPlayer.path.current.interrupted = true;
     }
 
     // The player's x-y on map (always 7,5)
     // to where they clicked on the map
-    const path = await Map.findQuickestPath(x, y, playerIndex, {
+    const path = await Map.findQuickestPath(x, y, pathingPlayer, {
       stopAdjacent: location === 'edge',
     });
+
+    // Pathfinding is async. If this character reconnected while it was
+    // running, the old session must not mutate or drive the replacement.
+    const livePlayer = world.players.find(player => (
+      player.uuid === uuidPath && player.socket_id === sessionSocketId
+    ));
+    if (livePlayer !== pathingPlayer) {
+      return;
+    }
 
     // Since we are performing an action on a resource or tile,
     // let's end the path one step so we don't step on it.
     // (For example, mining block, tree, door, etc.)
     // If the tile we clicked on
     // can be walked on, continue ->
-    if (world.players[playerIndex].path.current.walkable && path.length && path.length >= 1) {
-      world.players[playerIndex].path.current.path.walking = path;
-      world.players[playerIndex].path.current.step = 0;
-      world.players[playerIndex].path.current.interrupted = false;
+    if (pathingPlayer.path.current.walkable && path.length && path.length >= 1) {
+      pathingPlayer.path.current.path.walking = path;
+      pathingPlayer.path.current.step = 0;
+      pathingPlayer.path.current.interrupted = false;
 
       // We start moving the player along their path
-      world.players[playerIndex].walkPath(playerIndex);
+      pathingPlayer.walkPath();
     }
   }
 
@@ -1199,6 +1578,20 @@ class Map {
 
     // Load shops
     world.shops = Shop.load();
+
+    // Floor samples make the traders legible at a glance. They use the
+    // normal world-item renderer, but are marked as displays so interaction
+    // opens the owning shop instead of taking the sample for free.
+    const shopDisplays = world.shops.flatMap(shop => shop.displays.map((display) => {
+      const item = ItemFactory.createById(display.item);
+      if (!item) return null;
+      const worldItem = ItemFactory.toWorldInstance(item, { x: display.x, y: display.y });
+      worldItem.shopDisplay = true;
+      worldItem.shopNpcId = shop.npcId;
+      worldItem.timestamp = Date.now();
+      return worldItem;
+    })).filter(Boolean);
+    world.items.push(...shopDisplays);
 
     // Add a timestamp to all dropped items
     world.items = world.items.map((i) => {
@@ -1260,7 +1653,8 @@ class Map {
    * @param {object} player The player asking
    */
   static getMatrix(player, options = {}) {
-    const { x, y } = player;
+    const x = Math.round(player.x);
+    const y = Math.round(player.y);
     const { size } = config.map;
     const defaultViewport = player.path && player.path.viewport
       ? player.path.viewport
@@ -1272,14 +1666,14 @@ class Map {
         x: Math.max(
           0,
           Math.min(
-            typeof requestedViewport.x === 'number' ? requestedViewport.x : defaultViewport.x,
+            Math.round(typeof requestedViewport.x === 'number' ? requestedViewport.x : defaultViewport.x),
             size.x - 1,
           ),
         ),
         y: Math.max(
           0,
           Math.min(
-            typeof requestedViewport.y === 'number' ? requestedViewport.y : defaultViewport.y,
+            Math.round(typeof requestedViewport.y === 'number' ? requestedViewport.y : defaultViewport.y),
             size.y - 1,
           ),
         ),
@@ -1288,10 +1682,10 @@ class Map {
       const requestedCenter = options.center || null;
       const center = {
         x: requestedCenter && typeof requestedCenter.x === 'number'
-          ? requestedCenter.x
+          ? Math.round(requestedCenter.x)
           : Math.floor(viewport.x / 2),
         y: requestedCenter && typeof requestedCenter.y === 'number'
-          ? requestedCenter.y
+          ? Math.round(requestedCenter.y)
           : Math.floor(viewport.y / 2),
       };
 

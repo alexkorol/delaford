@@ -1,35 +1,44 @@
 /**
- * Continuity: instance zones have PHYSICAL gates in the world, not just a
- * menu (playtest feedback: "going into a random dungeon is through... a
- * drop down menu? where's the continuity?"). Step on a gate, arrive in the
- * generated zone.
+ * Continuity: the ways out of the Crossroads are PHYSICAL gates in the
+ * world. Each of the four road gates opens that road's Wayfinder's Chart
+ * (travel happens from the chart — see world-web.mjs for the full loop).
  */
-const GATES = [
-  { sceneId: 'zone:old-wood', x: 96, y: 139, template: 'grove', layout: 'clearings' },
-  { sceneId: 'zone:old-wood', x: 112, y: 142, template: 'dungeon', layout: 'warren' },
-  { sceneId: 'zone:fenmire', x: 60, y: 116, template: 'marsh', layout: 'clearings' },
-  { sceneId: 'zone:saint-aldrics-graveyard', x: 88, y: 44, template: 'crypt', layout: 'warren' },
+const ROAD_GATES = [
+  { x: 38, y: 94, roadId: 'tin' },
+  { x: 64, y: 115, roadId: 'salt' },
+  { x: 38, y: 138, roadId: 'chalk' },
+  { x: 12, y: 115, roadId: 'copper' },
 ];
 
 export default async function gates({ connect, assert }) {
-   
-  for (const gate of GATES) {
-    const p = await connect();
-    try {
-      const before = p.sceneTransitions || 0;
+  const p = await connect({
+    guestId: `playtest-gates-${Date.now()}`,
+    houseName: 'House Gateward',
+    scionName: 'Gate Testborn',
+  });
+  try {
+    for (const gate of ROAD_GATES) {
+      const screensBefore = p.screens.length;
       // Teleporting ONTO the gate tile triggers the portal, like stepping on it.
-      p.devTeleport(gate.x, gate.y, gate.sceneId);
-      await p.waitFor(() => (p.sceneTransitions || 0) > before, {
-        timeoutMs: 10000,
-        label: `gate to ${gate.template}/${gate.layout}`,
-      });
-      const s = await p.state();
-      assert(s.sceneType === 'instance', `${gate.template}: gate leads into an instance`);
-      assert(s.sceneMetadata.layout === gate.layout, `${gate.template}: layout ${s.sceneMetadata.layout}`);
-    } finally {
-      p.close();
+      p.devTeleport(gate.x, gate.y);
+      const chart = await p.waitFor(() => {
+        const opened = p.screens.slice(screensBefore).find(screen => screen.screen === 'chart');
+        return opened ? opened.payload : false;
+      }, { timeoutMs: 8000, label: `road gate ${gate.roadId}` });
+
+      assert(chart.roadId === gate.roadId, `${gate.roadId}: gate opens its own chart`);
+      assert(chart.nodes.length >= 1, `${gate.roadId}: the chart has a first stage`);
+      assert(chart.nodes.find(node => node.tier === 1)?.status === 'open',
+        `${gate.roadId}: tier 1 is charted from the start`);
+
+      const home = await p.state();
+      assert(home.sceneType === 'town', `${gate.roadId}: reading the chart does not move you`);
+
+      // Step off the gate so the next teleport re-triggers cleanly.
+      p.devTeleport(42, 115);
+      await p.waitFor(async () => (await p.state()).x === 42, { label: 'return to the plaza' });
     }
-    await new Promise(resolve => { setTimeout(resolve, 700); });
+  } finally {
+    p.close();
   }
-   
 }

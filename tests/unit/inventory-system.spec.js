@@ -9,6 +9,7 @@ import { applyStacking, canStackWith, isStackableItem } from '@/core/inventory/s
 import { canEquipInventoryItemToSlot } from '@/stores/inventory.js';
 import { DEFAULT_GRID, ORIENTATION_DEFAULT, ORIENTATION_ROTATED } from '@/core/inventory/constants.js';
 import { canPlaceInventoryItem, packInventoryItems, resolveItemSize } from '@shared/inventory-footprints.js';
+import { wearableItems } from '@server/core/data/items/index.js';
 
 const mockItem = (overrides = {}) => ({
   id: 'mock-item',
@@ -69,6 +70,46 @@ describe('inventory normalisation', () => {
     expect(resolveItemSize({ id: 'bronze-armor', slot: 'armor', type: 'armor' })).toEqual({ width: 2, height: 3 });
   });
 
+  it('keeps every helm, glove, and boot at a 2x2 footprint', () => {
+    const squareArmorSlots = new Set(['head', 'gloves', 'feet']);
+    const squareArmor = wearableItems.filter(item => squareArmorSlots.has(item.slot));
+
+    expect(squareArmor.length).toBeGreaterThan(0);
+    squareArmor.forEach((item) => {
+      expect(resolveItemSize(item), item.id).toEqual({ width: 2, height: 2 });
+    });
+
+    expect(resolveItemSize({
+      id: 'legacy-boots',
+      slot: 7,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    })).toEqual({ width: 2, height: 2 });
+
+    const normalisedLegacyBoots = normaliseInventoryItem({
+      id: 'legacy-boots',
+      uuid: 'legacy-boots-1',
+      slot: 7,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    }, DEFAULT_GRID);
+    expect(normalisedLegacyBoots.baseSize).toEqual({ width: 2, height: 2 });
+  });
+
+  it('repacks legacy small armor records as 2x2 items', () => {
+    const [boots] = packInventoryItems([{
+      id: 'legacy-boots',
+      slot: 0,
+      equipSlot: 'feet',
+      type: 'armor',
+      size: { width: 2, height: 1 },
+    }], DEFAULT_GRID);
+
+    expect(boots.size).toEqual({ width: 2, height: 2 });
+  });
+
   it('enriches bare server inventory records from the client item catalogue for paperdoll drops', () => {
     globalThis.window = {
       allItems: [{
@@ -114,15 +155,20 @@ describe('inventory normalisation', () => {
     expect(canEquipInventoryItemToSlot(normalised, 'right_hand')).toBe(true);
   });
 
-  it('packs legacy slot-only items around larger footprints', () => {
+  it('keeps carried gold outside backpack footprints', () => {
     const packed = packInventoryItems([
       { id: 'iron-halberd', slot: 0, type: 'weapon', twoHanded: true },
       { id: 'coins', slot: 1, stackable: true, qty: 10 },
     ], DEFAULT_GRID);
 
     expect(packed[0].position).toEqual({ x: 0, y: 0 });
-    expect(packed[1].slot).toBe(2);
-    expect(packed[1].position).toEqual({ x: 2, y: 0 });
+    expect(packed[1].slot).toBeNull();
+    expect(packed[1].position).toBeNull();
+    expect(canPlaceInventoryItem(packed, {
+      id: 'small-item',
+      uuid: 'small-item',
+      size: { width: 1, height: 1 },
+    }, { x: 2, y: 0 }).valid).toBe(true);
   });
 });
 

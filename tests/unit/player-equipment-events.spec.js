@@ -1,4 +1,5 @@
 import {
+  afterEach,
   describe,
   expect,
   it,
@@ -25,6 +26,39 @@ describe('player equipment event handlers', () => {
         },
       },
     },
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('never adds the local player projection to the remote render list', () => {
+    vi.useFakeTimers();
+    const localPlayer = {
+      uuid: 'player-1',
+      socket_id: 'private-socket-id',
+      x: 10,
+      y: 10,
+    };
+    const context = {
+      game: {
+        player: localPlayer,
+        map: { players: [] },
+        updateActorAnimation: vi.fn(),
+      },
+    };
+
+    playerEvents['player:joined']({
+      data: [
+        // Public projections do not contain socket_id.
+        { uuid: 'player-1', x: 10, y: 10, wear: {} },
+        { uuid: 'player-2', x: 12, y: 10, wear: {} },
+      ],
+      meta: {},
+    }, context);
+    vi.runAllTimers();
+
+    expect(context.game.map.players.map(player => player.uuid)).toEqual(['player-2']);
   });
 
   it('applies refreshed stats and resources after equipping gear', () => {

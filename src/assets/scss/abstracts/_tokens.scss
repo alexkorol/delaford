@@ -1,23 +1,31 @@
 :root {
-  /* Retro stone / marble palette */
-  --color-bg-primary: #1e1a14;
-  --color-bg-surface: rgba(50, 44, 34, 0.96);
-  --color-bg-surface-muted: rgba(40, 35, 26, 0.94);
-  --color-border-subtle: rgba(160, 135, 95, 0.35);
-  --color-border-strong: rgba(190, 160, 110, 0.55);
-  --color-text-primary: #f0e6d2;
-  --color-text-secondary: rgba(220, 205, 180, 0.9);
-  --color-accent: #d4ad5a;
-  --color-accent-strong: #e8c76e;
-  --color-danger: #cc3a3a;
-  --color-success: #6a9e48;
+  /* Verdigris UI: blackened iron, worn brass, parchment, ruby and sapphire. */
+  --color-bg-primary: #090a0b;
+  --color-bg-deep: #050607;
+  --color-bg-surface: rgba(23, 22, 20, 0.98);
+  --color-bg-surface-raised: rgba(33, 30, 26, 0.98);
+  --color-bg-surface-muted: rgba(15, 16, 17, 0.97);
+  --color-bg-inset: rgba(6, 7, 8, 0.82);
+  --color-border-subtle: rgba(139, 113, 69, 0.34);
+  --color-border-strong: rgba(177, 143, 80, 0.68);
+  --color-text-primary: #eee2c5;
+  --color-text-secondary: #b6a98d;
+  --color-text-dim: #786f60;
+  --color-accent: #b7924f;
+  --color-accent-strong: #e1c174;
+  --color-accent-cool: #537a93;
+  --color-ruby: #8b3034;
+  --color-sapphire: #315b7a;
+  --color-danger: #b94845;
+  --color-success: #7da165;
 
-  /* Beveled border colors for skeuomorphic panels */
-  --color-bevel-light: rgba(210, 190, 150, 0.5);
-  --color-bevel-dark: rgba(0, 0, 0, 0.5);
-  --color-frame: #9e8462;
-  --color-frame-light: #d4ad5a;
-  --color-frame-dark: #4a3820;
+  /* Structural frame tones shared by every panel and control. */
+  --color-bevel-light: rgba(218, 184, 112, 0.42);
+  --color-bevel-dark: rgba(0, 0, 0, 0.82);
+  --color-frame: #785f36;
+  --color-frame-light: #b7924f;
+  --color-frame-dark: #261b10;
+  --color-frame-black: #0a0908;
 
   --font-size-base: clamp(14px, 1.1vw, 16px);
   --font-size-sm: clamp(12px, 1vw, 14px);
@@ -30,12 +38,23 @@
   --space-xl: clamp(20px, 1.4vw, 28px);
   --space-2xl: clamp(28px, 2vw, 40px);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
 
-  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.5);
-  --shadow-strong: 0 16px 40px rgba(0, 0, 0, 0.7);
+  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.62);
+  --shadow-strong: 0 18px 48px rgba(0, 0, 0, 0.82);
+  --shadow-inset: inset 0 0 22px rgba(0, 0, 0, 0.72);
+
+  --panel-surface:
+    radial-gradient(circle at 18% 0%, rgba(116, 34, 35, 0.1), transparent 30%),
+    radial-gradient(circle at 82% 0%, rgba(42, 76, 96, 0.09), transparent 26%),
+    linear-gradient(180deg, #1e1c19 0%, #111214 42%, #0a0b0c 100%);
+  --panel-header:
+    linear-gradient(90deg, rgba(106, 35, 37, 0.42), transparent 34%, rgba(34, 64, 82, 0.28)),
+    linear-gradient(180deg, #302b24 0%, #171716 58%, #0d0e0f 100%);
+  --control-surface: linear-gradient(180deg, #3b3429 0%, #211d18 48%, #121314 100%);
+  --control-surface-hover: linear-gradient(180deg, #5a482c 0%, #30271d 48%, #171617 100%);
 }
 
 body {

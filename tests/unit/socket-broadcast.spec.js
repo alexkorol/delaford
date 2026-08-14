@@ -75,4 +75,16 @@ describe('Socket.broadcast', () => {
 
     expect(world.clients).toEqual([targetedClient, ignoredClient]);
   });
+
+  it('contains send races instead of crashing the server', () => {
+    const racingClient = createClient({ id: 'racing', readyState: 1 });
+    racingClient.send.mockImplementation(() => {
+      throw new Error('socket closed during send');
+    });
+    world.clients = [racingClient];
+    world._players = [{ socket_id: 'racing' }];
+
+    expect(() => Socket.broadcast('game:update', { value: 1 }, world.players)).not.toThrow();
+    expect(world.clients).toEqual([]);
+  });
 });

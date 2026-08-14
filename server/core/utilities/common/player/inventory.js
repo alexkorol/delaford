@@ -4,7 +4,7 @@ import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import ItemFactory from '#server/core/items/factory.js';
 import { refreshVesselBlock } from '#server/core/items/vesselforge/adapter.js';
-import { packInventoryItems } from '#shared/inventory-footprints.js';
+import { packInventoryItems, positionFromSlot } from '#shared/inventory-footprints.js';
 
 const hydrateInventoryItem = (item = {}) => {
   if (!item || !item.id) {
@@ -42,9 +42,10 @@ const hydrateInventoryItem = (item = {}) => {
 };
 
 export default class Inventory {
-  constructor(slots, socketId) {
+  constructor(slots, socketId, playerUuid = null) {
     this.slots = packInventoryItems((slots || []).map(hydrateInventoryItem));
     this.socketId = socketId;
+    this.playerUuid = playerUuid;
     // Player constructs its inventory before Authentication adds it to the
     // world, so this cached index is initially -1 in real sessions. Resolve
     // ownership again whenever an item enters the backpack.
@@ -52,7 +53,10 @@ export default class Inventory {
   }
 
   getPlayer() {
-    this.playerIndex = world.players.findIndex(p => p.socket_id === this.socketId);
+    this.playerIndex = world.players.findIndex(p => (
+      (this.playerUuid && p.uuid === this.playerUuid)
+      || (this.socketId && p.socket_id === this.socketId)
+    ));
     return this.playerIndex === -1 ? null : world.players[this.playerIndex];
   }
 
@@ -83,7 +87,10 @@ export default class Inventory {
   add(itemId, qty = 1, options = {}) {
     // Return an explicit accounting result so reward callers can distinguish
     // inventory additions, merged currency, recoverable drops, and rejection.
-    return new Promise((resolve) => {
+    // Synchronous by design (await tolerates it): { ok, added, remainder }
+    // mirrors the wagon/pickup contract, while requested/stacked/dropped/
+    // rejected/inventoryItems/groundItems carry the full accounting.
+    {
       const baseItem = Query.getItemData(itemId) || { id: itemId };
       const stackable = !!baseItem.stackable;
       const quantity = Number.isFinite(qty) ? Math.max(1, Math.floor(qty)) : 1;
@@ -93,6 +100,7 @@ export default class Inventory {
         uuid: incomingUuid = null,
         rng,
         itemLevel,
+        overflow = 'drop',
       } = options;
       const player = this.getPlayer();
       const playerUuid = player ? player.uuid : null;
@@ -113,8 +121,9 @@ export default class Inventory {
           result.added = quantity;
           result.stacked = quantity;
           result.inventoryItems.push(existingStack);
-          resolve(result);
-          return;
+          result.ok = true;
+          result.remainder = 0;
+          return result;
         }
       }
 
@@ -145,7 +154,7 @@ export default class Inventory {
 
         const openSlot = UI.getOpenSlot(this.slots, 'inventory', instance);
         if (openSlot === false && openSlot !== 0) {
-          const dropped = this.dropOverflow(instance, player);
+          const dropped = overflow === 'drop' ? this.dropOverflow(instance, player) : null;
           if (dropped) {
             result.dropped += stackable ? quantity : 1;
             result.groundItems.push(dropped);
@@ -156,6 +165,7 @@ export default class Inventory {
         }
 
         instance.slot = openSlot;
+        instance.position = positionFromSlot(openSlot);
         instance.context = 'item';
 
         if (stackable) {
@@ -176,7 +186,9 @@ export default class Inventory {
         });
       }
 
-      resolve(result);
-    });
+      result.ok = result.rejected === 0 && result.dropped === 0 && result.added > 0;
+      result.remainder = Math.max(0, result.requested - result.added);
+      return result;
+    }
   }
 }

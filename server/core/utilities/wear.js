@@ -50,10 +50,15 @@ class Wear {
   }
 
   /**
-   * Update a player's combat attack and defense
+   * Rebuild combat totals from authoritative worn-item state. Accepting a
+   * player object lets the Player constructor restore persisted equipment
+   * before the actor has been inserted into world.players.
    */
-  static updateCombat(playerIndex) {
-    return this.calculateCombat(world.players[playerIndex] && world.players[playerIndex].wear);
+  static updateCombat(playerOrIndex) {
+    const player = Number.isInteger(playerOrIndex)
+      ? world.players[playerOrIndex]
+      : playerOrIndex;
+    return this.calculateCombat(player && player.wear);
   }
 
   static calculateCombat(wear = {}) {
@@ -76,8 +81,12 @@ class Wear {
       damageAgainstBeasts: 0,
     };
 
+    if (!wear || typeof wear !== 'object') {
+      return stats;
+    }
+
     // Go through each wear item and add up its value
-    Object.keys(wear || {}).forEach((key) => {
+    Object.keys(wear).forEach((key) => {
       const val = wear[key];
       if (val !== null && val.uuid && val.id) {
         const attack = this.getAttack(val);

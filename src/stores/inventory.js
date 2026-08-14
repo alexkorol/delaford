@@ -8,8 +8,14 @@ import { buildOccupancyMap, canPlaceItem, clampFootprintWithinGrid, getItemAtCel
 import { canStackWith, applyStacking } from '@/core/inventory/stacking.js';
 import { indexFromCoords } from '@/core/inventory/grid-math.js';
 import { packInventoryItems } from '@shared/inventory-footprints.js';
+import { canItemUseSlot } from '@shared/wear-slots.js';
 
 const cloneItems = (items) => items.map((item) => ({ ...item, position: { ...item.position } }));
+const isGold = item => item?.id === 'coins';
+
+const getGoldAmount = (items = []) => items
+  .filter(isGold)
+  .reduce((total, item) => total + Math.max(0, Number(item?.qty) || 0), 0);
 
 export const getItemEquipSlot = item => (
   item?.equipSlot
@@ -21,7 +27,9 @@ export const getItemEquipSlot = item => (
 
 export const canEquipInventoryItemToSlot = (item, slotId) => {
   const equipSlot = getItemEquipSlot(item);
-  return Boolean(equipSlot && slotId && equipSlot === slotId);
+  // Grouped slots (rings have two seats) mean the item's base slot can map to
+  // more than one physical seat, so match on the shared slot rules.
+  return Boolean(equipSlot && slotId && canItemUseSlot(equipSlot, slotId));
 };
 
 export const useInventoryStore = defineStore('inventoryGrid', () => {
@@ -29,6 +37,7 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
   const orientationMap = reactive(new Map());
   const state = reactive({
     items: [],
+    gold: 0,
     equipment: {},
     dragState: {
       activeItemId: null,
@@ -43,9 +52,11 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
   });
 
   const setInventoryItems = (rawItems = []) => {
+    const incomingItems = Array.isArray(rawItems) ? rawItems : [];
     const snapshot = new Map(orientationMap);
     orientationMap.clear();
-    const packedItems = packInventoryItems(rawItems, grid);
+    state.gold = getGoldAmount(incomingItems);
+    const packedItems = packInventoryItems(incomingItems.filter(item => !isGold(item)), grid);
     state.items = cloneItems(packedItems.map((item) => {
       const mapped = normaliseInventoryItem(item, grid, snapshot);
       orientationMap.set(mapped.uuid, mapped.orientation);
@@ -338,6 +349,7 @@ export const useInventoryStore = defineStore('inventoryGrid', () => {
     grid,
     state,
     items: computed(() => state.items),
+    gold: computed(() => state.gold),
     equipment: computed(() => state.equipment),
     isDragging,
     activeItem,

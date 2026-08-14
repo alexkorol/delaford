@@ -1,9 +1,11 @@
 .DS_Store
 node_modules
+node_modules_old/
 /dist
 /build
 
 # local env files
+.env
 .env.local
 .env.*.local
 
@@ -37,3 +39,7 @@ server/data/
 # Local guest/dev character saves (per-machine state)
 server/data/guest-saves/
 server/logs/
+
+# Browser test artifacts
+test-results/
+playwright-report/

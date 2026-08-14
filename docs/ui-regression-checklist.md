@@ -13,7 +13,7 @@
 ## Chat + Quickbar
 - With chat collapsed, send/receive a message; badge increments, preview updates, and `Show chat` opens the overlay without shifting the canvas.
 - Keep chat unpinned, interact, and verify it auto-collapses after ~8s of inactivity; pinning disables auto-hide.
-- Press numeric keys `1-8` while the canvas is focused; the matching quick slot highlights briefly and `bus` emits `quickbar:activate`.
+- Press numeric keys `1-8` while the canvas is focused; the matching quick slot highlights briefly and activates its assigned skill.
 - Hit `/` to open chat and focus the input, then `Esc` to collapse (when unpinned) without affecting panes.
 
 ## Responsive Behaviour

@@ -5,6 +5,13 @@ import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import { awardSkillExperience } from '#server/core/combat/experience.js';
 import { notifyProgression } from '#server/core/progression-events.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
+import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
+import {
+  notifyFirstGoalFloorCleared,
+  notifyFirstGoalReturned,
+} from '#server/core/first-goal.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 const INSTANCE_START_COOLDOWN_MS = Number(process.env.INSTANCE_START_COOLDOWN_MS) || 3000;
@@ -449,6 +456,17 @@ class PartyService {
       depth,
     };
     this.forEachMember(party, member => notifyProgression(member, 'delve', delveContext));
+    this.forEachMember(party, (member) => {
+      if (!member?.scionId || !member.accountId || !member.houseId) return;
+      const recorded = chroniclesRepository.recordDepth(
+        member.accountId,
+        member.houseId,
+        member.scionId,
+        depth,
+      );
+      if (recorded) member.bestDepth = Math.max(member.bestDepth || 0, recorded);
+    });
+    this.forEachMember(party, member => notifyTutorial(member, 'delve'));
 
     this.sendPartyUpdate(party);
     this.sendSceneTransition(party, scene);
@@ -585,13 +603,14 @@ class PartyService {
           return;
         }
 
-        if (stairsDown && player.x === stairsDown.x && player.y === stairsDown.y) {
+        const playerTile = occupiedTile(player);
+        if (stairsDown && playerTile.x === stairsDown.x && playerTile.y === stairsDown.y) {
           triggered = true;
           this.transitionFloor(party, depth + 1);
           return;
         }
 
-        if (stairsUp && player.x === stairsUp.x && player.y === stairsUp.y) {
+        if (stairsUp && playerTile.x === stairsUp.x && playerTile.y === stairsUp.y) {
           triggered = true;
           if (depth <= 1) {
             this.sendMessageToParty(party, 'The party returns to the surface.');
@@ -647,6 +666,7 @@ class PartyService {
       player.preInstancePosition = null;
 
       world.assignPlayerToScene(player, returnScene.id);
+      if (returnScene.type === 'town') notifyFirstGoalReturned(player);
       if (typeof player.cancelPathfinding === 'function') {
         player.cancelPathfinding();
       }
@@ -784,6 +804,11 @@ class PartyService {
     const completionMessage = options.message
       || `Floor ${depth} cleared! Rewards distributed — find the stairs to descend, or take the entry stairs to leave.`;
     this.sendInstanceComplete(party, rewards, completionMessage);
+    this.forEachMember(party, player => notifyFirstGoalFloorCleared(player, {
+      template: party.metadata.template,
+      layout: party.metadata.layout,
+      depth,
+    }));
     this.sendLoadingState(party, 'idle');
     return true;
   }
@@ -853,6 +878,11 @@ class PartyService {
     }
 
     party.invites.delete(player.uuid);
+    // Single-party invariant: accepting abandons any seat taken while the
+    // invite was in flight. Otherwise the stale membership persists in the
+    // other party's roster and instance rewards pay the ghost member twice
+    // (cand-006). Mirrors createParty's own removePlayer call.
+    this.removePlayer(player.uuid);
     this.addMember(party, player);
     return true;
   }

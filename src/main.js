@@ -1,9 +1,9 @@
 import { createApp } from 'vue';
 import { plugin as VueTippy } from 'vue-tippy';
 import 'tippy.js/dist/tippy.css';
+import './assets/scss/main.scss';
 
 import Delaford from './Delaford.vue';
-import Socket from './core/utilities/socket.js';
 import { registerGlobalComponents } from './plugins/register-components.js';
 import { installStores } from './stores/index.js';
 
@@ -26,18 +26,15 @@ if (typeof window !== 'undefined' && 'WebSocket' in window) {
   // self-hosted build works over LAN or Tailscale with no configuration.
   // Override with VITE_WS_URL at build time when fronted by a proxy.
   const sameOrigin = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
-  const wsurl = {
-    prod: import.meta.env.VITE_WS_URL || sameOrigin,
-    dev: `ws://${window.location.hostname}:6500`,
-  };
-
-  const url = import.meta.env.PROD ? wsurl.prod : wsurl.dev;
+  const url = import.meta.env.VITE_WS_URL
+    || (import.meta.env.PROD ? sameOrigin : `ws://${window.location.hostname}:6500`);
   window.ws = new WebSocket(url);
-  Socket.ensureListeners();
-  Socket.flushQueue();
 }
 
 window.addEventListener('beforeunload', () => {
+  if (window.__verdigrisConnection) {
+    window.__verdigrisConnection.stop();
+  }
   if (window.ws) {
     window.ws.close();
   }

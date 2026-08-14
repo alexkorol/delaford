@@ -6,13 +6,16 @@ import Monster from '#server/core/monster.js';
 import Player from '#server/core/player.js';
 import { getSkillExecutionProfile } from '#shared/skills/index.js';
 import { DEFAULT_SKILL_IDS } from '#shared/combat.js';
+import { occupiedTile } from '#shared/movement.js';
 import { directionDelta } from '#server/core/entities/player/movement-handler.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { awardSkillExperience, sendMessage } from '#server/core/combat/experience.js';
 import { dropMonsterLoot } from '#server/core/combat/loot.js';
 import { notifyProgression } from '#server/core/progression-events.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
 import { processResourceRegeneration, REGEN_INTERVAL_MS } from '#server/core/combat/regeneration.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
+import { traceProjectilePath } from '#shared/projectile-collision.js';
 
 const DEFAULT_PROJECTILE_RANGE = 5;
 const FALLBACK_EXPERIENCE_PER_LEVEL = 12;
@@ -69,13 +72,14 @@ export const getMeleeArcTiles = (player, direction) => {
     return [];
   }
 
-  const front = { x: player.x + delta.x, y: player.y + delta.y };
+  const origin = occupiedTile(player);
+  const front = { x: origin.x + delta.x, y: origin.y + delta.y };
   const tiles = [front];
 
   if (delta.x !== 0 && delta.y !== 0) {
     // Diagonal swing covers the two cardinal neighbours of the front tile
-    tiles.push({ x: player.x + delta.x, y: player.y });
-    tiles.push({ x: player.x, y: player.y + delta.y });
+    tiles.push({ x: origin.x + delta.x, y: origin.y });
+    tiles.push({ x: origin.x, y: origin.y + delta.y });
   } else if (delta.x !== 0) {
     tiles.push({ x: front.x, y: front.y - 1 });
     tiles.push({ x: front.x, y: front.y + 1 });
@@ -117,8 +121,8 @@ const directionToward = (from, to, fallback = 'down') => {
     return fallback;
   }
 
-  const dx = Math.max(-1, Math.min(1, (to.x || 0) - (from.x || 0)));
-  const dy = Math.max(-1, Math.min(1, (to.y || 0) - (from.y || 0)));
+  const dx = Math.sign((to.x || 0) - (from.x || 0));
+  const dy = Math.sign((to.y || 0) - (from.y || 0));
   const key = `${dx}:${dy}`;
   const directions = {
     '1:0': 'right',
@@ -164,16 +168,17 @@ const canMoveToTile = (player, x, y) => {
 };
 
 const canDashStep = (player, delta) => {
-  const targetX = player.x + delta.x;
-  const targetY = player.y + delta.y;
+  const origin = occupiedTile(player);
+  const targetX = origin.x + delta.x;
+  const targetY = origin.y + delta.y;
 
   if (!canMoveToTile(player, targetX, targetY)) {
     return false;
   }
 
   if (delta.x !== 0 && delta.y !== 0) {
-    const horizontalOpen = canMoveToTile(player, player.x + delta.x, player.y);
-    const verticalOpen = canMoveToTile(player, player.x, player.y + delta.y);
+    const horizontalOpen = canMoveToTile(player, origin.x + delta.x, origin.y);
+    const verticalOpen = canMoveToTile(player, origin.x, origin.y + delta.y);
     if (!horizontalOpen && !verticalOpen) {
       return false;
     }
@@ -222,8 +227,9 @@ export const findStepTarget = (player, direction) => {
     return null;
   }
 
-  const targetX = player.x + delta.x;
-  const targetY = player.y + delta.y;
+  const origin = occupiedTile(player);
+  const targetX = origin.x + delta.x;
+  const targetY = origin.y + delta.y;
   return getAliveSceneMonsters(player.sceneId)
     .find(monster => monsterTileX(monster) === targetX && monsterTileY(monster) === targetY) || null;
 };
@@ -246,32 +252,46 @@ export const findMeleeTargets = (player, direction) => {
  * Find the first monster on the line projected from the player,
  * stopping at walls.
  */
-export const findProjectileTarget = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => {
+export const findProjectileCollision = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => {
   const delta = directionDelta(direction);
   if (!delta) {
-    return null;
+    return { target: null, impact: { x: player.x, y: player.y }, blocked: false };
   }
 
   const scene = world.getScene(player.sceneId);
   const map = scene && scene.map ? scene.map : world.map;
   const monsters = getAliveSceneMonsters(player.sceneId);
+  const distance = Math.max(1, Math.floor(range));
+  const origin = occupiedTile(player);
 
-  for (let step = 1; step <= range; step += 1) {
-    const x = player.x + (delta.x * step);
-    const y = player.y + (delta.y * step);
+  for (let step = 1; step <= distance; step += 1) {
+    const x = origin.x + (delta.x * step);
+    const y = origin.y + (delta.y * step);
+    const trace = traceProjectilePath(map, player, { x, y });
+
+    if (!trace.clear) {
+      return { target: null, impact: trace.impact, blocked: true, blockedTile: trace.blockedTile };
+    }
 
     const hit = monsters.find(monster => monsterTileX(monster) === x && monsterTileY(monster) === y);
     if (hit) {
-      return hit;
-    }
-
-    if (tileBlocked(map, x, y)) {
-      return null;
+      return { target: hit, impact: { x, y }, blocked: false };
     }
   }
 
-  return null;
+  return {
+    target: null,
+    impact: {
+      x: origin.x + (delta.x * distance),
+      y: origin.y + (delta.y * distance),
+    },
+    blocked: false,
+  };
 };
+
+export const findProjectileTarget = (player, direction, range = DEFAULT_PROJECTILE_RANGE) => (
+  findProjectileCollision(player, direction, range).target
+);
 
 /**
  * Roll player damage for a skill from attributes and equipped weapon.
@@ -364,7 +384,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
   if (died) {
     experience = awardSkillExperience(player, 'attack', experienceForKill(monster));
     sendMessage(player, `You have slain ${monster.name}.`);
-    dropMonsterLoot(monster, { player });
+    dropMonsterLoot(monster, { player, killer: player });
     const scene = world.getScene(player.sceneId);
     const killContext = {
       monsterId: monster.templateId || monster.id || null,
@@ -377,7 +397,12 @@ const applyHitToMonster = (player, monster, skill, now) => {
     if ((monster.rarityId || monster.rarity) === 'elite') {
       notifyProgression(player, 'slay-elite', killContext);
     }
+    notifyTutorial(player, 'slay');
   }
+
+  const weaponStyle = Object.entries(player.combat?.attack || {})
+    .filter(([, value]) => Number(value) > 0)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))[0]?.[0] || 'slash';
 
   return {
     attackerId: player.uuid,
@@ -387,6 +412,7 @@ const applyHitToMonster = (player, monster, skill, now) => {
     targetType: 'monster',
     skillId: skill.id,
     skillName: skill.label || skill.name || skill.id,
+    attackStyle: skill.behaviour?.area ? 'sweep' : weaponStyle,
     amount: result.amount !== undefined ? result.amount : damage,
     baseAmount: baseDamage,
     beastbaneAmount: beastbaneDamage,
@@ -518,8 +544,9 @@ const applyMovementEffect = (player, skill, profile, payload, now, outcome) => {
     if (!canDashStep(player, delta)) {
       break;
     }
-    player.x += delta.x;
-    player.y += delta.y;
+    const origin = occupiedTile(player);
+    player.x = origin.x + delta.x;
+    player.y = origin.y + delta.y;
     path.push({ x: player.x, y: player.y });
   }
 
@@ -650,27 +677,22 @@ export const tryUseSkill = (player, payload = {}, options = {}) => {
 
   let targets = [];
   if (projectile) {
-    const target = findProjectileTarget(
+    const collision = findProjectileCollision(
       player,
       direction,
       projectile.range || DEFAULT_PROJECTILE_RANGE,
     );
+    const { target } = collision;
     targets = target ? [target] : [];
 
-    // Player projectiles are visible too — fly to the victim, or the full
-    // range on a miss.
-    const delta = directionDelta(direction) || { x: 0, y: 1 };
-    const range = projectile.range || DEFAULT_PROJECTILE_RANGE;
-    const impact = target
-      ? { x: monsterTileX(target), y: monsterTileY(target) }
-      : { x: player.x + (delta.x * range), y: player.y + (delta.y * range) };
     Socket.broadcast('world:projectile', {
       fromX: player.x,
       fromY: player.y,
-      toX: impact.x,
-      toY: impact.y,
+      toX: collision.impact.x,
+      toY: collision.impact.y,
       travelMs: Math.max(120, projectile.travelTimeMs || 280),
       kind: 'player',
+      blocked: collision.blocked,
     }, world.getScenePlayers(player.sceneId));
   } else {
     targets = findMeleeTargets(player, direction);

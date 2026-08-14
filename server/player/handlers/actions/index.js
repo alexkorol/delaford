@@ -10,7 +10,7 @@ import config from '#server/config.js';
 import Action from '#server/player/action.js';
 import ContextMenu from '#server/core/context-menu.js';
 import Item from '#server/core/item.js';
-import Map from '#server/core/map.js';
+import GameMap from '#server/core/map.js';
 import Player from '#server/core/player.js';
 import Wear from '#server/core/utilities/wear.js';
 import Mining from '#server/core/skills/mining.js';
@@ -24,24 +24,24 @@ import {
   positionFromSlot,
   slotFromPosition,
 } from '#shared/inventory-footprints.js';
+import { canItemUseSlot, resolveEquipSlot } from '#shared/wear-slots.js';
 import pipe from '#server/player/pipeline/index.js';
 import ItemFactory from '#server/core/items/factory.js';
 import { vesselEligible } from '#server/core/items/vesselforge/adapter.js';
 import world from '#server/core/world.js';
 import { notifyProgression } from '#server/core/progression-events.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
+import { notifyTutorial } from '#server/core/tutorial.js';
+import { commitGroundItemPickup, refreshInventory } from '#server/core/items/pickup.js';
+import { MAIN_TOWN_FOUNTAIN } from '#server/core/town-amenities.js';
+import { talkToAldwyn } from '#server/core/first-goal.js';
+import { applyVesselCombatStats, getForge, vesselTooltip } from '#server/core/items/vesselforge/adapter.js';
+import { BRAND_COST } from '#server/core/context-menu/strategies/vesselforge-brand.js';
 import playerPersistence from '#server/core/services/player-persistence.js';
-
-const refreshInventory = (player) => {
-  if (!player || !player.socket_id) {
-    return;
-  }
-
-  Socket.emit('core:refresh:inventory', {
-    player: { socket_id: player.socket_id },
-    data: player.inventory.slots,
-  });
-};
+import chroniclesRepository from '#server/core/repositories/chronicles-repository.js';
+import wagonService, { wagonNpcId } from '#server/core/services/wagon-service.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const notifyLootProgression = (player, item) => {
   notifyProgression(player, 'loot');
@@ -64,13 +64,29 @@ const sendInventoryError = (player, text) => {
 
 const getPlayerFromPayload = (incoming) => {
   const payload = incoming.data || {};
-  const socketId = payload.player?.socket_id || incoming.player?.socket_id;
-  const playerId = payload.id || incoming.id || payload.player?.uuid || incoming.player?.uuid;
+  const socketId = payload.player?.socket_id
+    || incoming.player?.socket_id
+    || incoming.socketId
+    || incoming.todo?.player?.socket_id;
+  const playerId = payload.id
+    || incoming.id
+    || payload.player?.uuid
+    || incoming.player?.uuid
+    || incoming.playerUuid
+    || incoming.todo?.player?.uuid;
 
-  return world.players.find((player) => (
+  const stablePlayer = world.players.find((player) => (
     (playerId && player.uuid === playerId)
     || (socketId && player.socket_id === socketId)
   ));
+
+  if (stablePlayer) {
+    return stablePlayer;
+  }
+
+  return Number.isInteger(incoming.playerIndex)
+    ? world.players[incoming.playerIndex] || null
+    : null;
 };
 
 const getActionPlayer = (incoming = {}) => {
@@ -207,6 +223,133 @@ const goldenPlaqueCooldowns = new globalThis.Map();
 const getPlayerScene = player => (
   world.getSceneForPlayer(player) || world.getDefaultTown()
 );
+
+const getReachableShopDisplay = (player, reference = {}) => {
+  const scene = player ? getPlayerScene(player) : null;
+  const display = scene?.items?.find(item => (
+    item.shopDisplay
+    && item.shopNpcId === reference.id
+    && item.id === reference.shopItemId
+  ));
+  if (!player || !display) return null;
+  const playerTile = occupiedTile(player);
+  return Math.max(Math.abs(playerTile.x - display.x), Math.abs(playerTile.y - display.y)) <= 1
+    ? display
+    : null;
+};
+
+const SHOPKEEPER_REACH = 2;
+
+const chebyshevWithin = (x1, y1, x2, y2, radius) => (
+  Number.isFinite(x1) && Number.isFinite(y1) && Number.isFinite(x2) && Number.isFinite(y2)
+  && Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2)) <= radius
+);
+
+// A legacy-lane shop trade is only meaningful next to the shopkeeper or one
+// of the shop's market displays; a client-echoed npcId is not proof of
+// presence (cand-004). The shop-display path keeps its tighter 1-tile rule.
+const isShopReachable = (player, shopNpcId) => {
+  if (!player || shopNpcId === undefined || shopNpcId === null) {
+    return false;
+  }
+  const scene = getPlayerScene(player);
+  if (!scene) {
+    return false;
+  }
+  const playerTile = occupiedTile(player);
+  const nearKeeper = (scene.npcs || []).some(npc => npc
+    && npc.id === shopNpcId
+    && chebyshevWithin(playerTile.x, playerTile.y, npc.x, npc.y, SHOPKEEPER_REACH));
+  if (nearKeeper) {
+    return true;
+  }
+  return (scene.items || []).some(item => item
+    && item.shopDisplay
+    && item.shopNpcId === shopNpcId
+    && chebyshevWithin(playerTile.x, playerTile.y, item.x, item.y, 1));
+};
+
+// The countinghouse banker is NPC id 4 in a town scene, within one tile -
+// the same rule the bank-open handler enforces (cand-005).
+const isBankerReachable = (player) => {
+  const scene = player ? getPlayerScene(player) : null;
+  if (!player || !scene || scene.type !== 'town') {
+    return false;
+  }
+  const banker = (scene.npcs || []).find(npc => npc && npc.id === 4);
+  const playerTile = occupiedTile(player);
+  return Boolean(banker) && chebyshevWithin(playerTile.x, playerTile.y, banker.x, banker.y, 1);
+};
+
+// The context-menu protocol is echo-based: the client sends back the menu
+// entry it clicked. Keep the last menu this server built per socket and only
+// execute entries it actually offered (cand-003).
+const CONTEXT_MENU_OFFER_TTL_MS = 30 * 1000;
+const lastOfferedMenus = new Map();
+
+const rememberOfferedMenu = (socketId, items) => {
+  if (!socketId || !Array.isArray(items)) {
+    return;
+  }
+  lastOfferedMenus.set(socketId, { items, offeredAt: Date.now() });
+};
+
+const menuEntryMatches = (entry, echo) => {
+  if (!entry || !echo || !entry.action || !echo.action) {
+    return false;
+  }
+  if (entry.action.actionId !== echo.action.actionId
+    || entry.action.name !== echo.action.name) {
+    return false;
+  }
+  if (entry.type && echo.type && entry.type !== echo.type) {
+    return false;
+  }
+  if (entry.id !== undefined && entry.id !== echo.id) {
+    return false;
+  }
+  if (entry.uuid !== undefined && entry.uuid !== echo.uuid) {
+    return false;
+  }
+  if (entry.shopItemId !== undefined && entry.shopItemId !== echo.shopItemId) {
+    return false;
+  }
+  if (entry.params) {
+    const echoedQuantity = echo.params ? echo.params.quantity : undefined;
+    if (entry.params.quantity !== echoedQuantity) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const findOfferedMenuEntry = (socketId, echo) => {
+  const record = lastOfferedMenus.get(socketId);
+  if (!record || (Date.now() - record.offeredAt) > CONTEXT_MENU_OFFER_TTL_MS) {
+    return null;
+  }
+  return record.items.find(entry => menuEntryMatches(entry, echo)) || null;
+};
+
+const refreshShopPurchase = (shop, response) => {
+  if (!Shop.successfulSale(response)) return false;
+  const player = world.players[shop.playerIndex];
+  world.shops[shop.shopIndex].inventory = response.shopItems;
+  player.inventory.slots = response.inventory;
+  playerPersistence.markDirty(player);
+  Socket.emit('core:refresh:inventory', {
+    player: { socket_id: player.socket_id },
+    data: response.inventory,
+  });
+  if (response.transaction) {
+    const itemName = Query.getItemData(response.transaction.itemId)?.name || response.transaction.itemId;
+    sendPlayerMessage(
+      player,
+      `Bought ${response.transaction.quantity} ${itemName} for ${response.transaction.coins} coins.`,
+    );
+  }
+  return true;
+};
 
 const getSceneItems = (scene) => {
   if (!scene) {
@@ -356,6 +499,46 @@ const refreshEquipmentStats = (player) => {
   }
 };
 
+const coinTotal = player => player.inventory.slots
+  .filter(item => item?.id === 'coins')
+  .reduce((total, item) => total + Math.max(0, Number(item.qty) || 0), 0);
+
+const spendCoins = (player, amount) => {
+  let remaining = amount;
+  player.inventory.slots.forEach((item) => {
+    if (remaining <= 0 || item?.id !== 'coins') return;
+    const available = Math.max(0, Number(item.qty) || 0);
+    const spent = Math.min(available, remaining);
+    item.qty = available - spent;
+    remaining -= spent;
+  });
+  player.inventory.slots = player.inventory.slots
+    .filter(item => item?.id !== 'coins' || item.qty > 0);
+};
+
+const buildBankPayload = (player) => {
+  const chronicle = player?.accountId
+    ? chroniclesRepository.getChronicle(player.accountId)
+    : { houses: [] };
+  const house = chronicle.houses.find(entry => entry.id === player?.houseId) || null;
+  return {
+    items: player?.bank || [],
+    carriedCoins: player ? coinTotal(player) : 0,
+    house: house ? {
+      id: house.id,
+      name: house.name,
+      treasury: house.treasury,
+    } : null,
+  };
+};
+
+const sendPlayerMessage = (player, text) => {
+  Socket.emit('game:send:message', {
+    player: { socket_id: player.socket_id },
+    text,
+  });
+};
+
 const dropEquippedItem = (player, slotId) => {
   if (!player || !slotId || !player.wear || !player.wear[slotId]) {
     return null;
@@ -363,7 +546,7 @@ const dropEquippedItem = (player, slotId) => {
 
   const equipped = player.wear[slotId];
   const baseItem = wearableItems.find(i => i.id === equipped.id);
-  if (!baseItem || baseItem.slot !== slotId) {
+  if (!baseItem || !canItemUseSlot(baseItem.slot, slotId)) {
     return null;
   }
 
@@ -382,7 +565,7 @@ const dropEquippedItem = (player, slotId) => {
   world.addItem(dropped, scene.id);
   broadcastSceneItems(scene, 'world:itemDropped');
   broadcastSceneItems(scene, 'item:change');
-  Socket.broadcast('player:unequippedAnItem', player);
+  Socket.broadcast('player:unequippedAnItem', publicPlayerProjection(player), getSceneRecipients(scene));
 
   return dropped;
 };
@@ -424,6 +607,7 @@ const actionEvents = {
     }
 
     const player = world.players[playerIndexMoveTo];
+    const playerTile = occupiedTile(player);
 
     // A dead player must not queue click-to-move; otherwise the path set while
     // awaiting respawn walks the character across the map once they revive.
@@ -470,15 +654,15 @@ const actionEvents = {
       && typeof providedWorld.y === 'number')
       ? providedWorld
       : {
-        x: player.x - baseCenter.x + localX,
-        y: player.y - baseCenter.y + localY,
+        x: playerTile.x - baseCenter.x + localX,
+        y: playerTile.y - baseCenter.y + localY,
       };
 
     const offsets = {
-      left: Math.max(0, player.x - targetWorld.x),
-      right: Math.max(0, targetWorld.x - player.x),
-      up: Math.max(0, player.y - targetWorld.y),
-      down: Math.max(0, targetWorld.y - player.y),
+      left: Math.max(0, playerTile.x - targetWorld.x),
+      right: Math.max(0, targetWorld.x - playerTile.x),
+      up: Math.max(0, playerTile.y - targetWorld.y),
+      down: Math.max(0, targetWorld.y - playerTile.y),
     };
 
     const desiredCenter = {
@@ -491,7 +675,7 @@ const actionEvents = {
       y: Math.max(baseViewport.y, desiredCenter.y + offsets.down),
     };
 
-    const matrix = await Map.getMatrix(player, {
+    const matrix = await GameMap.getMatrix(player, {
       viewport: desiredViewport,
       center: desiredCenter,
     });
@@ -499,11 +683,11 @@ const actionEvents = {
     const clampCoordinate = (value, max) => Math.max(0, Math.min(value, max));
     const relativeTarget = {
       x: clampCoordinate(
-        targetWorld.x - (player.x - matrix.center.x),
+        targetWorld.x - (playerTile.x - matrix.center.x),
         matrix.viewport.x,
       ),
       y: clampCoordinate(
-        targetWorld.y - (player.y - matrix.center.y),
+        targetWorld.y - (playerTile.y - matrix.center.y),
         matrix.viewport.y,
       ),
     };
@@ -537,7 +721,7 @@ const actionEvents = {
 
     const location = movingData.location || null;
 
-    Map.findPath(movingData.id, relativeTarget.x, relativeTarget.y, location);
+    GameMap.findPath(movingData.id, relativeTarget.x, relativeTarget.y, location);
   },
   'player:examine': (data) => {
     Socket.emit('item:examine', {
@@ -546,6 +730,18 @@ const actionEvents = {
         socket_id: data.player.socket_id,
       },
     });
+  },
+  'player:npc:talk': (data) => {
+    const player = getPlayerFromPayload(data);
+    const scene = player && getPlayerScene(player);
+    const npc = scene?.npcs?.find(entry => entry.id === data.item?.id);
+    const playerTile = player ? occupiedTile(player) : null;
+    const nearby = npc && Math.max(
+      Math.abs(playerTile.x - npc.x),
+      Math.abs(playerTile.y - npc.y),
+    ) <= 1;
+    if (!player || scene?.type !== 'town' || !npc || npc.id !== 1 || !nearby) return;
+    talkToAldwyn(player);
   },
   'player:inventory-drop': (data) => {
     const player = world.players.find(p => p.uuid === data.id) || getPlayerFromPayload(data);
@@ -678,7 +874,7 @@ const actionEvents = {
       return;
     }
     const targetSlot = itemPayload.targetSlot || miscData.targetSlot || null;
-    if (targetSlot && targetSlot !== getItem.slot) {
+    if (targetSlot && !canItemUseSlot(getItem.slot, targetSlot)) {
       sendInventoryError(player, 'That item cannot be equipped there.');
       return;
     }
@@ -701,15 +897,19 @@ const actionEvents = {
       : Number.isInteger(itemPayload.slot)
         ? itemPayload.slot
         : inventoryItem?.slot;
+    // Resolve which physical seat this item takes (rings have two) so the
+    // swap-first and the equip target the same seat.
+    const wearSlot = resolveEquipSlot(player.wear, getItem.slot, targetSlot);
     // Normalise to the flat shape equippedAnItem/unequipItem expect.
-    const equipData = { id: player.uuid, item: itemPayload };
-    const alreadyWearing = player.wear[getItem.slot];
+    const equipData = { id: player.uuid, item: { ...itemPayload, targetSlot: wearSlot } };
+    const alreadyWearing = player.wear[wearSlot];
     if (alreadyWearing) {
       const status = await pipe.player.unequipItem({
         item: {
           uuid: alreadyWearing.uuid,
           id: alreadyWearing.id,
           slot: sourceSlot,
+          wearSlot,
         },
         replacingItem: {
           uuid: itemPayload.uuid,
@@ -770,6 +970,9 @@ const actionEvents = {
         id: itemUnequipping.id,
         uuid: itemUnequipping.uuid,
         slot: slotId,
+        // The physical seat to clear (e.g. ring vs ring2); slot alone is
+        // ambiguous for grouped slots.
+        wearSlot: slotId,
         miscData: {
           ...miscData,
           slot: slotId,
@@ -778,6 +981,62 @@ const actionEvents = {
       },
     };
     pipe.player.unequipItem(newData);
+  },
+
+  'player:vesselforge:add-brand': (incoming) => {
+    const player = getPlayerFromPayload(incoming);
+    const payload = incoming?.item ? incoming : (incoming?.data || {});
+    const reference = payload.item || {};
+    const scene = player && getPlayerScene(player);
+    if (!player || scene?.id !== world.defaultTownId) {
+      if (player) sendPlayerMessage(player, 'Brands can only be added at the Delaford forge.');
+      return;
+    }
+
+    const item = player.inventory?.slots?.find(entry => (
+      entry
+      && reference.uuid
+      && entry.uuid === reference.uuid
+      && (!reference.id || entry.id === reference.id)
+    ));
+    if (!item?.vessel?.item) {
+      sendPlayerMessage(player, 'That item cannot hold brands.');
+      return;
+    }
+    if (coinTotal(player) < BRAND_COST) {
+      sendPlayerMessage(player, `Adding a brand costs ${BRAND_COST} coins.`);
+      return;
+    }
+
+    const oldVessel = item.vessel;
+    const result = getForge().sear(oldVessel.item);
+    if (!result.item) {
+      sendPlayerMessage(player, 'That item cannot take another brand.');
+      return;
+    }
+
+    const baseItem = Query.getItemData(item.id);
+    const oldProjected = applyVesselCombatStats(baseItem?.stats || {}, oldVessel);
+    const newVessel = {
+      ...oldVessel,
+      item: result.item,
+      lines: vesselTooltip(result.item),
+    };
+    const newProjected = applyVesselCombatStats(baseItem?.stats || {}, newVessel);
+    const currentAttack = item.stats?.attack || {};
+    item.stats = {
+      ...(item.stats || {}),
+      attack: Object.fromEntries(['stab', 'slash', 'crush', 'range'].map(style => [
+        style,
+        (currentAttack[style] || 0)
+          + ((newProjected.attack?.[style] || 0) - (oldProjected.attack?.[style] || 0)),
+      ])),
+    };
+    item.vessel = newVessel;
+    spendCoins(player, BRAND_COST);
+    playerPersistence.markDirty(player);
+    refreshInventory(player);
+    sendPlayerMessage(player, result.event?.text?.replace(/^Seared:/, 'Brand added:') || 'Brand added.');
   },
 
   /**
@@ -821,6 +1080,8 @@ const actionEvents = {
 
     const items = await contextMenu.build();
 
+    rememberOfferedMenu(incomingData.data.player.socket_id, items);
+
     if (incomingData.data.miscData.firstOnly) {
       Socket.emit('game:context-menu:first-only', {
         data: items,
@@ -834,9 +1095,35 @@ const actionEvents = {
     }
   },
   'player:context-menu:action': (incoming) => {
-    const miscData = incoming.data.data.item.miscData || false;
-    const action = new Action(incoming.data.player.socket_id, miscData);
-    action.do(incoming.data.data, incoming.data.queueItem);
+    const payload = incoming?.data;
+    const actionData = payload?.data;
+    const item = actionData?.item;
+    const selectedAction = item?.action;
+    const socketId = payload?.player?.socket_id;
+    if (!socketId
+      || !actionData?.tile
+      || !selectedAction
+      || typeof selectedAction.name !== 'string'
+      || typeof selectedAction.actionId !== 'string'
+      || !selectedAction.actionId) {
+      return;
+    }
+
+    // Never trust the echoed action: the client may only SELECT among the
+    // entries this server offered for its current menu. Forged actionIds or
+    // tampered item identities are dropped here instead of reaching the
+    // dynamic dispatcher in Action.do (cand-003).
+    const offeredItem = findOfferedMenuEntry(socketId, item);
+    if (!offeredItem) {
+      return;
+    }
+
+    const action = new Action(socketId, item.miscData || false);
+    if (!action.player) return;
+    action.do({
+      tile: actionData.tile,
+      item: { ...offeredItem, miscData: item.miscData },
+    }, payload.queueItem);
   },
 
   'player:resource:smelt:anvil:action': async (data) => {
@@ -1039,9 +1326,8 @@ const actionEvents = {
   },
 
   'player:take': (data = {}) => {
-    const { playerIndex } = data;
     const todo = data.todo || null;
-    const player = world.players[playerIndex];
+    const player = getPlayerFromPayload(data);
 
     if (!player) {
       return;
@@ -1063,14 +1349,6 @@ const actionEvents = {
       return;
     }
 
-    if (!isWithinReach(player, todo.at)) {
-      console.warn(`[actions] player:take rejected: ${player.username} is too far from (${todo.at.x}, ${todo.at.y}).`);
-      return;
-    }
-
-    const baseData = Query.getItemData(todo.item.id) || {};
-    const itemId = baseData.id || todo.item.id;
-
     const scene = getPlayerScene(player);
     const sceneItems = getSceneItems(scene);
     const itemToTake = sceneItems.findIndex(
@@ -1088,35 +1366,25 @@ const actionEvents = {
     }
 
     if (worldItem.boundTo && worldItem.boundTo !== player.uuid) {
-      Socket.sendMessageToPlayer(
-        playerIndex,
-        'That item is bound to another adventurer.',
-      );
+      sendInventoryError(player, 'That item is bound to another adventurer.');
       return;
     }
 
-    const candidateInventoryItem = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
-      || { ...baseData, ...worldItem };
-    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidateInventoryItem);
-    if (!hasStackCapacity(player.inventory.slots, baseData)
-      && openSlot === false && openSlot !== 0) {
+    const playerTile = occupiedTile(player);
+    const withinReach = Math.max(
+      Math.abs(playerTile.x - worldItem.x),
+      Math.abs(playerTile.y - worldItem.y),
+    ) <= 1;
+    if (!withinReach) {
+      sendInventoryError(player, 'That item is too far away.');
+      return;
+    }
+
+    const pickup = commitGroundItemPickup(player, scene, itemToTake);
+    if (pickup.added <= 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
       return;
     }
-
-    // If qty not specified, we are picking up 1 item.
-    const quantity = worldItem.qty || 1;
-    sceneItems.splice(itemToTake, 1);
-
-    broadcastSceneItems(scene, 'item:change');
-
-    const itemUuidLabel = todo.item.uuid ? `${todo.item.uuid.substr(0, 5)}...` : 'no-uuid';
-    console.log(`Picking up: ${todo.item.id} (${itemUuidLabel})`);
-
-    world.players[playerIndex].inventory.add(itemId, quantity, {
-      uuid: todo.item.uuid,
-      existingItem: worldItem,
-    });
 
     if (worldItem.chroniclesRelic && worldItem.chroniclesRelic.id) {
       // Persist the recovered identity before closing the Chronicle entry.
@@ -1132,7 +1400,7 @@ const actionEvents = {
           );
           if (recovered.ok) {
             Socket.sendMessageToPlayer(
-              playerIndex,
+              player,
               `${worldItem.chroniclesRelic.scionName}'s heirloom is home once more.`,
             );
           }
@@ -1145,20 +1413,15 @@ const actionEvents = {
       i => i.respawn && i.x === todo.at.x && i.y === todo.at.y,
     );
 
-    if (resetItemIndex !== -1) {
+    if (pickup.ok && resetItemIndex !== -1) {
       sceneRespawns.items[resetItemIndex].pickedUp = true;
       sceneRespawns.items[resetItemIndex].willRespawnIn = Item.calculateRespawnTime(
         sceneRespawns.items[resetItemIndex].respawnIn,
       );
     }
 
-    // Tell client to update their inventory
-    Socket.emit('core:refresh:inventory', {
-      player: { socket_id: world.players[playerIndex].socket_id },
-      data: world.players[playerIndex].inventory.slots,
-    });
-
-    notifyLootProgression(world.players[playerIndex], worldItem);
+    notifyLootProgression(player, worldItem);
+    notifyTutorial(player, 'loot');
   },
 
   /**
@@ -1176,12 +1439,13 @@ const actionEvents = {
     const sceneItems = getSceneItems(scene);
 
     // Own tile first, then the four cardinal neighbours.
+    const playerTile = occupiedTile(player);
     const spots = [
-      { x: player.x, y: player.y },
-      { x: player.x + 1, y: player.y },
-      { x: player.x - 1, y: player.y },
-      { x: player.x, y: player.y + 1 },
-      { x: player.x, y: player.y - 1 },
+      playerTile,
+      { x: playerTile.x + 1, y: playerTile.y },
+      { x: playerTile.x - 1, y: playerTile.y },
+      { x: playerTile.x, y: playerTile.y + 1 },
+      { x: playerTile.x, y: playerTile.y - 1 },
     ];
     let itemIndex = -1;
     for (const spot of spots) {
@@ -1200,43 +1464,108 @@ const actionEvents = {
     }
 
     const worldItem = sceneItems[itemIndex];
-    const baseData = Query.getItemData(worldItem.id) || {};
-    const candidate = ItemFactory.adoptExisting(worldItem, { baseItem: baseData })
-      || { ...baseData, ...worldItem };
-    const openSlot = UI.getOpenSlot(player.inventory.slots, 'inventory', candidate);
-    if (!hasStackCapacity(player.inventory.slots, baseData)
-      && openSlot === false && openSlot !== 0) {
+    const pickup = commitGroundItemPickup(player, scene, itemIndex);
+    if (pickup.added <= 0) {
       sendInventoryError(player, 'There is no room in your backpack.');
       return;
     }
-
-    const quantity = worldItem.qty || 1;
-    sceneItems.splice(itemIndex, 1);
-    broadcastSceneItems(scene, 'item:change');
-
-    player.inventory.add(baseData.id || worldItem.id, quantity, {
-      uuid: worldItem.uuid,
-      existingItem: worldItem,
-    });
 
     const sceneRespawns = getSceneRespawns(scene);
     const respawnIndex = sceneRespawns.items.findIndex(
       entry => entry.respawn && entry.x === worldItem.x && entry.y === worldItem.y,
     );
-    if (respawnIndex !== -1) {
+    if (pickup.ok && respawnIndex !== -1) {
       sceneRespawns.items[respawnIndex].pickedUp = true;
       sceneRespawns.items[respawnIndex].willRespawnIn = Item.calculateRespawnTime(
         sceneRespawns.items[respawnIndex].respawnIn,
       );
     }
 
-    refreshInventory(player);
     notifyLootProgression(player, worldItem);
+    notifyTutorial(player, 'loot');
+  },
+
+  'player:fountain:drink': (data = {}, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(candidate => candidate.socket_id === ws?.id);
+    const scene = player ? getPlayerScene(player) : null;
+    if (!player || scene?.type !== 'town') return;
+
+    const playerTile = occupiedTile(player);
+    const distance = Math.max(
+      Math.abs(playerTile.x - MAIN_TOWN_FOUNTAIN.x),
+      Math.abs(playerTile.y - MAIN_TOWN_FOUNTAIN.y),
+    );
+    if (distance > 1) return;
+
+    const health = player.stats?.resources?.health;
+    if (!health || health.current <= 0) return;
+    const missing = Math.max(0, health.max - health.current);
+    if (missing > 0 && typeof player.applyHealing === 'function') {
+      player.applyHealing(missing);
+      Player.broadcastStats(player);
+    }
+
+    Socket.emit('game:send:message', {
+      player: { socket_id: player.socket_id },
+      text: missing > 0
+        ? 'You drink from the Crossroads fountain. Its cold water restores you completely.'
+        : 'You drink from the Crossroads fountain. You are already at full health.',
+    });
   },
 
   /**
    * A player wants opening a trade shop
    */
+  'player:screen:shop-display': (data = {}, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(entry => entry.socket_id === ws?.id);
+    const reference = data.data?.item || data.item || {};
+    const shopNpcId = reference.id;
+    const shopItemId = reference.shopItemId;
+    const display = getReachableShopDisplay(player, { id: shopNpcId, shopItemId });
+    if (!player || !display) return;
+
+    const shop = world.shops.find(entry => entry.npcId === shopNpcId);
+    if (!shop) return;
+    player.currentPane = 'shop';
+    player.objectId = shopNpcId;
+    Socket.emit('open:screen', {
+      player: { socket_id: player.socket_id },
+      screen: 'shop',
+      payload: shop,
+    });
+  },
+
+  'player:shop-display:buy': (data = {}) => {
+    const player = getPlayerFromPayload(data);
+    const reference = data.item || {};
+    if (!getReachableShopDisplay(player, reference)) return;
+    try {
+      const shop = new Shop(reference.id, player.uuid, reference.shopItemId, 'buy', 1);
+      refreshShopPurchase(shop, shop.buy());
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+    }
+  },
+
+  'player:shop-display:appraise': (data = {}) => {
+    const player = getPlayerFromPayload(data);
+    const reference = data.item || {};
+    if (!getReachableShopDisplay(player, reference)) return;
+    try {
+      new Shop(reference.id, player.uuid, reference.shopItemId, 'value', 1).value();
+    } catch (err) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: err.message,
+      });
+    }
+  },
+
   'player:screen:npc:trade': (data) => {
     const player = getActionPlayer(data);
     const target = data.todo?.item;
@@ -1263,6 +1592,10 @@ const actionEvents = {
       return;
     }
 
+    if (player.currentPane !== 'shop' || !isShopReachable(player, player.objectId)) {
+      return;
+    }
+
     const rawQty = data.item.params ? data.item.params.quantity : 0;
     const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
     try {
@@ -1286,18 +1619,25 @@ const actionEvents = {
    */
   'player:screen:npc:trade:action': (data) => {
     const player = getPlayerFromPayload(data);
-    if (!player || !player.objectId || !data.item?.id
+    const payload = data.data || data;
+    if (!player || !player.objectId || !payload.item?.id
       || !isActiveNpcPane(player, 'shop', 'trade')) {
       return;
     }
 
     // Validate action type before constructing the shop operation.
     const allowedShopActions = ['buy', 'sell', 'value'];
-    if (!allowedShopActions.includes(data.doing)) {
+    if (!allowedShopActions.includes(payload.doing)) {
       return;
     }
 
-    const rawQty = data.item.params ? data.item.params.quantity : 0;
+    // Trading also requires the shop pane to be open and current adjacency
+    // to the shopkeeper or one of its market displays (cand-004).
+    if (player.currentPane !== 'shop' || !isShopReachable(player, player.objectId)) {
+      return;
+    }
+
+    const rawQty = payload.item.params ? payload.item.params.quantity : 0;
     const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
     let shop;
     let response;
@@ -1305,13 +1645,13 @@ const actionEvents = {
       shop = new Shop(
         player.objectId,
         player.uuid,
-        data.item.id,
-        data.doing,
+        payload.item.id,
+        payload.doing,
         quantity,
       );
 
       // We will be buying or selling an item
-      response = shop[data.doing]();
+      response = shop[payload.doing]();
     } catch (err) {
       Socket.emit('game:send:message', {
         player: { socket_id: player.socket_id },
@@ -1324,6 +1664,7 @@ const actionEvents = {
     if (Shop.successfulSale(response)) {
       world.shops[shop.shopIndex].inventory = response.shopItems;
       world.players[shop.playerIndex].inventory.slots = response.inventory;
+      playerPersistence.markDirty(world.players[shop.playerIndex]);
 
       // Refresh client with new data
       Socket.emit('core:refresh:inventory', {
@@ -1336,24 +1677,41 @@ const actionEvents = {
         screen: 'shop',
         payload: world.shops[shop.shopIndex],
       });
+      if (response.transaction) {
+        const itemName = Query.getItemData(response.transaction.itemId)?.name || response.transaction.itemId;
+        const verb = response.transaction.type === 'sell' ? 'Sold' : 'Bought';
+        sendPlayerMessage(
+          world.players[shop.playerIndex],
+          `${verb} ${response.transaction.quantity} ${itemName} for ${response.transaction.coins} coins.`,
+        );
+      }
     }
   },
 
-  'player:screen:smelt': (data) => {
-    if (data.playerIndex === undefined) {
-      data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
-      data.todo = data;
-    }
-    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+  /**
+   * A player opens a House wagon at the Crossroads. Only their own House's
+   * wagon opens the pane; another House's quartermaster waves them off.
+   */
+  'player:screen:wagon': (data, ws = null) => {
+    const player = getPlayerFromPayload(data)
+      || world.players.find(entry => entry.socket_id === ws?.id);
+    if (!player) return;
+    const scene = getPlayerScene(player);
+    const reference = data.data?.item || data.item || {};
+    const wagon = scene?.npcs?.find(npc => npc.id === reference.id && String(npc.id).startsWith('wagon-'));
+    const playerTile = occupiedTile(player);
+    const nearby = wagon && Math.max(
+      Math.abs(playerTile.x - wagon.x),
+      Math.abs(playerTile.y - wagon.y),
+    ) <= 2;
+    if (scene?.type !== 'town' || !wagon || !nearby) return;
+
+    if (!player.houseId || wagon.id !== wagonNpcId(player.houseId)) {
+      sendPlayerMessage(player, `The quartermaster of ${wagon.name.replace(/ Wagon$/, '')} waves you off. House business only.`);
       return;
     }
-    world.players[data.playerIndex].currentPane = 'smelt';
 
-    Socket.emit('open:screen', {
-      player: { socket_id: world.players[data.playerIndex].socket_id },
-      screen: 'smelt',
-      payload: { items: world.players[data.playerIndex].skills.smithing.level },
-    });
+    wagonService.sendWagonScreen(player);
   },
 
   /**
@@ -1373,7 +1731,7 @@ const actionEvents = {
     Socket.emit('open:screen', {
       player: { socket_id: player.socket_id },
       screen: 'bank',
-      payload: { items: player.bank },
+      payload: buildBankPayload(player),
     });
   },
 
@@ -1388,6 +1746,13 @@ const actionEvents = {
 
     const player = getPlayerFromPayload(data);
     if (!player || !data.item?.id || !isActiveNpcPane(player, 'bank', 'bank')) {
+      return;
+    }
+
+    // Transfers only run with the bank pane open and the countinghouse
+    // banker still adjacent - the same gate the bank-open handler enforces
+    // (cand-005).
+    if (player.currentPane !== 'bank' || !isBankerReachable(player)) {
       return;
     }
 

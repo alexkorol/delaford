@@ -51,6 +51,8 @@ class Map {
 
     // Transient combat feedback (floating damage numbers, hit flashes)
     this.combatFeedback = [];
+    this.attackEffects = [];
+    this.groundTelegraphs = [];
 
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
@@ -136,12 +138,14 @@ class Map {
 
   getViewportMetrics() {
     const { viewport, tileset } = this.config.map;
+    const playerTileX = Math.round(this.player.x);
+    const playerTileY = Math.round(this.player.y);
     return {
       viewport,
       tileSize: tileset.tile.width,
       tileCrop: {
-        x: this.player.x - Math.floor(0.5 * viewport.x),
-        y: this.player.y - Math.floor(0.5 * viewport.y),
+        x: playerTileX - Math.floor(0.5 * viewport.x),
+        y: playerTileY - Math.floor(0.5 * viewport.y),
       },
     };
   }
@@ -214,7 +218,11 @@ class Map {
 
     if (this.player && this.player.movement) {
       const renderPosition = this.player.movement.update({ deltaSeconds });
-      const tileCenter = centerOfTile(this.player.x, this.player.y, tileSize);
+      const tileCenter = centerOfTile(
+        Math.round(this.player.x),
+        Math.round(this.player.y),
+        tileSize,
+      );
 
       const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
       const offsetX = clamp(renderPosition.x - tileCenter.x, -tileSize, tileSize);
@@ -495,6 +503,33 @@ class Map {
     }
 
     const at = now();
+    const actorById = (id) => {
+      if (this.player?.uuid === id) return this.player;
+      return (this.players || []).find(actor => actor.uuid === id)
+        || (this.monsters || []).find(actor => actor.uuid === id);
+    };
+    const attacker = actorById(payload.attackerId);
+    const target = actorById(payload.targetId);
+    if (attacker && target) {
+      const duplicate = this.attackEffects.some(effect => (
+        effect.attackerId === payload.attackerId
+        && effect.skillId === payload.skillId
+        && at - effect.startedAt < 90
+      ));
+      if (!duplicate) {
+        this.attackEffects.push({
+          attackerId: payload.attackerId,
+          skillId: payload.skillId,
+          style: payload.attackStyle || (payload.targetType === 'player' ? 'claw' : 'slash'),
+          fromX: attacker.x,
+          fromY: attacker.y,
+          toX: target.x,
+          toY: target.y,
+          monster: payload.targetType === 'player',
+          startedAt: at,
+        });
+      }
+    }
 
     if (payload.targetType === 'monster') {
       const index = (this.monsters || []).findIndex((monster) => monster.uuid === payload.targetId);
@@ -592,9 +627,6 @@ class Map {
       vesselsImage,
       dungeonImage,
     };
-
-    // Tell client images are loaded
-    bus.$emit('game:images:loaded');
 
     // Set image and config
     this.build();
@@ -984,6 +1016,7 @@ class Map {
       sourceSize,
     );
 
+    this.drawPaperdoll(ctx, this.player, drawX, drawY, tileSize, 'back');
     ctx.drawImage(
       this.images.playerImage,
       sourceX,
@@ -995,6 +1028,7 @@ class Map {
       renderSize,
       renderSize,
     );
+    this.drawPaperdoll(ctx, this.player, drawX, drawY, tileSize, 'front');
 
     this.drawHitTint(
       ctx,
@@ -1041,6 +1075,7 @@ class Map {
         sourceSize,
       );
 
+      this.drawPaperdoll(ctx, player, screenPosition.x, screenPosition.y, tileSize, 'back');
       ctx.drawImage(
         this.images.playerImage,
         sourceX,
@@ -1052,6 +1087,7 @@ class Map {
         renderSize,
         renderSize,
       );
+      this.drawPaperdoll(ctx, player, screenPosition.x, screenPosition.y, tileSize, 'front');
 
       this.drawHitTint(
         ctx,
@@ -1061,6 +1097,171 @@ class Map {
         player.lastHitAt,
         now(),
       );
+    });
+  }
+
+  equipmentColour(item) {
+    const id = String(item?.id || item || '').toLowerCase();
+    if (id.includes('steel') || id.includes('skymetal')) return '#aebbc4';
+    if (id.includes('jade')) return '#5ca581';
+    if (id.includes('obsidian') || id.includes('onyx')) return '#50475f';
+    if (id.includes('fur') || id.includes('hide') || id.includes('rawhide')) return '#8b6547';
+    if (id.includes('bronze') || id.includes('copper')) return '#b87942';
+    return '#7f8d91';
+  }
+
+  /**
+   * Lightweight DCSS-style equipment composition. The actor sprite remains
+   * the animation source; worn slots add stable pixel silhouettes so a new
+   * helm, body piece, cloak, shield, or weapon is visible in the world.
+   */
+  drawPaperdoll(ctx, actor, x, y, tileSize, layer = 'front') {
+    const wear = actor?.wear || {};
+    if (!wear || typeof wear !== 'object') return;
+    const unit = tileSize / 32;
+    const fill = (item, alpha = 0.92) => {
+      ctx.fillStyle = this.equipmentColour(item);
+      ctx.globalAlpha = alpha;
+    };
+
+    ctx.save();
+    if (layer === 'back') {
+      if (wear.back) {
+        fill(wear.back, 0.78);
+        ctx.beginPath();
+        ctx.moveTo(x + 9 * unit, y + 10 * unit);
+        ctx.lineTo(x + 23 * unit, y + 10 * unit);
+        ctx.lineTo(x + 25 * unit, y + 28 * unit);
+        ctx.lineTo(x + 7 * unit, y + 28 * unit);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (wear.armor) {
+      fill(wear.armor, 0.72);
+      ctx.fillRect(x + 9 * unit, y + 12 * unit, 14 * unit, 10 * unit);
+      ctx.fillStyle = 'rgba(235, 224, 190, 0.35)';
+      ctx.fillRect(x + 10 * unit, y + 13 * unit, 12 * unit, 2 * unit);
+    }
+    if (wear.head) {
+      fill(wear.head);
+      ctx.fillRect(x + 10 * unit, y + 5 * unit, 12 * unit, 5 * unit);
+      ctx.fillRect(x + 8 * unit, y + 9 * unit, 16 * unit, 2 * unit);
+    }
+    if (wear.left_hand) {
+      fill(wear.left_hand, 0.9);
+      ctx.beginPath();
+      ctx.arc(x + 7 * unit, y + 18 * unit, 5 * unit, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(25, 20, 15, 0.8)';
+      ctx.lineWidth = Math.max(1, unit);
+      ctx.stroke();
+    }
+    if (wear.right_hand) {
+      fill(wear.right_hand);
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = Math.max(2, 2 * unit);
+      ctx.beginPath();
+      ctx.moveTo(x + 23 * unit, y + 20 * unit);
+      ctx.lineTo(x + 29 * unit, y + 8 * unit);
+      ctx.stroke();
+      ctx.fillRect(x + 26 * unit, y + 7 * unit, 5 * unit, 2 * unit);
+    }
+    if (wear.feet) {
+      fill(wear.feet);
+      ctx.fillRect(x + 8 * unit, y + 27 * unit, 7 * unit, 3 * unit);
+      ctx.fillRect(x + 18 * unit, y + 27 * unit, 7 * unit, 3 * unit);
+    }
+    ctx.restore();
+  }
+
+  /** Draw short-lived slash, stab, crush, and monster-claw reach telegraphs. */
+  drawAttackEffects() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !this.attackEffects.length) return;
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+
+    this.attackEffects = this.attackEffects.filter((effect) => {
+      const age = timestamp - effect.startedAt;
+      const duration = effect.monster ? 180 : 260;
+      if (age >= duration) return false;
+      const from = this.worldToScreen(centerOfTile(effect.fromX, effect.fromY, tileSize), metrics);
+      const to = this.worldToScreen(centerOfTile(effect.toX, effect.toY, tileSize), metrics);
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      const progress = Math.min(1, age / duration);
+      const radius = tileSize * (0.45 + progress * 0.65);
+      const colour = effect.monster ? '#ef785e' : '#f6d68a';
+
+      ctx.save();
+      ctx.globalAlpha = (1 - progress) * (effect.monster ? 0.65 : 0.9);
+      ctx.strokeStyle = colour;
+      ctx.fillStyle = colour;
+      ctx.lineWidth = effect.monster ? 2 : 3;
+      ctx.lineCap = 'round';
+      if (effect.style === 'stab' || effect.style === 'range') {
+        ctx.beginPath();
+        ctx.moveTo(from.x + Math.cos(angle) * tileSize * 0.2, from.y + Math.sin(angle) * tileSize * 0.2);
+        ctx.lineTo(from.x + Math.cos(angle) * radius, from.y + Math.sin(angle) * radius);
+        ctx.stroke();
+      } else if (effect.style === 'crush') {
+        ctx.beginPath();
+        ctx.arc(to.x, to.y, radius * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const spread = effect.style === 'sweep' ? 1.15 : effect.monster ? 0.45 : 0.78;
+        ctx.beginPath();
+        ctx.arc(from.x, from.y, radius, angle - spread, angle + spread);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return true;
+    });
+  }
+
+  /** Register a server-authored area warning before a boss attack resolves. */
+  addGroundTelegraph(data = {}) {
+    if (!Number.isFinite(data.x) || !Number.isFinite(data.y) || !Number.isFinite(data.radius)) return;
+    this.groundTelegraphs.push({
+      ...data,
+      durationMs: Math.max(100, data.durationMs || 1000),
+      receivedAt: now(),
+    });
+    if (this.groundTelegraphs.length > 12) this.groundTelegraphs.splice(0, this.groundTelegraphs.length - 12);
+  }
+
+  /** Draw the danger circle filling toward impact so the dodge window reads. */
+  drawGroundTelegraphs() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !this.groundTelegraphs.length) return;
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const timestamp = now();
+
+    this.groundTelegraphs = this.groundTelegraphs.filter((telegraph) => {
+      const progress = Math.max(0, Math.min(1, (timestamp - telegraph.receivedAt) / telegraph.durationMs));
+      if (progress >= 1) return false;
+      const center = this.worldToScreen(centerOfTile(telegraph.x, telegraph.y, tileSize), metrics);
+      const radius = telegraph.radius * tileSize;
+      ctx.save();
+      ctx.strokeStyle = '#ff6b45';
+      ctx.fillStyle = `rgba(255, 69, 45, ${0.08 + (progress * 0.2)})`;
+      ctx.lineWidth = Math.max(2, tileSize * 0.08);
+      ctx.setLineDash([Math.max(3, tileSize * 0.2), Math.max(2, tileSize * 0.12)]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius * progress, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return true;
     });
   }
 
@@ -1080,6 +1281,7 @@ class Map {
       toY: data.toY,
       travelMs: Math.max(80, data.travelMs || 280),
       kind: data.kind || 'monster',
+      blocked: data.blocked === true,
       startedAt: now(),
     });
     if (this.projectiles.length > 48) {
@@ -1108,7 +1310,26 @@ class Map {
     this.projectiles = this.projectiles.filter((p) => {
       const t = (timestamp - p.startedAt) / p.travelMs;
       if (t >= 1) {
-        return false;
+        if (!p.blocked || timestamp >= p.startedAt + p.travelMs + 120) {
+          return false;
+        }
+
+        const impact = this.worldToScreen(centerOfTile(p.toX, p.toY, tileSize), metrics);
+        const colour = colours[p.kind] || colours.monster;
+        const fade = 1 - ((timestamp - p.startedAt - p.travelMs) / 120);
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, fade);
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 1.5;
+        for (let ray = 0; ray < 4; ray += 1) {
+          const angle = (Math.PI * 2 * ray) / 4;
+          ctx.beginPath();
+          ctx.moveTo(impact.x, impact.y);
+          ctx.lineTo(impact.x + (Math.cos(angle) * 7), impact.y + (Math.sin(angle) * 7));
+          ctx.stroke();
+        }
+        ctx.restore();
+        return true;
       }
 
       const from = centerOfTile(p.fromX, p.fromY, tileSize);

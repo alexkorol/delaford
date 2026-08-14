@@ -227,7 +227,7 @@ export default {
   width: 168px;
   padding: 5px;
   border: 1px solid rgba(205, 174, 105, 0.42);
-  border-radius: 4px;
+  border-radius: 0;
   background: rgba(5, 7, 10, 0.82);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),

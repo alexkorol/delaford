@@ -51,6 +51,7 @@ const tile = {
   altarGeneric: dungeonGid('altar_generic_0'),
   statueAngel: dungeonGid('statue_angel'),
   statueArcher: dungeonGid('statue_archer'),
+  altar: dungeonGroupGids('decor', 'altar_generic'),
   statueDragon: dungeonGid('statue_dragon'),
   sarcophagus: dungeonGid('sarcophagus'),
   rockDepleted: dungeonGid('rock_depleted'),
@@ -309,6 +310,7 @@ const makeScene = ({
   portals = [],
   interactions = [],
   monsterDefinitions = [],
+  metadata = {},
 }) => ({
   id,
   type,
@@ -327,8 +329,25 @@ const makeScene = ({
     portals,
     interactions,
     monsterDefinitions,
+    ...metadata,
   },
 });
+
+// Wagon pitches ring the plaza off the road axes: two per quadrant, each a
+// 3x3 packed-earth pad. A House's wagon (its quartermaster) stands here while
+// any of its scions are on the ground; scions log in at their House's pitch.
+// (docs/crossroads-world-web.md — the world-web systems operate out of the
+// village town until the full Crossroads conversion lands.)
+const WAGON_PITCHES = [
+  { x: 47, y: 112 },
+  { x: 42, y: 109 },
+  { x: 34, y: 109 },
+  { x: 29, y: 112 },
+  { x: 29, y: 118 },
+  { x: 34, y: 121 },
+  { x: 42, y: 121 },
+  { x: 47, y: 118 },
+];
 
 const createTownScene = () => {
   const map = createMap(tile.lairFloor, 11);
@@ -338,6 +357,9 @@ const createTownScene = () => {
     name: 'Delaford Village',
     map,
     spawnPoints: [{ x: 42, y: 115 }],
+    metadata: {
+      wagonPitches: WAGON_PITCHES,
+    },
   });
 
   fillEllipse(map, 38, 115, 14, 8, tile.greyFloor, 'background', 20);
@@ -450,6 +472,56 @@ const createTownScene = () => {
     floor: tile.tombFloor,
     destination: { sceneId: ZONES.barrow, x: 100, y: 176 },
     message: 'You descend beneath the village chapel.',
+  });
+
+  // Wagon pitches: packed earth pads around the plaza (world-web economy).
+  WAGON_PITCHES.forEach((pitch, order) => {
+    fillRect(map, pitch.x - 1, pitch.y - 1, 3, 3, tile.dirtFloor, 'background', 50 + order);
+  });
+
+  // The four road gates of the world web. Each sits beside the village's own
+  // wilderness gate; stepping through opens that road's Wayfinder's Chart
+  // (zone-service.openRoadChart via world-transitions).
+  addPortal(scene, map, {
+    id: 'gate-tin-road',
+    name: 'The Tin Road',
+    x: 37,
+    y: 94,
+    floor: tile.dirtFloor,
+    destination: { road: 'tin' },
+    message: 'The Tin Road runs north into the old quarry country.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-salt-road',
+    name: 'The Salt Road',
+    x: 64,
+    y: 114,
+    floor: tile.dirtFloor,
+    destination: { road: 'salt' },
+    message: 'The Salt Road runs east through the fens.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-chalk-road',
+    name: 'The Chalk Road',
+    x: 37,
+    y: 138,
+    floor: tile.dirtFloor,
+    destination: { road: 'chalk' },
+    message: 'The Chalk Road runs south over the downs and their graves.',
+  });
+  addPortal(scene, map, {
+    id: 'gate-copper-road',
+    name: 'The Copper Road',
+    x: 12,
+    y: 115,
+    floor: tile.dirtFloor,
+    destination: { road: 'copper' },
+    message: 'The Copper Road runs west into the burnt hills.',
+  });
+
+  // Keep every pitch walkable no matter what decor landed there.
+  WAGON_PITCHES.forEach((pitch) => {
+    openPad(map, pitch.x, pitch.y, { radius: 1, floor: tile.dirtFloor });
   });
 
   clearSceneSpawnPads(scene, map);

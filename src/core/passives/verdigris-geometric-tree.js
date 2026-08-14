@@ -1,6 +1,18 @@
 import {
   VERDIGRIS_SKILL_TREE_TOTALS,
-} from '@/core/passives/verdigris-skill-tree.js';
+} from './verdigris-skill-tree.js';
+import AUTHORED_TREE_DATA from './verdigris-authored-tree-data.js';
+
+export const VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION = 2;
+
+export const VERDIGRIS_CLASS_UNLOCKS = Object.freeze({
+  Champion: ['tower_shield', 'war_horn_curio', 'war_call_slot'],
+  Acrobat: ['second_weapon_set', 'dual_wield_one_handers', 'quick_rig_slot'],
+  Archmage: ['second_curio', 'rite_focus_socket', 'attendant_focus_slot'],
+  Reaver: ['thrown_melee_projectile', 'belt_fetish', 'spoils_pack'],
+  Nightblade: ['trap_mark_tools', 'venom_vials', 'preparations_pack'],
+  Ritualist: ['banners', 'war_companion', 'reliquary_pack'],
+});
 
 export const VERDIGRIS_AXIS_META = Object.freeze({
   STR: { label: 'Strength', short: 'STR', color: '#f06a54', path: 'Iron Route' },
@@ -31,6 +43,28 @@ export const VERDIGRIS_DERIVED_LABELS = Object.freeze({
 const RADIUS = 72;
 const SUBTREE_SPACING = 58;
 const TREE_LAYERS = VERDIGRIS_SKILL_TREE_TOTALS.layers;
+const AUTHORED_SEATS = AUTHORED_TREE_DATA.seats || {};
+const STAT_ALIASES = Object.freeze({
+  accuracy_flat: 'projectileDamage',
+  crit_bonus_flat: 'critChance',
+  ember_res: 'allResistances',
+  emberkiss: 'spellDamage',
+  evasion_increased: 'evasion',
+  gloam_res: 'allResistances',
+  guard: 'armour',
+  guard_increased: 'armour',
+  heavy: 'attackDamage',
+  physical_increased: 'attackDamage',
+  reach_increased: 'attackDamage',
+  river_resistance: 'allResistances',
+  spirit: 'mana',
+  storm_res: 'allResistances',
+  ward: 'energyShield',
+  ward_pct: 'energyShield',
+});
+const ATTRIBUTE_STATS = Object.freeze({ str: 'STR', dex: 'DEX', int: 'INT' });
+
+const canonicalStat = stat => STAT_ALIASES[stat] || stat;
 const PERCENT_STATS = new Set([
   'attackDamage',
   'spellDamage',
@@ -80,136 +114,14 @@ const HEX_DIRECTIONS = [
 ];
 
 const AXIS_DIRECTIONS = {
-  STR: { q: 1, r: 0 },
-  DEX: { q: -1, r: 1 },
-  INT: { q: 0, r: -1 },
+  STR: { q: -1, r: 1 },
+  DEX: { q: 0, r: -1 },
+  INT: { q: 1, r: 0 },
 };
 
-const NODE_EFFECTS = {
-  STR: [
-    { tag: 'weapon', names: ['Hammer Cant', 'Iron Grip', 'Break Rhythm', 'Headsplitter', 'Warhand', 'Heft', 'Follow Through'], stat: 'attackDamage', amount: 9, line: '+9% melee and heavy weapon damage' },
-    { tag: 'armour', names: ['Braced Plate', 'Shield Memory', 'Stone Vein', 'Close Guard', 'Tidewall', 'Thick Skin', 'Padded Guard'], stat: 'armour', amount: 85, line: '+85 Armour' },
-    { tag: 'life', names: ['Red Marrow', 'Field Surgeon', 'Second Breath', 'Blood Reserve', 'Unbroken Core', 'Old Scars', 'Deep Lungs'], stat: 'life', amount: 55, line: '+55 maximum Life' },
-    { tag: 'block', names: ['Doorframe Stance', 'Shield Hook', 'Locking Elbow', 'Iron Angle', 'Line Holder', 'Raised Rim', 'Braced Wrist'], stat: 'blockChance', amount: 2, line: '+2% Block Chance' },
-  ],
-  DEX: [
-    { tag: 'blade', names: ['Knife Tempo', 'Twin Feint', 'Edge Step', 'Whisper Cut', 'Clean Draw', 'Short Grip', 'Off Hand'], stat: 'attackSpeed', amount: 4, line: '+4% Attack Speed' },
-    { tag: 'evasion', names: ['Loose Footing', 'Wind Pocket', 'Slidecast', 'Narrow Escape', 'Pivot Guard', 'Light Step', 'Read the Room'], stat: 'evasion', amount: 90, line: '+90 Evasion Rating' },
-    { tag: 'projectile', names: ['String Theory', 'Fletched Line', 'Far Hand', 'Ricochet Habit', 'Green Angle', 'Steady Loose', 'High Arc'], stat: 'projectileDamage', amount: 9, line: '+9% Projectile Damage' },
-    { tag: 'critical', names: ['Clean Read', 'Soft Target', 'Needle Line', 'Second Look', 'Open Guard', 'Gap Finder', 'Cold Eye'], stat: 'critChance', amount: 0.8, line: '+0.8% Critical Strike Chance' },
-  ],
-  INT: [
-    { tag: 'spell', names: ['Runic Memory', 'Cold Diagram', 'Amber Formula', 'Thoughtspark', 'Held Word', 'Chalk Line', 'Third Reading'], stat: 'spellDamage', amount: 10, line: '+10% Spell Damage' },
-    { tag: 'energy-shield', names: ['Mirror Ward', 'Blue Aegis', 'Quiet Barrier', 'Glyph Skin', 'Second Sigil', 'Layered Thought', 'Glass Calm'], stat: 'energyShield', amount: 48, line: '+48 Ward' },
-    { tag: 'minion', names: ['Familiar Line', 'Servant Rule', 'Bound Chorus', 'Living Ink', 'Lantern Host', 'Roll Call', 'Long Leash'], stat: 'minionDamage', amount: 9, line: '+9% Minion Damage' },
-    { tag: 'mana', names: ['Deep Vessel', 'Blue Reserve', 'Stored Word', 'Mana Lattice', 'Quiet Font', 'Still Water', 'Spare Ink'], stat: 'mana', amount: 35, line: '+35 maximum Mana' },
-  ],
-  HYBRID: [
-    { tag: 'elemental', names: ['Cross-Discipline', 'Joined Method', 'Two-Hand Thesis', 'Practical Lore', 'Measured Risk', 'Borrowed Fire', 'Split Study'], stat: 'spellDamage', amount: 6, line: '+6% Elemental and Spell Damage' },
-    { tag: 'recovery', names: ['Deep Pockets', 'Reservoir Knot', 'Field Cache', 'Slow Burn', 'Held Breath', 'Short Rest', 'Second Course'], stat: 'cooldownRecovery', amount: 3, line: '+3% Cooldown Recovery Rate' },
-    { tag: 'ailment', names: ['Marking Rule', 'Weighted Hex', 'Hex Vector', 'Fault Line', 'Soft Lock', 'Salted Wound', 'Slow Poison'], stat: 'ailmentEffect', amount: 7, line: '+7% Ailment Effect' },
-    { tag: 'resistance', names: ['Weathered Thread', 'Salt Charm', 'Brass Omen', 'Fourfold Ward', 'Ash Measure', 'Oiled Cloak', 'Hearth Charm'], stat: 'allResistances', amount: 3, line: '+3% to all Elemental Resistances' },
-  ],
-};
-
-const NOTABLES = {
-  STR: [
-    { name: 'Oath of the Front Line', stat: 'armour', amount: 240, lines: ['+240 Armour', 'When hit recently, +12% melee damage'] },
-    { name: 'Anvil Reading', stat: 'attackDamage', amount: 22, lines: ['+22% Melee Damage', 'Stuns you inflict count as one rank stronger'] },
-    { name: 'Red Standard', stat: 'life', amount: 180, lines: ['+180 maximum Life', 'War skills recover 3% Life on first target hit'] },
-    { name: "Breaker's Posture", stat: 'attackDamage', amount: 25, lines: ['+25% damage against armoured enemies', 'Armour Break lasts 20% longer'] },
-    { name: 'Berserker', stat: 'attackDamage', amount: 26, lines: ['+26% Melee Damage', '+10% Attack Speed while below half Life'] },
-    { name: 'Gladiator', stat: 'blockChance', amount: 4, lines: ['+4% Block Chance', 'Blocking grants +8% melee damage for 3 seconds'] },
-    { name: 'Hoplite', stat: 'armour', amount: 200, lines: ['+200 Armour', '+14% damage with spears and long weapons'] },
-    { name: 'Warden', stat: 'life', amount: 150, lines: ['+150 maximum Life', 'Nearby allies take 6% less damage'] },
-    { name: 'Executioner', stat: 'attackDamage', amount: 20, lines: ['+20% Melee Damage', 'Enemies below a fifth of their life take +25% damage from you'] },
-  ],
-  DEX: [
-    { name: 'Needlework Footing', stat: 'evasion', amount: 260, lines: ['+260 Evasion Rating', 'First dodge after moving grants +8% Attack Speed'] },
-    { name: 'Far Hand Geometry', stat: 'projectileDamage', amount: 22, lines: ['+22% Projectile Damage', 'Projectiles gain +1 rebound after travelling through a conduit loop'] },
-    { name: 'Quiet Draw', stat: 'critChance', amount: 2.2, lines: ['+2.2% Critical Strike Chance', 'Critical misses refund a small amount of stamina'] },
-    { name: 'Poison Ledger', stat: 'ailmentEffect', amount: 21, lines: ['+21% Ailment Effect', 'Poisons tick 12% faster on marked targets'] },
-    { name: 'Duelist', stat: 'critChance', amount: 2.5, lines: ['+2.5% Critical Strike Chance', 'After you dodge, your next strike cannot miss'] },
-    { name: 'Assassin', stat: 'attackSpeed', amount: 8, lines: ['+8% Attack Speed', '+30% Critical Damage Bonus against enemies at full life'] },
-    { name: 'Falconer', stat: 'projectileDamage', amount: 20, lines: ['+20% Projectile Damage', 'Companions mark the first enemy they strike'] },
-    { name: 'Corsair', stat: 'evasion', amount: 220, lines: ['+220 Evasion Rating', '+10% Movement Speed for 4 seconds after a kill'] },
-    { name: 'Outrider', stat: 'attackSpeed', amount: 6, lines: ['+6% Attack Speed', 'Damage taken while moving is reduced by 8%'] },
-  ],
-  INT: [
-    { name: "Archivist's Spark", stat: 'spellDamage', amount: 25, lines: ['+25% Spell Damage', 'Every third spell gains +12% area or chain range'] },
-    { name: 'Ward in Two Parts', stat: 'energyShield', amount: 210, lines: ['+210 Ward', 'Half of broken Ward becomes Mana over 4 seconds'] },
-    { name: 'Lanterns Answer', stat: 'minionDamage', amount: 23, lines: ['+23% Minion Damage', 'Summoned allies inherit 10% of your path attributes'] },
-    { name: 'Blue Arithmetic', stat: 'mana', amount: 120, lines: ['+120 maximum Mana', 'Mana spent recently improves spell critical chance'] },
-    { name: 'Alchemist', stat: 'cooldownRecovery', amount: 10, lines: ['+10% Cooldown Recovery Rate', 'Flasks and preparations last 20% longer'] },
-    { name: 'Summoner', stat: 'minionDamage', amount: 25, lines: ['+25% Minion Damage', '+1 maximum companion while a loop conduit is complete'] },
-    { name: 'Occultist', stat: 'ailmentEffect', amount: 20, lines: ['+20% Hex and Curse Effect', 'Cursed enemies deal 8% less damage to you'] },
-    { name: 'Chronicler', stat: 'mana', amount: 100, lines: ['+100 maximum Mana', 'Repeating your previous spell costs 15% less'] },
-    { name: 'Hierophant', stat: 'energyShield', amount: 180, lines: ['+180 Ward', 'Auras you cast gain +12% effect'] },
-  ],
-  HYBRID: [
-    { name: 'Spellblade Interval', stat: 'spellDamage', amount: 21, lines: ['+21% mixed Attack and Spell Damage', 'Attack after casting grants +8 INT and +8 STR for 4 seconds'] },
-    { name: 'Cunning Bulwark', stat: 'evasion', amount: 160, lines: ['+160 Evasion Rating', 'Defensive skills keep 15% of movement speed'] },
-    { name: "Tutor's Ambush", stat: 'ailmentEffect', amount: 22, lines: ['+22% trap, mark, and ailment effect', 'Marked enemies count as studied'] },
-    { name: 'Field Alchemy', stat: 'cooldownRecovery', amount: 12, lines: ['+12% Cooldown Recovery Rate', 'Recovery effects improve your weakest attribute'] },
-    { name: 'Battlemage', stat: 'spellDamage', amount: 18, lines: ['+18% Spell Damage', '+18% Attack Damage while holding a two-handed weapon'] },
-    { name: 'Inquisitor', stat: 'critChance', amount: 1.8, lines: ['+1.8% Critical Strike Chance', 'Criticals against hexed enemies recover 2% Mana'] },
-    { name: 'Trickster', stat: 'evasion', amount: 180, lines: ['+180 Evasion Rating', 'Traps arm 30% faster'] },
-    { name: 'Warpriest', stat: 'life', amount: 120, lines: ['+120 maximum Life', 'Healing you cast also grants a small ward'] },
-    { name: 'Nightblade', stat: 'attackSpeed', amount: 6, lines: ['+6% Attack Speed', 'Spells cast from stealth are always critical'] },
-  ],
-};
-
-const KEYSTONES = {
-  STR: [
-    { name: 'No Backward Step', lines: ['You cannot evade while standing still', 'Standing still grants +70% guard and +30% heavy damage'] },
-    { name: 'Weight Has Memory', lines: ['Every recent stun grants +8 STR', 'Your movement speed cannot exceed its base value'] },
-    { name: 'The Wall Moves', lines: ['Guard skills become attacks', 'Guard skills have 35% longer cooldowns'] },
-  ],
-  DEX: [
-    { name: 'The Hand Arrives First', lines: ['Your first strike against each enemy always has advantage', 'You lose 20% guard while not moving'] },
-    { name: 'Knife Before Name', lines: ['Critical hits apply your strongest ailment', 'Non-critical hits deal 18% less damage'] },
-    { name: 'Thin Air Doctrine', lines: ['Every 6 allocated DEX paths grants one free dodge', 'You cannot block'] },
-  ],
-  INT: [
-    { name: 'The Book Reads Back', lines: ['Spells repeat once at 45% effect', 'Repeated spells cost life instead of mana'] },
-    { name: 'Borrowed Familiar', lines: ['Companions copy your last cast spell at reduced effect', 'You can summon one fewer permanent companion'] },
-    { name: 'Cold Proof', lines: ['Ward also absorbs ailments', 'Life recovery is 30% slower while ward is full'] },
-  ],
-  HYBRID: [
-    { name: 'Two Laws, One Price', lines: ['Your two highest attributes count as each other', 'Your lowest attribute cannot be raised by equipment'] },
-    { name: 'Closed Circuit', lines: ['Completed circles empower their center twice', 'Path conduits cost one extra point outside circles'] },
-    { name: 'The Practical Miracle', lines: ['Notables grant +8 to their nearest path attribute', 'Small passives grant 20% less direct effect'] },
-  ],
-};
-
-// Ring-8 keystones are the Signs: birthsign-style build-defining picks,
-// one big bonus and one real price.
-export const VERDIGRIS_SIGNS = [
-  { name: 'The Bull', lines: ['You cannot be slowed, knocked back, or interrupted', '-15% Movement Speed'] },
-  { name: 'The Serpent', lines: ['Your critical strikes always poison, and poisons stack once more', 'You take 20% more damage from ailments'] },
-  { name: 'The Tower', lines: ['+30% Block Chance while stationary', 'You cannot dodge'] },
-  { name: 'The Steed', lines: ['+20% Movement Speed and skills can be used while moving', 'You cannot stand and fight: -20% damage while stationary'] },
-  { name: 'The Shadow', lines: ['After 2 seconds unseen, your next action has advantage', 'Your maximum Life is 15% lower'] },
-  { name: 'The Lantern', lines: ['Allies and companions near you gain +15% damage', 'You are always revealed to enemies'] },
-  { name: 'The Scales', lines: ['Your attributes count as equal to their average', 'Attribute bonuses from equipment are halved'] },
-  { name: 'The Crow', lines: ['Kills recently grant +1% damage each, up to +25%', 'The bonus resets if you go 6 seconds without a kill'] },
-  { name: 'The Wheel', lines: ['Cooldowns recover 30% faster', 'Your skills cost 15% more'] },
-];
-
-const MASTERIES = {
-  STR: { name: 'Mastery of Force', lines: ['Choose this region for weapons, armour, and direct confrontation.'] },
-  DEX: { name: 'Mastery of Motion', lines: ['Choose this region for speed, precision, projectiles, and evasive play.'] },
-  INT: { name: 'Mastery of Thought', lines: ['Choose this region for spells, wards, companions, and resource engines.'] },
-  HYBRID: { name: 'Mastery of Method', lines: ['Hybrid areas reward builds that cross school boundaries.'] },
-};
-
-// Ring-7 axis milestones read as classic classes rather than a second "Mastery of X".
-const GRAND_MASTERIES = {
-  STR: { name: 'Champion', lines: ['+12% Melee Damage and +120 Armour', 'War banners and shouts affect a wider area.'] },
-  DEX: { name: 'Acrobat', lines: ['+8% Attack Speed and +140 Evasion Rating', 'Dodging costs no stamina inside completed loops.'] },
-  INT: { name: 'Archmage', lines: ['+12% Spell Damage and +80 maximum Mana', 'Your highest-cost spell gains +1 echo.'] },
-  HYBRID: { name: 'Spellsword', lines: ['+9% Attack and Spell Damage', 'Weapon strikes recover 1% Mana.'] },
-};
+export const VERDIGRIS_SIGNS = Object.freeze(Object.values(AUTHORED_SEATS)
+  .filter(seat => seat.type === 'sign')
+  .map(seat => ({ name: seat.name, lines: seat.effects.slice() })));
 
 // Gateway annexes hang off the six ring-9 corners. Axis gateways sit on the
 // game's axis directions (STR q+, DEX -q+r, INT -r); hybrid annexes take the
@@ -218,7 +130,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'vanguard',
     title: 'Vanguard Oath',
-    gateway: { q: 9, r: 0 },
+    gateway: { q: -10, r: 10 },
     axis: 'STR',
     nodes: [
       { id: 'vanguard-core', name: 'Raised Banner', type: 'notable', stat: 'armour', amount: 260, effects: ['+260 Armour', 'Allies behind you gain +8% damage'], tag: 'armour' },
@@ -234,7 +146,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'ranger',
     title: "Ranger's Writ",
-    gateway: { q: -9, r: 9 },
+    gateway: { q: 0, r: -10 },
     axis: 'DEX',
     nodes: [
       { id: 'ranger-core', name: 'Distance Contract', type: 'notable', stat: 'projectileDamage', amount: 24, effects: ['+24% Projectile Damage', 'First projectile after a dodge pierces'], tag: 'projectile' },
@@ -249,7 +161,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'genius',
     title: 'Genius Circle',
-    gateway: { q: 0, r: -9 },
+    gateway: { q: 10, r: 0 },
     axis: 'INT',
     nodes: [
       { id: 'genius-core', name: 'Proof Engine', type: 'notable', stat: 'spellDamage', amount: 22, effects: ['+22% Spell Damage', 'Completed circles add +5 INT'], tag: 'spell' },
@@ -265,7 +177,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'spellblade',
     title: 'Spellblade Annex',
-    gateway: { q: 9, r: -9 },
+    gateway: { q: 10, r: -10 },
     axis: 'HYBRID',
     nodes: [
       { id: 'spellblade-core', name: 'Edge Formula', type: 'notable', stat: 'spellDamage', amount: 18, effects: ['+18% Spell Damage', '+18% Attack Damage if you cast recently'], tag: 'hybrid' },
@@ -281,7 +193,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'skirmish',
     title: 'Skirmish Annex',
-    gateway: { q: -9, r: 0 },
+    gateway: { q: -10, r: 0 },
     axis: 'HYBRID',
     nodes: [
       { id: 'skirmish-core', name: "Brawler's Angle", type: 'notable', stat: 'attackDamage', amount: 18, effects: ['+18% close-range and thrown damage'], tag: 'weapon' },
@@ -296,7 +208,7 @@ export const VERDIGRIS_SUBTREES = [
   {
     id: 'seer',
     title: "Seer's Annex",
-    gateway: { q: 0, r: 9 },
+    gateway: { q: 0, r: 10 },
     axis: 'HYBRID',
     nodes: [
       { id: 'seer-core', name: 'Hidden Mark', type: 'notable', stat: 'ailmentEffect', amount: 19, effects: ['+19% Mark, Hex, and Ailment Effect'], tag: 'ailment' },
@@ -339,10 +251,13 @@ export const hexDistance = (hexOrQ, maybeR = null) => {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(s));
 };
 
-const toPixel = hex => ({
-  x: RADIUS * (hex.q + hex.r / 2),
-  y: RADIUS * (hex.r * Math.sqrt(3) / 2),
-});
+// Rotate the axial lattice so the authored WIZARD axes read INT up, DEX
+// bottom-left, and STR bottom-right.
+const toPixel = (hex) => {
+  const rawX = RADIUS * (hex.q + hex.r / 2);
+  const rawY = RADIUS * (hex.r * Math.sqrt(3) / 2);
+  return { x: rawY, y: -rawX };
+};
 
 const neighbor = (hex, i) => {
   const d = HEX_DIRECTIONS[i % 6];
@@ -352,51 +267,6 @@ const neighbor = (hex, i) => {
 const normalizeVector = (vector) => {
   const length = Math.hypot(vector.x, vector.y) || 1;
   return { x: vector.x / length, y: vector.y / length };
-};
-
-const hexRingIndex = (hex, ring) => {
-  if (ring === 0) return 0;
-  let cursor = { q: 0, r: 0 };
-  for (let k = 0; k < ring; k += 1) cursor = neighbor(cursor, 4);
-  let index = 0;
-  for (let side = 0; side < 6; side += 1) {
-    for (let step = 0; step < ring; step += 1) {
-      if (cursor.q === hex.q && cursor.r === hex.r) return index;
-      cursor = neighbor(cursor, side);
-      index += 1;
-    }
-  }
-  return -1;
-};
-
-const isHexCorner = (hex, ring) => {
-  const s = -hex.q - hex.r;
-  return [Math.abs(hex.q), Math.abs(hex.r), Math.abs(s)].filter(value => value === ring).length >= 2;
-};
-
-const isPrimaryAxisNode = (hex, ring) => (
-  (hex.q === ring && hex.r === 0)
-  || (hex.q === 0 && hex.r === -ring)
-  || (hex.q === -ring && hex.r === ring)
-);
-
-const nodeTypeFor = (hex, ring) => {
-  if (ring === 0) return 'origin';
-  const index = hexRingIndex(hex, ring);
-  const corner = isHexCorner(hex, ring);
-  const axisNode = isPrimaryAxisNode(hex, ring);
-  if (ring === TREE_LAYERS && corner) return 'gateway';
-  if (ring === 6 && index % 6 === 3) return 'keystone';
-  if (ring === 8 && index % 8 === 4) return 'keystone';
-  if ((ring === 3 || ring === 5 || ring === 7) && axisNode) return 'mastery';
-  if (ring === 2 && index % 2 === 0) return 'notable';
-  if (ring === 4 && index % 4 === 2) return 'notable';
-  if (ring === 5 && index % 5 === 2) return 'notable';
-  if (ring === 6 && index % 6 === 0) return 'notable';
-  if (ring === 7 && index % 7 === 2) return 'notable';
-  if (ring === 8 && index % 8 === 0) return 'notable';
-  if (ring === TREE_LAYERS && index % 7 === 3) return 'notable';
-  return 'small';
 };
 
 // PoE convention: every passive costs 1 regardless of power; travel is the real cost.
@@ -454,50 +324,16 @@ const biasArcAttributes = (attrs, weights) => {
   return copy;
 };
 
-const effectTemplate = (axis, hex, ring) => {
-  const pool = NODE_EFFECTS[axis] || NODE_EFFECTS.HYBRID;
-  const index = Math.abs((hex.q * 17 + hex.r * 31 + ring * 7) % pool.length);
-  return pool[index];
-};
-
-const notableTemplate = (axis, hex, ring) => {
-  const pool = NOTABLES[axis] || NOTABLES.HYBRID;
-  const index = Math.abs((hex.q * 11 + hex.r * 19 + ring * 5) % pool.length);
-  return pool[index];
-};
-
-const keystoneTemplate = (axis, hex, ring) => {
-  // Outer-ring keystones draw from the Signs; inner keystones stay axis-flavored.
-  // Index by position around the ring so each sign seat gets a distinct Sign.
-  if (ring >= 8) {
-    const seat = Math.floor(hexRingIndex(hex, ring) / 8);
-    return VERDIGRIS_SIGNS[Math.abs(seat) % VERDIGRIS_SIGNS.length];
-  }
-  const pool = KEYSTONES[axis] || KEYSTONES.HYBRID;
-  const index = Math.abs((hex.q * 13 + hex.r * 23 + ring * 3) % pool.length);
-  return pool[index];
-};
-
-const masteryTemplate = (axis, ring = 0) => {
-  if (ring >= 7) return GRAND_MASTERIES[axis] || GRAND_MASTERIES.HYBRID;
-  return MASTERIES[axis] || MASTERIES.HYBRID;
-};
-
-const makeNodeName = (template, hex, ring, type) => {
-  if (type === 'small') {
-    const pool = template.names;
-    const index = Math.abs((hex.q * 7 + hex.r * 5 + ring * 3) % pool.length);
-    return pool[index];
-  }
-  return template.name;
-};
-
 export const nodeRadius = (node, empowered = false) => {
   const base = {
     origin: 14,
     small: 7,
     notable: 12,
     mastery: 11,
+    waystone: 12,
+    socket: 10,
+    class: 14,
+    sign: 16,
     gateway: 13,
     keystone: 16,
   }[node.type] || 8;
@@ -530,59 +366,45 @@ class SkillNode {
 }
 
 const createMainNode = (hex) => {
+  const id = axialKey(hex.q, hex.r);
   const ring = hexDistance(hex);
   const pos = toPixel(hex);
   const weights = axisWeightsFromPosition(pos);
-  const axis = ring === 0 ? 'HYBRID' : dominantAxis(weights);
-  const type = nodeTypeFor(hex, ring);
-
-  if (type === 'origin') {
-    return new SkillNode({
-      id: axialKey(hex.q, hex.r),
-      hex,
-      pos,
-      ring,
-      type,
-      axis,
-      weights,
-      name: 'Origin',
-      effects: ['Starting point. No passive bonus.'],
-      tags: ['HYB', 'origin'],
-    });
-  }
-
-  const template = type === 'keystone'
-    ? keystoneTemplate(axis, hex, ring)
-    : type === 'notable'
-      ? notableTemplate(axis, hex, ring)
-      : type === 'mastery'
-        ? masteryTemplate(axis, ring)
-        : effectTemplate(axis, hex, ring);
-  const name = makeNodeName(template, hex, ring, type);
-  const effects = ['keystone', 'notable', 'mastery'].includes(type)
-    ? template.lines.slice()
-    : [template.line];
-  const stat = type === 'keystone' ? null : template.stat || null;
-  const amount = type === 'keystone' ? 0 : template.amount || 0;
-  const tags = [VERDIGRIS_AXIS_META[axis].short, type];
-  if (template.tag) tags.push(template.tag);
-  if (ring === 8 && type === 'keystone') tags.push('sign');
+  const seat = AUTHORED_SEATS[id];
+  const authoredAxis = String(seat?.axis || '').toUpperCase();
+  const axis = VERDIGRIS_AXIS_META[authoredAxis]
+    ? authoredAxis
+    : ring === 0 ? 'HYBRID' : dominantAxis(weights);
+  const type = seat?.type || (ring === 0 ? 'origin' : 'small');
+  const effects = Array.isArray(seat?.effects) && seat.effects.length
+    ? seat.effects.slice()
+    : [ring === 0 ? 'Starting point. No passive bonus.' : 'This seat has no authored entry yet.'];
+  const tags = Array.from(new Set([
+    VERDIGRIS_AXIS_META[axis].short,
+    type,
+    ...(Array.isArray(seat?.tags) ? seat.tags : []),
+  ]));
   if (ring === TREE_LAYERS) tags.push('outer');
 
-  return new SkillNode({
-    id: axialKey(hex.q, hex.r),
+  const node = new SkillNode({
+    id,
     hex,
     pos,
     ring,
     type,
     axis,
     weights,
-    name,
+    name: seat?.name || (ring === 0 ? 'Origin' : `Unauthored Seat ${id}`),
     effects,
     tags,
-    stat,
-    amount,
+    stat: type === 'origin' ? null : canonicalStat(seat?.stat || null),
+    amount: type === 'origin' || !Number.isFinite(seat?.amount) ? 0 : seat.amount,
   });
+  node.seat = seat || null;
+  node.status = seat?.status || 'empty';
+  node.notes = seat?.notes || '';
+  node.clusterId = seat?.clusterId || '';
+  return node;
 };
 
 class Conduit {
@@ -652,7 +474,7 @@ class Conduit {
 
 export class VerdigrisGeometricTree {
   // availablePoints is the current earned pool (1 per level after 1, plus
-  // quest points). A fresh level-1 character starts with 0; the 123 constant
+  // quest points). A fresh level-1 character starts with 0; the 140 constant
   // in VERDIGRIS_SKILL_TREE_POINTS is only the lifetime cap shown in the UI.
   constructor({ availablePoints = 0 } = {}) {
     this.initialPoints = Math.max(0, Math.floor(availablePoints));
@@ -669,6 +491,7 @@ export class VerdigrisGeometricTree {
     this.shapeBonuses = [];
     this.lastDeltas = [];
     this.stats = null;
+    this.classOrder = [];
     this.generateTree(TREE_LAYERS);
     this.buildSubtrees();
     this.recalculate();
@@ -792,6 +615,7 @@ export class VerdigrisGeometricTree {
 
   snapshot() {
     return {
+      schemaVersion: VERDIGRIS_PASSIVE_TREE_SCHEMA_VERSION,
       nodes: Array.from(this.nodes.values()).filter(node => node.active).map(node => node.id),
       conduits: Array.from(this.conduits.values())
         .filter(conduit => conduit.allocated)
@@ -799,6 +623,7 @@ export class VerdigrisGeometricTree {
       points: { ...this.points },
       log: this.log.slice(),
       selectedNodeId: this.selectedNodeId,
+      classOrder: this.classOrder.slice(),
     };
   }
 
@@ -808,9 +633,17 @@ export class VerdigrisGeometricTree {
       const saved = snapshot.conduits.find(item => item.id === conduit.id);
       conduit.allocatedVariant = saved ? saved.variant : null;
     });
-    this.points = { ...snapshot.points };
-    this.log = snapshot.log.slice();
+    this.points = { ...(snapshot.points || { skill: this.initialPoints }) };
+    this.log = Array.isArray(snapshot.log) ? snapshot.log.slice() : [];
     this.selectedNodeId = snapshot.selectedNodeId || '0,0';
+    const activeClasses = new Set(Array.from(this.nodes.values())
+      .filter(node => node.active && node.type === 'class')
+      .map(node => node.id));
+    const savedOrder = Array.isArray(snapshot.classOrder) ? snapshot.classOrder : [];
+    this.classOrder = [
+      ...savedOrder.filter(id => activeClasses.has(id)),
+      ...Array.from(activeClasses).filter(id => !savedOrder.includes(id)),
+    ];
     this.pending = null;
     this.recalculate();
   }
@@ -832,6 +665,7 @@ export class VerdigrisGeometricTree {
     this.points = { skill: this.initialPoints };
     this.pending = null;
     this.selectedNodeId = '0,0';
+    this.classOrder = [];
     this.log = ['Build reset to origin.'];
     this.recalculate();
   }
@@ -914,11 +748,14 @@ export class VerdigrisGeometricTree {
   }
 
   isAvailableConduit(conduit, optionId = null) {
-    if (!conduit || conduit.allocated || !this.isConduitVisible(conduit) || this.points.skill < 1) return false;
+    if (!conduit || conduit.allocated || !this.isConduitVisible(conduit)) return false;
     if (optionId && !conduit.getOption(optionId)) return false;
     const fromNode = this.nodes.get(conduit.fromId);
     const toNode = this.nodes.get(conduit.toId);
-    return Boolean(fromNode && toNode && fromNode.active && toNode.active);
+    if (!fromNode || !toNode) return false;
+    if (fromNode.active && toNode.active) return this.points.skill >= 1;
+    const target = fromNode.active ? toNode : toNode.active ? fromNode : null;
+    return Boolean(target && this.points.skill >= target.cost + 1);
   }
 
   handleNodeClick(id) {
@@ -941,6 +778,11 @@ export class VerdigrisGeometricTree {
   tryAllocateNode(id) {
     const node = this.nodes.get(id);
     if (!node) return;
+    if (node.type === 'sign' && Array.from(this.nodes.values()).some(entry => entry.active && entry.type === 'sign')) {
+      this.commit('Only one Sign may mark a life.');
+      this.recalculate();
+      return;
+    }
     if (this.points.skill < node.cost + 1) {
       this.commit(`Not enough skill points for ${node.name} (needs ${node.cost + 1} with its path).`);
       this.recalculate();
@@ -970,6 +812,7 @@ export class VerdigrisGeometricTree {
     if (!option) return;
     this.saveHistory();
     node.active = true;
+    if (node.type === 'class' && !this.classOrder.includes(node.id)) this.classOrder.push(node.id);
     conduit.allocatedVariant = option.id;
     this.points.skill -= node.cost + 1;
     this.pending = null;
@@ -1005,6 +848,13 @@ export class VerdigrisGeometricTree {
     if (this.isAvailableConduit(conduit, optionId)) {
       const option = conduit.getOption(optionId);
       if (!option) return;
+      const fromNode = this.nodes.get(conduit.fromId);
+      const toNode = this.nodes.get(conduit.toId);
+      const target = fromNode.active ? toNode : toNode.active ? fromNode : null;
+      if (target && !target.active) {
+        this.allocateNodeWithConduit(target, conduit, option.id);
+        return;
+      }
       this.saveHistory();
       conduit.allocatedVariant = option.id;
       this.points.skill -= 1;
@@ -1051,6 +901,7 @@ export class VerdigrisGeometricTree {
     }
     this.saveHistory();
     node.active = false;
+    if (node.type === 'class') this.classOrder = this.classOrder.filter(nodeId => nodeId !== node.id);
     this.points.skill += node.cost;
     node.connections.forEach((neighborId) => {
       const conduit = this.conduits.get(edgeKey(node.id, neighborId));
@@ -1128,9 +979,33 @@ export class VerdigrisGeometricTree {
     this.lastDeltas = this.computeDeltas(previousStats, this.stats);
   }
 
+  characterClassNode() {
+    const firstId = this.classOrder.find(id => this.nodes.get(id)?.active);
+    return firstId ? this.nodes.get(firstId) : null;
+  }
+
+  getUnlocks() {
+    return [...new Set(this.classOrder
+      .map(id => this.nodes.get(id))
+      .filter(node => node?.active)
+      .flatMap(node => VERDIGRIS_CLASS_UNLOCKS[node.name] || []))];
+  }
+
   computeStats() {
     const attrs = { STR: 0, DEX: 0, INT: 0 };
     const derived = { ...BASE_CHARACTER };
+    const applyAmount = (stat, amount) => {
+      if (!stat || !Number.isFinite(amount)) return;
+      if (ATTRIBUTE_STATS[stat]) {
+        attrs[ATTRIBUTE_STATS[stat]] += amount;
+      } else if (stat === 'attrs') {
+        attrs.STR += amount;
+        attrs.DEX += amount;
+        attrs.INT += amount;
+      } else {
+        derived[stat] = (derived[stat] || 0) + amount;
+      }
+    };
     this.conduits.forEach((conduit) => {
       if (!conduit.allocated) return;
       attrs.STR += conduit.attrs.STR;
@@ -1139,10 +1014,10 @@ export class VerdigrisGeometricTree {
     });
     this.nodes.forEach((node) => {
       if (!node.active) return;
-      if (node.stat && typeof node.amount === 'number') derived[node.stat] = (derived[node.stat] || 0) + node.amount;
+      applyAmount(node.stat, node.amount);
       const boost = this.getNodeBoost(node);
       if (!boost) return;
-      if (node.stat && boost.directBonus) derived[node.stat] = (derived[node.stat] || 0) + boost.directBonus;
+      applyAmount(node.stat, boost.directBonus);
       attrs.STR += boost.attrBonus.STR;
       attrs.DEX += boost.attrBonus.DEX;
       attrs.INT += boost.attrBonus.INT;
@@ -1166,7 +1041,12 @@ export class VerdigrisGeometricTree {
     derived.critChance = round(derived.critChance + attrs.DEX * 0.035 + attrs.INT * 0.025);
     derived.allResistances = round(derived.allResistances + attrs.INT * 0.05 + attrs.STR * 0.025);
     derived.blockChance = round(Math.min(75, derived.blockChance + attrs.STR * 0.015));
-    return { attrs, derived };
+    return {
+      attrs,
+      derived,
+      characterClass: this.characterClassNode()?.name || null,
+      unlocks: this.getUnlocks(),
+    };
   }
 
   computeDeltas(previous, next) {
@@ -1458,6 +1338,8 @@ export class VerdigrisGeometricTree {
       stats: {
         attrs: { ...this.stats.attrs },
         derived: { ...this.stats.derived },
+        characterClass: this.stats.characterClass,
+        unlocks: this.stats.unlocks.slice(),
       },
       selectedNode: this.nodeView(selectedNode),
       shapeBonuses: this.shapeBonuses.map(bonus => ({ ...bonus })),

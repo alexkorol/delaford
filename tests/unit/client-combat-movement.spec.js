@@ -72,6 +72,19 @@ describe('client combat movement prediction', () => {
     expect(client.setLocalAnimation).not.toHaveBeenCalled();
   });
 
+  it('notifies the server and idles locally when held movement stops', () => {
+    const client = makeClient();
+    client.setLocalIdle = vi.fn();
+
+    client.stopMoving();
+
+    expect(Socket.emit).toHaveBeenCalledWith('player:move', {
+      id: 'player-1',
+      stopped: true,
+    });
+    expect(client.setLocalIdle).toHaveBeenCalled();
+  });
+
   it('clears queued local movement when optimistic movement is reset', () => {
     const client = makeClient({ mockReset: false });
     const hardSync = vi.fn();

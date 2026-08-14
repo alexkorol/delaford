@@ -48,7 +48,6 @@ export default class Mining extends Skill {
   pickAtRock() {
     const playerUuid = this.player ? this.player.uuid : null;
     const rock = this.rock;
-    console.log(`Mining for ${rock ? rock.resources : 'unknown'}`);
 
     if (!rock) {
       return Promise.reject(new Error('That rock is no longer available.'));
@@ -100,16 +99,5 @@ export default class Mining extends Skill {
         resolve(currentRock);
       }, 1000);
     });
-  }
-
-  /**
-   * Inspect a rock to be told what it is
-   */
-  prospect() {
-    const id = this.rock;
-    console.log(id);
-
-    // Get the ID of the rock
-    // Return back the name of the rock via chat
   }
 }

@@ -10,9 +10,7 @@ import {
 import Socket from '@/core/utilities/socket.js';
 
 const resetSocketState = () => {
-  Socket.queue.length = 0;
-  Socket.waitForOpen = false;
-  Socket.socketsWithListeners = new WeakSet();
+  Socket.reset();
   Socket.lastLoginPayload = null;
 };
 
@@ -61,7 +59,7 @@ describe('client Socket helper', () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  it('caps the queue while waiting for a socket to initialise', () => {
+  it('caps safe persisted-state messages while waiting for a socket', () => {
     class FakeWebSocket {}
     FakeWebSocket.OPEN = 1;
     FakeWebSocket.CLOSED = 3;
@@ -71,7 +69,7 @@ describe('client Socket helper', () => {
 
     const attempts = Socket.MAX_QUEUE_SIZE + 5;
     for (let index = 0; index < attempts; index += 1) {
-      Socket.emit('queued:event', { index });
+      Socket.emit('player:skilltree:save', { index });
     }
 
     expect(Socket.queue.length).toBe(Socket.MAX_QUEUE_SIZE);
@@ -97,11 +95,25 @@ describe('client Socket helper', () => {
 
     const socket = new FakeWebSocket();
     setWebSocketEnvironment(FakeWebSocket, socket);
+    Socket.setAuthenticated(true);
 
     Socket.emit('game:update', { payload: true });
 
     expect(socket.messages).toHaveLength(1);
     expect(Socket.queue).toHaveLength(0);
+  });
+
+  it('does not replay stale gameplay input after a disconnect', () => {
+    class FakeWebSocket {}
+    FakeWebSocket.OPEN = 1;
+    FakeWebSocket.CLOSED = 3;
+
+    setWebSocketEnvironment(FakeWebSocket);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(Socket.emit('player:move', { direction: 'up' })).toBe(false);
+    expect(Socket.queue).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('stale gameplay actions'));
   });
 
   it('routes browser logins through Chronicles and remembers the selected Scion', () => {
@@ -113,11 +125,13 @@ describe('client Socket helper', () => {
 
       addEventListener() {}
 
+
       send(message) {
         this.messages.push(JSON.parse(message));
       }
     }
     FakeWebSocket.OPEN = 1;
+    FakeWebSocket.CLOSED = 3;
 
     const socket = new FakeWebSocket();
     setWebSocketEnvironment(FakeWebSocket, socket);
@@ -138,5 +152,33 @@ describe('client Socket helper', () => {
     expect(Socket.lastLoginPayload.scionId).toBe('scion-vesper');
     expect(Socket.lastLoginPayload.houseId).toBe('house-vaelmont');
     expect(Socket.lastLoginPayload.mortal).toBe(true);
+  });
+
+  it('holds persisted state until login authentication completes', () => {
+    class FakeWebSocket {
+      constructor() {
+        this.readyState = FakeWebSocket.OPEN;
+        this.messages = [];
+      }
+
+      addEventListener() {}
+
+      send(message) {
+        this.messages.push(JSON.parse(message));
+      }
+    }
+    FakeWebSocket.OPEN = 1;
+    FakeWebSocket.CLOSED = 3;
+
+    const socket = new FakeWebSocket();
+    setWebSocketEnvironment(FakeWebSocket, socket);
+    Socket.enqueue('player:skilltree:save', { snapshot: true });
+
+    expect(Socket.flushQueue()).toBe(0);
+    expect(socket.messages).toEqual([]);
+
+    Socket.setAuthenticated(true);
+    expect(Socket.flushQueue()).toBe(1);
+    expect(socket.messages[0].event).toBe('player:skilltree:save');
   });
 });

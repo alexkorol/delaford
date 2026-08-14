@@ -21,4 +21,10 @@ export default {
       map.addProjectile(message && message.data ? message.data : {});
     }
   },
+  'monster:telegraph': (message, context) => {
+    const map = context && context.game && context.game.map;
+    if (map && typeof map.addGroundTelegraph === 'function') {
+      map.addGroundTelegraph(message && message.data ? message.data : {});
+    }
+  },
 };

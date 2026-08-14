@@ -1,6 +1,7 @@
 import Socket from '#server/socket.js';
 import { wearableItems } from '#server/core/data/items/index.js';
 import world from '#server/core/world.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
 import Wear from '#server/core/utilities/wear.js';
 import ItemFactory from '#server/core/items/factory.js';
 import {
@@ -9,6 +10,7 @@ import {
   findOpenInventorySlot,
   positionFromSlot,
 } from '#shared/inventory-footprints.js';
+import { canItemUseSlot, resolveEquipSlot } from '#shared/wear-slots.js';
 
 const findInventoryItemIndex = (slots = [], reference = {}) => {
   if (reference.uuid) {
@@ -44,6 +46,17 @@ const sendInventoryMessage = (player, text) => {
   Socket.emit('game:send:message', {
     player: { socket_id: player.socket_id },
     text,
+  });
+};
+
+const refreshPlayerInventory = (player) => {
+  if (!player || !player.socket_id) {
+    return;
+  }
+
+  Socket.emit('core:refresh:inventory', {
+    player: { socket_id: player.socket_id },
+    data: player.inventory.slots,
   });
 };
 
@@ -94,7 +107,11 @@ export default {
     wearItem.id = equippingItem.id || baseItem.id;
     wearItem.slotType = baseItem.slot;
 
-    player.wear[baseItem.slot] = wearItem;
+    // Grouped slots (rings) have more than one seat; honour the seat the caller
+    // resolved, else fill the first empty one.
+    const preferredSlot = data.item.targetSlot || data.item.miscData?.targetSlot || null;
+    const wearSlot = resolveEquipSlot(player.wear, baseItem.slot, preferredSlot);
+    player.wear[wearSlot] = wearItem;
 
     if (inventoryIndex > -1) {
       player.inventory.slots.splice(inventoryIndex, 1);
@@ -113,7 +130,15 @@ export default {
     if (typeof player.refreshDerivedStats === 'function') {
       player.refreshDerivedStats();
     }
-    Socket.broadcast('player:equippedAnItem', player);
+    Socket.broadcast(
+      'player:equippedAnItem',
+      publicPlayerProjection(player),
+      world.getScenePlayers(player.sceneId),
+    );
+    // The public scene projection intentionally excludes private inventory.
+    // Send the owner a separate authoritative backpack snapshot so a swap
+    // replaces the incoming item's tile with the item that was taken off.
+    refreshPlayerInventory(player);
   },
 
   /**
@@ -136,7 +161,14 @@ export default {
         return;
       }
 
-      const equipped = player.wear[baseItem.slot];
+      // Grouped slots (rings) can hold the same item id in more than one seat,
+      // so honour the physical seat the caller named; fall back to the base.
+      const requestedWearSlot = typeof data.item.wearSlot === 'string' ? data.item.wearSlot : null;
+      const wearSlot = requestedWearSlot && canItemUseSlot(baseItem.slot, requestedWearSlot)
+        ? requestedWearSlot
+        : baseItem.slot;
+
+      const equipped = player.wear[wearSlot];
       if (!equipped) {
         resolve(400);
         return;
@@ -199,7 +231,7 @@ export default {
 
       player.inventory.slots.push(inventoryItem);
 
-      player.wear[baseItem.slot] = null;
+      player.wear[wearSlot] = null;
 
       const combatStats = Wear.updateCombat(playerIndex);
       player.combat = {
@@ -216,7 +248,17 @@ export default {
         player.refreshDerivedStats();
       }
 
-      Socket.broadcast('player:unequippedAnItem', player);
+      Socket.broadcast(
+        'player:unequippedAnItem',
+        publicPlayerProjection(player),
+        world.getScenePlayers(player.sceneId),
+      );
+      // Replacement equips immediately follow this operation and emit the
+      // final backpack state themselves. Avoid sending an overlapping,
+      // intermediate inventory where both items occupy the source footprint.
+      if (!data.replacing) {
+        refreshPlayerInventory(player);
+      }
       resolve(200);
     });
   },

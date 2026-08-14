@@ -169,8 +169,6 @@ export default {
         item: this.uiStore.action.object,
       });
 
-      console.log(this.uiStore.action.object);
-
       // TODO
       // Make 'context-menu' to smelt bars into weapons
       // Do actual smithing from weapons from item click on menu
@@ -302,12 +300,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
 div.grid_container {
   display: flex;
   justify-content: space-between;
@@ -325,11 +317,11 @@ div.grid_container {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: color.adjust($background_color, $lightness: -35%);
+    background-color: var(--color-border-strong);
   }
 
   .locked-item {
-    filter: contrast(0.35);
+    filter: grayscale(0.7) brightness(0.45);
   }
 
   div.slot {
@@ -338,7 +330,9 @@ div.grid_container {
     height: 32px;
     margin: 0 1em;
     text-align: center;
-    background-color: transparent;
+    background-color: var(--color-bg-inset);
+    border: 1px solid rgba(183, 146, 79, 0.22);
+    box-shadow: inset 0 0 7px rgba(0, 0, 0, 0.68);
 
     .qty {
       font-size: 10px;
@@ -351,6 +345,7 @@ div.grid_container {
   .name {
     font-size: 0.45em;
     margin: 0.5em 0;
+    color: var(--color-text-secondary);
   }
 
   .barsNeeded {
@@ -359,15 +354,15 @@ div.grid_container {
   }
 
   .levelNeeded {
-    color: #901313 !important;
+    color: var(--color-ruby-light) !important;
   }
 
   .notEnoughBars {
-    color: #ffb42a;
+    color: var(--color-accent-strong);
   }
 
   .canSmith {
-    color: #14ff14;
+    color: #78ad83;
   }
 }
 </style>

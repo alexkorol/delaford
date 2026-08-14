@@ -9,14 +9,21 @@
  */
 
 import Player from '#server/core/player.js';
+import Monster from '#server/core/monster.js';
 import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
 import world from '#server/core/world.js';
 import { broadcastStats } from '#server/core/entities/player/stats-manager.js';
 import { transitionPlayerIfOnPortal } from '#server/core/world-transitions.js';
 import chroniclesStore from '#server/core/services/chronicles-store.js';
+import { dropMonsterLoot } from '#server/core/combat/loot.js';
+import ItemFactory from '#server/core/items/factory.js';
 
-const DEV_MODE = (process.env.NODE_ENV || 'development') !== 'production';
+// Fail closed: wiz/dev commands run ONLY under an explicit development env (or a
+// deliberate opt-in flag). An unset/typo'd NODE_ENV must not hand players
+// teleport/give/set-level. The old `!== 'production'` enabled them by default.
+const DEV_MODE = process.env.NODE_ENV === 'development'
+  || process.env.ENABLE_DEV_COMMANDS === 'true';
 
 const seededRng = (seed) => {
   let state = Math.floor(seed) >>> 0;
@@ -62,6 +69,19 @@ const itemIdentity = item => (item ? {
   size: item.size,
 } : null);
 
+const itemLevel = item => item?.vessel?.item?.ilvl ?? null;
+
+const snapshotItem = item => ({
+  id: item.id,
+  uuid: item.uuid,
+  qty: item.qty || 1,
+  slot: item.slot,
+  size: item.size ? { ...item.size } : null,
+  itemLevel: itemLevel(item),
+  stats: item.stats ? structuredClone(item.stats) : null,
+  vessel: item.vessel ? structuredClone(item.vessel) : null,
+});
+
 // Snapshot of everything a playtest needs to assert on, in one request.
 const buildStateSnapshot = (player) => {
   const scene = world.getSceneForPlayer(player);
@@ -83,11 +103,16 @@ const buildStateSnapshot = (player) => {
     lifecycleMode: player.stats && player.stats.lifecycle ? player.stats.lifecycle.mode : null,
     chronicles: player.chronicles ? { ...player.chronicles } : null,
     chroniclesRecord: chroniclesStore.snapshot(player.uuid),
-    quests: player.quests ? structuredClone(player.quests) : null,
+    bestDepth: player.bestDepth || 0,
+    attributes: player.stats?.attributes?.total
+      ? { ...player.stats.attributes.total }
+      : null,
+    experience: {
+      attack: player.skills?.attack?.exp || 0,
+      defence: player.skills?.defence?.exp || 0,
+    },
     inventory: Array.isArray(player.inventory && player.inventory.slots)
-      ? player.inventory.slots.map(item => ({
-        id: item.id, uuid: item.uuid, qty: item.qty || 1, slot: item.slot,
-      }))
+      ? player.inventory.slots.map(snapshotItem)
       : [],
     inventoryDetails: Array.isArray(player.inventory && player.inventory.slots)
       ? player.inventory.slots.map(itemIdentity)
@@ -110,6 +135,10 @@ const buildStateSnapshot = (player) => {
       ? Object.fromEntries(Object.entries(player.wear)
         .map(([slot, item]) => [slot, itemIdentity(item)]))
       : {},
+    wornItems: player.wear
+      ? Object.fromEntries(Object.entries(player.wear)
+        .map(([slot, item]) => [slot, item ? snapshotItem(item) : null]))
+      : {},
     combat: player.combat ? {
       attack: { ...player.combat.attack },
       defense: { ...player.combat.defense },
@@ -121,6 +150,8 @@ const buildStateSnapshot = (player) => {
     } : null,
     skills: player.skills ? structuredClone(player.skills) : {},
     passiveTree: player.passiveTree || null,
+    quests: structuredClone(player.quests || {}),
+    questPoints: player.questPoints || 0,
     monsters: scene && Array.isArray(scene.monsters)
       ? scene.monsters.filter(m => m && m.isAlive).map(m => ({
         uuid: m.uuid,
@@ -130,6 +161,15 @@ const buildStateSnapshot = (player) => {
         level: m.level,
         rarity: m.rarityId,
         tags: Array.isArray(m.tags) ? [...m.tags] : [],
+        modifiers: structuredClone(m.modifiers || []),
+        behaviour: {
+          type: m.behaviour?.type || 'melee',
+          aura: structuredClone(m.behaviour?.aura || null),
+        },
+        state: {
+          mode: m.state?.mode || 'idle',
+          effects: structuredClone(m.state?.effects || {}),
+        },
         hp: m.stats && m.stats.resources ? { ...m.stats.resources.health } : null,
         coins: Number.isFinite(m.rewards?.coins) ? m.rewards.coins : 0,
       }))
@@ -150,11 +190,17 @@ const buildStateSnapshot = (player) => {
         id: item.id,
         uuid: item.uuid,
         name: item.name,
+        displayName: item.displayName || item.name,
         boundTo: item.boundTo,
         x: item.x,
         y: item.y,
         qty: item.qty || 1,
         chroniclesRelic: item.chroniclesRelic || null,
+        itemLevel: itemLevel(item),
+        stats: item.stats ? structuredClone(item.stats) : null,
+        vessel: item.vessel ? structuredClone(item.vessel) : null,
+        legacyRelicId: item.legacyRelicId || null,
+        legacy: item.legacy || null,
       }))
       : [],
     sceneMetadata: scene && scene.metadata ? {
@@ -166,6 +212,17 @@ const buildStateSnapshot = (player) => {
       spawnPoints: Array.isArray(scene.metadata.spawnPoints)
         ? structuredClone(scene.metadata.spawnPoints)
         : [],
+      // Crossroads / world-web state (docs/crossroads-world-web.md)
+      sanctuary: scene.metadata.sanctuary === true,
+      wagonPitches: scene.metadata.wagonPitches || null,
+      nodeId: scene.metadata.nodeId || null,
+      nodeName: scene.metadata.nodeName || null,
+      roadId: scene.metadata.roadId || null,
+      tier: scene.metadata.tier ?? null,
+      wardenName: scene.metadata.wardenName || null,
+      wardenDead: scene.metadata.wardenDead === true,
+      entryGate: scene.metadata.entryGate || null,
+      zoneGates: scene.metadata.zoneGates || null,
     } : {},
   };
 };
@@ -209,6 +266,20 @@ const devEvents = {
 
     player.x = Math.floor(payload.x);
     player.y = Math.floor(payload.y);
+    // A teleport must outrank the client's last interpolated movement step.
+    // Reusing the previous sequence makes the browser correctly reject this
+    // authoritative jump as stale even though the server position changed.
+    player.movementStep = {
+      sequence: (Number(player.movementStep?.sequence) || 0) + 1,
+      startedAt: Date.now(),
+      duration: 0,
+      walkId: null,
+      stepIndex: null,
+      steps: null,
+      direction: null,
+      blocked: false,
+      interrupted: true,
+    };
     if (player.path) {
       player.path.grid = null;
     }
@@ -231,16 +302,69 @@ const devEvents = {
 
     const quantity = Number.isFinite(payload.qty) ? Math.max(1, Math.floor(payload.qty)) : 1;
     const seed = Number(payload.seed);
-    const itemLevel = Number(payload.itemLevel);
+    const requestedItemLevel = Number(payload.itemLevel);
     player.inventory.add(payload.itemId, quantity, {
       ...(Number.isFinite(seed) ? { rng: seededRng(seed) } : {}),
-      ...(Number.isFinite(itemLevel) ? { itemLevel } : {}),
+      ...(Number.isFinite(requestedItemLevel) ? { itemLevel: requestedItemLevel } : {}),
     });
     Socket.emit('core:refresh:inventory', {
       player: { socket_id: player.socket_id },
       data: player.inventory.slots,
     });
     sendDevMessage(player, `Granted ${quantity}x ${payload.itemId}.`);
+  },
+
+  /** Place deterministic gear on the active floor; pickup/equip stay real. */
+  'dev:drop': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    if (!DEV_MODE || !player || typeof payload.itemId !== 'string') return;
+    const rng = Number.isFinite(payload.seed) ? seededRng(payload.seed) : undefined;
+    const item = ItemFactory.createById(payload.itemId, {
+      itemLevel: payload.itemLevel,
+      rng,
+    });
+    const scene = world.getSceneForPlayer(player);
+    if (!item || !scene) return;
+    const dropped = ItemFactory.toWorldInstance(item, { x: player.x, y: player.y });
+    world.addItem(dropped, scene.id);
+    Socket.broadcast('world:itemDropped', scene.items, world.getScenePlayers(scene.id));
+    sendDevMessage(player, `Dropped ${payload.itemId} on the active floor.`);
+  },
+
+  /** Restore one exact comparison monster without regenerating the floor. */
+  'dev:monster:reset': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    const scene = player ? world.getSceneForPlayer(player) : null;
+    const monster = scene?.monsters?.find(entry => entry.uuid === payload.monsterUuid);
+    if (!DEV_MODE || !player || !monster) return;
+    monster.respawnNow();
+    if (monster.stats?.resources?.health) {
+      if (Number.isFinite(payload.maxHealth) && payload.maxHealth > 0) {
+        monster.stats.resources.health.max = Math.floor(payload.maxHealth);
+      }
+      monster.stats.resources.health.current = monster.stats.resources.health.max;
+    }
+    // Deterministic combat comparisons must not be extended indefinitely by
+    // an unrelated support monster. This override exists only in dev mode and
+    // only for the explicitly selected disposable floor monster.
+    if (payload.isolate === true) monster.heal = () => false;
+    Monster.broadcast([monster], { players: world.getScenePlayers(scene.id) });
+    sendDevMessage(player, `Reset ${monster.name} for a comparison trial.`);
+  },
+
+  /** Defeat the active floor's monsters so scenario setup can exercise completion. */
+  'dev:clear-floor': (_data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const scene = player ? world.getSceneForPlayer(player) : null;
+    if (!DEV_MODE || !player || scene?.type !== 'instance') return;
+    scene.monsters.forEach((monster) => {
+      if (monster?.stats?.resources?.health) monster.stats.resources.health.current = 0;
+      if (monster?.stats?.lifecycle) monster.stats.lifecycle.state = 'permadead';
+    });
+    Monster.broadcast(scene.monsters, { players: world.getScenePlayers(scene.id) });
+    sendDevMessage(player, 'Cleared the active floor for objective verification.');
   },
 
   /**
@@ -318,6 +442,51 @@ const devEvents = {
     sendDevMessage(player, result && result.permadeath === true
       ? 'Mortal lifecycle advanced to final death.'
       : `Lifecycle damage result: ${result ? result.type : 'none'}.`);
+  },
+
+  /** Apply nonlethal damage so amenities can be exercised quickly. */
+  'dev:hurt': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    const payload = (data && data.data) || {};
+    const health = player?.stats?.resources?.health;
+    if (!DEV_MODE || !player || !health || health.current <= 1) return;
+    const requested = Number.isFinite(payload.amount) ? Math.max(1, Math.floor(payload.amount)) : 5;
+    health.current = Math.max(1, health.current - requested);
+    if (player.hp) player.hp.current = health.current;
+    broadcastStats(player);
+    sendDevMessage(player, `Took ${requested} nonlethal damage.`);
+  },
+
+  /** Put the scion one real monster hit away from its final death. */
+  'dev:prepare-final-death': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!DEV_MODE || !player?.stats?.lifecycle || !player.stats.resources?.health) return;
+    player.stats.lifecycle.mode = 'hard';
+    player.stats.lifecycle.state = 'alive';
+    player.stats.lifecycle.cheatDeath = player.stats.lifecycle.cheatDeath || {};
+    player.stats.lifecycle.cheatDeath.charges = 0;
+    player.stats.resources.health.current = 1;
+    broadcastStats(player);
+    sendDevMessage(player, 'Final death armed; the next damaging monster hit is fatal.');
+  },
+
+  /** Exercise the live relic drop pipeline deterministically for playtests. */
+  'dev:release-relic': (data, ws) => {
+    const player = getPlayerBySocket(ws);
+    if (!DEV_MODE || !player) return;
+    const rngValues = [0.99, 0];
+    dropMonsterLoot({
+      x: player.x,
+      y: player.y,
+      sceneId: player.sceneId,
+      rarityId: 'common',
+      rewards: { coins: 0 },
+    }, {
+      killer: player,
+      relicChance: 1,
+      rng: () => rngValues.shift() ?? 0.99,
+    });
+    sendDevMessage(player, 'Released the next eligible Chronicle relic into the live loot stream.');
   },
 };
 

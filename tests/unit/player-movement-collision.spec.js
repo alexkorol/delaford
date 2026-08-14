@@ -12,6 +12,7 @@ import {
 import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import createPlayerMovementHandler from '#server/core/entities/player/movement-handler.js';
+import { PLAYER_MOVE_DISTANCE, PLAYER_MOVE_SAMPLE_MS } from '#shared/movement.js';
 
 const sceneId = 'test:player-movement-collision';
 
@@ -124,6 +125,57 @@ describe('player movement collision', () => {
     }));
   });
 
+  it('advances keyboard movement through continuous, speed-normalised positions', () => {
+    const player = makePlayer();
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [],
+      metadata: { portals: [], spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    world.players.push(player);
+
+    expect(player.move('right', { startedAt: 1_000 })).toBe(true);
+    expect(player.x).toBeCloseTo(10 + PLAYER_MOVE_DISTANCE, 5);
+    expect(player.y).toBe(10);
+    expect(Number.isInteger(player.x)).toBe(false);
+    expect(player.movementStep.duration).toBe(PLAYER_MOVE_SAMPLE_MS);
+    expect(player.move('right')).toBe(true);
+    expect(player.move('right')).toBe(true);
+    expect(player.x).toBe(11);
+
+    const diagonal = makePlayer();
+    scene.players.push(diagonal);
+    world.players.push(diagonal);
+    expect(diagonal.move('down-right', { startedAt: 1_050 })).toBe(true);
+    expect(Math.hypot(diagonal.x - 10, diagonal.y - 10)).toBeCloseTo(
+      PLAYER_MOVE_DISTANCE,
+      5,
+    );
+  });
+
+  it('stops at the edge of a blocked tile without snapping to the grid', () => {
+    const map = makeOpenMap();
+    map.background[(10 * 200) + 11] = 4; // zero-based terrain tile 3 is blocked
+    const player = makePlayer();
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map,
+      monsters: [],
+      metadata: { portals: [], spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    world.players.push(player);
+
+    expect(player.move('right')).toBe(true);
+    const edge = player.x;
+    expect(player.move('right')).toBe(false);
+    expect(player.x).toBe(edge);
+    expect(Number.isInteger(player.x)).toBe(false);
+    expect(player.movementStep.blocked).toBe(true);
+  });
+
   it('interrupts path following when the next path tile is occupied by a monster', async () => {
     vi.useFakeTimers();
     const player = makePlayer();
@@ -150,5 +202,33 @@ describe('player movement collision', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(player.x).toBe(10);
     expect(player.y).toBe(10);
+  });
+
+  it('abandons delayed path work when the session has been replaced', async () => {
+    vi.useFakeTimers();
+    const player = makePlayer();
+    const scene = world.ensureScene(sceneId, {
+      type: 'test',
+      map: makeOpenMap(),
+      monsters: [],
+      metadata: { portals: [], spawnPoints: [{ x: 10, y: 10 }] },
+    });
+    scene.players = [player];
+    world.players.push(player);
+
+    player.walkPath();
+    const replacement = {
+      ...player,
+      socket_id: 'replacement-socket',
+      x: 50,
+      y: 50,
+    };
+    world._players = [replacement];
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(player.x).toBe(10);
+    expect(player.y).toBe(10);
+    expect(replacement.x).toBe(50);
+    expect(replacement.y).toBe(50);
   });
 });

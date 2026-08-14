@@ -1,5 +1,7 @@
 import Socket from '#server/socket.js';
 import world from './world.js';
+import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
+import { occupiedTile } from '#shared/movement.js';
 
 const clone = value => JSON.parse(JSON.stringify(value || {}));
 
@@ -53,7 +55,7 @@ const broadcastJoinedPlayers = (scene) => {
     })),
   };
 
-  Socket.broadcast('player:joined', recipients, recipients, { meta });
+  Socket.broadcast('player:joined', recipients.map(publicPlayerProjection), recipients, { meta });
 };
 
 export const transitionPlayerToPortalDestination = (player, portal) => {
@@ -122,9 +124,23 @@ export const transitionPlayerIfOnPortal = (player) => {
     ? scene.metadata.portals
     : [];
 
-  const portal = portals.find(entry => entry.x === player.x && entry.y === player.y);
+  const playerTile = occupiedTile(player);
+  const portal = portals.find(entry => entry.x === playerTile.x && entry.y === playerTile.y);
   if (!portal) {
     return false;
+  }
+
+  // Road gates: the four ways out of the Crossroads. Stepping onto one opens
+  // that road's Wayfinder's Chart — the player picks a charted zone from it.
+  if (portal.destination && portal.destination.road) {
+    const { road } = portal.destination;
+    if (portal.message) {
+      sendMessage(player, portal.message);
+    }
+    import('#server/core/services/zone-service.js')
+      .then(({ zoneService }) => zoneService.openRoadChart(player, road))
+      .catch((error) => console.error('[world] Road gate failed:', error));
+    return true;
   }
 
   // Instance gates: physical entrances in the world that drop the player

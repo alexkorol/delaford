@@ -7,13 +7,21 @@
     <div
       v-if="current !== false"
       :style="getPaneDimensions"
-      class="pane"
+      :class="['pane', { 'pane--bank': current === 'bank' }]"
     >
       <component
         :is="current"
         :game="game"
         :data="screenData"
       />
+      <button
+        type="button"
+        class="pane-close"
+        aria-label="Close current pane"
+        @click="closePane"
+      >
+        ×
+      </button>
     </div>
     <canvas
       id="game-map"
@@ -45,6 +53,7 @@ import InputController from '../core/utilities/input-controller.js';
 
 export default {
   name: 'Game',
+  emits: ['pane-state'],
   props: {
     game: {
       type: Object,
@@ -119,12 +128,13 @@ export default {
     },
     otherPlayers() {
       return this.game.players.filter(
-        (p) => p.socket_id !== this.game.player.socket_id,
+        (p) => p.uuid !== this.game.player.uuid,
       );
     },
   },
   watch: {
     current(newVal) {
+      this.$emit('pane-state', typeof newVal !== 'boolean');
       if (typeof newVal === 'boolean') {
         Socket.emit('player:pane:close', {
           id: this.game.player.uuid,
@@ -224,7 +234,9 @@ export default {
       this.dispatchMovement(direction);
     },
     onMoveStop() {
-      if (this.game && typeof this.game.setLocalIdle === 'function') {
+      if (this.game && typeof this.game.stopMoving === 'function') {
+        this.game.stopMoving();
+      } else if (this.game && typeof this.game.setLocalIdle === 'function') {
         this.game.setLocalIdle();
       }
     },
@@ -293,8 +305,8 @@ export default {
 
       if (this.game && this.game.player) {
         return {
-          x: this.game.player.x - snapshot.center.x + local.x,
-          y: this.game.player.y - snapshot.center.y + local.y,
+          x: Math.round(this.game.player.x) - snapshot.center.x + local.x,
+          y: Math.round(this.game.player.y) - snapshot.center.y + local.y,
         };
       }
 
@@ -317,7 +329,6 @@ export default {
     openScreen(incoming) {
       this.current = incoming.data.screen;
       this.screenData = incoming.data.payload;
-      bus.$emit('pane:data', this.screenData);
     },
     /**
      * Right-click brings up context-menu
@@ -376,6 +387,7 @@ export default {
 
       if (!this.onGame) return;
       const mouseEvent = this.event || this.mouse;
+      if (!mouseEvent || !mouseEvent.target) return;
       // Save latest mouse data
       this.mouse = mouseEvent;
 
@@ -641,6 +653,38 @@ div.game {
     div {
       height: 100%;
       width: 100%;
+    }
+  }
+
+  .pane--bank {
+    left: 25%;
+    width: calc(50% - 16px);
+  }
+
+  .pane-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 30px;
+    height: 30px;
+    padding: 3px;
+    color: var(--color-text-secondary);
+    font: 1rem "GameFont", sans-serif;
+    background: var(--control-surface);
+    border: 1px solid var(--color-frame-dark);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid #fff2c8;
+      outline-offset: -3px;
+    }
+
+    &:hover {
+      color: #f0b4a8;
+      border-color: var(--color-danger);
+      background: linear-gradient(180deg, #4c2424, #211111);
     }
   }
 

@@ -8,54 +8,62 @@ import {
   buildGuestSnapshot,
 } from '#server/core/repositories/guest-save-store.js';
 
-// A real account player carries a JWT; guests carry token 'none' and are
-// skipped by the network save entirely.
+// Login accounts use local:<account id>; guests and retired token shapes use
+// machine-local snapshots. No player save performs a network request.
 const createMockPlayer = (uuid = 'player-1', username = 'TestUser') => ({
   uuid,
   username,
-  token: 'jwt-test-token',
+  token: `local:${uuid}`,
   update: vi.fn(),
-});
-
-const createMockRepository = () => ({
-  save: vi.fn().mockResolvedValue({ ok: true }),
 });
 
 describe('PlayerPersistenceService', () => {
   let service;
-  let repository;
+  let saveGuestPlayer;
+  let saveLocalProfile;
 
   beforeEach(() => {
-    repository = createMockRepository();
+    saveGuestPlayer = vi.fn().mockResolvedValue({ saved: 'guest' });
+    saveLocalProfile = vi.fn().mockResolvedValue({ saved: 'account' });
     service = new PlayerPersistenceService({
-      repository,
+      saveGuestPlayer,
+      saveLocalProfile,
       cooldownMs: 1000,
       logger: { error: vi.fn() },
     });
   });
 
   describe('savePlayer', () => {
-    it('saves a player through the repository', async () => {
+    it('saves a login account through the local SQLite profile writer', async () => {
       const player = createMockPlayer();
       const result = await service.savePlayer(player);
 
-      expect(repository.save).toHaveBeenCalledWith(player);
-      expect(result).toEqual({ ok: true });
+      expect(saveLocalProfile).toHaveBeenCalledWith(player);
+      expect(saveGuestPlayer).not.toHaveBeenCalled();
+      expect(result).toEqual({ saved: 'account' });
     });
 
     it('returns null for null player', async () => {
       const result = await service.savePlayer(null);
       expect(result).toBeNull();
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(saveLocalProfile).not.toHaveBeenCalled();
+      expect(saveGuestPlayer).not.toHaveBeenCalled();
     });
 
     it('routes guest players to the local file store, never the network', async () => {
       const guest = { ...createMockPlayer('guest-test-1', 'dev'), token: 'none' };
       const result = await service.savePlayer(guest);
-      // A snapshot comes back from the file store; the account API is untouched.
-      expect(result).toBeTruthy();
-      expect(result.level).toBe(guest.level);
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(result).toEqual({ saved: 'guest' });
+      expect(saveGuestPlayer).toHaveBeenCalledWith(guest);
+      expect(saveLocalProfile).not.toHaveBeenCalled();
+    });
+
+    it('routes retired non-local token shapes to a local snapshot', async () => {
+      const legacy = { ...createMockPlayer(), token: 'jwt-retired-token' };
+
+      expect(await service.savePlayer(legacy)).toEqual({ saved: 'guest' });
+      expect(saveGuestPlayer).toHaveBeenCalledWith(legacy);
+      expect(saveLocalProfile).not.toHaveBeenCalled();
     });
 
     it('records the save timestamp on success', async () => {
@@ -65,8 +73,8 @@ describe('PlayerPersistenceService', () => {
       expect(service.lastSuccessfulSave.has(player.uuid)).toBe(true);
     });
 
-    it('throws and logs on repository failure', async () => {
-      repository.save.mockRejectedValue(new Error('DB error'));
+    it('throws and logs on local persistence failure', async () => {
+      saveLocalProfile.mockRejectedValue(new Error('DB error'));
       const player = createMockPlayer();
 
       await expect(service.savePlayer(player)).rejects.toThrow('DB error');
@@ -201,11 +209,11 @@ describe('PlayerPersistenceService', () => {
     it('skips save when throttled', async () => {
       const player = createMockPlayer();
       await service.savePlayer(player);
-      repository.save.mockClear();
+      saveLocalProfile.mockClear();
 
       const result = await service.savePlayer(player);
       expect(result).toBeNull();
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(saveLocalProfile).not.toHaveBeenCalled();
     });
   });
 

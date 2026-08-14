@@ -62,18 +62,25 @@ Wiz/dev commands (server-side, disabled in production):
 export `async ({ connect, assert }) => {…}`. Add one for every new gameplay
 feature. Full details: `playtest/README.md`.
 
-## What the harness does NOT cover — browser pass
+## What the harness does NOT cover — browser smoke
 
 The harness drives server truth over the real protocol. Client-side bugs
 (dead Vue event bindings, canvas focus traps, stale HUD labels, raw-HTML
-rendering) are invisible to it. After client/UI changes, open the app in a
-real browser (`npm run dev`, http://localhost:5173, Login button is
-prefilled) and check at minimum:
+rendering) are invisible to it. After every client/UI change, run:
+
+```bash
+npm run smoke:browser   # builds, boots a real server, drives Playwright
+```
+
+The browser gate checks:
 
 1. WASD moves the character AFTER clicking a UI element (chat, a pane).
 2. Right-click opens the game menu on the canvas AND on an inventory item.
 3. Open the skill tree (press `p`), allocate, close, reopen — build intact.
 4. Enter a zone from the Adventure menu; minimap label shows the zone name.
+
+Use `npm run dev` for additional exploratory browser checks when the changed
+surface extends beyond these four contracts; do not leave it running.
 
 ## Commands
 
@@ -82,17 +89,19 @@ npm run dev          # client :5173 + server :6500 (concurrently)
 npm run test:unit    # vitest (448+ tests)
 npm run lint         # eslint
 npm run playtest     # goal harness — run before claiming playability
+npm run smoke:browser # required after client/UI changes
 ```
 
 Process hygiene (matters for sandboxed/CLI agents):
 
 - Do not start watch-mode or long-lived processes (`npm run dev`,
-  `npm run dev:server`, `npm run dev:client`) and leave them running; if
-  you must probe one, wrap it with a timeout and kill it. Prefer
-  `npm run playtest` (self-terminating) or, when a dev server is already
+  `npm run dev:server`, `npm run dev:client`) merely for an agent-side probe;
+  prefer `npm run playtest` (self-terminating) or, when a dev server is already
   running, `npm run playtest -- --attach`.
-- When the user should try the game themselves, give them the command
-  instead of hosting the server from your session.
+- When the user explicitly asks to run, launch, open, or try the game, start it
+  for them and keep the process attached so it can be stopped cleanly. If a
+  manual command is still useful, provide one copy-paste block that includes
+  the directory change and launch command.
 
 ## Protocol crib sheet (saves you spelunking)
 
@@ -109,6 +118,19 @@ Process hygiene (matters for sandboxed/CLI agents):
   `core:refresh:inventory`, `world:scene:transition` /
   `party:scene:transition` (instance→instance keeps the same scene id —
   wait on the transition event, not the id).
+- World web (docs/crossroads-world-web.md): `world:road:chart` (`{roadId}`,
+  roads: tin/salt/chalk/copper) opens the chart pane; `world:zone:enter`
+  (`{nodeId: 'road:tier:index'}`) travels to a charted node. Zones are
+  per-House scenes `zone:<houseId>:<nodeId>` that linger `ZONE_LINGER_MS`
+  (default 15 min) after emptying. The Warden (the floor's elite) bars the
+  onward gates; its death marks the node cleared in SQLite and unlocks the
+  children. Wagon pane events: `player:screen:wagon` (context-menu action —
+  lives in handlers/actions/index.js because the Action dispatcher only
+  routes there), `wagon:outfit:buy`, `wagon:daily:claim`, `wagon:upgrade`,
+  `chronicles:house:deposit` (bank or wagon pane).
+- The town (`town:delaford`, displayed as "The Crossroads") is truce-ground:
+  `metadata.sanctuary` is true, no monsters may exist or deal damage there,
+  and scions log in at their House's wagon pitch.
 - Vue right-click: use `@contextmenu.prevent`, never `@click.right`
   (browsers do not fire `click` for the right button).
 

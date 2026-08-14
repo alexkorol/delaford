@@ -81,16 +81,16 @@ const pack = {
       name: 'Khopesh', kind: 'weapon', kindLabel: 'Sickle-sword', w: 1, h: 3, icon: 'khopesh', weapon: { dmg: [11, 20], aps: 1.2 }, tags: ['blade'], weights: { blade: 1.2, fortune: 1.2 }, materials: ['flint', 'copper', 'bronze', 'skymetal'], implicit: { label: '+10% Attack Speed', stat: { id: 'atk_speed', v: 10 } },
     },
     sling: {
-      name: 'Sling', kind: 'weapon', kindLabel: 'Sling', w: 1, h: 2, icon: 'sling', weapon: { dmg: [5, 16], aps: 1.15 }, tags: ['reach', 'swift'], weights: { swift: 1.3 }, materials: ['hide', 'quilted'], implicit: { label: 'Ignores half of Ward', stat: null },
+      name: 'Sling', kind: 'weapon', kindLabel: 'Sling', w: 1, h: 2, icon: 'sling', weapon: { dmg: [5, 16], aps: 1.15 }, tags: ['reach', 'swift'], weights: { swift: 1.3 }, materials: ['hide', 'quilted'], implicit: { label: 'Ignores half of Armour', stat: null },
     },
     hideshield: {
       name: 'Shield', kind: 'shield', kindLabel: 'Shield', w: 2, h: 3, icon: 'shield', armor: 45, tags: ['ward'], weights: { ward: 1.5 }, materials: ['hide', 'bronze', 'bronzescale', 'rivetmail'], implicit: { label: '+4% Chance to Block', stat: { id: 'block', v: 4 } },
     },
     wrap: {
-      name: 'Wrap', kind: 'body', kindLabel: 'Body wrap', w: 2, h: 3, icon: 'wrap', armor: 60, tags: ['ward', 'life'], weights: { life: 1.2 }, materials: ['hide', 'quilted', 'bronzescale', 'rivetmail'], implicit: { label: '+15 to Maximum Life', stat: { id: 'life', v: 15 } },
+      name: 'Wrap', kind: 'body', kindLabel: 'Body wrap', w: 2, h: 3, icon: 'wrap', armor: 60, tags: ['ward', 'life'], weights: { life: 1.2 }, materials: ['hide', 'quilted', 'bronzescale', 'rivetmail'], implicit: { label: '+15 to Maximum Health', stat: { id: 'life', v: 15 } },
     },
     crest: {
-      name: 'Crest', kind: 'helmet', kindLabel: 'Headpiece', w: 2, h: 2, icon: 'crest', armor: 25, tags: ['ward', 'spirit'], weights: { spirit: 1.2 }, materials: ['bone', 'hide', 'copper', 'bronze', 'jade'], implicit: { label: '+10 to Maximum Spirit', stat: { id: 'spirit', v: 10 } },
+      name: 'Crest', kind: 'helmet', kindLabel: 'Headpiece', w: 2, h: 2, icon: 'crest', armor: 25, tags: ['ward', 'spirit'], weights: { spirit: 1.2 }, materials: ['bone', 'hide', 'copper', 'bronze', 'jade'], implicit: { label: '+10 to Maximum Mana', stat: { id: 'spirit', v: 10 } },
     },
     grips: {
       name: 'Grips', kind: 'gloves', kindLabel: 'Handwraps', w: 2, h: 2, icon: 'grips', armor: 18, tags: ['blade', 'swift'], weights: {}, materials: ['hide', 'quilted', 'bronzescale'], implicit: { label: '+8% Attack Speed', stat: { id: 'atk_speed', v: 8 } },
@@ -99,13 +99,13 @@ const pack = {
       name: 'Sandals', kind: 'boots', kindLabel: 'Footwear', w: 2, h: 2, icon: 'sandals', armor: 14, tags: ['swift'], weights: { swift: 1.6 }, materials: ['hide', 'quilted'], implicit: { label: '+10% Movement Speed', stat: { id: 'move', v: 10 } },
     },
     girdle: {
-      name: 'Girdle', kind: 'belt', kindLabel: 'Waistband', w: 2, h: 1, icon: 'girdle', armor: 0, tags: ['life'], weights: { life: 1.3 }, materials: ['hide', 'quilted', 'copper'], implicit: { label: '+12 to Maximum Life', stat: { id: 'life', v: 12 } },
+      name: 'Girdle', kind: 'belt', kindLabel: 'Waistband', w: 2, h: 1, icon: 'girdle', armor: 0, tags: ['life'], weights: { life: 1.3 }, materials: ['hide', 'quilted', 'copper'], implicit: { label: '+12 to Maximum Health', stat: { id: 'life', v: 12 } },
     },
     gorget: {
       name: 'Gorget', kind: 'amulet', kindLabel: 'Neckpiece', w: 1, h: 1, icon: 'gorget', armor: 0, tags: ['spirit', 'ward'], weights: { spirit: 1.4 }, materials: ['jade', 'amber', 'bone', 'copper'], implicit: { label: '+8 to All Attributes', stat: { id: 'attrs', v: 8 } },
     },
     ring: {
-      name: 'Ring', kind: 'ring', kindLabel: 'Ring', w: 1, h: 1, icon: 'ring', armor: 0, tags: ['fortune'], weights: { fortune: 1.2 }, materials: ['bone', 'copper', 'jade', 'amber'], implicit: { label: '+12 to Maximum Life', stat: { id: 'life', v: 12 } },
+      name: 'Ring', kind: 'ring', kindLabel: 'Ring', w: 1, h: 1, icon: 'ring', armor: 0, tags: ['fortune'], weights: { fortune: 1.2 }, materials: ['bone', 'copper', 'jade', 'amber'], implicit: { label: '+12 to Maximum Health', stat: { id: 'life', v: 12 } },
     },
     curio: {
       name: 'Curio', kind: 'curio', kindLabel: 'Curio', w: 1, h: 1, icon: 'curio', armor: 0, tags: [], noVessel: true, materials: ['bone', 'jade', 'amber'], implicit: null,
@@ -131,22 +131,22 @@ const pack = {
       label: '+{v}% increased Reach', shape: 'scalar', tags: ['reach'], kinds: ['weapon'], weight: 7, tiers: [{ roll: [6, 10] }, { roll: [11, 16], minIlvl: 30 }],
     },
     warded: {
-      label: '+{v}% increased Ward', shape: 'scalar', tags: ['ward'], kinds: ['shield', 'body', 'helmet', 'gloves', 'boots'], weight: 12, tiers: [{ roll: [10, 18] }, { roll: [19, 28], minIlvl: 20 }, { roll: [29, 40], minIlvl: 50 }],
+      label: '+{v}% increased Armour', shape: 'scalar', tags: ['ward'], kinds: ['shield', 'body', 'helmet', 'gloves', 'boots'], weight: 12, tiers: [{ roll: [10, 18] }, { roll: [19, 28], minIlvl: 20 }, { roll: [29, 40], minIlvl: 50 }],
     },
     hale: {
-      label: '+{v} to Maximum Life', shape: 'flat', tags: ['life'], kinds: ['weapon', 'shield', 'body', 'helmet', 'gloves', 'boots', 'belt', 'amulet', 'ring'], weight: 12, tiers: [{ roll: [10, 20] }, { roll: [21, 35], minIlvl: 25 }, { roll: [36, 55], minIlvl: 55 }],
+      label: '+{v} to Maximum Health', shape: 'flat', tags: ['life'], kinds: ['weapon', 'shield', 'body', 'helmet', 'gloves', 'boots', 'belt', 'amulet', 'ring'], weight: 12, tiers: [{ roll: [10, 20] }, { roll: [21, 35], minIlvl: 25 }, { roll: [36, 55], minIlvl: 55 }],
     },
     spirited: {
-      label: '+{v} to Maximum Spirit', shape: 'flat', tags: ['spirit'], kinds: ['helmet', 'amulet', 'ring', 'weapon'], weight: 10, tiers: [{ roll: [8, 15] }, { roll: [16, 26], minIlvl: 25 }, { roll: [27, 40], minIlvl: 55 }],
+      label: '+{v} to Maximum Mana', shape: 'flat', tags: ['spirit'], kinds: ['helmet', 'amulet', 'ring', 'weapon'], weight: 10, tiers: [{ roll: [8, 15] }, { roll: [16, 26], minIlvl: 25 }, { roll: [27, 40], minIlvl: 55 }],
     },
     emberkiss: {
-      label: 'Adds {v} Ember Damage', shape: 'flat', tags: ['ember'], kinds: ['weapon', 'amulet'], weight: 6, tiers: [{ roll: [3, 7] }, { roll: [8, 14], minIlvl: 30 }, { roll: [15, 22], minIlvl: 60 }],
+      label: 'Adds {v} Fire Damage', shape: 'flat', tags: ['ember'], kinds: ['weapon', 'amulet'], weight: 6, tiers: [{ roll: [3, 7] }, { roll: [8, 14], minIlvl: 30 }, { roll: [15, 22], minIlvl: 60 }],
     },
     riverblessed: {
-      label: '+{v}% to River Resistance', shape: 'scalar', tags: ['river', 'ward'], kinds: ['shield', 'body', 'helmet', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [8, 15] }, { roll: [16, 25], minIlvl: 25 }],
+      label: '+{v}% to Cold Resistance', shape: 'scalar', tags: ['river', 'ward'], kinds: ['shield', 'body', 'helmet', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [8, 15] }, { roll: [16, 25], minIlvl: 25 }],
     },
     emberward: {
-      label: '+{v}% to Ember Resistance', shape: 'scalar', tags: ['ember', 'ward'], kinds: ['shield', 'body', 'helmet', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [8, 15] }, { roll: [16, 25], minIlvl: 25 }],
+      label: '+{v}% to Fire Resistance', shape: 'scalar', tags: ['ember', 'ward'], kinds: ['shield', 'body', 'helmet', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [8, 15] }, { roll: [16, 25], minIlvl: 25 }],
     },
     surefoot: {
       label: '+{v}% Movement Speed', shape: 'scalar', tags: ['swift'], kinds: ['boots'], weight: 9, tiers: [{ roll: [5, 9] }, { roll: [10, 15], minIlvl: 30 }],
@@ -155,7 +155,7 @@ const pack = {
       label: '+{v}% Critical Chance', shape: 'scalar', tags: ['blade', 'swift'], kinds: ['weapon', 'ring'], weight: 7, tiers: [{ roll: [8, 14] }, { roll: [15, 22], minIlvl: 35 }],
     },
     wealthy: {
-      label: '+{v}% Goods Found', shape: 'scalar', tags: ['fortune'], kinds: ['weapon', 'shield', 'body', 'helmet', 'gloves', 'boots', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [6, 12] }, { roll: [13, 20], minIlvl: 30 }],
+      label: '+{v}% Item Find', shape: 'scalar', tags: ['fortune'], kinds: ['weapon', 'shield', 'body', 'helmet', 'gloves', 'boots', 'belt', 'amulet', 'ring'], weight: 8, tiers: [{ roll: [6, 12] }, { roll: [13, 20], minIlvl: 30 }],
     },
     beastbane: {
       label: '+{v}% Damage against Beasts', shape: 'scalar', tags: ['beast'], kinds: ['weapon'], weight: 7, tiers: [{ roll: [10, 18] }, { roll: [19, 30], minIlvl: 30 }],
@@ -171,7 +171,7 @@ const pack = {
       name: 'Slaughter',
       color: '#f87171',
       mods: {
-        blood_price: { name: 'The Blood Price', label: 'Recover {v}% of Life on Kill', shape: 'trigger', roll: [2, 3] },
+        blood_price: { name: 'The Blood Price', label: 'Recover {v}% of Health on Kill', shape: 'trigger', roll: [2, 3] },
         battle_rhythm: { name: 'Battle Rhythm', label: '+{v}% Attack Speed for 4s after a Kill', shape: 'trigger', roll: [12, 18] },
         read_wound: { name: 'Read the Wound', label: '+{v}% Critical Chance against Bleeding foes', shape: 'conditional', roll: [15, 25] },
       },
@@ -184,9 +184,9 @@ const pack = {
       name: 'Warding',
       color: '#93c5fd',
       mods: {
-        shieldwall: { name: 'The Shieldwall', label: 'Regain {v} Life when you Block', shape: 'trigger', roll: [8, 14] },
+        shieldwall: { name: 'The Shieldwall', label: 'Regain {v} Health when you Block', shape: 'trigger', roll: [8, 14] },
         stand_ground: { name: 'Stand Your Ground', label: '+{v}% Chance to Block while stationary', shape: 'conditional', roll: [3, 5] },
-        old_grudge: { name: 'Old Grudge', label: '+{v}% Ward for 2s when Hit', shape: 'trigger', roll: [20, 30] },
+        old_grudge: { name: 'Old Grudge', label: '+{v}% Armour for 2s when Hit', shape: 'trigger', roll: [20, 30] },
       },
       epithets: ['Oath', 'Bulwark', 'Vigil'],
       adjs: ['Unbroken', 'Stone', 'Dawnlit'],
@@ -197,8 +197,8 @@ const pack = {
       name: 'Spiritwork',
       color: '#c084fc',
       mods: {
-        clear_mind: { name: 'Clear Mind', label: '+{v}% Rite Power while Spirit is above three-quarters', shape: 'conditional', roll: [12, 20] },
-        ember_tithe: { name: 'Harvest', label: 'Recover {v}% of Spirit on Kill', shape: 'trigger', roll: [3, 5] },
+        clear_mind: { name: 'Clear Mind', label: '+{v}% Ability Power while Mana is above three-quarters', shape: 'conditional', roll: [12, 20] },
+        ember_tithe: { name: 'Harvest', label: 'Recover {v}% of Mana on Kill', shape: 'trigger', roll: [3, 5] },
         veil_wise: { name: 'Superstition', label: '{v}% chance to shrug off Curses', shape: 'conditional', roll: [10, 18] },
       },
       epithets: ['Whisper', 'Cinder', 'Riddle'],
@@ -212,7 +212,7 @@ const pack = {
       mods: {
         dead_sprint: { name: 'Dead Sprint', label: '+{v}% Movement Speed for 3s on Kill', shape: 'trigger', roll: [10, 16] },
         sidestep: { name: 'Sidestep', label: '{v}% chance to Avoid thrown weapons while moving', shape: 'conditional', roll: [10, 16] },
-        road_lore: { name: 'Second Wind', label: 'Regain {v} Life per second while moving', shape: 'conditional', roll: [2, 4] },
+        road_lore: { name: 'Second Wind', label: 'Regain {v} Health per second while moving', shape: 'conditional', roll: [2, 4] },
       },
       epithets: ['Stride', 'Wind', 'Lantern'],
       adjs: ['Fleet', 'Pale', 'Far'],
@@ -248,21 +248,21 @@ const pack = {
       name: 'River Pearl',
       fragments: 3,
       kinds: ['amulet', 'ring', 'helmet'],
-      mods: [{ stat: 'spirit', v: 12, label: '+{v} to Maximum Spirit', shape: 'flat' }],
-      completionBonus: { label: 'Undertow — your rites chill their targets', shape: 'trigger' },
+      mods: [{ stat: 'spirit', v: 12, label: '+{v} to Maximum Mana', shape: 'flat' }],
+      completionBonus: { label: 'Undertow — your abilities chill their targets', shape: 'trigger' },
     },
     ember_shell: {
       name: 'Beetle Shell',
       fragments: 3,
       kinds: ['shield', 'body'],
-      mods: [{ stat: 'ember_res', v: 15, label: '+{v}% to Ember Resistance', shape: 'scalar' }],
+      mods: [{ stat: 'ember_res', v: 15, label: '+{v}% to Fire Resistance', shape: 'scalar' }],
       completionBonus: { label: 'Cinder Skin — attackers are singed', shape: 'trigger' },
     },
     knucklebone: {
       name: 'Knucklebone',
       fragments: 3,
       kinds: ['amulet', 'ring', 'belt'],
-      mods: [{ stat: 'fortune', v: 10, label: '+{v}% Goods Found', shape: 'scalar' }],
+      mods: [{ stat: 'fortune', v: 10, label: '+{v}% Item Find', shape: 'scalar' }],
       completionBonus: { label: 'Grandmother’s Rite — once a day, reroll one omen', shape: 'grant' },
     },
   },

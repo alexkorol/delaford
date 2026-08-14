@@ -21,13 +21,19 @@ import { resolveGuestProfile } from '#server/player/playtest-guest.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
 import { validateScionName } from '#shared/chronicles.js';
+import {
+  beginScionSession,
+  ensureQuickGuestScion,
+  sendChronicleState,
+} from '#server/core/services/chronicles.js';
+import { resolveVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
-// One character, one session. When the same account logs in again (second
-// tab, another machine, an automated playtest), the OLD session used to be
-// silently replaced mid-play — its client got "foreign player reference"
-// rejections and its unsaved loot was lost. Now: flush the old session's
-// state to disk FIRST (so the new login loads it), tell the old client it
-// was replaced (so it doesn't auto-reconnect into a steal war), and close it.
+// Fast in-process mirror; authoritative scion snapshots also persist this in
+// SQLite through PlayerPersistenceService.
+const guestPassiveTrees = new Map();
+
+// One live session per identity: logging in again flushes and replaces any
+// session already attached to the same account/guest uuid.
 const replaceExistingSession = (uuid, newSocketId) => {
   const existing = world.players.find(p => p.uuid === uuid && p.socket_id !== newSocketId);
   if (!existing) {
@@ -53,10 +59,6 @@ const replaceExistingSession = (uuid, newSocketId) => {
   }
 };
 
-// Guest accounts have no backing API, so their skill-tree allocations live in
-// process memory keyed by uuid — surviving relogs within a server run.
-const guestPassiveTrees = new Map();
-
 // Whitelist and bound the client-sent skill tree snapshot; never trust shapes
 // straight off the wire.
 const sanitisePassiveTree = (snapshot) => {
@@ -71,6 +73,7 @@ const sanitisePassiveTree = (snapshot) => {
   }
 
   return {
+    schemaVersion: Number.isInteger(snapshot.schemaVersion) ? snapshot.schemaVersion : null,
     nodes: snapshot.nodes.filter(id => typeof id === 'string').slice(0, 512),
     conduits: snapshot.conduits
       .filter(entry => entry && typeof entry.id === 'string')
@@ -82,6 +85,9 @@ const sanitisePassiveTree = (snapshot) => {
     points: { skill: Math.max(0, Math.floor(Number(snapshot.points && snapshot.points.skill) || 0)) },
     earned: Math.max(0, Math.floor(Number(snapshot.earned) || 0)),
     selectedNodeId: typeof snapshot.selectedNodeId === 'string' ? snapshot.selectedNodeId : '0,0',
+    classOrder: Array.isArray(snapshot.classOrder)
+      ? snapshot.classOrder.filter(id => typeof id === 'string').slice(0, 6)
+      : [],
   };
 };
 
@@ -258,6 +264,46 @@ export default {
     const payload = data.data || {};
 
     try {
+      // Two login flows share this event.
+      //
+      // Chronicle-auth flow (guestId / quickGuest / resumeScionId payloads):
+      // the socket authenticates as an ACCOUNT, then negotiates a House and
+      // scion through the chronicles:* events before world admission. This is
+      // the flow the world-web/wagon systems key their identity off.
+      const wantsChronicleAuthFlow = payload.useGuestAccount === true
+        && !payload.awaitChronicles
+        && !payload.scionName
+        && (payload.quickGuest === true
+          || typeof payload.resumeScionId === 'string'
+          || typeof payload.guestId === 'string');
+
+      if (wantsChronicleAuthFlow) {
+        const guestId = typeof payload.guestId === 'string'
+          && /^[a-zA-Z0-9-]{8,64}$/.test(payload.guestId)
+          ? payload.guestId
+          : playerGuest.uuid;
+        const accountId = `guest:${guestId}`;
+        ws.chronicleAuth = {
+          accountId, profile: playerGuest, token: 'none', isGuest: true,
+        };
+        ws.authenticated = true;
+        if (payload.quickGuest === true) {
+          const scion = ensureQuickGuestScion(accountId);
+          if (!scion) throw new Error('Could not prepare a guest scion.');
+          const started = await beginScionSession(ws, scion.id, { quickStart: true });
+          if (!started.ok) throw new Error(started.reason);
+          return;
+        }
+        if (typeof payload.resumeScionId === 'string' && payload.resumeScionId) {
+          const resumed = await beginScionSession(ws, payload.resumeScionId, { resume: true });
+          if (resumed.ok) return;
+        }
+        sendChronicleState(ws);
+        return;
+      }
+
+      // Direct-admission flow: accounts and plain guests construct a Player
+      // immediately (optionally parking on the Chronicles screen first).
       let player;
       if (!payload.useGuestAccount) {
         const authenticated = await Authentication.login({ ...data, data: payload });
@@ -485,13 +531,14 @@ export default {
    * A player logs out of the game
    */
   'player:logout': async (data, ws, context) => {
-    context.constructor.close(ws, true);
+    await context.constructor.close(ws, true);
+    ws.authenticated = false;
   },
 
   /**
    * A player saves their skill-tree allocations. Stored on the live Player
-   * (so reopening the pane restores it), cached for guest relogs, and pushed
-   * to the account API for real accounts.
+   * (so reopening the pane restores it), cached for guest relogs, and saved
+   * to local SQLite for login accounts.
    */
   'player:skilltree:save': ({ data }, ws) => {
     const player = getPlayerBySocket(ws);
@@ -500,17 +547,25 @@ export default {
     }
 
     const sanitised = sanitisePassiveTree(data && data.snapshot);
-    if (!sanitised) {
+    const resolved = sanitised && resolveVerdigrisTree(sanitised, player.level, player.questPoints);
+    if (!resolved?.ok) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: resolved?.reason || 'That passive tree is invalid.',
+      });
       return;
     }
 
-    player.passiveTree = sanitised;
-    guestPassiveTrees.set(player.uuid, sanitised);
+    player.passiveTree = resolved.snapshot;
+    player.passiveTreeStats = resolved.stats;
+    player.refreshDerivedStats({ passiveAttributes: resolved.attributes });
+    Player.broadcastStats(player);
+    guestPassiveTrees.set(player.uuid, resolved.snapshot);
     playerPersistence.markDirty(player);
 
-    // Guests have no backing API — skip the network save (it would only log
-    // errors); the in-memory copies above already cover them.
-    if (player.token && player.token !== 'none') {
+    // Chronicle scions save to SQLite even for guests. A legacy non-scion
+    // local account uses the login registry profile fallback.
+    if (player.scionId || (player.token && player.token !== 'none')) {
       playerPersistence.savePlayer(player).catch(() => {});
     }
   },
@@ -560,7 +615,7 @@ export default {
   },
 
   /**
-   * A player moves to a new tile via keyboard
+   * A player starts, samples, or stops continuous keyboard movement.
    */
   'player:move': (data, ws) => {
     const payload = data.data || {};
@@ -568,6 +623,12 @@ export default {
     if (!player || isSpoofedPlayerPayload(player, payload) || !Combat.isPlayerAlive(player)) {
       return;
     }
+
+    if (payload.stopped === true) {
+      player.stopMovement({ player: { socket_id: player.socket_id } });
+      return;
+    }
+
     const startedAt = Date.now();
 
     if (Combat.findStepTarget(player, payload.direction)) {
@@ -611,7 +672,11 @@ export default {
       return;
     }
 
-    data.player = { ...(data.player || {}), socket_id: player.socket_id };
+    data.player = {
+      ...(data.player || {}),
+      uuid: player.uuid,
+      socket_id: player.socket_id,
+    };
     if (player.queue.length >= 20) {
       return;
     }

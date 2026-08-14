@@ -71,6 +71,17 @@ describe('instance treasure generation', () => {
     });
   });
 
+  it('raises guaranteed treasure item level with endless depth', async () => {
+    const shallow = await GameMap.generateInstance({ seed: 1717, template: 'dungeon', depth: 1 });
+    const deep = await GameMap.generateInstance({ seed: 1717, template: 'dungeon', depth: 5 });
+    const shallowGear = shallow.items.find(item => item.id !== 'coins');
+    const deepGear = deep.items.find(item => item.id !== 'coins');
+
+    expect(shallowGear.vessel.item.ilvl).toBe(10);
+    expect(deepGear.vessel.item.ilvl).toBe(50);
+    expect(deepGear.vessel.item.ilvl - shallowGear.vessel.item.ilvl).toBeGreaterThanOrEqual(30);
+  });
+
   it('guards the stairs down with an elite boss', async () => {
     const floor = await GameMap.generateInstance({ seed: 1717, template: 'tomb' });
     const { metadata, monsters } = floor;
@@ -260,6 +271,59 @@ describe('monster loot drops', () => {
       stats: item.stats,
       chroniclesRelic: item.chroniclesRelic,
     });
+  });
+
+  it('returns an eligible dead scion relic to the live loot stream', () => {
+    const sceneId = 'scene-loot-relic';
+    const killer = { accountId: 'account:heir', scionId: 'scion-heir' };
+    const scene = { id: sceneId, items: [], players: [killer] };
+    world.scenes.set(sceneId, scene);
+
+    const drops = dropMonsterLoot(makeSlainMonster(sceneId), {
+      killer,
+      rng: makeRngQueue([0.99, 0]),
+      relicProvider: () => ({
+        id: 'gold-ring',
+        uuid: 'ancestral-ring',
+        name: 'Bryn\'s Oath — Relic of Bryn',
+        displayName: 'Bryn\'s Oath — Relic of Bryn',
+        legacyRelicId: 'relic-1',
+        legacy: { sourceScionName: 'Bryn' },
+      }),
+    });
+
+    expect(drops).toHaveLength(2);
+    expect(drops[1]).toMatchObject({
+      id: 'gold-ring',
+      legacyRelicId: 'relic-1',
+      legacy: { sourceScionName: 'Bryn' },
+    });
+  });
+
+  it('moves drops off stairs onto a reachable non-transition tile', async () => {
+    const sceneId = 'scene-loot-stairs';
+    const floor = await GameMap.generateInstance({ seed: 9090, template: 'dungeon' });
+    const scene = {
+      id: sceneId,
+      items: [],
+      players: [],
+      map: floor.map,
+      metadata: floor.metadata,
+    };
+    world.scenes.set(sceneId, scene);
+
+    const stairs = floor.metadata.stairsDown;
+    const drops = dropMonsterLoot(makeSlainMonster(sceneId, {
+      x: stairs.x,
+      y: stairs.y,
+    }), { rng: makeRngQueue([0.99]) });
+
+    expect(drops).toHaveLength(1);
+    expect({ x: drops[0].x, y: drops[0].y }).not.toEqual(stairs);
+    const index = (drops[0].y * 200) + drops[0].x;
+    expect(UI.tileWalkable(floor.map.background[index] - 1)).toBe(true);
+    expect(!floor.map.foreground[index]
+      || UI.tileWalkable(floor.map.foreground[index] - 1, 'foreground')).toBe(true);
   });
 
   it('drops nothing without a scene or rewards', () => {

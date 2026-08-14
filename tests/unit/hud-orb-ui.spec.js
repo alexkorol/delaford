@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -10,6 +10,26 @@ const readSource = relativePath => readFileSync(
 );
 
 describe('WIZARD HUD orbs', () => {
+  it('uses the pane host instead of the retired tab-strip shell', () => {
+    const delaford = readSource('src/Delaford.vue');
+    const container = readSource('src/components/layout/GameContainer.vue');
+    const retiredSlots = fileURLToPath(new URL('../../src/components/Slots.vue', import.meta.url));
+    const retiredWear = fileURLToPath(new URL('../../src/components/slots/Wear.vue', import.meta.url));
+    const retiredFriends = fileURLToPath(new URL('../../src/components/slots/FriendList.vue', import.meta.url));
+
+    expect(delaford).toContain('<GameContainer');
+    expect(delaford).toContain(':pane-registry="paneRegistryMap"');
+    expect(delaford).not.toContain("from './components/Slots.vue'");
+    expect(delaford).not.toContain('WearPane');
+    expect(delaford).not.toContain('FriendListPane');
+    expect(container).toContain("@click=\"$emit('request-pane', 'quests')\"");
+    expect(container).toContain("@click=\"$emit('request-pane', 'settings')\"");
+    expect(container).toContain("@click=\"$emit('request-pane', 'logout')\"");
+    expect(existsSync(retiredSlots)).toBe(false);
+    expect(existsSync(retiredWear)).toBe(false);
+    expect(existsSync(retiredFriends)).toBe(false);
+  });
+
   it('renders the orb art without visible redundant text or bar overlays', () => {
     const source = readSource('src/components/hud/HudOrb.vue');
 
@@ -57,6 +77,15 @@ describe('WIZARD HUD orbs', () => {
     expect(source).toContain('bottom: calc(var(--hud-chat-inset) + var(--hud-chat-clearance));');
   });
 
+  it('gets the minimap out of the way whenever a pane is open', () => {
+    const container = readSource('src/components/layout/GameContainer.vue');
+    const canvas = readSource('src/components/GameCanvas.vue');
+
+    expect(container).toContain('v-if="!uiHidden && !legacyPaneOpen && !hasDockedPane"');
+    expect(container).toContain('@pane-state="legacyPaneOpen = $event"');
+    expect(canvas).toContain("emits: ['pane-state']");
+  });
+
   it('makes the message log dock draggable inside the playfield', () => {
     const source = readSource('src/components/layout/GameContainer.vue');
 
@@ -101,14 +130,13 @@ describe('WIZARD HUD orbs', () => {
     expect(hud).toContain('flex: 0 1 auto;');
     expect(container).toContain('grid-template-rows: minmax(0, 1fr);');
     expect(container).toContain('.game-container__hud {\n  position: absolute;');
-    // PoE-style rebuild: full fixed bar, corner hotkey, cooldown sweep, and
-    // right-click remap (no occluding remap button).
+    // PoE-style rebuild: full fixed bar, corner hotkey, and cooldown sweep.
     expect(quickbar).toContain('slotEntries()');
     expect(quickbar).toContain('@media (width <= 1100px)');
     expect(quickbar).toContain('height: 40px;');
     expect(quickbar).toContain('quickbar__slot--empty');
     expect(quickbar).toContain('quickbar__sweep');
-    expect(quickbar).toContain('@contextmenu.prevent="$emit(\'request-remap\'');
+    expect(quickbar).not.toContain('request-remap');
     expect(quickbar).toContain('flex-basis: 36px;');
     expect(quickbar).toContain('clip: rect(0 0 0 0);');
   });
