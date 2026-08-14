@@ -891,7 +891,11 @@ class Map {
     );
   }
 
-  bakeGroundTexture({ tileSize = 16, marginTiles = 0 } = {}) {
+  bakeGroundTexture({
+    tileSize = 16,
+    marginTiles = 0,
+    flattenForeground = true,
+  } = {}) {
     const { size } = this.config.map;
     const canvas = document.createElement('canvas');
     canvas.width = (size.x + (marginTiles * 2)) * tileSize;
@@ -915,14 +919,19 @@ class Map {
           tileSize,
           sheets,
         );
-        this.drawTile(
-          ctx,
-          (this.foreground[index] || 0) - 1,
-          drawX,
-          drawY,
-          tileSize,
-          sheets,
-        );
+        const foreground = this.foreground[index] || 0;
+        const verticalForeground = foreground
+          && !UI.tileWalkable(foreground - 1, 'foreground');
+        if (flattenForeground || !verticalForeground) {
+          this.drawTile(
+            ctx,
+            foreground - 1,
+            drawX,
+            drawY,
+            tileSize,
+            sheets,
+          );
+        }
       }
     }
 

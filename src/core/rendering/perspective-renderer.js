@@ -1,4 +1,5 @@
 import UI from '@shared/ui.js';
+import DUNGEON_TILESET, { DUNGEON_FIRST_GID } from '@shared/dungeon-tiles.js';
 import { now } from '../config/movement.js';
 import {
   actorIdentityFrame,
@@ -14,6 +15,15 @@ import AtmosphereRenderer from './atmosphere-renderer.js';
 
 const ACTOR_SCALE = 1.45;
 const ITEM_SCALE = 0.92;
+const VERTICAL_TILE_RANGE = Object.freeze({ x: 32, north: 44, south: 20 });
+
+const globalGidsForGroup = (category) => new Set(
+  Object.values(DUNGEON_TILESET.groups?.[category] || {})
+    .flat()
+    .map(localId => DUNGEON_FIRST_GID + localId),
+);
+const WALL_GIDS = globalGidsForGroup('wall');
+const TREE_GIDS = globalGidsForGroup('tree');
 
 const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
 
@@ -186,6 +196,8 @@ class PerspectiveRenderer {
     const { tileSize } = metrics;
     const timestamp = now();
 
+    this.collectVerticalTerrain(draws, tileSize);
+
     (this.map.droppedItems || []).forEach((item) => {
       const foot = centerOfTile(item.x, item.y, tileSize);
       draws.push({
@@ -234,6 +246,119 @@ class PerspectiveRenderer {
     }
 
     return draws;
+  }
+
+  collectVerticalTerrain(draws, tileSize) {
+    const mapSize = this.map.config.map.size;
+    const playerX = Math.round(this.map.player?.x || 0);
+    const playerY = Math.round(this.map.player?.y || 0);
+    const minimumX = Math.max(0, playerX - VERTICAL_TILE_RANGE.x);
+    const maximumX = Math.min(mapSize.x - 1, playerX + VERTICAL_TILE_RANGE.x);
+    const minimumY = Math.max(0, playerY - VERTICAL_TILE_RANGE.north);
+    const maximumY = Math.min(mapSize.y - 1, playerY + VERTICAL_TILE_RANGE.south);
+
+    for (let worldY = minimumY; worldY <= maximumY; worldY += 1) {
+      for (let worldX = minimumX; worldX <= maximumX; worldX += 1) {
+        const index = (worldY * mapSize.x) + worldX;
+        const foregroundGid = this.map.foreground[index] || 0;
+        const backgroundGid = this.map.background[index] || 0;
+        const verticalForeground = foregroundGid
+          && !UI.tileWalkable(foregroundGid - 1, 'foreground');
+        const wall = WALL_GIDS.has(backgroundGid);
+        if (!verticalForeground && !wall) {
+          continue;
+        }
+
+        const gid = verticalForeground ? foregroundGid : backgroundGid;
+        const kind = TREE_GIDS.has(gid) ? 'tree' : (wall ? 'wall' : 'decor');
+        const foot = centerOfTile(worldX, worldY + 0.42, tileSize);
+        draws.push({
+          depthY: foot.y,
+          draw: () => this.drawVerticalTerrainTile(gid, foot, tileSize, kind),
+        });
+      }
+    }
+  }
+
+  drawVerticalTerrainTile(gid, foot, tileSize, kind) {
+    const point = this.camera.projectTerrain(foot.x, foot.y);
+    if (!point) {
+      return;
+    }
+
+    const dimensions = {
+      tree: { width: 1.18, height: 1.9 },
+      wall: { width: 1.06, height: 1.42 },
+      decor: { width: 1.05, height: 1.28 },
+    }[kind];
+    const width = tileSize * point.scale * dimensions.width;
+    const height = tileSize * point.scale * dimensions.height;
+    const drawX = point.x - (width / 2);
+    const drawY = point.y - height;
+    if (
+      point.x + width < 0
+      || point.x - width > this.camera.width
+      || point.y < -height
+      || drawY > this.camera.height
+    ) {
+      return;
+    }
+
+    const zeroId = gid - 1;
+    const sheet = this.map.resolveTileSheet(zeroId);
+    if (!sheet?.image || !sheet.columns) {
+      return;
+    }
+    const local = zeroId - sheet.from;
+    const sourceSize = this.map.config.map.tileset.tile.width;
+    const sourceX = Math.floor(local % sheet.columns) * sourceSize;
+    const sourceY = Math.floor(local / sheet.columns) * sourceSize;
+    const ctx = this.map.bufferContext;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(4, 7, 5, 0.34)';
+    ctx.beginPath();
+    ctx.ellipse(point.x, point.y, width * 0.38, width * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (kind === 'tree') {
+      const trunkWidth = Math.max(2, width * 0.14);
+      ctx.fillStyle = 'rgba(62, 43, 24, 0.9)';
+      ctx.fillRect(point.x - (trunkWidth / 2), point.y - (height * 0.55), trunkWidth, height * 0.52);
+    } else if (kind === 'wall') {
+      const faceTop = drawY + (height * 0.18);
+      const faceGradient = ctx.createLinearGradient(0, faceTop, 0, point.y);
+      faceGradient.addColorStop(0, 'rgba(65, 58, 48, 0.24)');
+      faceGradient.addColorStop(1, 'rgba(5, 6, 6, 0.72)');
+      ctx.fillStyle = faceGradient;
+      ctx.fillRect(drawX, faceTop, width, point.y - faceTop);
+    }
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+    ctx.shadowBlur = Math.max(2, point.scale * 5);
+    ctx.shadowOffsetY = Math.max(1, point.scale * 2);
+    ctx.drawImage(
+      sheet.image,
+      sourceX,
+      sourceY,
+      sourceSize,
+      sourceSize,
+      drawX,
+      drawY,
+      width,
+      height,
+    );
+
+    if (kind === 'wall') {
+      ctx.strokeStyle = 'rgba(239, 220, 174, 0.16)';
+      ctx.lineWidth = Math.max(1, point.scale);
+      ctx.beginPath();
+      ctx.moveTo(drawX, drawY + 0.5);
+      ctx.lineTo(drawX + width, drawY + 0.5);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   getActorFoot(actor, tileSize) {

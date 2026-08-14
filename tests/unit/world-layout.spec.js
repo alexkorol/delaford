@@ -141,6 +141,23 @@ describe('the Crossroads layout', () => {
       expect(isWalkable(scene, pitch.x, pitch.y)).toBe(true);
       expect(hasWalkablePath(scene, spawn, pitch)).toBe(true);
     });
+
+    [
+      { x: 38, y: 80 },
+      { x: 88, y: 115 },
+      { x: 38, y: 170 },
+      { x: 0, y: 115 },
+      { x: 26, y: 161 },
+    ].forEach((approach) => {
+      expect(isWalkable(scene, approach.x, approach.y)).toBe(true);
+      expect(hasWalkablePath(scene, spawn, approach)).toBe(true);
+    });
+
+    for (let y = 80; y <= 103; y += 1) {
+      for (let x = 37; x <= 39; x += 1) {
+        expect(isWalkable(scene, x, y)).toBe(true);
+      }
+    }
   });
 
   it('keeps every town NPC spawn walkable and reachable', () => {

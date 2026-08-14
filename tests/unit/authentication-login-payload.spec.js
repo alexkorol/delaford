@@ -52,4 +52,28 @@ describe('authentication login payload', () => {
     expect(loginCall[1].scene.metadata.seed).toBe(123);
     expect(loginCall[1].scene.metadata.monsterDefinitions).toBeUndefined();
   });
+
+  it('returns stale surface coordinates outside the village to the plaza spawn', () => {
+    vi.spyOn(Socket, 'emit').mockImplementation(() => {});
+    vi.spyOn(Socket, 'broadcast').mockImplementation(() => {});
+
+    const town = world.getDefaultTown();
+    town.map = {
+      foreground: new Array(200 * 200).fill(0),
+      background: new Array(200 * 200).fill(541),
+    };
+    town.metadata = { spawnPoints: [{ x: 42, y: 115 }] };
+    const player = {
+      uuid: 'player-stale-position',
+      socket_id: 'socket-stale-position',
+      username: 'Stranded',
+      sceneId: world.defaultTownId,
+      x: 26,
+      y: 161,
+    };
+
+    Authentication.addPlayer(player);
+
+    expect({ x: player.x, y: player.y }).toEqual({ x: 42, y: 115 });
+  });
 });

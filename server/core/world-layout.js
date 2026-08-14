@@ -400,6 +400,14 @@ const createTownScene = () => {
   fillEllipse(map, 74, 129, 8, 5, tile.water, 'background', 65);
   addFlowers(map, 69, 122, 12, 10, 3, 66);
 
+  // Groves are painted after the original plaza roads. Re-cut the four road
+  // approaches last so random trees can never seal a player into the outer
+  // wilderness ring (or hide the route back to the village wall).
+  carveVertical(map, 38, 80, 103, 1, tile.dirtFloor, 67);
+  carveVertical(map, 38, 138, 170, 1, tile.dirtFloor, 68);
+  carveHorizontal(map, 0, 12, 115, 1, tile.dirtFloor, 69);
+  carveHorizontal(map, 64, 88, 115, 1, tile.dirtFloor, 70);
+
   addPortal(scene, map, {
     id: 'town-north-old-wood',
     name: 'Old Wood Trail',

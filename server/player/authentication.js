@@ -9,10 +9,18 @@ import { publicPlayerProjection } from '#server/core/entities/player/public-proj
 import UI from '#shared/ui.js';
 import config from '#server/config.js';
 
+const TOWN_ADMISSION_BOUNDS = Object.freeze({
+  minX: 12,
+  maxX: 64,
+  minY: 94,
+  maxY: 138,
+});
+
 // Persisted or template coordinates can be stale relative to the current town
-// layout (a decor tile may now occupy them). Under continuous movement a
-// player wedged in a blocked tile can never move again, so admission snaps
-// any non-walkable position to the scene's spawn point.
+// layout (a decor tile may now occupy them, or a save from another surface
+// scene can contain coordinates outside the village). Under continuous
+// movement a player wedged in a blocked or disconnected wilderness pocket can
+// never reach town, so admission snaps those positions to the plaza spawn.
 const snapToSceneSpawnIfBlocked = (player) => {
   const scene = world.getSceneForPlayer(player);
   const spawn = scene?.metadata?.spawnPoints?.[0];
@@ -34,8 +42,14 @@ const snapToSceneSpawnIfBlocked = (player) => {
     && Number.isFinite(background)
     && UI.tileWalkable(background - 1, 'background')
     && (!foreground || UI.tileWalkable(foreground - 1, 'foreground'));
+  const outsideTown = scene.id === world.defaultTownId && (
+    tileX < TOWN_ADMISSION_BOUNDS.minX
+    || tileX > TOWN_ADMISSION_BOUNDS.maxX
+    || tileY < TOWN_ADMISSION_BOUNDS.minY
+    || tileY > TOWN_ADMISSION_BOUNDS.maxY
+  );
 
-  if (!walkable) {
+  if (!walkable || outsideTown) {
     player.x = spawn.x;
     player.y = spawn.y;
   }

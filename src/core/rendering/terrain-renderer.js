@@ -238,6 +238,7 @@ class TerrainRenderer {
     const ground = this.map.bakeGroundTexture({
       tileSize: BAKE_TILE_SIZE,
       marginTiles: MAP_MARGIN_TILES,
+      flattenForeground: false,
     });
     const requestedSize = nextPowerOfTwo(Math.max(ground.width, ground.height));
     const maximumSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
