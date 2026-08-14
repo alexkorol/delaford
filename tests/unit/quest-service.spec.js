@@ -68,6 +68,16 @@ describe('authoritative quest progression', () => {
     }));
   });
 
+  it('preserves the shared Aldwyn first-goal record while normalising campaign state', () => {
+    const firstGoal = {
+      stage: 'clear-floor',
+      startedAt: 1234,
+      completedAt: null,
+    };
+
+    expect(normaliseQuestState({ firstGoal }).firstGoal).toEqual(firstGoal);
+  });
+
   it('starts the first incomplete quest and exposes objective state', () => {
     const player = makePlayer();
 

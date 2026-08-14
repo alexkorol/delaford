@@ -149,19 +149,19 @@ describe('inventory drag store equipment commits', () => {
     expect(result.item.uuid).toBe('weapon-a');
   });
 
-  it('commits bare starter equipment records after catalogue enrichment', () => {
+  it('commits bare fresh-Scion equipment records after catalogue enrichment', () => {
     const store = useInventoryStore();
     store.setInventoryItems([{
-      id: 'bronze-pickaxe',
-      uuid: 'starter-pickaxe',
+      id: 'bronze-dagger',
+      uuid: 'starter-dagger',
       slot: 0,
     }]);
 
-    const item = store.items.find(entry => entry.uuid === 'starter-pickaxe');
+    const item = store.items.find(entry => entry.uuid === 'starter-dagger');
     expect(item.equipSlot).toBe('right_hand');
     expect(canEquipInventoryItemToSlot(item, 'right_hand')).toBe(true);
 
-    store.beginDrag('starter-pickaxe', 'inventory');
+    store.beginDrag('starter-dagger', 'inventory');
     store.setHoverTarget({
       type: 'equipment',
       slotId: 'right_hand',
@@ -175,7 +175,7 @@ describe('inventory drag store equipment commits', () => {
       type: 'equip',
       slotId: 'right_hand',
     }));
-    expect(result.item.uuid).toBe('starter-pickaxe');
+    expect(result.item.uuid).toBe('starter-dagger');
   });
 
   it('commits equipped paperdoll items back into the backpack grid', () => {

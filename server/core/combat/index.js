@@ -313,11 +313,11 @@ export const rollPlayerDamage = (player, skill = {}) => {
   const usesIntelligence = Boolean(skill.resourceCost && skill.resourceCost.mana);
   const base = usesIntelligence
     ? 4 + ((attributes.intelligence || 0) * 0.5)
-    // Weapons are the core ARPG upgrade lever. A 0.6 multiplier let a visible
+    // Weapons are the core ARPG upgrade lever. Lower weighting let a visible
     // 31% sheet upgrade (13 -> 17 attack) disappear into roll variance and
     // produce almost identical real kill times. Keep strength meaningful, but
     // let authored weapon power materially change the next fight.
-    : 2 + ((attributes.strength || 0) * 0.45) + (weaponPower * 1.2);
+    : 2 + ((attributes.strength || 0) * 0.45) + (weaponPower * 1.5);
 
   const min = Math.max(1, Math.floor(base * 0.75));
   const max = Math.max(min, Math.ceil(base * 1.25));

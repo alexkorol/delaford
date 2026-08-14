@@ -272,7 +272,7 @@ describe('player damage rolls', () => {
     const highDamage = Combat.rollPlayerDamage(high, {});
     midpointRoll.mockRestore();
 
-    expect(highDamage).toBeGreaterThanOrEqual(Math.ceil(lowDamage * 1.15));
+    expect(highDamage).toBeGreaterThanOrEqual(Math.ceil(lowDamage * 1.2));
   });
 
   it('uses intelligence for mana-costed skills', () => {

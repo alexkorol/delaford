@@ -87,8 +87,6 @@ import AuthContainer from './components/layout/AuthContainer.vue';
 import GameContainer from './components/layout/GameContainer.vue';
 import StatsPane from './components/slots/Stats.vue';
 import InventoryPane from './components/slots/Inventory.vue';
-import WearPane from './components/slots/Wear.vue';
-import FriendListPane from './components/slots/FriendList.vue';
 import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
@@ -122,8 +120,6 @@ const createDefaultQuickSlots = () => createQuickbarSlots();
 const paneRegistry = {
   stats: { component: StatsPane, title: 'Character', slot: 'left' },
   inventory: { component: InventoryPane, title: 'Inventory', slot: 'right' },
-  wear: { component: WearPane, title: 'Equipment' },
-  friendlist: { component: FriendListPane, title: 'Friends' },
   settings: { component: SettingsPane, title: 'Settings' },
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },
@@ -1749,8 +1745,6 @@ export default {
       const slotMap = {
         0: 'stats',
         1: 'inventory',
-        2: 'wear',
-        3: 'friendlist',
         4: 'settings',
         5: 'logout',
         6: 'quests',

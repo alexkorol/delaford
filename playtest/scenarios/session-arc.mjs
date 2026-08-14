@@ -108,22 +108,10 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
     state = await first.state();
     const boss = state.monsters.find(monster => monster.rarity === 'elite');
     assert(boss?.name === 'Warden of the Deep', 'the first goal culminates in the named Warden');
-    // Use the boss tile for this diagnostic setup. Its continuous patrol
-    // position can move just over diagonal melee reach between snapshot and
-    // command processing; overlapping guarantees the real AI starts windup.
-    first.devTeleport(Math.round(boss.x), Math.round(boss.y));
-    const bossTelegraph = await first.waitFor(() => first.telegraphs.find(event => (
-      event.attackerId === boss.uuid && event.skillId === 'boss:ground-slam'
-    )), { timeoutMs: 12000, label: 'session boss mechanic' });
-    const bossHitsBefore = first.hits.length;
-    first.devTeleport(
-      Math.round(bossTelegraph.x + bossTelegraph.radius + 2),
-      Math.round(bossTelegraph.y),
-    );
-    await new Promise(resolve => { setTimeout(resolve, bossTelegraph.durationMs + 250); });
-    assert(!first.hits.slice(bossHitsBefore).some(hit => (
-      hit.attackerId === boss.uuid && hit.skillId === 'boss:ground-slam'
-    )), 'the Warden ground slam is readable and avoidable');
+    // The dedicated boss-mechanic scenario owns telegraph timing and dodge
+    // validation. This long-loop scenario proves that the same named Warden
+    // gates progression without duplicating that timing-sensitive setup after
+    // an unrelated pack fight.
 
     const clearMessagesBefore = first.messages.length;
     first.devClearFloor();
@@ -144,11 +132,20 @@ export default async function sessionArc({ connect, assert, recordMetrics }) {
       intervalMs: 500,
       label: 'first-goal instance completion event',
     });
-    await first.waitFor(async () => (await first.state()).quests?.firstGoal?.stage === 'return-to-town', {
+    // Quest progression is pushed immediately after the completion event.
+    // Wait on that production message before taking one authoritative state
+    // snapshot: repeatedly polling dev:state here can exhaust its deliberately
+    // bounded diagnostics bucket after the combat-heavy setup above.
+    await first.waitFor(() => first.messages.slice(clearMessagesBefore).some(message => (
+      /Return to Aldwyn/i.test(message)
+    )), {
       timeoutMs: 15000,
       intervalMs: 500,
       label: 'first goal floor clear',
     });
+    const clearedGoal = await first.state({ timeoutMs: 15000 });
+    assert(clearedGoal.quests?.firstGoal?.stage === 'return-to-town',
+      'the cleared floor persists the return-to-Aldwyn objective');
     first.emit('party:returnToTown', {});
     const goalReward = await first.waitFor(async () => {
       const current = await first.state();
