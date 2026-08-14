@@ -55,7 +55,7 @@ export default async function vesselforge({ connect, assert }) {
     assert(state.combat.goodsFound === equippedGoodsFound,
       `Wealthy reaches combat state (${state.combat.goodsFound}%)`);
     assert(state.wearDetails.ring.vessel.lines.some(line => (
-      line.section === 'brand' && /Goods Found/.test(line.text)
+      line.section === 'brand' && /Item Find/.test(line.text)
     )), 'Wealthy is presented as a live Brand');
     assert(state.combat.damageAgainstBeasts === 13,
       'Beastbane reaches combat state (13%)');

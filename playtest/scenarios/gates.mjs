@@ -3,10 +3,12 @@
  * world. Each of the four road gates opens that road's Wayfinder's Chart
  * (travel happens from the chart — see world-web.mjs for the full loop).
  */
+// The road gates sit one tile beside the village's own wilderness portals
+// (see createTownScene in server/core/world-layout.js).
 const ROAD_GATES = [
-  { x: 38, y: 94, roadId: 'tin' },
-  { x: 64, y: 115, roadId: 'salt' },
-  { x: 38, y: 138, roadId: 'chalk' },
+  { x: 37, y: 94, roadId: 'tin' },
+  { x: 64, y: 114, roadId: 'salt' },
+  { x: 37, y: 138, roadId: 'chalk' },
   { x: 12, y: 115, roadId: 'copper' },
 ];
 

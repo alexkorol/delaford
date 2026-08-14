@@ -4,7 +4,12 @@
  * after three later Set Out runs.
  */
 export default async function chronicles({ connect, assert }) {
-  const fallen = await connect();
+  // A stable guest id keeps every reconnect inside the same House Chronicle
+  // (the relic must return to the same house three runs later). Explicit
+  // guestId routes through the Chronicle-auth login flow.
+  const guestId = `playtest-chronicles-${Date.now()}`;
+  const houseName = 'House Chronicle';
+  const fallen = await connect({ guestId, houseName, scionName: 'Chron the First' });
   let fallenName;
   try {
     fallenName = fallen.player.username;
@@ -31,13 +36,13 @@ export default async function chronicles({ connect, assert }) {
 
   // Each Set Out advances the House run ledger. Relics are deliberately
   // dormant for three later runs so their return feels like history.
-  const firstRun = await connect();
+  const firstRun = await connect({ guestId, houseName, scionName: 'Chron Again' });
   firstRun.close();
   await new Promise(resolve => { setTimeout(resolve, 350); });
-  const secondRun = await connect();
+  const secondRun = await connect({ guestId, houseName, scionName: 'Chron Anew' });
   secondRun.close();
   await new Promise(resolve => { setTimeout(resolve, 350); });
-  const heir = await connect();
+  const heir = await connect({ guestId, houseName, scionName: 'Chron the Heir' });
 
   try {
     await heir.enterZone('crypt', 'warren');

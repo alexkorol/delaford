@@ -3,6 +3,7 @@ import Socket from '#server/socket.js';
 import world from '#server/core/world.js';
 import { claimCirculatingRelic } from '#server/core/services/chronicles.js';
 import { notifyTutorial } from '#server/core/tutorial.js';
+import { notifyProgression } from '#server/core/progression-events.js';
 
 const getSceneItems = (scene) => {
   if (!scene) return [];
@@ -71,6 +72,9 @@ export const autoPickupCurrency = (player, { radius = 1 } = {}) => {
   }
 
   if (collected > 0) {
+    // Walking over gold is a real claim: it advances quest loot objectives
+    // exactly like a context-menu Take would.
+    notifyProgression(player, 'loot', { itemId: 'coins', quantity: collected });
     notifyTutorial(player, 'loot');
     Socket.emit('game:send:message', {
       player: { socket_id: player.socket_id },

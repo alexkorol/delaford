@@ -6,6 +6,40 @@ import { maybeStartQuest } from '#server/core/services/quest-service.js';
 import identityRegistry from '#server/core/services/identity-registry.js';
 import playerTemplate from '#server/core/data/helpers/player.json' with { type: 'json' };
 import { publicPlayerProjection } from '#server/core/entities/player/public-projection.js';
+import UI from '#shared/ui.js';
+import config from '#server/config.js';
+
+// Persisted or template coordinates can be stale relative to the current town
+// layout (a decor tile may now occupy them). Under continuous movement a
+// player wedged in a blocked tile can never move again, so admission snaps
+// any non-walkable position to the scene's spawn point.
+const snapToSceneSpawnIfBlocked = (player) => {
+  const scene = world.getSceneForPlayer(player);
+  const spawn = scene?.metadata?.spawnPoints?.[0];
+  const map = scene?.map;
+  if (!spawn || !map || !Array.isArray(map.background)) {
+    return;
+  }
+
+  const tileX = Math.round(Number(player.x));
+  const tileY = Math.round(Number(player.y));
+  const width = config.map.size.x;
+  const height = config.map.size.y;
+  const inBounds = Number.isFinite(tileX) && Number.isFinite(tileY)
+    && tileX >= 0 && tileY >= 0 && tileX < width && tileY < height;
+  const index = (tileY * width) + tileX;
+  const background = inBounds ? map.background[index] : null;
+  const foreground = inBounds ? map.foreground[index] : null;
+  const walkable = inBounds
+    && Number.isFinite(background)
+    && UI.tileWalkable(background - 1, 'background')
+    && (!foreground || UI.tileWalkable(foreground - 1, 'foreground'));
+
+  if (!walkable) {
+    player.x = spawn.x;
+    player.y = spawn.y;
+  }
+};
 
 class Authentication {
   /**
@@ -48,6 +82,7 @@ class Authentication {
    */
   static addPlayer(player) {
     world.addPlayer(player);
+    snapToSceneSpawnIfBlocked(player);
     maybeStartQuest(player);
 
     const scene = world.getSceneForPlayer(player);

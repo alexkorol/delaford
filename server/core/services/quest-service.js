@@ -32,6 +32,11 @@ export const normaliseQuestState = (candidate = {}) => {
 
   return {
     version: QUEST_SCHEMA_VERSION,
+    // The first-goal system (server/core/first-goal.js) shares this state
+    // bag; normalisation must carry its record through, not strip it.
+    ...(source.firstGoal && typeof source.firstGoal === 'object'
+      ? { firstGoal: source.firstGoal }
+      : {}),
     activeQuestId: active && !alreadyCompleted && objectiveIndex < active.objectives.length
       ? active.id
       : null,

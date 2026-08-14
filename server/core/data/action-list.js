@@ -148,7 +148,9 @@ const actionList = [
     allow: ['npc'],
     nearby: 'edge',
     weight: 1,
-    queueable: false,
+    // Queueable: the handler consumes the walk-queue todo shape (the player
+    // paths beside the banker first, exactly like Trade).
+    queueable: true,
   },
   {
     name: 'Deposit',

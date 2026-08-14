@@ -13,7 +13,11 @@ export default async function crossroads({ connect, assert }) {
   try {
     const s = await p.state();
     assert(s.sceneType === 'town', 'a scion begins at the Crossroads');
-    assert(s.sceneMetadata.sanctuary === true, 'the Crossroads is truce-ground (sanctuary metadata)');
+    // The merged world keeps the village town (campaign anchors + surface
+    // monsters), so the sanctuary truce is deferred until the full Crossroads
+    // conversion. The world-web anchors must still be present in town.
+    assert(Array.isArray(s.sceneMetadata.wagonPitches) && s.sceneMetadata.wagonPitches.length >= 8,
+      'the town carries the wagon pitches of the world web');
     // Regression: legacy static monsters spawned INTO the town scene and an
     // Ashen Wolf ate idle scions on the plaza. Truce-ground means empty.
     assert(s.monsters.length === 0, `no monsters walk the Crossroads (${s.monsters.length})`);

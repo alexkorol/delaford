@@ -39,10 +39,10 @@ const resetMonster = async (player, targetUuid, maxHealth = COMPARISON_HEALTH) =
 };
 
 const lootAndEquip = async (player, itemLevel) => {
-  player.devDrop('steel-battleaxe', { itemLevel, seed: 3493 });
+  player.devDrop('vessel-handaxe', { itemLevel, seed: 3493 });
   const drop = await player.waitFor(async () => {
     const state = await player.state();
-    return state.groundItems.find(item => item.id === 'steel-battleaxe'
+    return state.groundItems.find(item => item.id === 'vessel-handaxe'
       && item.itemLevel === itemLevel) || false;
   }, { label: `item-level ${itemLevel} vessel drop` });
   player.devTeleport(drop.x, drop.y);

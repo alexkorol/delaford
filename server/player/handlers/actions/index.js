@@ -1619,7 +1619,9 @@ const actionEvents = {
    */
   'player:screen:npc:trade:action': (data) => {
     const player = getPlayerFromPayload(data);
-    const payload = data.data || data;
+    // Action.do dispatches { item, doing, data: { miscData } }; the socket
+    // envelope wraps the same fields one level deeper under data.
+    const payload = data.item ? data : (data.data || data);
     if (!player || !player.objectId || !payload.item?.id
       || !isActiveNpcPane(player, 'shop', 'trade')) {
       return;

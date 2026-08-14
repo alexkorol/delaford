@@ -13,7 +13,7 @@ export default async function worldWeb({ connect, assert }) {
   try {
     // 1. The north gate opens the Tin Road's chart.
     const screensBefore = p.screens.length;
-    p.devTeleport(38, 94);
+    p.devTeleport(37, 94); // tin road gate sits beside the village's north portal
     await p.waitFor(() => p.screens.slice(screensBefore).some(screen => screen.screen === 'chart'), {
       timeoutMs: 8000,
       label: 'road gate opens the Wayfinder\'s Chart',
