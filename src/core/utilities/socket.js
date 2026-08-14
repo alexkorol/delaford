@@ -32,6 +32,35 @@ class Socket {
     Socket.authenticated = Boolean(value);
   }
 
+  /**
+   * Attach open/close bookkeeping to the current window.ws exactly once per
+   * socket instance, so queued persisted-state messages flush when a
+   * (re)connection opens.
+   */
+  static ensureListeners() {
+    if (typeof window === 'undefined' || !window.ws) {
+      return;
+    }
+
+    if (!Socket.socketsWithListeners) {
+      Socket.socketsWithListeners = new WeakSet();
+    }
+
+    if (Socket.socketsWithListeners.has(window.ws)) {
+      return;
+    }
+
+    const socket = window.ws;
+    socket.addEventListener('open', Socket.flushQueue);
+    socket.addEventListener('close', () => {
+      Socket.waitForOpen = false;
+      if (Socket.socketsWithListeners) {
+        Socket.socketsWithListeners.delete(socket);
+      }
+    });
+    Socket.socketsWithListeners.add(socket);
+  }
+
   static canSend(event) {
     return event === 'player:login' || Socket.authenticated;
   }
@@ -122,6 +151,9 @@ class Socket {
 
     const queued = Socket.enqueue(event, data);
     Socket.waitForOpen = queued;
+    if (queued && window.ws) {
+      Socket.ensureListeners();
+    }
     return queued;
   }
 
