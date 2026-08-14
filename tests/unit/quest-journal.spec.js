@@ -59,7 +59,7 @@ describe('quest journal', () => {
     expect(source).not.toContain('Haunted Trails');
   });
 
-  it('keeps the journal reachable from the HUD and Q hotkey', () => {
+  it('keeps the journal reachable from the HUD and J hotkey', () => {
     const rootSource = readFileSync(
       fileURLToPath(new URL('../../src/Delaford.vue', import.meta.url)),
       'utf8',
@@ -69,9 +69,9 @@ describe('quest journal', () => {
       'utf8',
     );
 
-    expect(rootSource).toContain("q: 'quests'");
+    expect(rootSource).toContain("j: 'quests'");
     expect(rootSource).toContain('@request-pane="requestPane"');
     expect(containerSource).toContain("@click=\"$emit('request-pane', 'quests')\"");
-    expect(containerSource).toContain('Quest journal (Q)');
+    expect(containerSource).toContain('Quest journal (J)');
   });
 });

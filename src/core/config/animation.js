@@ -22,7 +22,7 @@ const attackFrames = [0, 3];
 export const PLAYER_SPRITE_CONFIG = {
   tileSize: 64,
   renderSize: 32,
-  perspectiveScale: 0.84,
+  perspectiveScale: 1.06,
   defaultState: 'idle',
   defaultDirection: DEFAULT_FACING_DIRECTION,
   states: {
@@ -74,13 +74,13 @@ export const PLAYER_SPRITE_CONFIG = {
 export const MONSTER_SPRITE_CONFIG = {
   tileSize: 64,
   renderSize: 32,
-  perspectiveScale: 0.84,
+  perspectiveScale: 1.02,
 };
 
 export const NPC_SPRITE_CONFIG = {
   tileSize: 64,
   renderSize: 32,
-  perspectiveScale: 0.84,
+  perspectiveScale: 1.0,
 };
 
 export const actorIdentityFrame = actor => ({

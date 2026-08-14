@@ -15,6 +15,15 @@ import { occupiedTile } from '#shared/movement.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 const INSTANCE_START_COOLDOWN_MS = Number(process.env.INSTANCE_START_COOLDOWN_MS) || 3000;
+// The client has to rebuild a large terrain texture when a procedural floor
+// arrives. Monsters must not spend that load time surrounding an adventurer
+// who cannot see or control the game yet.
+// Keep the landing ward long enough for a player to read the room and choose
+// their first move after the scene becomes visible. It is also anchored to the
+// three-tile entry area by the monster combat controller, so walking into the
+// dungeon ends the practical protection immediately instead of granting a
+// portable thirty-second invulnerability window.
+const INSTANCE_ENTRY_PROTECTION_MS = 30_000;
 
 // Instance generation is the most expensive thing a client can request (full
 // dungeon map + monsters). Enforce a per-player cooldown at the untrusted
@@ -382,6 +391,9 @@ class PartyService {
         player.y = spawn.y;
       }
       world.assignPlayerToScene(player, scene.id);
+      player.combat = player.combat || {};
+      player.combat.instanceEntryProtectionUntil = Date.now() + INSTANCE_ENTRY_PROTECTION_MS;
+      player.combat.instanceEntryProtectionOrigin = { x: player.x, y: player.y };
       // Kill any in-flight click-to-walk path: spawn tiles sit right next to
       // the entry stairs, so one leftover step from the surface walk would
       // carry the player onto them and instantly bounce the party back to

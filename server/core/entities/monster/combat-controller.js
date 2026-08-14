@@ -25,11 +25,18 @@ const isTargetablePlayer = (player, now = Date.now()) => {
   const health = player?.stats?.resources?.health;
   const lifecycleState = player?.stats?.lifecycle?.state || 'alive';
   const protectedUntil = Number(player?.combat?.respawnProtectionUntil) || 0;
+  const entryProtectedUntil = Number(player?.combat?.instanceEntryProtectionUntil) || 0;
+  const entryOrigin = player?.combat?.instanceEntryProtectionOrigin;
+  const insideEntryWard = entryProtectedUntil > now
+    && Number.isFinite(entryOrigin?.x)
+    && Number.isFinite(entryOrigin?.y)
+    && manhattanDistance(player, entryOrigin) <= 3;
   return Boolean(
     health
     && health.current > 0
     && (lifecycleState === 'alive' || lifecycleState === 'cheat-death')
-    && protectedUntil <= now,
+    && protectedUntil <= now
+    && !insideEntryWard
   );
 };
 

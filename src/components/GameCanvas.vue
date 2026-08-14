@@ -20,7 +20,7 @@
         aria-label="Close current pane"
         @click="closePane"
       >
-        ×
+        &times;
       </button>
     </div>
     <canvas
@@ -75,6 +75,7 @@ export default {
       event: false,
       inputController: null,
       rendererMode: 'perspective',
+      aimDirection: null,
     };
   },
   computed: {
@@ -226,6 +227,10 @@ export default {
         return;
       }
 
+      // Movement intent is also the WASD-first aim vector. Keep it even when
+      // the attempted step is blocked so a player pressed against a tree or
+      // wall can still turn and cast in the direction they chose.
+      this.aimDirection = direction;
       this.dispatchMovement(direction);
     },
     onMoveStop() {
@@ -572,6 +577,7 @@ export default {
       }
 
       const facing = options.direction
+        || this.aimDirection
         || (typeof this.game.getFacingDirection === 'function'
           ? this.game.getFacingDirection()
           : (this.game.player.animation && this.game.player.animation.direction) || 'down');
@@ -616,7 +622,12 @@ div.game {
   canvas.main-canvas {
     width: 100%;
     height: 100%;
-    background: #fff;
+
+    // Scene swaps rebuild a large terrain texture. A dark world-colour keeps
+    // that brief handoff from flashing an empty white page into the player's
+    // eyes.
+    background:
+      radial-gradient(circle at 50% 55%, #172018 0%, #080b09 68%, #030403 100%);
     outline: none;
     cursor: pointer;
 

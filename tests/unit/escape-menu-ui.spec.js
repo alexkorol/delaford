@@ -19,7 +19,7 @@ describe('Escape game menu', () => {
     expect(menu).toContain('this.$refs.resumeButton.focus()');
     expect(menu).toContain("{ pane: 'stats', label: 'Character', hotkey: 'C' }");
     expect(menu).toContain("{ pane: 'inventory', label: 'Inventory', hotkey: 'I' }");
-    expect(menu).toContain("{ pane: 'quests', label: 'Quests', hotkey: 'Q' }");
+    expect(menu).toContain("{ pane: 'quests', label: 'Quests', hotkey: 'J' }");
     expect(menu).toContain("{ pane: 'flowerOfLife', label: 'Skill Tree', hotkey: 'P' }");
     expect(menu).toContain("{ pane: 'settings', label: 'Settings', hotkey: '' }");
     expect(menu).toContain("$emit('open-pane', 'logout')");
@@ -34,6 +34,8 @@ describe('Escape game menu', () => {
     expect(delaford).toContain("element.querySelector('[data-pane-autofocus]')");
     expect(delaford).toContain('window.requestAnimationFrame(() => this.focusActivePane())');
     expect(delaford).toContain('this.requestPane(paneHotkeys[key]);');
+    expect(delaford).toContain("j: 'quests'");
+    expect(delaford).not.toContain("q: 'quests'");
     expect(delaford.indexOf("if (this.layout.activePane)"))
       .toBeLessThan(delaford.indexOf("this.openPane('escapeMenu');"));
   });

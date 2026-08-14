@@ -55,7 +55,7 @@
           type="button"
           @click="chooseHouse(house.id)"
         >
-          <span>House {{ house.name }}</span>
+          <span>House {{ displayHouseName(house.name) }}</span>
           <small>{{ house.scions.length }} living · {{ house.crypt.length }} fallen</small>
         </button>
         <button
@@ -71,7 +71,7 @@
         <div class="chronicles__house-heading">
           <div>
             <p class="chronicles__eyebrow">House of</p>
-            <h2>{{ activeHouse.name }}</h2>
+            <h2>{{ displayHouseName(activeHouse.name) }}</h2>
           </div>
           <dl>
             <div><dt>Renown</dt><dd>{{ activeHouse.renown }}</dd></div>
@@ -245,6 +245,10 @@ export default {
     bus.$off('player:chronicles:update', this.handleServerUpdate);
   },
   methods: {
+    displayHouseName(name) {
+      const display = String(name || '').replace(/^house\s+/i, '').trim();
+      return display || 'Nameless';
+    },
     relicStatus(status) {
       if (status === 'recovered') return 'recovered';
       if (status === 'circulating') return 'abroad in the world';

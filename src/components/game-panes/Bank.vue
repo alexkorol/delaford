@@ -7,7 +7,7 @@
         <strong>{{ carriedCoins }} gold</strong>
       </div>
       <div>
-        <span>House {{ house.name }} treasury</span>
+        <span>House {{ displayHouseName(house.name) }} treasury</span>
         <strong>{{ house.treasury }} gold</strong>
       </div>
       <button type="button" :disabled="carriedCoins < 100" @click="deposit(100)">
@@ -64,6 +64,10 @@ export default {
     bus.$emit('show-sidebar', INVENTORY);
   },
   methods: {
+    displayHouseName(name) {
+      const display = String(name || '').replace(/^house\s+/i, '').trim();
+      return display || 'Nameless';
+    },
     deposit(amount) {
       Socket.emit('chronicles:house:deposit', { amount });
     },

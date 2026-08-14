@@ -51,7 +51,7 @@ export default {
       paneActions: [
         { pane: 'stats', label: 'Character', hotkey: 'C' },
         { pane: 'inventory', label: 'Inventory', hotkey: 'I' },
-        { pane: 'quests', label: 'Quests', hotkey: 'Q' },
+        { pane: 'quests', label: 'Quests', hotkey: 'J' },
         { pane: 'flowerOfLife', label: 'Skill Tree', hotkey: 'P' },
         { pane: 'settings', label: 'Settings', hotkey: '' },
       ],

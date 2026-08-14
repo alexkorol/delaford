@@ -32,6 +32,16 @@
               :world-viewport="worldViewport"
               @pane-state="legacyPaneOpen = $event"
             />
+            <div
+              v-if="partyLoading.active"
+              class="game-container__loading-screen"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="game-container__loading-rune" aria-hidden="true">&#9671;</span>
+              <strong>{{ loadingMessage }}</strong>
+              <span>The road is taking shape</span>
+            </div>
             <WorldMinimap
               v-if="!uiHidden && !legacyPaneOpen && !hasDockedPane"
               :game="game"
@@ -44,7 +54,7 @@
                 <button
                   type="button"
                   class="game-container__party-toggle"
-                  title="Quest journal (Q)"
+                  title="Quest journal (J)"
                   @click="$emit('request-pane', 'quests')"
                 >
                   Quests
@@ -108,16 +118,26 @@
                 class="game-container__zone-menu"
                 aria-label="Choose a zone"
               >
-                <p class="game-container__zone-title">Descend into…</p>
+                <div class="game-container__zone-heading">
+                  <p class="game-container__zone-title">Choose an expedition</p>
+                  <span class="game-container__zone-player-level">You: Lv {{ playerProgress.level }}</span>
+                </div>
                 <button
                   v-for="zone in adventureZones"
                   :key="zone.id"
                   type="button"
                   class="game-container__zone"
+                  :class="zoneClasses(zone)"
                   @click="enterZone(zone)"
                 >
-                  <span class="game-container__zone-name">{{ zone.name }}</span>
-                  <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                  <span class="game-container__zone-copy">
+                    <span class="game-container__zone-name">{{ zone.name }}</span>
+                    <span class="game-container__zone-note">{{ zone.note }}</span>
+                  </span>
+                  <span class="game-container__zone-meta">
+                    <span class="game-container__zone-status">{{ zoneStatus(zone) }}</span>
+                    <span class="game-container__zone-level">Lv {{ zone.levelHint }}</span>
+                  </span>
                 </button>
               </div>
               <div
@@ -451,6 +471,11 @@ export default {
       || props.defaultRightPane
       || props.activeOverlayDescriptor?.id,
     ));
+    const loadingMessage = computed(() => (
+      props.partyLoading?.state === 'enter-instance'
+        ? 'Entering the expedition…'
+        : 'Preparing the road…'
+    ));
 
     // The four roads out of the Crossroads (server: world-web.js ROADS).
     // Each opens that road's Wayfinder's Chart; travel happens from the chart.
@@ -469,13 +494,27 @@ export default {
     // Solo Adventure zones must match the server's ADVENTURE_ZONES; each
     // pairs an art template with a layout shape, both validated server-side.
     const adventureZones = [
-      { id: 'old-barrow', name: 'The Old Barrow', template: 'dungeon', layout: 'warren', levelHint: '1–5' },
-      { id: 'verdant-grove', name: 'Verdant Grove', template: 'grove', layout: 'clearings', levelHint: '1–6' },
-      { id: 'sunken-colonnade', name: 'Sunken Colonnade', template: 'crypt', layout: 'gauntlet', levelHint: '3–8' },
-      { id: 'weir-crypt', name: 'Weir Crypt', template: 'crypt', layout: 'warren', levelHint: '4–9' },
-      { id: 'the-wilds', name: 'The Wilds', template: 'wilds', layout: 'clearings', levelHint: '6–12' },
-      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', template: 'marsh', layout: 'clearings', levelHint: '8–14' },
+      { id: 'old-barrow', name: 'The Old Barrow', note: 'Tight halls · forgiving first delve', template: 'dungeon', layout: 'warren', minLevel: 1, maxLevel: 5, levelHint: '1–5' },
+      { id: 'verdant-grove', name: 'Verdant Grove', note: 'Open clearings · roaming packs', template: 'grove', layout: 'clearings', minLevel: 1, maxLevel: 6, levelHint: '1–6' },
+      { id: 'sunken-colonnade', name: 'Sunken Colonnade', note: 'A narrow, punishing gauntlet', template: 'crypt', layout: 'gauntlet', minLevel: 3, maxLevel: 8, levelHint: '3–8' },
+      { id: 'weir-crypt', name: 'Weir Crypt', note: 'Dense rooms · little retreat', template: 'crypt', layout: 'warren', minLevel: 4, maxLevel: 9, levelHint: '4–9' },
+      { id: 'the-wilds', name: 'The Wilds', note: 'Broad hunting grounds', template: 'wilds', layout: 'clearings', minLevel: 6, maxLevel: 12, levelHint: '6–12' },
+      { id: 'marsh-of-reeds', name: 'Marsh of Reeds', note: 'Hostile wetlands · elite packs', template: 'marsh', layout: 'clearings', minLevel: 8, maxLevel: 14, levelHint: '8–14' },
     ];
+
+    const zoneStatus = (zone) => {
+      const level = Number(props.playerProgress?.level) || 1;
+      if (level < zone.minLevel) return 'Danger';
+      if (zone.id === 'old-barrow' && level <= 2) return 'Start here';
+      if (level > zone.maxLevel) return 'Low threat';
+      return 'Ready';
+    };
+
+    const zoneClasses = zone => ({
+      'game-container__zone--recommended': zoneStatus(zone) === 'Start here',
+      'game-container__zone--danger': zoneStatus(zone) === 'Danger',
+      'game-container__zone--outlevelled': zoneStatus(zone) === 'Low threat',
+    });
 
     const enterZone = (zone) => {
       adventureOpen.value = false;
@@ -757,10 +796,13 @@ export default {
       uiHidden,
       legacyPaneOpen,
       hasDockedPane,
+      loadingMessage,
       partyOpen,
       adventureOpen,
       roadsOpen,
       adventureZones,
+      zoneStatus,
+      zoneClasses,
       enterZone,
       toggleAdventure,
       toggleRoads,
@@ -899,6 +941,55 @@ export default {
   outline: none;
 }
 
+.game-container__loading-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 78;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(60, 45, 24, 0.32), transparent 24%),
+    linear-gradient(180deg, rgba(5, 7, 8, 0.96), rgba(3, 5, 5, 0.99));
+  color: rgba(197, 185, 158, 0.7);
+  font-family: Georgia, serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: auto;
+}
+
+.game-container__loading-screen strong {
+  color: #e6c675;
+  font-family: 'GameFont', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-shadow: 0 2px 8px #000;
+}
+
+.game-container__loading-rune {
+  color: #67c3ab;
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px rgba(71, 193, 160, 0.52));
+  animation: loading-rune-pulse 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes loading-rune-pulse {
+  from {
+    opacity: 0.42;
+    transform: scale(0.88) rotate(0deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.06) rotate(45deg);
+  }
+}
+
 .game-container__hud {
   position: absolute;
   right: 0;
@@ -987,11 +1078,25 @@ export default {
 }
 
 .game-container__zone-title {
-  margin: 0 0 2px;
+  margin: 0;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-dim);
+}
+
+.game-container__zone-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.game-container__zone-player-level {
+  color: rgba(218, 190, 129, 0.82);
+  font-size: 0.64rem;
+  white-space: nowrap;
 }
 
 .game-container__zone {
@@ -999,8 +1104,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 36px;
-  padding: 7px 10px;
+  min-height: 48px;
+  padding: 7px 9px;
   border-radius: 0;
   border: 1px solid var(--color-frame-dark);
   background: var(--control-surface);
@@ -1014,8 +1119,63 @@ export default {
   }
 }
 
+.game-container__zone--recommended {
+  border-color: rgba(207, 164, 83, 0.76);
+  background:
+    linear-gradient(90deg, rgba(111, 78, 30, 0.32), transparent 72%),
+    var(--control-surface);
+  box-shadow: inset 3px 0 0 #d6a94e;
+}
+
+.game-container__zone-status {
+  color: #e7c570;
+  font-size: 0.63rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.game-container__zone--danger {
+  border-color: rgba(132, 55, 45, 0.56);
+  background:
+    linear-gradient(90deg, rgba(105, 28, 25, 0.25), transparent 70%),
+    var(--control-surface);
+}
+
+.game-container__zone--danger .game-container__zone-status {
+  color: #e7826f;
+}
+
+.game-container__zone--outlevelled {
+  opacity: 0.68;
+}
+
+.game-container__zone-copy,
+.game-container__zone-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.game-container__zone-copy {
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+}
+
+.game-container__zone-meta {
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
 .game-container__zone-name {
   font-size: 0.82rem;
+}
+
+.game-container__zone-note {
+  color: rgba(178, 170, 153, 0.72);
+  font-family: Georgia, serif;
+  font-size: 0.64rem;
+  white-space: nowrap;
 }
 
 .game-container__zone-level {

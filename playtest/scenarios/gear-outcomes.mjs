@@ -58,10 +58,23 @@ const lootAndEquip = async (player, itemLevel) => {
   }, { timeoutMs: 12000, label: `item-level ${itemLevel} vessel drop` });
   player.devTeleport(drop.x, drop.y);
   player.pickupUnderfoot();
+  let lastPickupAt = Date.now();
   const inventoryItem = await player.waitFor(async () => {
     const state = await player.state();
-    return state.inventory.find(item => item.uuid === drop.uuid) || false;
-  }, { label: `item-level ${itemLevel} vessel pickup` });
+    const pickedUp = state.inventory.find(item => item.uuid === drop.uuid);
+    if (pickedUp) return pickedUp;
+
+    // The dev teleport and the real pickup travel through separate socket
+    // handlers. Under a busy full-suite server the first grab can race the
+    // authoritative teleport; retrying the idempotent grab models holding G
+    // for a moment instead of turning scheduler jitter into a false failure.
+    if (Date.now() - lastPickupAt >= 750) {
+      lastPickupAt = Date.now();
+      player.devTeleport(drop.x, drop.y);
+      player.pickupUnderfoot();
+    }
+    return false;
+  }, { timeoutMs: 12000, label: `item-level ${itemLevel} vessel pickup` });
   player.equipItem(inventoryItem);
   return player.waitFor(async () => {
     const state = await player.state();

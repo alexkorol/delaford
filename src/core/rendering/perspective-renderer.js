@@ -151,6 +151,7 @@ class PerspectiveRenderer {
     );
     this.lightingRenderer.drawVignette(ctx, canvas.width, canvas.height);
     this.drawPlayerDamageVignette(ctx, canvas.width, canvas.height, timestamp);
+    this.drawDeathState(ctx, canvas.width, canvas.height);
   }
 
   alignLegacyGround(ctx, canvas) {
@@ -331,6 +332,15 @@ class PerspectiveRenderer {
     const ctx = this.map.bufferContext;
 
     ctx.save();
+    const playerFoot = this.getPlayerFoot(tileSize);
+    const horizontalDistance = Math.abs(foot.x - playerFoot.x);
+    const depthDistance = foot.y - playerFoot.y;
+    const obscuresPlayer = horizontalDistance < tileSize * 1.05
+      && depthDistance > -tileSize * 0.12
+      && depthDistance < tileSize * 1.7;
+    if (obscuresPlayer) {
+      ctx.globalAlpha = kind === 'tree' ? 0.32 : 0.46;
+    }
     this.drawVerticalTerrainShadow(ctx, point, width, height, kind);
 
     ctx.fillStyle = 'rgba(4, 7, 5, 0.42)';
@@ -375,6 +385,14 @@ class PerspectiveRenderer {
       ctx.beginPath();
       ctx.moveTo(drawX, faceTop + 0.5);
       ctx.lineTo(drawX + width, faceTop + 0.5);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(2, 3, 4, 0.22)';
+      ctx.fillRect(drawX, drawY + (height * 0.18), width * 0.09, height * 0.82);
+      ctx.strokeStyle = 'rgba(255, 224, 164, 0.16)';
+      ctx.beginPath();
+      ctx.moveTo(drawX + (width * 0.09), drawY + (height * 0.22));
+      ctx.lineTo(drawX + (width * 0.09), point.y);
       ctx.stroke();
     }
     ctx.restore();
@@ -552,7 +570,15 @@ class PerspectiveRenderer {
       sourceSize,
     );
 
-    this.drawFrame({
+    if (player === this.map.player) {
+      this.drawActorAnchor(foot, PLAYER_SPRITE_CONFIG.tileSize, {
+        colour: '#74e0bd',
+        glow: 'rgba(64, 210, 168, 0.28)',
+        radiusScale: 0.30,
+      });
+    }
+
+    const projected = this.drawFrame({
       image: this.map.images.playerImage,
       sourceX,
       sourceY,
@@ -562,6 +588,47 @@ class PerspectiveRenderer {
       lastHitAt: player.lastHitAt,
       timestamp,
     });
+
+    if (player === this.map.player && projected) {
+      const ctx = this.map.bufferContext;
+      const markerY = projected.drawY - Math.max(5, projected.scale * 5);
+      ctx.save();
+      ctx.fillStyle = '#e8c66d';
+      ctx.shadowColor = 'rgba(232, 198, 109, 0.75)';
+      ctx.shadowBlur = Math.max(3, projected.scale * 5);
+      ctx.beginPath();
+      ctx.moveTo(projected.x, markerY);
+      ctx.lineTo(projected.x + (projected.size * 0.07), markerY + (projected.size * 0.09));
+      ctx.lineTo(projected.x, markerY + (projected.size * 0.18));
+      ctx.lineTo(projected.x - (projected.size * 0.07), markerY + (projected.size * 0.09));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  drawActorAnchor(foot, frameSize, {
+    colour = '#d85b4b',
+    glow = 'rgba(216, 91, 75, 0.22)',
+    radiusScale = 0.28,
+  } = {}) {
+    const projected = this.getProjectedFrame(foot, frameSize, 1);
+    if (!projected) {
+      return;
+    }
+
+    const ctx = this.map.bufferContext;
+    const radius = projected.size * radiusScale;
+    ctx.save();
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = Math.max(1.25, projected.scale * 1.7);
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = Math.max(4, projected.scale * 7);
+    ctx.globalAlpha = 0.88;
+    ctx.beginPath();
+    ctx.ellipse(projected.x, projected.y, radius, radius * 0.31, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawNPC(npc, foot) {
@@ -590,6 +657,21 @@ class PerspectiveRenderer {
       actorIdentityFrame(monster),
       sourceSize,
     );
+    const tileSize = this.map.config.map.tileset.tile.width;
+    const playerFoot = this.getPlayerFoot(tileSize);
+    const distanceInTiles = Math.hypot(
+      foot.x - playerFoot.x,
+      foot.y - playerFoot.y,
+    ) / tileSize;
+    const elite = monster.rarityId === 'elite' || monster.rarity === 'elite' || monster.boss;
+    if (distanceInTiles <= 9 || elite) {
+      this.drawActorAnchor(foot, sourceSize, {
+        colour: elite ? '#e0ad4f' : '#cf584e',
+        glow: elite ? 'rgba(224, 173, 79, 0.30)' : 'rgba(207, 88, 78, 0.22)',
+        radiusScale: elite ? 0.35 : 0.27,
+      });
+    }
+
     const projected = this.drawFrame({
       image,
       sourceX,
@@ -604,7 +686,8 @@ class PerspectiveRenderer {
     const health = monster.stats && monster.stats.resources
       ? monster.stats.resources.health
       : null;
-    if (!projected || !health || !health.max || health.current >= health.max) {
+    const showNearbyHealth = distanceInTiles <= 7;
+    if (!projected || !health || !health.max || (!showNearbyHealth && health.current >= health.max)) {
       return;
     }
 
@@ -619,6 +702,46 @@ class PerspectiveRenderer {
     ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
     ctx.fillStyle = fraction > 0.4 ? '#5fd35f' : '#e04f4f';
     ctx.fillRect(x, y, width * fraction, height);
+    ctx.restore();
+  }
+
+  drawDeathState(ctx, width, height) {
+    const player = this.map.player;
+    const health = player?.stats?.resources?.health || player?.hp || player?.health;
+    if (!health || health.current > 0) {
+      return;
+    }
+
+    const lifecycle = player.lifecycle || player.stats?.lifecycle || {};
+    const respawnAt = Number(lifecycle.respawn?.at) || 0;
+    const seconds = respawnAt ? Math.max(0, Math.ceil((respawnAt - Date.now()) / 1000)) : null;
+    const permanent = lifecycle.state === 'permadead';
+    const message = permanent
+      ? 'Your Chronicle has ended'
+      : (seconds === null ? 'Returning to the road...' : `Rising in ${seconds}`);
+
+    ctx.save();
+    const wash = ctx.createRadialGradient(
+      width / 2,
+      height * 0.52,
+      Math.min(width, height) * 0.08,
+      width / 2,
+      height * 0.52,
+      Math.max(width, height) * 0.65,
+    );
+    wash.addColorStop(0, 'rgba(46, 9, 10, 0.12)');
+    wash.addColorStop(1, 'rgba(2, 2, 3, 0.62)');
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, width, height);
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    ctx.shadowBlur = 9;
+    ctx.fillStyle = '#c98975';
+    ctx.font = 'normal 1.8rem "GameFont", sans-serif';
+    ctx.fillText('FALLEN', width / 2, height * 0.39);
+    ctx.fillStyle = 'rgba(236, 220, 193, 0.82)';
+    ctx.font = 'normal 0.72rem "ChatFont", sans-serif';
+    ctx.fillText(message, width / 2, (height * 0.39) + 31);
     ctx.restore();
   }
 
@@ -689,7 +812,7 @@ class PerspectiveRenderer {
 
     const tileSize = this.map.config.map.tileset.tile.width;
     const timestamp = now();
-    const duration = 1050;
+    const duration = 820;
     this.map.combatFeedback = this.map.combatFeedback.filter(
       entry => timestamp - entry.startedAt < duration,
     );
@@ -730,8 +853,11 @@ class PerspectiveRenderer {
       const label = entry.blocked
         ? 'BLOCK'
         : `${hitPrefix ? `${hitPrefix} ` : ''}${entry.amount > 0 ? `-${entry.amount}` : '0'}`;
-      ctx.strokeText(label, point.x, point.y - rise);
-      ctx.fillText(label, point.x, point.y - rise);
+      const offsetStep = Math.ceil((entry.offsetIndex || 0) / 2);
+      const offsetDirection = (entry.offsetIndex || 0) % 2 === 0 ? 1 : -1;
+      const offsetX = offsetStep * offsetDirection * 13 * point.scale;
+      ctx.strokeText(label, point.x + offsetX, point.y - rise);
+      ctx.fillText(label, point.x + offsetX, point.y - rise);
       ctx.restore();
     });
   }

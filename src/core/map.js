@@ -573,6 +573,11 @@ class Map {
       }
     }
 
+    const recentTargetHits = this.combatFeedback.filter(entry => (
+      entry.targetId === payload.targetId
+      && at - entry.startedAt < 420
+    )).length;
+
     this.combatFeedback.push({
       targetId: payload.targetId,
       targetType: payload.targetType || 'monster',
@@ -581,6 +586,7 @@ class Map {
       critical: Boolean(payload.critical),
       beastbane: Boolean(payload.beastbane),
       died: Boolean(payload.died),
+      offsetIndex: recentTargetHits,
       startedAt: at,
     });
   }

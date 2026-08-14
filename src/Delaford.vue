@@ -1238,8 +1238,8 @@ export default {
         const paneHotkeys = {
           c: 'stats',
           i: 'inventory',
+          j: 'quests',
           p: 'flowerOfLife',
-          q: 'quests',
         };
         if (paneHotkeys[key]) {
           this.requestPane(paneHotkeys[key]);
@@ -1542,6 +1542,10 @@ export default {
         Socket.emit('world:road:chart', { roadId: road });
         return;
       }
+      // Start the visible transition on click, before the server spends time
+      // generating the floor. Waiting for the socket loading event exposes a
+      // dead black canvas on slower devices.
+      this.partyLoading = { active: true, state: 'enter-instance', startedAt: Date.now() };
       Socket.emit('instance:enterSolo', { template, layout });
     },
 
@@ -1583,7 +1587,8 @@ export default {
         this.partyInvites = this.partyInvites.filter((invite) => invite.partyId !== party.id);
       }
 
-      if (!party || party.state !== 'instance') {
+      if ((!party || party.state !== 'instance')
+        && this.partyLoading.state !== 'enter-instance') {
         this.partyLoading = { active: false, state: null };
       }
     },
@@ -1602,8 +1607,18 @@ export default {
     },
 
     handlePartyLoading(state) {
+      // The server sends idle immediately after the scene payload. Keep the
+      // veil up until the async client-side terrain rebuild has actually
+      // finished; otherwise the player gets a black canvas while combat runs.
+      if (state === 'idle' && this.partyLoading.state === 'enter-instance') {
+        return;
+      }
       const active = Boolean(state && state !== 'idle');
-      this.partyLoading = { active, state };
+      this.partyLoading = {
+        active,
+        state,
+        startedAt: active ? (this.partyLoading.startedAt || Date.now()) : null,
+      };
       if (active) {
         this.setPartyStatusMessage('');
       }
@@ -1614,6 +1629,7 @@ export default {
         return;
       }
 
+      const transitionStartedAt = this.partyLoading.startedAt || Date.now();
       await this.game.loadScene(scene, playerState);
       this.applyWorldViewportToMap();
 
@@ -1621,7 +1637,17 @@ export default {
         this.party = partySnapshot;
       }
 
-      this.partyLoading = { active: false, state: null };
+      // Let the render loop bake and paint the new terrain behind the veil.
+      // Scene deserialisation finishing is not the same thing as a visible
+      // frame; hiding here used to reveal 0.5–1.5 seconds of black canvas.
+      const remaining = Math.max(0, 1400 - (Date.now() - transitionStartedAt));
+      if (remaining > 0) {
+        await new Promise(resolve => window.setTimeout(resolve, remaining));
+      }
+      await new Promise(resolve => window.requestAnimationFrame(
+        () => window.requestAnimationFrame(resolve),
+      ));
+      this.partyLoading = { active: false, state: null, startedAt: null };
     },
 
     handlePartyError(error = {}) {
@@ -1629,6 +1655,7 @@ export default {
         return;
       }
 
+      this.partyLoading = { active: false, state: null };
       this.setPartyStatusMessage(error.message);
     },
 

@@ -348,6 +348,12 @@ export default {
 
     if (context.game.player.uuid === playerId) {
       applyToActor(context.game.player);
+      // Map keeps an actor reference of its own. Without this sync the HUD
+      // reached 0 HP while the renderer still saw the pre-hit health object,
+      // so death had no visible world state at all.
+      if (context.game.map) {
+        context.game.map.player = context.game.player;
+      }
       if (lifecycle && lifecycle.state === 'permadead'
         && typeof context.handlePermadeath === 'function') {
         context.handlePermadeath(payload);

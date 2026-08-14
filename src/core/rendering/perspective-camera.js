@@ -54,7 +54,10 @@ class PerspectiveCamera {
     this.projectionArea = (this.focus - this.horizon) * this.depthToFocus;
     this.cameraFootY = this.y + this.depthToFocus;
     const zoomProgress = clamp((this.userZoom - 0.72) / 0.88, 0, 1);
-    this.dofStrength = interpolate(1, 2.2, zoomProgress);
+    // The old miniature-effect blur made distant monsters and scenery dissolve
+    // into the already dark ground. Retain just enough focus falloff to sell
+    // depth without sacrificing combat readability.
+    this.dofStrength = interpolate(0.32, 0.82, zoomProgress);
     this.valid = Number.isFinite(this.cameraFootY)
       && Number.isFinite(this.projectionArea)
       && this.depthToFocus > 0;
@@ -126,7 +129,7 @@ class PerspectiveCamera {
     }
     const distance = (Math.abs(depth - this.depthToFocus) / this.depthToFocus)
       * this.dofStrength;
-    return clamp((distance - 0.20) / 0.65, 0, 1);
+    return clamp((distance - 0.04) / 0.92, 0, 1);
   }
 }
 
