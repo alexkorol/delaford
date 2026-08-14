@@ -105,7 +105,18 @@ if (isDevelopment) {
 }
 
 if (hasClientBundle()) {
-  app.use(express.static(distDir));
+  // Hashed assets are immutable; the HTML shell must always revalidate so a
+  // phone that loaded the app during one deploy cannot keep running a stale
+  // bundle after the next (stale shells surface as unexplainable client bugs).
+  app.use(express.static(distDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+  }));
 } else {
   process.stderr.write('[server] Client bundle not found in dist/. Static assets will be skipped.\n');
 }
@@ -300,6 +311,7 @@ if (isDevelopment) {
 app.use((_req, res) => {
 
   if (hasClientBundle()) {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(distDir, 'index.html'));
     return;
   }
