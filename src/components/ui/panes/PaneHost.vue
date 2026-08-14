@@ -14,6 +14,7 @@
         v-if="showLeftPane"
         key="left"
         class="pane-host__side pane-host__side--left"
+        :class="`pane-host__side--${leftPane}`"
       >
         <PaneCard
           :title="leftPaneTitle"
@@ -44,6 +45,7 @@
         v-if="showRightPane"
         key="right"
         class="pane-host__side pane-host__side--right"
+        :class="`pane-host__side--${rightPane}`"
       >
         <PaneCard
           :title="rightPaneTitle"
@@ -286,6 +288,13 @@ export default {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+}
+
+/* Inventory needs room for both authored 54px item art and the complete
+   12x7 backpack. It remains an overlay, so this never narrows the world. */
+.pane-host__side--inventory {
+  width: min(calc(100vw - (var(--pane-host-panel-gutter) * 2)), 1240px);
+  max-width: min(calc(100vw - (var(--pane-host-panel-gutter) * 2)), 1240px);
 }
 
 .pane-host__center {

@@ -51,4 +51,16 @@ describe('inventory pane layout', () => {
     expect(worldViewport).not.toContain('defaultLeftPane');
     expect(worldViewport).not.toContain('defaultRightPane');
   });
+
+  it('uses the overlay width to keep the complete backpack above the fold', () => {
+    const paneHost = readSource('src/components/ui/panes/PaneHost.vue');
+    const inventory = readSource('src/components/slots/Inventory.vue');
+    const inventoryGrid = readSource('src/components/inventory/InventoryGrid.vue');
+
+    expect(paneHost).toContain('pane-host__side--inventory');
+    expect(paneHost).toContain('1240px');
+    expect(inventory).toContain('@media (width >= 1100px)');
+    expect(inventory).toContain('flex-direction: row');
+    expect(inventoryGrid).toContain('clamp(40px, 4.1vw, ${CELL_SIZE_PX}px)');
+  });
 });

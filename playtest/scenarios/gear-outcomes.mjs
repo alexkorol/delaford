@@ -26,7 +26,11 @@ const timeKill = async (player, targetUuid) => {
 };
 
 const COMPARISON_HEALTH = 100;
-const DEEP_COMPARISON_HEALTH = 240;
+// The deeper comparison must span enough attack cycles that one scheduling
+// interval cannot erase the measured item-level advantage. At 240 health the
+// same 13 -> 17 attack increase could report anywhere from 7% to 18% faster
+// depending on which 250ms poll observed the final hit.
+const DEEP_COMPARISON_HEALTH = 480;
 
 const resetMonster = async (player, targetUuid, maxHealth = COMPARISON_HEALTH) => {
   player.devResetMonster(targetUuid, { maxHealth, isolate: true });

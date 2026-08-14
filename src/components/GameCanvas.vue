@@ -619,6 +619,12 @@ div.game {
     background: #fff;
     outline: none;
     cursor: pointer;
+
+    /* The source tiles were authored for a brighter top-down presentation.
+       Perspective resampling plus multiply lighting otherwise crushes their
+       midtones into the same green-brown band. Keep silhouettes crisp while
+       easing saturation and lifting the playable world, not the HUD chrome. */
+    filter: brightness(1.12) contrast(1.08) saturate(0.9);
     image-rendering: pixelated;
     display: block;
   }

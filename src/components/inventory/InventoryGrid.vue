@@ -126,10 +126,9 @@ export default {
     } = storeToRefs(inventoryStore);
 
     const gridStyle = computed(() => ({
-      // The desktop pane occupies 48vw. This keeps the 12-column backpack as
-      // large as that pane allows and reaches the authored 54px size on wide
-      // screens, while retaining a usable floor on narrow viewports.
-      '--cell-size': `clamp(40px, calc((48vw - 128px) / 12), ${CELL_SIZE_PX}px)`,
+      // The inventory overlay is deliberately wide enough to reach the
+      // authored WIZARD scale without pushing columns into implicit rows.
+      '--cell-size': `clamp(40px, 4.1vw, ${CELL_SIZE_PX}px)`,
       '--cell-gap': `${CELL_GAP_PX}px`,
       gridTemplateColumns: `repeat(${props.columns}, var(--cell-size))`,
       gridTemplateRows: `repeat(${props.rows}, var(--cell-size))`,

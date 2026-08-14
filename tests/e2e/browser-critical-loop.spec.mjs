@@ -171,6 +171,13 @@ test('the built game supports the browser-critical guest loop', async ({ page })
     };
   });
   expect(backpackDistribution).toEqual({ columns: 12, rows: 7 });
+  const firstBackpackCell = await backpackCells.first().boundingBox();
+  const lastBackpackCell = await backpackCells.last().boundingBox();
+  const inventoryViewport = page.viewportSize();
+  expect(firstBackpackCell?.width).toBeGreaterThanOrEqual(50);
+  expect(lastBackpackCell && inventoryViewport
+    ? lastBackpackCell.y + lastBackpackCell.height
+    : Number.POSITIVE_INFINITY).toBeLessThanOrEqual(inventoryViewport?.height || 0);
 
   await expect(inventory.locator('.inventory-item[aria-label*="Pickaxe"]')).toHaveCount(0);
   await expect(inventory.locator('.inventory-item[aria-label*="Bronze Bar"]')).toHaveCount(0);

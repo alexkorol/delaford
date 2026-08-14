@@ -895,6 +895,7 @@ class Map {
     tileSize = 16,
     marginTiles = 0,
     flattenForeground = true,
+    skipBackgroundGids = null,
   } = {}) {
     const { size } = this.config.map;
     const canvas = document.createElement('canvas');
@@ -911,14 +912,17 @@ class Map {
         const index = (worldY * size.x) + worldX;
         const drawX = (worldX + marginTiles) * tileSize;
         const drawY = (worldY + marginTiles) * tileSize;
-        this.drawTile(
-          ctx,
-          (this.background[index] || 0) - 1,
-          drawX,
-          drawY,
-          tileSize,
-          sheets,
-        );
+        const background = this.background[index] || 0;
+        if (!skipBackgroundGids?.has(background)) {
+          this.drawTile(
+            ctx,
+            background - 1,
+            drawX,
+            drawY,
+            tileSize,
+            sheets,
+          );
+        }
         const foreground = this.foreground[index] || 0;
         const verticalForeground = foreground
           && !UI.tileWalkable(foreground - 1, 'foreground');

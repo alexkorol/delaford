@@ -27,6 +27,9 @@ class TerrainRenderer {
   constructor(map, options = {}) {
     this.map = map;
     this.heightAt = typeof options.heightAt === 'function' ? options.heightAt : () => 0;
+    this.skipBackgroundGids = options.skipBackgroundGids instanceof Set
+      ? options.skipBackgroundGids
+      : new Set();
     this.canvas = document.createElement('canvas');
     this.gl = this.canvas.getContext('webgl', {
       alpha: true,
@@ -124,7 +127,7 @@ class TerrainRenderer {
         vec3 sharp = texture2D(uTexture, vUv).rgb;
         vec3 soft = texture2D(uTexture, vUv, 1.8).rgb;
         vec3 colour = mix(sharp, soft, circleOfConfusion);
-        float haze = clamp((vDepth / uDepthToFocus - 1.28) / 1.35, 0.0, 1.0) * 0.58;
+        float haze = clamp((vDepth / uDepthToFocus - 1.34) / 1.42, 0.0, 1.0) * 0.46;
         gl_FragColor = vec4(mix(colour, uSky, haze), 1.0);
       }
     `;
@@ -239,6 +242,7 @@ class TerrainRenderer {
       tileSize: BAKE_TILE_SIZE,
       marginTiles: MAP_MARGIN_TILES,
       flattenForeground: false,
+      skipBackgroundGids: this.skipBackgroundGids,
     });
     const requestedSize = nextPowerOfTwo(Math.max(ground.width, ground.height));
     const maximumSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);

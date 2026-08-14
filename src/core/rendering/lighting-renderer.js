@@ -85,7 +85,7 @@ class LightingRenderer {
       Math.max(width, height) * 0.72,
     );
     gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(1, 'rgba(10, 4, 16, 0.28)');
+    gradient.addColorStop(1, 'rgba(10, 4, 16, 0.18)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
   }
@@ -111,7 +111,7 @@ class LightingRenderer {
         screenY,
         radius,
       );
-      gradient.addColorStop(0, 'rgba(226, 228, 234, 1)');
+      gradient.addColorStop(0, 'rgba(236, 238, 242, 1)');
       gradient.addColorStop(1, 'rgba(255, 255, 255, 1)');
       ctx.fillStyle = gradient;
       ctx.beginPath();

@@ -312,4 +312,32 @@ export default {
     grid-template-columns: 1fr;
   }
 }
+
+/* On a desktop/landscape viewport, stacking two wide authored surfaces made
+   the backpack fall below the fold. Use the width of the overlay instead. */
+@media (width >= 1100px) {
+  .inventory-pane__body {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .inventory-pane__ragdoll {
+    --eq-cell: clamp(48px, 3.5vw, 56px);
+    --eq-gap: 4px;
+
+    flex: 0 0 auto;
+    width: max-content;
+  }
+
+  .inventory-pane__grid {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .inventory-pane__utility-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

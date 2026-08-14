@@ -37,6 +37,10 @@ class PerspectiveRenderer {
     this.legacyGroundContext = this.legacyGroundCanvas.getContext('2d');
     this.terrainRenderer = new TerrainRenderer(map, {
       heightAt: (worldX, worldY) => this.terrainHeight(worldX, worldY),
+      // Wall tiles are drawn below as raised billboards. Keeping their dark
+      // top-down copies in the ground bake was the source of the flat double
+      // image running around every building and boundary.
+      skipBackgroundGids: WALL_GIDS,
     });
     this.lightingRenderer = new LightingRenderer();
     this.atmosphereRenderer = new AtmosphereRenderer();
@@ -96,7 +100,7 @@ class PerspectiveRenderer {
     const elapsedSeconds = timestamp / 1000;
     const ambient = sampleAmbient(elapsedSeconds);
     const skyColour = ambient.map((channel, index) => (
-      channel * [0.62, 0.60, 0.58][index]
+      channel * [0.78, 0.80, 0.76][index]
     ));
     this.drawSky(ctx, canvas, skyColour);
     if (this.terrainRenderer.render(this.camera, skyColour)) {
@@ -287,9 +291,9 @@ class PerspectiveRenderer {
     }
 
     const dimensions = {
-      tree: { width: 1.18, height: 1.9 },
-      wall: { width: 1.06, height: 1.42 },
-      decor: { width: 1.05, height: 1.28 },
+      tree: { width: 1.24, height: 2.12 },
+      wall: { width: 1.08, height: 1.52 },
+      decor: { width: 1.08, height: 1.36 },
     }[kind];
     const width = tileSize * point.scale * dimensions.width;
     const height = tileSize * point.scale * dimensions.height;
@@ -316,7 +320,9 @@ class PerspectiveRenderer {
     const ctx = this.map.bufferContext;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(4, 7, 5, 0.34)';
+    this.drawVerticalTerrainShadow(ctx, point, width, height, kind);
+
+    ctx.fillStyle = 'rgba(4, 7, 5, 0.42)';
     ctx.beginPath();
     ctx.ellipse(point.x, point.y, width * 0.38, width * 0.12, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -325,13 +331,6 @@ class PerspectiveRenderer {
       const trunkWidth = Math.max(2, width * 0.14);
       ctx.fillStyle = 'rgba(62, 43, 24, 0.9)';
       ctx.fillRect(point.x - (trunkWidth / 2), point.y - (height * 0.55), trunkWidth, height * 0.52);
-    } else if (kind === 'wall') {
-      const faceTop = drawY + (height * 0.18);
-      const faceGradient = ctx.createLinearGradient(0, faceTop, 0, point.y);
-      faceGradient.addColorStop(0, 'rgba(65, 58, 48, 0.24)');
-      faceGradient.addColorStop(1, 'rgba(5, 6, 6, 0.72)');
-      ctx.fillStyle = faceGradient;
-      ctx.fillRect(drawX, faceTop, width, point.y - faceTop);
     }
 
     ctx.imageSmoothingEnabled = false;
@@ -351,13 +350,42 @@ class PerspectiveRenderer {
     );
 
     if (kind === 'wall') {
-      ctx.strokeStyle = 'rgba(239, 220, 174, 0.16)';
+      const faceTop = drawY + (height * 0.42);
+      const faceGradient = ctx.createLinearGradient(0, faceTop, 0, point.y);
+      faceGradient.addColorStop(0, 'rgba(58, 48, 38, 0.08)');
+      faceGradient.addColorStop(1, 'rgba(2, 3, 4, 0.58)');
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = faceGradient;
+      ctx.fillRect(drawX, faceTop, width, point.y - faceTop);
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(255, 230, 174, 0.30)';
       ctx.lineWidth = Math.max(1, point.scale);
       ctx.beginPath();
-      ctx.moveTo(drawX, drawY + 0.5);
-      ctx.lineTo(drawX + width, drawY + 0.5);
+      ctx.moveTo(drawX, faceTop + 0.5);
+      ctx.lineTo(drawX + width, faceTop + 0.5);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  drawVerticalTerrainShadow(ctx, point, width, height, kind) {
+    const reach = kind === 'tree' ? height * 0.62 : height * 0.34;
+    const spread = kind === 'tree' ? width * 0.42 : width * 0.50;
+    const alpha = kind === 'tree' ? 0.34 : 0.26;
+
+    ctx.save();
+    ctx.translate(point.x + (reach * 0.34), point.y + (reach * 0.12));
+    ctx.rotate(-0.18);
+    ctx.scale(1, 0.34);
+    const gradient = ctx.createRadialGradient(0, 0, spread * 0.08, 0, 0, spread + reach);
+    gradient.addColorStop(0, `rgba(2, 5, 3, ${alpha})`);
+    gradient.addColorStop(0.58, `rgba(2, 5, 3, ${alpha * 0.62})`);
+    gradient.addColorStop(1, 'rgba(2, 5, 3, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, spread + reach, spread, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
