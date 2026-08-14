@@ -1,4 +1,4 @@
-import { general, wearableItems, smithing } from '#server/core/data/items/index.js';
+import { general, wearableItems } from '#server/core/data/items/index.js';
 
 import Authentication from '#server/player/authentication.js';
 import Combat from '#server/core/combat/index.js';
@@ -429,7 +429,7 @@ class Delaford {
     world.clients.push(ws);
 
     // Only return needed values for client
-    const allItems = [...wearableItems, ...general, ...smithing].map((i) => {
+    const allItems = [...wearableItems, ...general].map((i) => {
       const item = {
         name: i.name,
         id: i.id,

@@ -4,10 +4,8 @@ import drinkFountainStrategy from './drink-fountain.js';
 import equipStrategy from './equip.js';
 import examineStrategy from './examine.js';
 import inventoryDropStrategy from './inventory-drop.js';
-import miningRockStrategy from './mining-rock.js';
 import openScreenStrategy from './open-screen.js';
 import resourcePaneStrategy from './resource-pane.js';
-import smeltActionStrategy from './smelt-action.js';
 import takeStrategy from './take.js';
 import talkStrategy from './talk.js';
 import tradeActionStrategy from './trade-action.js';
@@ -25,8 +23,6 @@ const strategies = [
   equipStrategy,
   unequipStrategy,
   examineStrategy,
-  miningRockStrategy,
-  smeltActionStrategy,
   resourcePaneStrategy,
   openScreenStrategy,
   bankActionStrategy,

@@ -49,13 +49,8 @@ const presetActions = (items) => {
       list = ['chop'];
       break;
     case 'pickaxe':
-      list = ['mine', 'examine'];
-      break;
-    case 'furnace':
-      list = ['smelt', 'examine'];
-      break;
-    case 'anvil':
-      list = ['smith', 'forge', 'examine'];
+      // The ore/smithing loop is retired; pickaxes remain legacy weapons.
+      list = ['examine'];
     }
 
     actions.push(...list);

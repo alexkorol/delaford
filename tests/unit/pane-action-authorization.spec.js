@@ -64,16 +64,23 @@ const attachInventory = (player, slots) => {
 };
 
 const withStackableCopperOre = () => {
+  // The ore catalogue is retired; synthesize a stackable trade good under the
+  // old id so the stack-merge shop contracts stay covered.
   const originalGetItemData = Query.getItemData.bind(Query);
   vi.spyOn(Query, 'getItemData').mockImplementation((id) => {
-    const item = originalGetItemData(id);
-    if (id === 'copper-ore' && item) {
+    if (id === 'copper-ore') {
       return {
-        ...item,
+        id: 'copper-ore',
+        name: 'Copper Ore',
+        examine: 'A stackable trade good.',
+        price: 9,
+        type: 'trade-good',
         stackable: true,
+        graphics: { tileset: 'general', row: 0, column: 0 },
+        actions: ['take', 'examine', 'drop', 'deposit', 'withdraw', 'buy', 'sell', 'value'],
       };
     }
-    return item;
+    return originalGetItemData(id);
   });
 };
 

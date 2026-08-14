@@ -186,16 +186,6 @@ export default {
     },
     gridData(section) {
       const modifier = {
-        furnace: {
-          columns: 6,
-          rows: 1,
-          classId: 'furnaceSlot',
-        },
-        anvil: {
-          columns: 5,
-          rows: 3,
-          classId: 'anvilSlot',
-        },
         inventory: {
           columns: 12,
           rows: 7,

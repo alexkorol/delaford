@@ -37,8 +37,6 @@ const DEFAULT_ACTIONS = [
   'equip',
   'examine',
   'take',
-  'mine',
-  'smelt',
   'deposit',
   'withdraw',
   'buy',

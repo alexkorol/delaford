@@ -127,13 +127,13 @@ describe('character sheet model', () => {
   it('sorts known skills in character-screen order', () => {
     const sheet = buildCharacterSheet({
       skills: {
-        smithing: { level: 5, exp: 180 },
+        crafting: { level: 5, exp: 180 },
         attack: { level: 7, exp: 320 },
-        mining: { level: 3, exp: 90 },
+        woodcutting: { level: 3, exp: 90 },
       },
     });
 
-    expect(sheet.skills.map(skill => skill.id)).toEqual(['attack', 'mining', 'smithing']);
+    expect(sheet.skills.map(skill => skill.id)).toEqual(['attack', 'woodcutting', 'crafting']);
   });
 
   it('surfaces authoritative Vesselforge combat effects as percentages', () => {

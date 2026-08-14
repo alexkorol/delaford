@@ -18,7 +18,7 @@ import createPlayerStatsManager, {
 import Wear from '#server/core/utilities/wear.js';
 import { resolvePersistedVerdigrisTree } from '#server/core/passives/verdigris-authority.js';
 
-const PLAYER_SKILL_IDS = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
+const PLAYER_SKILL_IDS = ['attack', 'defence', 'fishing', 'cooking'];
 
 export const normalisePlayerSkills = (skills) => {
   const source = skills && typeof skills === 'object' && !Array.isArray(skills) ? skills : {};

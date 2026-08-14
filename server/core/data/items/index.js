@@ -6,11 +6,9 @@ import general from './general.js';
 import vessels from './vessels.js';
 import verdigris from './verdigris.js';
 
-import smithing from './skills/smithing.js';
-
 const wearableItems = [...weapons, ...armor, ...belts, ...jewelry, ...vessels, ...verdigris];
 
 export {
-  armor, belts, weapons, jewelry, vessels, verdigris, general, smithing, wearableItems,
+  armor, belts, weapons, jewelry, vessels, verdigris, general, wearableItems,
 
 };

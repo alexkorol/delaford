@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import GameCanvas from '@/components/GameCanvas.vue';
 import ContextMenu from '@/components/sub/ContextMenu.vue';
 import ItemGrid from '@/components/util/ItemGrid.vue';
-import AnvilGrid from '@/components/util/AnvilGrid.vue';
 import ClientUI from '@/core/utilities/client-ui.js';
 import bus from '@/core/utilities/bus.js';
 
@@ -75,7 +74,6 @@ describe('component event-bus cleanup', () => {
 
   it.each([
     ['ItemGrid', ItemGrid],
-    ['AnvilGrid', AnvilGrid],
   ])('removes the shared hover listener from %s', (_name, component) => {
     const on = vi.spyOn(bus, '$on').mockImplementation(() => {});
     const off = vi.spyOn(bus, '$off').mockImplementation(() => {});

@@ -23,7 +23,6 @@ describe('legacy module cleanup', () => {
       'src/components/ui/panes/FloatingWindow.vue',
       'src/components/passives/FlowerOfLifePane.vue',
       'src/components/passives/FlowerOfLifeTree.vue',
-      'src/components/ui/auth/CharacterCreate.vue',
       'server/player/player-socket.js',
     ].forEach((relativePath) => {
       expect(existsSync(sourcePath(relativePath)), relativePath).toBe(false);

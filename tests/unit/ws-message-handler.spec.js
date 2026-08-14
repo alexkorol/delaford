@@ -96,7 +96,6 @@ vi.mock('#server/player/handler.js', () => ({
 vi.mock('#server/core/data/items/index.js', () => ({
   general: [],
   wearableItems: [],
-  smithing: [],
 }));
 
 vi.mock('#server/core/npc.js', () => ({

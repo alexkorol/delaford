@@ -22,17 +22,22 @@ describe('stale player snapshot tolerance', () => {
     const skills = normalisePlayerSkills({
       attack: null,
       defence: { exp: 'old-number', level: 99 },
-      mining: { exp: -50 },
+      fishing: { exp: -50 },
+      // Retired delaford-era skills in old saves must vanish, not throw.
+      mining: { exp: 120 },
+      smithing: { exp: 90 },
       renamedCraft: { exp: 5000 },
     });
 
     expect(Object.keys(skills)).toEqual([
-      'attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking',
+      'attack', 'defence', 'fishing', 'cooking',
     ]);
     expect(skills.attack).toMatchObject({ exp: 0, level: 1 });
     expect(skills.defence).toMatchObject({ exp: 0, level: 1 });
-    expect(skills.mining).toMatchObject({ exp: 0, level: 1 });
+    expect(skills.fishing).toMatchObject({ exp: 0, level: 1 });
     expect(skills).not.toHaveProperty('renamedCraft');
+    expect(skills).not.toHaveProperty('mining');
+    expect(skills).not.toHaveProperty('smithing');
   });
 
   it('drops malformed records and preserves removed ids as inert legacy items', () => {

@@ -3,8 +3,6 @@ import UI from '#shared/ui.js';
 const resourcePaneStrategy = {
   actionIds: [
     'player:resource:goldenplaque:push',
-    'player:resource:smelt:furnace:pane',
-    'player:resource:smith:anvil:pane',
   ],
   description: 'Open or interact with specialised resource panes.',
   canExecute: ({ foregroundData, menu, action }) => (

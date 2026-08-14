@@ -113,12 +113,7 @@ export default {
       };
     },
     getPaneDimensions() {
-      switch (this.current) {
-      default:
-        return '';
-      case 'furnace':
-        return 'width:70%;height:40%';
-      }
+      return '';
     },
     currentAction() {
       return this.uiStore.action.object;

@@ -2,9 +2,9 @@ import { coordsFromIndex, indexFromCoords, normaliseSize } from './grid-math.js'
 import { ORIENTATION_DEFAULT } from './constants.js';
 import { isStackableItem } from './stacking.js';
 import { resolveItemSize } from '@shared/inventory-footprints.js';
-import { general, smithing, wearableItems } from '@server/core/data/items/index.js';
+import { general, wearableItems } from '@server/core/data/items/index.js';
 
-const FALLBACK_ITEM_CATALOGUE = [...wearableItems, ...general, ...smithing];
+const FALLBACK_ITEM_CATALOGUE = [...wearableItems, ...general];
 
 const deriveUuid = (item) => {
   if (item.uuid) {

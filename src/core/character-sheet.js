@@ -59,8 +59,6 @@ const COMBAT_TYPES = ['stab', 'slash', 'crush', 'range'];
 const SKILL_ORDER = [
   'attack',
   'defence',
-  'mining',
-  'smithing',
   'woodcutting',
   'crafting',
   'magic',

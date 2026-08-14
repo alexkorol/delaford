@@ -1,4 +1,4 @@
-import { general, wearableItems, smithing } from '#server/core/data/items/index.js';
+import { general, wearableItems } from '#server/core/data/items/index.js';
 
 import { foregroundObjects } from '#server/core/data/foreground/index.js';
 
@@ -16,7 +16,7 @@ const firstById = (items) => {
 };
 
 const foregroundById = firstById(foregroundObjects);
-const itemById = firstById([...wearableItems, ...general, ...smithing]);
+const itemById = firstById([...wearableItems, ...general]);
 
 class Query {
   /**
