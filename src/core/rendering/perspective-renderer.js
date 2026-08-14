@@ -97,14 +97,19 @@ class PerspectiveRenderer {
       this.alignLegacyGround(ctx, canvas);
     }
 
+    // Mist belongs to the landscape rather than over the actors. Keeping it
+    // below the combat layer preserves atmosphere without erasing silhouettes.
+    this.atmosphereRenderer.drawMist(ctx, this.camera, elapsedSeconds);
+
+    this.drawGroundTelegraphs(ctx);
     const draws = this.collectBillboards();
     draws.sort((left, right) => left.depthY - right.depthY);
     draws.forEach(entry => entry.draw());
 
+    this.drawAttackEffects(ctx);
     this.drawProjectiles(ctx);
     this.drawCombatFeedback(ctx);
     this.drawMouse(ctx);
-    this.atmosphereRenderer.drawMist(ctx, this.camera, elapsedSeconds);
     this.lightingRenderer.apply(ctx, {
       width: canvas.width,
       height: canvas.height,
@@ -120,6 +125,7 @@ class PerspectiveRenderer {
       nightFactor,
     );
     this.lightingRenderer.drawVignette(ctx, canvas.width, canvas.height);
+    this.drawPlayerDamageVignette(ctx, canvas.width, canvas.height, timestamp);
   }
 
   alignLegacyGround(ctx, canvas) {
@@ -297,7 +303,7 @@ class PerspectiveRenderer {
     }
 
     ctx.save();
-    const blur = this.camera.circleOfConfusion(projected.depth) * 3.6;
+    const blur = this.camera.circleOfConfusion(projected.depth) * 2;
     if (blur > 0.3) {
       const quantizedBlur = Math.round(blur * 4) / 4;
       ctx.filter = `blur(${quantizedBlur}px)`;
@@ -305,6 +311,9 @@ class PerspectiveRenderer {
     } else {
       ctx.imageSmoothingEnabled = false;
     }
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.82)';
+    ctx.shadowBlur = Math.max(2, projected.scale * 4);
+    ctx.shadowOffsetY = Math.max(1, projected.scale * 2);
     ctx.drawImage(
       image,
       sourceX,
@@ -514,7 +523,7 @@ class PerspectiveRenderer {
 
     const tileSize = this.map.config.map.tileset.tile.width;
     const timestamp = now();
-    const duration = 900;
+    const duration = 1050;
     this.map.combatFeedback = this.map.combatFeedback.filter(
       entry => timestamp - entry.startedAt < duration,
     );
@@ -537,12 +546,12 @@ class PerspectiveRenderer {
       const progress = clamp((timestamp - entry.startedAt) / duration, 0, 1);
       const alpha = 1 - progress;
       const rise = ((tileSize * 0.9) + (progress * 18)) * point.scale;
-      const fontSize = Math.max(9, 12 * point.scale * ACTOR_SCALE);
+      const fontSize = Math.max(13, 15 * point.scale * ACTOR_SCALE);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.font = `600 ${fontSize}px "GameFont", sans-serif`;
       ctx.textAlign = 'center';
-      ctx.lineWidth = Math.max(2, point.scale * 3);
+      ctx.lineWidth = Math.max(3, point.scale * 3.5);
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillStyle = entry.blocked
         ? '#8bd5ff'
@@ -559,6 +568,148 @@ class PerspectiveRenderer {
       ctx.fillText(label, point.x, point.y - rise);
       ctx.restore();
     });
+  }
+
+  drawGroundTelegraphs(ctx) {
+    if (!Array.isArray(this.map.groundTelegraphs) || !this.map.groundTelegraphs.length) {
+      return;
+    }
+
+    const tileSize = this.map.config.map.tileset.tile.width;
+    const timestamp = now();
+    this.map.groundTelegraphs = this.map.groundTelegraphs.filter((telegraph) => {
+      const duration = Math.max(100, telegraph.durationMs || 1000);
+      const progress = clamp((timestamp - telegraph.receivedAt) / duration, 0, 1);
+      if (progress >= 1) {
+        return false;
+      }
+
+      const centerWorld = centerOfTile(telegraph.x, telegraph.y, tileSize);
+      const center = this.camera.projectTerrain(centerWorld.x, centerWorld.y);
+      if (!center) {
+        return true;
+      }
+
+      const worldRadius = Math.max(0.5, telegraph.radius) * tileSize;
+      const edge = this.camera.projectTerrain(centerWorld.x + worldRadius, centerWorld.y);
+      if (!edge) {
+        return true;
+      }
+      const radiusX = Math.max(4, Math.abs(edge.x - center.x));
+      const radiusY = Math.max(2, radiusX * 0.34);
+
+      ctx.save();
+      ctx.strokeStyle = '#ff7048';
+      ctx.fillStyle = `rgba(255, 70, 42, ${0.1 + (progress * 0.24)})`;
+      ctx.lineWidth = Math.max(2, center.scale * 3);
+      ctx.setLineDash([Math.max(4, center.scale * 7), Math.max(3, center.scale * 5)]);
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.ellipse(
+        center.x,
+        center.y,
+        radiusX * progress,
+        radiusY * progress,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+      ctx.restore();
+      return true;
+    });
+  }
+
+  drawAttackEffects(ctx) {
+    if (!Array.isArray(this.map.attackEffects) || !this.map.attackEffects.length) {
+      return;
+    }
+
+    const tileSize = this.map.config.map.tileset.tile.width;
+    const timestamp = now();
+    this.map.attackEffects = this.map.attackEffects.filter((effect) => {
+      const age = timestamp - effect.startedAt;
+      const duration = effect.monster ? 210 : 300;
+      if (age >= duration) {
+        return false;
+      }
+
+      const fromWorld = centerOfTile(effect.fromX, effect.fromY, tileSize);
+      const toWorld = centerOfTile(effect.toX, effect.toY, tileSize);
+      const from = this.camera.projectTerrain(fromWorld.x, fromWorld.y);
+      const to = this.camera.projectTerrain(toWorld.x, toWorld.y);
+      if (!from || !to) {
+        return true;
+      }
+
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      const progress = clamp(age / duration, 0, 1);
+      const radius = tileSize * from.scale * (0.58 + (progress * 0.78));
+      const colour = effect.monster ? '#ff765c' : '#ffe09a';
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (1 - progress) * (effect.monster ? 0.72 : 0.95);
+      ctx.strokeStyle = colour;
+      ctx.fillStyle = colour;
+      ctx.shadowColor = colour;
+      ctx.shadowBlur = Math.max(4, from.scale * 9);
+      ctx.lineWidth = Math.max(effect.monster ? 2 : 3, from.scale * 3.5);
+      ctx.lineCap = 'round';
+      if (effect.style === 'stab' || effect.style === 'range') {
+        ctx.beginPath();
+        ctx.moveTo(
+          from.x + (Math.cos(angle) * tileSize * from.scale * 0.2),
+          from.y + (Math.sin(angle) * tileSize * from.scale * 0.2),
+        );
+        ctx.lineTo(
+          from.x + (Math.cos(angle) * radius),
+          from.y + (Math.sin(angle) * radius),
+        );
+        ctx.stroke();
+      } else if (effect.style === 'crush') {
+        ctx.beginPath();
+        ctx.ellipse(to.x, to.y, radius * 0.48, radius * 0.18, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const spread = effect.style === 'sweep' ? 1.15 : (effect.monster ? 0.45 : 0.78);
+        ctx.beginPath();
+        ctx.arc(from.x, from.y, radius, angle - spread, angle + spread);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return true;
+    });
+  }
+
+  drawPlayerDamageVignette(ctx, width, height, timestamp) {
+    const latestHit = (this.map.combatFeedback || [])
+      .filter(entry => entry.targetType === 'player' && entry.amount > 0)
+      .reduce((latest, entry) => Math.max(latest, entry.startedAt || 0), 0);
+    const age = timestamp - latestHit;
+    if (!latestHit || age < 0 || age >= 360) {
+      return;
+    }
+
+    const alpha = 0.22 * (1 - (age / 360));
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.24,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.68,
+    );
+    gradient.addColorStop(0, 'rgba(160, 12, 16, 0)');
+    gradient.addColorStop(1, `rgba(190, 18, 22, ${alpha})`);
+    ctx.save();
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
   }
 
   drawMouse(ctx) {

@@ -120,11 +120,11 @@ class TerrainRenderer {
 
       void main() {
         float focusDistance = abs(vDepth - uDepthToFocus) / uDepthToFocus * uDofStrength;
-        float circleOfConfusion = clamp((focusDistance - 0.12) / 0.40, 0.0, 1.0);
+        float circleOfConfusion = clamp((focusDistance - 0.20) / 0.65, 0.0, 1.0);
         vec3 sharp = texture2D(uTexture, vUv).rgb;
-        vec3 soft = texture2D(uTexture, vUv, 3.5).rgb;
+        vec3 soft = texture2D(uTexture, vUv, 1.8).rgb;
         vec3 colour = mix(sharp, soft, circleOfConfusion);
-        float haze = clamp((vDepth / uDepthToFocus - 1.12) / 1.02, 0.0, 1.0) * 0.96;
+        float haze = clamp((vDepth / uDepthToFocus - 1.28) / 1.35, 0.0, 1.0) * 0.58;
         gl_FragColor = vec4(mix(colour, uSky, haze), 1.0);
       }
     `;

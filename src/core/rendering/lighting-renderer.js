@@ -1,14 +1,17 @@
-const DAY_LENGTH_SECONDS = 90;
+// Keep the opening minutes in readable daylight. The old 90 second cycle
+// raced from morning to night during a player's first encounter and made the
+// world appear to flicker between colour grades instead of inhabiting them.
+const DAY_LENGTH_SECONDS = 300;
 const LIGHTMAP_SCALE = 0.25;
 
 const AMBIENT_KEYFRAMES = [
-  [0, [255, 244, 224]],
-  [0.30, [255, 240, 214]],
-  [0.45, [255, 205, 150]],
-  [0.58, [150, 140, 205]],
-  [0.80, [110, 120, 190]],
-  [0.90, [210, 180, 175]],
-  [1, [255, 244, 224]],
+  [0, [255, 247, 231]],
+  [0.30, [255, 242, 218]],
+  [0.45, [255, 218, 176]],
+  [0.58, [184, 174, 219]],
+  [0.80, [148, 158, 211]],
+  [0.90, [220, 193, 190]],
+  [1, [255, 247, 231]],
 ];
 
 const CLOUDS = [
@@ -82,7 +85,7 @@ class LightingRenderer {
       Math.max(width, height) * 0.72,
     );
     gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(1, 'rgba(10, 4, 16, 0.48)');
+    gradient.addColorStop(1, 'rgba(10, 4, 16, 0.28)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
   }
@@ -108,7 +111,7 @@ class LightingRenderer {
         screenY,
         radius,
       );
-      gradient.addColorStop(0, 'rgba(196, 198, 208, 1)');
+      gradient.addColorStop(0, 'rgba(226, 228, 234, 1)');
       gradient.addColorStop(1, 'rgba(255, 255, 255, 1)');
       ctx.fillStyle = gradient;
       ctx.beginPath();

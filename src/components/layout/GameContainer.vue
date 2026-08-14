@@ -44,7 +44,7 @@
                 <button
                   type="button"
                   class="game-container__party-toggle"
-                  title="Quests (Q)"
+                  title="Quest journal (Q)"
                   @click="$emit('request-pane', 'quests')"
                 >
                   Quests
@@ -64,13 +64,29 @@
                   Exit
                 </button>
               </nav>
-              <button
-                type="button"
-                class="game-container__party-toggle"
-                @click="partyOpen = !partyOpen"
-              >
-                Party{{ partyInvites.length ? ` (${partyInvites.length})` : '' }}
-              </button>
+              <nav class="game-container__world-actions" aria-label="World actions">
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="partyOpen = !partyOpen"
+                >
+                  Party{{ partyInvites.length ? ` (${partyInvites.length})` : '' }}
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="toggleAdventure"
+                >
+                  Adventure
+                </button>
+                <button
+                  type="button"
+                  class="game-container__party-toggle"
+                  @click="toggleRoads"
+                >
+                  Roads
+                </button>
+              </nav>
               <PartyPanel
                 v-if="partyOpen || partyInvites.length"
                 :player-id="game && game.player ? game.player.uuid : null"
@@ -87,28 +103,6 @@
                 @accept-invite="$emit('party-accept-invite', $event)"
                 @decline-invite="$emit('party-decline-invite', $event)"
               />
-              <button
-                type="button"
-                class="game-container__party-toggle"
-                @click="toggleAdventure"
-              >
-                Adventure
-              </button>
-              <button
-                type="button"
-                class="game-container__party-toggle"
-                @click="toggleRoads"
-              >
-                Roads
-              </button>
-              <button
-                type="button"
-                class="game-container__party-toggle"
-                title="Quest journal (Q)"
-                @click="$emit('request-pane', 'quests')"
-              >
-                Quests
-              </button>
               <div
                 v-if="adventureOpen"
                 class="game-container__zone-menu"
@@ -960,6 +954,17 @@ export default {
   background: rgba(5, 6, 7, 0.78);
   border: 1px solid rgba(120, 95, 54, 0.28);
   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
+}
+
+.game-container__world-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(5, 6, 7, 0.66);
+  border: 1px solid rgba(120, 95, 54, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
 }
 
 .game-container__party-overlay :deep(.party-panel) {

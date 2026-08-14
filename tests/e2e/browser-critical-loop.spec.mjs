@@ -33,6 +33,58 @@ const pointerDrag = async (page, source, target) => {
   await page.mouse.up();
 };
 
+const visibleEmptyInventoryCell = async (page, inventory, footprintHeight = 1) => {
+  const grid = inventory.locator('.inventory-grid');
+  const cells = grid.locator('.inventory-grid__cell');
+  const items = grid.locator('.inventory-item');
+  const columns = await grid.evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
+  ));
+  const viewport = page.viewportSize();
+  const occupiedBounds = [];
+
+  for (let index = 0; index < await items.count(); index += 1) {
+    const bounds = await items.nth(index).boundingBox();
+    if (bounds) occupiedBounds.push(bounds);
+  }
+
+  const cellCount = await cells.count();
+  for (let index = 0; index < cellCount; index += 1) {
+    let available = true;
+    for (let row = 0; row < footprintHeight; row += 1) {
+      const cellIndex = index + (row * columns);
+      if (cellIndex >= cellCount) {
+        available = false;
+        break;
+      }
+
+      const bounds = await cells.nth(cellIndex).boundingBox();
+      if (!bounds || !viewport || bounds.y < 0 || bounds.y + bounds.height > viewport.height) {
+        available = false;
+        break;
+      }
+
+      const center = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      };
+      if (occupiedBounds.some(item => (
+        center.x >= item.x
+        && center.x <= item.x + item.width
+        && center.y >= item.y
+        && center.y <= item.y + item.height
+      ))) {
+        available = false;
+        break;
+      }
+    }
+
+    if (available) return cells.nth(index);
+  }
+
+  throw new Error(`No visible ${footprintHeight}-cell inventory vacancy found.`);
+};
+
 const completeChroniclesOnboarding = async (page) => {
   const chronicles = page.getByRole('heading', { name: 'Chronicles' });
   await expect.poll(async () => (
@@ -104,15 +156,29 @@ test('the built game supports the browser-critical guest loop', async ({ page })
   const inventory = page.getByLabel('Inventory panel');
   await expect(inventory).toBeVisible();
   const inventoryItem = inventory.locator('.inventory-item[aria-label^="Bronze Pickaxe"]');
-  await expect(inventoryItem).toBeVisible();
+  const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
+
+  // The shared development guest is intentionally persistent. A previous
+  // browser pass may have left the starter pickaxe equipped, so normalise it
+  // through the server-authored menu before asserting both pointer directions.
+  if (!(await inventoryItem.isVisible())) {
+    await expect(rightHand).toHaveAttribute('aria-label', /^Bronze Pickaxe/);
+    await rightHand.click({ button: 'right' });
+    const unequipAction = page.locator('#actions .action', { hasText: 'Unequip' });
+    await expect(unequipAction).toBeVisible();
+    await unequipAction.click();
+    await expect(inventoryItem).toBeVisible();
+  }
+
+  // Find an actually vacant, visible run for the pickaxe's 1x3 footprint.
+  // Persistent browser passes can rearrange the shared development backpack.
+  const emptyInventoryCell = await visibleEmptyInventoryCell(page, inventory, 3);
 
   // Pointer drag must use the same authoritative equip/unequip flow as the
   // context menu, including the reverse trip back into an empty grid cell.
-  const rightHand = inventory.locator('[data-equipment-slot="right_hand"]');
   await pointerDrag(page, inventoryItem, rightHand);
   await expect(rightHand.locator('.wearSlot')).toBeVisible();
 
-  const emptyInventoryCell = inventory.locator('.inventory-grid__cell').last();
   await pointerDrag(page, rightHand, emptyInventoryCell);
   await expect(rightHand.locator('.wearSlot')).toBeHidden();
   await expect(inventoryItem).toBeVisible();

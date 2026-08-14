@@ -21,4 +21,17 @@ describe('2.5D day/night lighting', () => {
     expect(night[2]).toBeGreaterThan(night[0]);
     expect(getNightFactor(night)).toBeGreaterThan(getNightFactor(noon));
   });
+
+  it('keeps the first minute bright enough for a readable first encounter', () => {
+    const firstMinute = sampleAmbient(60);
+
+    expect(DAY_LENGTH_SECONDS).toBeGreaterThanOrEqual(240);
+    expect(Math.min(...firstMinute)).toBeGreaterThanOrEqual(210);
+  });
+
+  it('keeps the cool night grade above the old crushed-black floor', () => {
+    const night = sampleAmbient(DAY_LENGTH_SECONDS * 0.80);
+
+    expect(Math.min(...night)).toBeGreaterThanOrEqual(140);
+  });
 });

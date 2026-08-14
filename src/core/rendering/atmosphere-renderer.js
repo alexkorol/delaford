@@ -42,11 +42,11 @@ class AtmosphereRenderer {
       if (radius < 2) {
         return;
       }
-      const alpha = 0.055 + (Math.sin((elapsedSeconds * 0.38) + phase) * 0.018);
+      const alpha = 0.026 + (Math.sin((elapsedSeconds * 0.38) + phase) * 0.009);
       const y = point.y - (18 * point.scale);
       const gradient = ctx.createRadialGradient(point.x, y, 2, point.x, y, radius);
-      gradient.addColorStop(0, `rgba(192, 213, 197, ${alpha})`);
-      gradient.addColorStop(1, 'rgba(192, 213, 197, 0)');
+      gradient.addColorStop(0, `rgba(184, 207, 190, ${alpha})`);
+      gradient.addColorStop(1, 'rgba(184, 207, 190, 0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(point.x, y, radius, 0, Math.PI * 2);

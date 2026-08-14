@@ -126,7 +126,7 @@ class PerspectiveCamera {
     }
     const distance = (Math.abs(depth - this.depthToFocus) / this.depthToFocus)
       * this.dofStrength;
-    return clamp((distance - 0.12) / 0.40, 0, 1);
+    return clamp((distance - 0.20) / 0.65, 0, 1);
   }
 }
 

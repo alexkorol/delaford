@@ -21,12 +21,25 @@ class FakeWebSocket {
     this.url = url;
     this.readyState = FakeWebSocket.CONNECTING;
     this.messages = [];
+    this.listeners = new Map();
     FakeWebSocket.instances.push(this);
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  dispatch(type, event) {
+    (this.listeners.get(type) || []).forEach(listener => listener(event));
   }
 
   open() {
     this.readyState = FakeWebSocket.OPEN;
-    this.onopen?.({ type: 'open' });
+    const event = { type: 'open' };
+    this.onopen?.(event);
+    this.dispatch('open', event);
   }
 
   send(payload) {
@@ -35,7 +48,9 @@ class FakeWebSocket {
 
   close(code = 1006, reason = 'test close') {
     this.readyState = FakeWebSocket.CLOSED;
-    this.onclose?.({ code, reason, wasClean: code === 1000 });
+    const event = { code, reason, wasClean: code === 1000 };
+    this.onclose?.(event);
+    this.dispatch('close', event);
   }
 }
 

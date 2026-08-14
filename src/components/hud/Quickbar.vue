@@ -163,10 +163,10 @@ export default {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   width: max-content;
   max-width: 100%;
-  padding: 4px 6px;
+  padding: 5px 7px;
   border-radius: var(--radius-sm);
   background:
     linear-gradient(180deg, rgba(58, 50, 38, 0.55), rgba(12, 10, 8, 0.62)),
@@ -179,9 +179,9 @@ export default {
 
 .quickbar__slot {
   position: relative;
-  flex: 0 0 46px;
-  width: 46px;
-  height: 46px;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: linear-gradient(180deg, #34120f 0%, #1c0d0b 100%);
@@ -237,14 +237,14 @@ export default {
   left: 3px;
   z-index: 2;
   font-family: 'GameFont', sans-serif;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   line-height: 1;
   color: #f2d391;
   text-shadow: 1px 1px 0 #000;
 }
 
 .quickbar__icon {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8));
 }
@@ -257,7 +257,7 @@ export default {
   padding: 0 2px;
   border-radius: 2px;
   background: rgba(5, 5, 6, 0.68);
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   line-height: 1.25;
   color: var(--color-accent-strong, #e0b45c);
 }
@@ -298,13 +298,13 @@ export default {
 
 @media (width <= 1100px) {
   .quickbar__slot {
-    flex-basis: 40px;
-    width: 40px;
-    height: 40px;
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
   }
 
   .quickbar__icon {
-    font-size: 19px;
+    font-size: 21px;
   }
 }
 

@@ -100,8 +100,8 @@ export default {
   align-items: flex-end;
   justify-content: center;
   gap: clamp(6px, 1vw, 14px);
-  min-height: clamp(58px, calc(var(--hud-orb-size, 152px) * 0.48), 76px);
-  padding: 0 calc(var(--hud-orb-size, 152px) * 0.74) 6px;
+  min-height: clamp(64px, calc(var(--hud-orb-size, 152px) * 0.52), 84px);
+  padding: 0 calc(var(--hud-orb-size, 152px) * 0.74) 5px;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -112,7 +112,7 @@ export default {
 
 .hud-shell__orb {
   position: absolute;
-  bottom: -8px;
+  bottom: -3px;
   z-index: 2;
   flex: 0 0 auto;
   margin-bottom: 0;
@@ -133,8 +133,8 @@ export default {
 .hud-shell__xp {
   position: relative;
   width: 100%;
-  height: 7px;
-  margin-top: 3px;
+  height: 13px;
+  margin-top: 0;
   background: rgba(0, 0, 0, 0.72);
   border-top: 1px solid rgba(212, 173, 90, 0.35);
   overflow: hidden;
@@ -155,7 +155,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.62rem;
+  font-size: 0.56rem;
   line-height: 1;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -169,7 +169,7 @@ export default {
   z-index: 3;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(100%, 460px);
+  max-width: min(100%, 510px);
   align-self: center;
   margin: 0;
   pointer-events: auto;
