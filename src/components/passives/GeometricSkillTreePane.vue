@@ -239,8 +239,9 @@ import Socket from '@/core/utilities/socket.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SEARCH_DIM_OPACITY = '0.18';
 
-// 1 point per level after the first, capped at the lifetime maximum. Quest
-// points (currently 0) will add on top of this later.
+// 1 point per level after the first plus server-awarded quest points, capped
+// at the lifetime maximum. Quest points arrive top-level on the player;
+// older snapshots carried them inside the quests object.
 const earnedPointsForPlayer = (player) => {
   // An allocation costs 2 points (node + its path), so grant at least 2 — a
   // fresh character must be able to make their first pick immediately, not
@@ -250,17 +251,13 @@ const earnedPointsForPlayer = (player) => {
     Math.max(2, Math.floor(Number(player?.level) || 1)),
     VERDIGRIS_SKILL_TREE_SOURCES.levels,
   );
+  const questPoints = Number(player?.questPoints ?? player?.quests?.questPoints) || 0;
   const fromQuests = Math.min(
-    Math.max(0, Math.floor(Number(player?.questPoints) || 0)),
+    Math.max(0, Math.floor(questPoints)),
     VERDIGRIS_SKILL_TREE_SOURCES.quests,
   );
   return Math.min(VERDIGRIS_SKILL_TREE_POINTS.skill, fromLevels + fromQuests);
 };
-
-const earnedPointsForPlayer = (player) => Math.min(
-  VERDIGRIS_SKILL_TREE_POINTS.skill,
-  earnedPointsForLevel(player?.level) + Math.max(0, Math.floor(Number(player?.quests?.questPoints) || 0)),
-);
 
 const makeSvgEl = (tag, attrs = {}) => {
   const el = document.createElementNS(SVG_NS, tag);
