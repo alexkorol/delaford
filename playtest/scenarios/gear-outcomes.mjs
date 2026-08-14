@@ -39,12 +39,19 @@ const resetMonster = async (player, targetUuid, maxHealth = COMPARISON_HEALTH) =
 };
 
 const lootAndEquip = async (player, itemLevel) => {
-  player.devDrop('vessel-handaxe', { itemLevel, seed: 3493 });
+  // The development-control rate bucket can drop a single dev:drop while the
+  // heal/teleport trial loop is running hot; re-request the idempotent drop
+  // (same seed => same roll) until it lands, like state() does for dev:state.
+  let lastRequestAt = 0;
   const drop = await player.waitFor(async () => {
+    if (Date.now() - lastRequestAt > 2000) {
+      lastRequestAt = Date.now();
+      player.devDrop('vessel-handaxe', { itemLevel, seed: 3493 });
+    }
     const state = await player.state();
     return state.groundItems.find(item => item.id === 'vessel-handaxe'
       && item.itemLevel === itemLevel) || false;
-  }, { label: `item-level ${itemLevel} vessel drop` });
+  }, { timeoutMs: 12000, label: `item-level ${itemLevel} vessel drop` });
   player.devTeleport(drop.x, drop.y);
   player.pickupUnderfoot();
   const inventoryItem = await player.waitFor(async () => {

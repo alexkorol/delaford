@@ -2,14 +2,16 @@
 
 ## Status (updated 2026-08-13)
 
-**The Crossroads & the world web** (docs/crossroads-world-web.md): the static
-Delaford Village + wilderness ring was replaced by a trading-hub town (the
-Crossroads — truce-ground, House wagon pitches, four road gates) and a
-procedurally generated, House-charted web of zones (four roads, branching
-tiers, a Warden per zone gating the next, ~15-minute zone persistence, zones
-private to a player/party). Wagon pane covers the daily road purse, deposits,
-prestige/forge-gated outfitting, and House improvements in-game. Lore doc and
-in-game text follow one rule: walked ground holds; forsaken ground weathers.
+**The world web at the village gates** (docs/crossroads-world-web.md): the
+rebuilt 2.5D Delaford Village remains the campaign's town, and the
+House-charted world web now hangs off four road gates beside its portals — a
+procedurally generated web of zones (four roads, branching tiers, a Warden
+per zone gating the next, ~15-minute zone persistence, zones private to a
+player/party), plus wagon pitches, the daily road purse, deposits, and House
+outfitting on the plaza. The full Crossroads conversion (trading-hub town,
+sanctuary truce-ground, wagon pane UI in the client shell) is the planned
+follow-up; the server systems and playtests for it are already live. One
+rule holds: walked ground holds; forsaken ground weathers.
 
 Landed from the WIZARD prototypes (skill tree, Vesselforge inventory engine,
 Chronicles account creator):
@@ -62,11 +64,9 @@ The character sheet now reuses the generated player sprite for its portrait
 and each equipped item's real atlas frame; generic slot glyphs remain only for
 empty equipment positions.
 
-The rebuilt Delaford Village now exposes a reachable smithy inside the 2.5D
-world: interaction identity is scene metadata rather than an obsolete atlas
-tile number, blocked stations path to a valid adjacent square, and the real
-furnace → bronze bar → anvil loop consumes authoritative materials and grants
-smithing experience only after a successful craft.
+The delaford-era resource loops (ore mining, furnace/anvil smithing) are
+retired: Verdigris is an ARPG, and crafting arrives through the Houses meta
+systems instead (Vesselforge brand-searing in town is already live).
 
 The live bestiary and townsfolk are now reference-driven 64px actors as well.
 All 15 surface-campaign monsters have named silhouettes, and the 28 Adventure

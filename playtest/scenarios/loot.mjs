@@ -47,9 +47,15 @@ export default async function loot({ connect, assert }) {
     // queued Take path with nowhere to start. Stand on the drop through the
     // dev movement path, as the quest scenario does, then exercise the same
     // real server-built right-click menu and Take action.
+    // The drop sits inside a live pack; a level-5 scion can be cut down in
+    // the seconds the walk-and-take dance needs. Level and heal shields the
+    // PICKUP contract under test from combat noise (TTK was proven above).
+    p.devSetLevel(20);
+    p.devHeal();
     p.devTeleport(drop.x, drop.y);
     const before = await p.waitFor(async () => {
       const state = await p.state();
+      if (state.lifecycle !== 'alive') p.devHeal();
       return state.x === drop.x && state.y === drop.y ? state : false;
     }, { timeoutMs: 6000, label: 'reach the first drop' });
     const coinsBefore = before.inventory
